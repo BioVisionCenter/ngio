@@ -35,8 +35,8 @@ classifiers = [
 dependencies = [
     "numpy",
     "filelock",
-    "zarr<3",
-    "anndata>=0.8.0,<0.11.4", # To be removed when we transition to zarr v3
+    "zarr>3",
+    "anndata>=0.8.0",
     "pydantic",
     "pandas>=1.2.0",
     "requests",
@@ -44,7 +44,7 @@ dependencies = [
     "dask[array]",
     "dask[distributed]",
     "xarray",
-    "ome-zarr-models",
+    # "ome-zarr-models",
     "pooch",
     "polars",
     "pyarrow",
@@ -190,6 +190,7 @@ platforms = ["osx-arm64", "linux-64", "win-64"]
 
 [tool.pixi.pypi-dependencies]
 ngio = { path = ".", editable = true }
+ome-zarr-models = { path = "/Users/locerr/Projects/ome-zarr-models-py", editable = true }
 
 [tool.pixi.feature.task-feat.dependencies]
 python = ">=3.11,<3.12"

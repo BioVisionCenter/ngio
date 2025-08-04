@@ -211,8 +211,10 @@ def init_empty_pyramid(
             shape=ref_shape,
             dtype=dtype,
             chunks=chunks,
+            #chunk_key_encoding={"name": "default", "separator": "/"},
             dimension_separator="/",
             overwrite=True,
+            zarr_format=2,  # Use Zarr v2 format
         )
 
         # Todo redo this with when a proper build of pyramid is implemented
