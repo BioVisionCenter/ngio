@@ -36,7 +36,7 @@ dependencies = [
     "numpy",
     "filelock",
     "zarr<3",
-    "anndata>=0.8.0",
+    "anndata>=0.8.0,<0.11.4", # To be removed when we transition to zarr v3
     "pydantic",
     "pandas>=1.2.0",
     "requests",
