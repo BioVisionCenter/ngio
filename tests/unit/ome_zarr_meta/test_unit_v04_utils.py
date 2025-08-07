@@ -69,4 +69,4 @@ def test_well_meta_path_normalization():
     assert isinstance(output_metadata, dict)
 
     images = [image["path"] for image in output_metadata["well"]["images"]]
-    assert images == ["0", "0mip"]
+    assert images == ["0", "0_mip"]
