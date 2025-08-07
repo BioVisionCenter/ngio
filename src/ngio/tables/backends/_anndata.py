@@ -77,7 +77,6 @@ class AnnDataBackend(AbstractTableBackend):
         self.write_from_anndata(anndata)
 
 
-
 class AnnDataBackendV1(AnnDataBackend):
     """A wrapper for the AnnData backend that for backwards compatibility."""
 
