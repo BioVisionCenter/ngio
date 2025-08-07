@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.3.5]
+
+- Remove path normalization for images in wells. While the spec requires paths to be alphanumeric, this patch removes the normalization to allow for arbitrary image paths.
+
 ## [v0.3.4]
 
 - allow to write as `anndata_v1` for backward compatibility with older ngio versions.
