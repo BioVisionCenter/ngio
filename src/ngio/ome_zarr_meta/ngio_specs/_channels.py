@@ -3,7 +3,7 @@
 Stores the same information as the Omero section of the ngff 0.4 metadata.
 """
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from difflib import SequenceMatcher
 from enum import Enum
 from typing import Any, TypeVar
@@ -288,7 +288,7 @@ class Channel(BaseModel):
 T = TypeVar("T")
 
 
-def _check_elements(elements: Collection[T], expected_type: Any) -> Collection[T]:
+def _check_elements(elements: Sequence[T], expected_type: Any) -> Sequence[T]:
     """Check that the elements are of the same type."""
     if len(elements) == 0:
         raise NgioValidationError("At least one element must be provided.")
@@ -302,7 +302,7 @@ def _check_elements(elements: Collection[T], expected_type: Any) -> Collection[T
     return elements
 
 
-def _check_unique(elements: Collection[T]) -> Collection[T]:
+def _check_unique(elements: Sequence[T]) -> Sequence[T]:
     """Check that the elements are unique."""
     if len(set(elements)) != len(elements):
         raise NgioValidationError("All elements must be unique.")
@@ -330,35 +330,35 @@ class ChannelsMeta(BaseModel):
     @classmethod
     def default_init(
         cls,
-        labels: Collection[str | None] | int,
-        wavelength_id: Collection[str | None] | None = None,
-        colors: Collection[str | NgioColors | None] | None = None,
-        start: Collection[int | float | None] | int | float | None = None,
-        end: Collection[int | float | None] | int | float | None = None,
-        active: Collection[bool | None] | None = None,
+        labels: Sequence[str | None] | int,
+        wavelength_id: Sequence[str | None] | None = None,
+        colors: Sequence[str | NgioColors | None] | None = None,
+        start: Sequence[int | float | None] | int | float | None = None,
+        end: Sequence[int | float | None] | int | float | None = None,
+        active: Sequence[bool | None] | None = None,
         data_type: Any = np.uint16,
         **omero_kwargs: dict,
     ) -> "ChannelsMeta":
         """Create a ChannelsMeta object with the default unit.
 
         Args:
-            labels(Collection[str | None] | int): The list of channels names
+            labels(Sequence[str | None] | int): The list of channels names
                 in the image. If an integer is provided, the channels will be
                 named "channel_i".
-            wavelength_id(Collection[str | None] | None): The wavelength ID of the
+            wavelength_id(Sequence[str | None] | None): The wavelength ID of the
                 channel. If None, the wavelength ID will be the same as the
                 channel name.
-            colors(Collection[str | NgioColors | None] | None): The list of
+            colors(Sequence[str | NgioColors | None] | None): The list of
                 colors for the channels. If None, the colors will be random.
-            start(Collection[int | float | None] | int | float | None): The start
+            start(Sequence[int | float | None] | int | float | None): The start
                 value of the channel. If None, the start value will be the
                 minimum value of the data type.
-            end(Collection[int | float | None] | int | float | None): The end
+            end(Sequence[int | float | None] | int | float | None): The end
                 value of the channel. If None, the end value will be the
                 maximum value of the data type.
             data_type(Any): The data type of the channel. Will be used to set the
                 min and max values of the channel.
-            active (Collection[bool | None] | None): Whether the channel should
+            active (Sequence[bool | None] | None): Whether the channel should
                 be shown by default.
             omero_kwargs(dict): Extra fields to store in the omero attributes.
         """
@@ -368,9 +368,9 @@ class ChannelsMeta(BaseModel):
         labels = _check_elements(labels, str)
         labels = _check_unique(labels)
 
-        _wavelength_id: Collection[str | None] = [None] * len(labels)
+        _wavelength_id: Sequence[str | None] = [None] * len(labels)
         if wavelength_id is None:
-            _wavelength_id: Collection[str | None] = [None] * len(labels)
+            _wavelength_id: Sequence[str | None] = [None] * len(labels)
         else:
             _wavelength_id = _check_elements(wavelength_id, str)
             _wavelength_id = _check_unique(wavelength_id)

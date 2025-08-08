@@ -17,11 +17,11 @@ from ngio.utils import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Collection
+    from collections.abc import Callable, Sequence
 
 
 def custom_anndata_read_zarr(
-    store: StoreOrGroup, elem_to_read: Collection[str] | None = None
+    store: StoreOrGroup, elem_to_read: Sequence[str] | None = None
 ) -> AnnData:
     """Read from a hierarchical Zarr array store.
 
@@ -31,7 +31,7 @@ def custom_anndata_read_zarr(
 
     Args:
         store (StoreOrGroup): A store or group to read the AnnData from.
-        elem_to_read (Collection[str] | None): The elements to read from the store.
+        elem_to_read (Sequence[str] | None): The elements to read from the store.
     """
     group = open_group_wrapper(store=store, mode="r")
 

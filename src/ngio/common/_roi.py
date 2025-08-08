@@ -4,12 +4,27 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 
-from collections.abc import Collection
+from collections.abc import Callable, Sequence
 
+import dask.array as da
 import numpy as np
+import zarr
 from pydantic import BaseModel, ConfigDict, Field
 
+from ngio.common._array_io_pipe import (
+    SlicingInputType,
+    _normalize_slicing_dict,
+    build_dask_getter,
+    build_dask_setter,
+    build_masked_dask_getter,
+    build_masked_dask_setter,
+    build_masked_numpy_getter,
+    build_masked_numpy_setter,
+    build_numpy_getter,
+    build_numpy_setter,
+)
 from ngio.common._dimensions import Dimensions
+from ngio.common._io_transforms import TransformProtocol
 from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnits
 from ngio.utils import NgioValueError
 
@@ -242,52 +257,333 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
     return new_roi
 
 
-def roi_to_slice_kwargs(
+def _roi_to_slice_kwargs(
     roi: Roi | RoiPixels,
     dimensions: Dimensions,
     pixel_size: PixelSize | None = None,
-    **slice_kwargs: slice | int | Collection[int],
-) -> dict[str, slice | int | Collection[int]]:
-    """Convert a WorldCooROI to slice_kwargs."""
+) -> dict[str, SlicingInputType]:
+    """Convert a ROI to slice_kwargs."""
     if isinstance(roi, Roi):
         if pixel_size is None:
             raise NgioValueError(
                 "pixel_size must be provided when converting a Roi to slice_kwargs."
             )
-        pixel_roi = roi.to_pixel_roi(
+        roi_slices = roi.to_pixel_roi(
             pixel_size=pixel_size, dimensions=dimensions
         ).to_slices()
     elif isinstance(roi, RoiPixels):
-        pixel_roi = roi.to_slices()
+        roi_slices = roi.to_slices()
     else:
         raise TypeError(f"Unsupported ROI type: {type(roi)}")
 
-    for ax in ["x", "y", "z", "t"]:
-        if not dimensions.has_axis(axis_name=ax):
-            pixel_roi.pop(ax, None)
-
-    for key in slice_kwargs.keys():
-        if key in pixel_roi:
-            raise NgioValueError(
-                f"Key {key} is already in the slice_kwargs. "
-                "Ambiguous which one to use: "
-                f"{key}={slice_kwargs[key]} or roi_{key}={pixel_roi[key]}"
-            )
-    return {**pixel_roi, **slice_kwargs}
+    _slicing_kwargs = _normalize_slicing_dict(
+        dimensions=dimensions, slicing_dict=roi_slices, remove_channel_selection=False
+    )
+    return _slicing_kwargs
 
 
-def add_channel_label_to_slice_kwargs(
-    channel_idx: int | None = None,
-    channel_label: str | None = None,
-    **slice_kwargs: slice | int | Collection[int],
-) -> dict[str, slice | int | Collection[int]]:
-    """Add a channel label to the image metadata."""
-    if channel_label is None or channel_idx is None:
-        return slice_kwargs
+def roi_to_slicing_dict(
+    roi: Roi | RoiPixels,
+    dimensions: Dimensions,
+    pixel_size: PixelSize | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> dict[str, SlicingInputType]:
+    """Convert a ROI to a slicing dictionary."""
+    _slicing_roi = _roi_to_slice_kwargs(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+    )
+    if slicing_dict is None:
+        return _slicing_roi
 
-    if "c" in slice_kwargs:
-        raise NgioValueError(
-            "Cannot specify a channel label and a channel index at the same time."
-        )
-    slice_kwargs["c"] = channel_idx
-    return slice_kwargs
+    # Additional slice kwargs can be provided
+    # and will override the ones from the ROI
+    _slicing_dict = _normalize_slicing_dict(
+        dimensions=dimensions, slicing_dict=slicing_dict, remove_channel_selection=False
+    )
+    _slicing_dict.update(_slicing_roi)
+    return _slicing_dict
+
+
+def build_roi_numpy_getter(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    remove_channel_selection: bool = False,
+) -> Callable[[], np.ndarray]:
+    """Prepare slice kwargs for setting an array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    return build_numpy_getter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=input_slice_kwargs,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+
+def build_roi_numpy_setter(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> Callable[[np.ndarray], None]:
+    """Prepare slice kwargs for setting an array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    return build_numpy_setter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=input_slice_kwargs,
+    )
+
+
+def build_roi_dask_getter(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    remove_channel_selection: bool = False,
+) -> Callable[[], da.Array]:
+    """Prepare slice kwargs for getting an array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    return build_dask_getter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=input_slice_kwargs,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+
+def build_roi_dask_setter(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> Callable[[da.Array], None]:
+    """Prepare slice kwargs for setting an array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    return build_dask_setter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=input_slice_kwargs,
+    )
+
+
+################################################################
+#
+# Masked ROIs array pipes
+#
+################################################################
+
+
+def build_roi_masked_numpy_getter(
+    *,
+    roi: Roi | RoiPixels,
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    pixel_size: PixelSize | None = None,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    label_pixel_size: PixelSize | None = None,
+    label: int | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    fill_value: int | float = 0,
+) -> Callable[[], np.ndarray]:
+    """Prepare slice kwargs for getting a masked array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    label_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=label_dimensions,
+        pixel_size=label_pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    return build_masked_numpy_getter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        label_zarr_array=label_zarr_array,
+        label_dimensions=label_dimensions,
+        label_id=label,
+        axes_order=axes_order,
+        transforms=transforms,
+        label_transforms=label_transforms,
+        slicing_dict=input_slice_kwargs,
+        label_slicing_dict=label_slice_kwargs,
+        fill_value=fill_value,
+    )
+
+
+def build_roi_masked_numpy_setter(
+    *,
+    roi: Roi | RoiPixels,
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    pixel_size: PixelSize | None = None,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    label_pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> Callable[[np.ndarray], None]:
+    """Prepare slice kwargs for setting a masked array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    label_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=label_dimensions,
+        pixel_size=label_pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    return build_masked_numpy_setter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        label_zarr_array=label_zarr_array,
+        label_dimensions=label_dimensions,
+        label_id=roi.label,
+        axes_order=axes_order,
+        transforms=transforms,
+        label_transforms=label_transforms,
+        slicing_dict=input_slice_kwargs,
+        label_slicing_dict=label_slice_kwargs,
+    )
+
+
+def build_roi_masked_dask_getter(
+    *,
+    roi: Roi | RoiPixels,
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    pixel_size: PixelSize | None = None,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    label_pixel_size: PixelSize | None = None,
+    label: int | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> Callable[[], da.Array]:
+    """Prepare slice kwargs for getting a masked array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    label_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=label_dimensions,
+        pixel_size=label_pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    return build_masked_dask_getter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        label_zarr_array=label_zarr_array,
+        label_dimensions=label_dimensions,
+        label_id=label,
+        axes_order=axes_order,
+        transforms=transforms,
+        label_transforms=label_transforms,
+        slicing_dict=input_slice_kwargs,
+        label_slicing_dict=label_slice_kwargs,
+    )
+
+
+def build_roi_masked_dask_setter(
+    *,
+    roi: Roi | RoiPixels,
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    pixel_size: PixelSize | None = None,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    label_pixel_size: PixelSize | None = None,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+) -> Callable[[da.Array], None]:
+    """Prepare slice kwargs for setting a masked array."""
+    input_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=dimensions,
+        pixel_size=pixel_size,
+        slicing_dict=slicing_dict,
+    )
+    label_slice_kwargs = roi_to_slicing_dict(
+        roi=roi,
+        dimensions=label_dimensions,
+        pixel_size=label_pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    return build_masked_dask_setter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        label_zarr_array=label_zarr_array,
+        label_dimensions=label_dimensions,
+        label_id=roi.label,
+        axes_order=axes_order,
+        transforms=transforms,
+        label_transforms=label_transforms,
+        slicing_dict=input_slice_kwargs,
+        label_slicing_dict=label_slice_kwargs,
+    )

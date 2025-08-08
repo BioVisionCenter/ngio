@@ -1,6 +1,6 @@
 """Utility functions for working with OME-Zarr images."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import TypeVar
 
 from ngio.common._pyramid import init_empty_pyramid
@@ -29,7 +29,7 @@ _image_or_label_meta = TypeVar("_image_or_label_meta", NgioImageMeta, NgioLabelM
 def _init_generic_meta(
     meta_type: type[_image_or_label_meta],
     pixelsize: float,
-    axes_names: Collection[str],
+    axes_names: Sequence[str],
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     levels: int | list[str] = 5,
@@ -80,7 +80,7 @@ def _init_generic_meta(
 
 def create_empty_label_container(
     store: StoreOrGroup,
-    shape: Collection[int],
+    shape: Sequence[int],
     pixelsize: float,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
@@ -89,9 +89,9 @@ def create_empty_label_container(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
@@ -100,7 +100,7 @@ def create_empty_label_container(
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
-        shape (Collection[int]): The shape of the image.
+        shape (Sequence[int]): The shape of the image.
         pixelsize (float): The pixel size in x and y dimensions.
         z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
         time_spacing (float, optional): The spacing between time points.
@@ -115,10 +115,10 @@ def create_empty_label_container(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.
@@ -171,7 +171,7 @@ def create_empty_label_container(
 
 def create_empty_image_container(
     store: StoreOrGroup,
-    shape: Collection[int],
+    shape: Sequence[int],
     pixelsize: float,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
@@ -180,9 +180,9 @@ def create_empty_image_container(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
@@ -191,7 +191,7 @@ def create_empty_image_container(
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
-        shape (Collection[int]): The shape of the image.
+        shape (Sequence[int]): The shape of the image.
         pixelsize (float): The pixel size in x and y dimensions.
         z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
         time_spacing (float, optional): The spacing between time points.
@@ -206,10 +206,10 @@ def create_empty_image_container(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.

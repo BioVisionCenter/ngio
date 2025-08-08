@@ -6,7 +6,7 @@ But they can be built from the OME standard metadata, and the
 can be converted to the OME standard.
 """
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Any, Literal, TypeVar
 
 import numpy as np
@@ -66,10 +66,10 @@ class AbstractNgioImageMeta:
     @classmethod
     def default_init(
         cls,
-        levels: int | Collection[str],
-        axes_names: Collection[str],
+        levels: int | Sequence[str],
+        axes_names: Sequence[str],
         pixel_size: PixelSize,
-        scaling_factors: Collection[float] | None = None,
+        scaling_factors: Sequence[float] | None = None,
         name: str | None = None,
         version: NgffVersions = DefaultNgffVersion,
     ):

@@ -87,6 +87,11 @@ class Dimensions:
         return tuple(self._shape)
 
     @property
+    def on_disk_axes(self) -> tuple[str, ...]:
+        """Return the axes as a tuple of strings."""
+        return tuple(ax.on_disk_name for ax in self._axes_mapper.on_disk_axes)
+
+    @property
     def is_time_series(self) -> bool:
         """Return whether the data is a time series."""
         if self.get("t", default=1) == 1:

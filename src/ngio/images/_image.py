@@ -1,6 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Literal
 
 import dask.array as da
@@ -11,8 +11,8 @@ from ngio.common import (
     Dimensions,
     Roi,
     RoiPixels,
+    SlicingInputType,
     TransformProtocol,
-    add_channel_label_to_slice_kwargs,
 )
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_image_container
@@ -36,6 +36,8 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
 )
+
+ChannelSlicingInputType = SlicingInputType | str | tuple[str, ...]
 
 
 def _check_channel_meta(meta: NgioImageMeta, dimension: Dimensions) -> ChannelsMeta:
@@ -113,33 +115,17 @@ class Image(AbstractImage[ImageMetaHandler]):
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
-    def _add_channel_label(
-        self,
-        channel_label: str | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> dict[str, slice | int | Collection[int]]:
-        """Add a channel label to the image metadata."""
-        if channel_label is not None:
-            channel_idx = self.get_channel_idx(channel_label=channel_label)
-        else:
-            channel_idx = None
-
-        slice_kwargs = add_channel_label_to_slice_kwargs(
-            channel_idx=channel_idx, channel_label=channel_label, **slice_kwargs
-        )
-        return slice_kwargs
-
     def get_as_numpy(
         self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: int | Sequence[int] | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: slice | int | Sequence[int] | None,
     ) -> np.ndarray:
         """Get the image as a numpy array.
 
         Args:
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a specific channel by label.
                 If None, all channels are returned.
                 Alternatively, you can slice arbitrary channels
                 using the slice_kwargs (c=[0, 2]).
@@ -150,57 +136,78 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
-        )
+        slice_kwargs["c"] = channel_selection
         return self._get_as_numpy(
             axes_order=axes_order, transforms=transforms, **slice_kwargs
         )
 
+    def _add_channel_selection(
+        self,
+        channel_selection: ChannelSlicingInputType,
+        **slicing_kwargs: SlicingInputType,
+    ) -> dict[str, SlicingInputType]:
+        """Add channel selection to the slicing kwargs."""
+        if isinstance(channel_selection, str):
+            # If a string is provided, convert it to an integer index
+            channel_selection = self.get_channel_idx(channel_label=channel_selection)
+        elif isinstance(channel_selection, tuple):
+            # For each check if it is a string (and if so convert to int)
+            channel_selection = [
+                self.get_channel_idx(channel_label=label)
+                if isinstance(label, str)
+                else label
+                for label in channel_selection
+            ]
+        if "c" not in slicing_kwargs and channel_selection is not None:
+            slicing_kwargs["c"] = channel_selection
+        elif "c" in slicing_kwargs and channel_selection is None:
+            raise NgioValidationError(
+                "Both channel_selection and 'c' in slicing_kwargs are provided. "
+                "Which channel selection should be used is ambiguous. "
+                "Please provide only one."
+            )
+        return slicing_kwargs
+
     def get_roi_as_numpy(
         self,
         roi: Roi | RoiPixels,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Get the image as a numpy array for a region of interest.
 
         Args:
             roi: The region of interest to get the array.
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slicing_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slicing_kwargs
         )
         return self._get_roi_as_numpy(
-            roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+            roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
         )
 
     def get_as_dask(
         self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: SlicingInputType,
     ) -> da.Array:
         """Get the image as a dask array.
 
         Args:
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
             **slice_kwargs: The slices to get the array.
@@ -208,8 +215,8 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The dask array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         return self._get_as_dask(
             axes_order=axes_order, transforms=transforms, **slice_kwargs
@@ -218,19 +225,17 @@ class Image(AbstractImage[ImageMetaHandler]):
     def get_roi_as_dask(
         self,
         roi: Roi | RoiPixels,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: SlicingInputType,
     ) -> da.Array:
         """Get the image as a dask array for a region of interest.
 
         Args:
             roi: The region of interest to get the array.
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
             **slice_kwargs: The slices to get the array.
@@ -238,8 +243,8 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The dask array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         return self._get_roi_as_dask(
             roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
@@ -247,19 +252,17 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def get_array(
         self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: slice | int | Collection[int],
+        **slice_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Get the image as a zarr array.
 
         Args:
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
             mode: The object type to return.
@@ -269,8 +272,8 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The zarr array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         return self._get_array(
             axes_order=axes_order, mode=mode, transforms=transforms, **slice_kwargs
@@ -279,20 +282,18 @@ class Image(AbstractImage[ImageMetaHandler]):
     def get_roi(
         self,
         roi: Roi | RoiPixels,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: slice | int | Collection[int],
+        **slice_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Get the image as a zarr array for a region of interest.
 
         Args:
             roi: The region of interest to get the array.
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
             mode: The object type to return.
@@ -302,8 +303,8 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The zarr array of the region of interest.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         return self._get_roi(
             roi=roi,
@@ -316,25 +317,23 @@ class Image(AbstractImage[ImageMetaHandler]):
     def set_array(
         self,
         patch: ArrayLike,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array.
 
         Args:
             patch: The array to set.
-            channel_label: Select a specific channel by label.
+            channel_selection: Select a what subset of channels to return.
                 If None, all channels are set.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
             **slice_kwargs: The slices to set the array.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         self._set_array(
             patch=patch, axes_order=axes_order, transforms=transforms, **slice_kwargs
@@ -344,26 +343,23 @@ class Image(AbstractImage[ImageMetaHandler]):
         self,
         roi: Roi | RoiPixels,
         patch: ArrayLike,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array for a region of interest.
 
         Args:
             roi: The region of interest to set the array.
             patch: The array to set.
-            channel_label: Select a specific channel by label.
-                If None, all channels are set.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
+            channel_selection: Select a what subset of channels to return.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
             **slice_kwargs: The slices to set the array.
         """
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
         )
         self._set_roi(
             roi=roi,
@@ -445,33 +441,33 @@ class ImagesContainer:
 
     def set_channel_meta(
         self,
-        labels: Collection[str | None] | int | None = None,
-        wavelength_id: Collection[str | None] | None = None,
-        start: Collection[float | None] | None = None,
-        end: Collection[float | None] | None = None,
+        labels: Sequence[str | None] | int | None = None,
+        wavelength_id: Sequence[str | None] | None = None,
+        start: Sequence[float | None] | None = None,
+        end: Sequence[float | None] | None = None,
         percentiles: tuple[float, float] | None = None,
-        colors: Collection[str | None] | None = None,
-        active: Collection[bool | None] | None = None,
+        colors: Sequence[str | None] | None = None,
+        active: Sequence[bool | None] | None = None,
         **omero_kwargs: dict,
     ) -> None:
         """Create a ChannelsMeta object with the default unit.
 
         Args:
-            labels(Collection[str | None] | int): The list of channels names
+            labels(Sequence[str | None] | int): The list of channels names
                 in the image. If an integer is provided, the channels will
                 be named "channel_i".
-            wavelength_id(Collection[str | None]): The wavelength ID of the channel.
+            wavelength_id(Sequence[str | None]): The wavelength ID of the channel.
                 If None, the wavelength ID will be the same as the channel name.
-            start(Collection[float | None]): The start value for each channel.
+            start(Sequence[float | None]): The start value for each channel.
                 If None, the start value will be computed from the image.
-            end(Collection[float | None]): The end value for each channel.
+            end(Sequence[float | None]): The end value for each channel.
                 If None, the end value will be computed from the image.
             percentiles(tuple[float, float] | None): The start and end
                 percentiles for each channel. If None, the percentiles will
                 not be computed.
-            colors(Collection[str | None]): The list of colors for the
+            colors(Sequence[str | None]): The list of colors for the
                 channels. If None, the colors will be random.
-            active (Collection[bool | None]): Whether the channel should
+            active (Sequence[bool | None]): Whether the channel should
                 be shown by default.
             omero_kwargs(dict): Extra fields to store in the omero attributes.
         """
@@ -586,12 +582,12 @@ class ImagesContainer:
         self,
         store: StoreOrGroup,
         ref_path: str | None = None,
-        shape: Collection[int] | None = None,
-        labels: Collection[str] | None = None,
+        shape: Sequence[int] | None = None,
+        labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
+        axes_names: Sequence[str] | None = None,
         name: str | None = None,
-        chunks: Collection[int] | None = None,
+        chunks: Sequence[int] | None = None,
         dtype: str | None = None,
         overwrite: bool = False,
     ) -> "ImagesContainer":
@@ -601,12 +597,12 @@ class ImagesContainer:
             store (StoreOrGroup): The Zarr store or group to create the image in.
             ref_path (str | None): The path to the reference image in
                 the image container.
-            shape (Collection[int] | None): The shape of the new image.
-            labels (Collection[str] | None): The labels of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
+            labels (Sequence[str] | None): The labels of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
             name (str | None): The name of the new image.
-            chunks (Collection[int] | None): The chunk shape of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
             dtype (str | None): The data type of the new image.
             overwrite (bool): Whether to overwrite an existing image.
 
@@ -699,12 +695,12 @@ def derive_image_container(
     image_container: ImagesContainer,
     store: StoreOrGroup,
     ref_path: str | None = None,
-    shape: Collection[int] | None = None,
-    labels: Collection[str] | None = None,
+    shape: Sequence[int] | None = None,
+    labels: Sequence[str] | None = None,
     pixel_size: PixelSize | None = None,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str | None = None,
     overwrite: bool = False,
 ) -> ImagesContainer:
@@ -714,12 +710,12 @@ def derive_image_container(
         image_container (ImagesContainer): The image container to derive the new image.
         store (StoreOrGroup): The Zarr store or group to create the image in.
         ref_path (str | None): The path to the reference image in the image container.
-        shape (Collection[int] | None): The shape of the new image.
-        labels (Collection[str] | None): The labels of the new image.
+        shape (Sequence[int] | None): The shape of the new image.
+        labels (Sequence[str] | None): The labels of the new image.
         pixel_size (PixelSize | None): The pixel size of the new image.
-        axes_names (Collection[str] | None): The axes names of the new image.
+        axes_names (Sequence[str] | None): The axes names of the new image.
         name (str | None): The name of the new image.
-        chunks (Collection[int] | None): The chunk shape of the new image.
+        chunks (Sequence[int] | None): The chunk shape of the new image.
         dtype (str | None): The data type of the new image.
         overwrite (bool): Whether to overwrite an existing image.
 

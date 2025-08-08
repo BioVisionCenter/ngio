@@ -1,5 +1,5 @@
 import math
-from collections.abc import Callable, Collection
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 import dask.array as da
@@ -180,9 +180,9 @@ def consolidate_pyramid(
 def init_empty_pyramid(
     store: StoreOrGroup,
     paths: list[str],
-    ref_shape: Collection[int],
-    scaling_factors: Collection[float],
-    chunks: Collection[int] | None = None,
+    ref_shape: Sequence[int],
+    scaling_factors: Sequence[float],
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
 ) -> None:

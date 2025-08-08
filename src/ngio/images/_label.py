@@ -1,6 +1,6 @@
 """A module for handling label images in OME-NGFF files."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Literal
 
 from ngio.common import compute_masking_roi
@@ -162,10 +162,10 @@ class LabelsContainer:
         self,
         name: str,
         ref_image: Image | Label,
-        shape: Collection[int] | None = None,
+        shape: Sequence[int] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
-        chunks: Collection[int] | None = None,
+        axes_names: Sequence[str] | None = None,
+        chunks: Sequence[int] | None = None,
         dtype: str | None = None,
         overwrite: bool = False,
     ) -> "Label":
@@ -178,11 +178,11 @@ class LabelsContainer:
             ref_image (Image | Label): A reference image that will be used to create
                 the new image.
             name (str): The name of the new image.
-            shape (Collection[int] | None): The shape of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
-            chunks (Collection[int] | None): The chunk shape of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
             dtype (str | None): The data type of the new image.
             overwrite (bool): Whether to overwrite an existing image.
 
@@ -222,10 +222,10 @@ def derive_label(
     store: StoreOrGroup,
     ref_image: Image | Label,
     name: str,
-    shape: Collection[int] | None = None,
+    shape: Sequence[int] | None = None,
     pixel_size: PixelSize | None = None,
-    axes_names: Collection[str] | None = None,
-    chunks: Collection[int] | None = None,
+    axes_names: Sequence[str] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str | None = None,
     overwrite: bool = False,
 ) -> None:
@@ -236,11 +236,11 @@ def derive_label(
         ref_image (Image | Label): A reference image that will be used to
             create the new image.
         name (str): The name of the new image.
-        shape (Collection[int] | None): The shape of the new image.
+        shape (Sequence[int] | None): The shape of the new image.
         pixel_size (PixelSize | None): The pixel size of the new image.
-        axes_names (Collection[str] | None): The axes names of the new image.
+        axes_names (Sequence[str] | None): The axes names of the new image.
             For labels, the channel axis is not allowed.
-        chunks (Collection[int] | None): The chunk shape of the new image.
+        chunks (Sequence[int] | None): The chunk shape of the new image.
         dtype (str | None): The data type of the new image.
         overwrite (bool): Whether to overwrite an existing image.
 
