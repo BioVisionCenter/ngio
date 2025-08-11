@@ -4,9 +4,7 @@ This class follows the roi_table specification at:
 https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/
 """
 
-# Import _type to avoid name conflict with table.type
 from collections.abc import Iterable
-from functools import cache
 from typing import Literal
 
 import pandas as pd
@@ -27,7 +25,7 @@ from ngio.utils import (
     NgioTableValidationError,
     NgioValueError,
     ZarrGroupHandler,
-    ngio_logger,
+    ngio_warn,
 )
 
 REQUIRED_COLUMNS = [
@@ -75,14 +73,10 @@ INDEX_COLUMNS = [
 OPTIONAL_COLUMNS = ORIGIN_COLUMNS + TRANSLATION_COLUMNS + PLATE_COLUMNS + INDEX_COLUMNS
 
 
-@cache
 def _check_optional_columns(col_name: str) -> None:
     """Check if the column name is in the optional columns."""
     if col_name not in OPTIONAL_COLUMNS + TIME_COLUMNS:
-        ngio_logger.warning(
-            f"Column {col_name} is not in the optional columns. "
-            f"Standard optional columns are: {OPTIONAL_COLUMNS}."
-        )
+        ngio_warn(f"Column {col_name} is not in the optional columns.")
 
 
 def _dataframe_to_rois(
@@ -162,6 +156,7 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
         extra = roi.model_extra or {}
         for col in extra:
             _check_optional_columns(col)
+            row[col] = extra[col]
         data.append(row)
 
     dataframe = pd.DataFrame(data)
