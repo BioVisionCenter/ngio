@@ -331,7 +331,7 @@ class OmeZarrContainer:
         """
         image = self.get_image(path=path, pixel_size=pixel_size, strict=strict)
         masking_label = self.get_label(
-            name=masking_label_name, path=path, pixel_size=pixel_size, strict=strict
+            name=masking_label_name, pixel_size=image.pixel_size, strict=strict
         )
         if masking_table_name is None:
             masking_table = masking_label.build_masking_roi_table()
@@ -340,7 +340,7 @@ class OmeZarrContainer:
 
         return MaskedImage(
             group_handler=image._group_handler,
-            path=masking_label.path,
+            path=image.path,
             meta_handler=image.meta_handler,
             label=masking_label,
             masking_roi_table=masking_table,

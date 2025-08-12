@@ -250,9 +250,9 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
         y_length=roi.y_length + diff_y,
         z_length=roi.z_length,
         t_length=roi.t_length,
+        label=roi.label,
         unit=roi.unit,
     )
-
     return new_roi
 
 
@@ -400,7 +400,6 @@ def build_roi_masked_numpy_getter(
     label_zarr_array: zarr.Array,
     label_dimensions: Dimensions,
     label_pixel_size: PixelSize | None = None,
-    label: int | None = None,
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     label_transforms: Sequence[TransformProtocol] | None = None,
@@ -426,7 +425,7 @@ def build_roi_masked_numpy_getter(
         dimensions=dimensions,
         label_zarr_array=label_zarr_array,
         label_dimensions=label_dimensions,
-        label_id=label,
+        label_id=roi.label,
         axes_order=axes_order,
         transforms=transforms,
         label_transforms=label_transforms,
@@ -464,6 +463,7 @@ def build_roi_masked_numpy_setter(
         pixel_size=label_pixel_size,
         slicing_dict=label_slicing_dict,
     )
+    print("label", roi.label)
     return build_masked_numpy_setter(
         zarr_array=zarr_array,
         dimensions=dimensions,
@@ -487,7 +487,6 @@ def build_roi_masked_dask_getter(
     label_zarr_array: zarr.Array,
     label_dimensions: Dimensions,
     label_pixel_size: PixelSize | None = None,
-    label: int | None = None,
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     label_transforms: Sequence[TransformProtocol] | None = None,
@@ -512,7 +511,7 @@ def build_roi_masked_dask_getter(
         dimensions=dimensions,
         label_zarr_array=label_zarr_array,
         label_dimensions=label_dimensions,
-        label_id=label,
+        label_id=roi.label,
         axes_order=axes_order,
         transforms=transforms,
         label_transforms=label_transforms,
