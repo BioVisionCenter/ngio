@@ -5,6 +5,7 @@ from typing import Literal
 
 import dask.array as da
 import numpy as np
+from pydantic import BaseModel, model_validator
 
 from ngio.common import (
     ArrayLike,
@@ -37,7 +38,32 @@ from ngio.utils import (
     ZarrGroupHandler,
 )
 
-ChannelSlicingInputType = SlicingInputType | str | tuple[str, ...]
+
+class ChannelSelectionModel(BaseModel):
+    """Model for channel selection."""
+
+    identifier: str | int
+    mode: Literal["label", "wavelength_id", "index"]
+
+    @model_validator(mode="after")
+    def check_channel_selection(self):
+        if self.mode == "index":
+            try:
+                self.identifier = int(self.identifier)
+            except ValueError as e:
+                raise ValueError(
+                    "Identifier must be an integer when mode is 'index'"
+                ) from e
+        return self
+
+
+ChannelSlicingInputType = (
+    None
+    | int
+    | str
+    | ChannelSelectionModel
+    | Sequence[str | ChannelSelectionModel | int]
+)
 
 
 def _check_channel_meta(meta: NgioImageMeta, dimension: Dimensions) -> ChannelsMeta:
@@ -115,39 +141,12 @@ class Image(AbstractImage[ImageMetaHandler]):
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
-    def _add_channel_selection(
-        self,
-        channel_selection: ChannelSlicingInputType,
-        **slicing_kwargs: SlicingInputType,
-    ) -> dict[str, SlicingInputType]:
-        """Add channel selection to the slicing kwargs."""
-        if isinstance(channel_selection, str):
-            # If a string is provided, convert it to an integer index
-            channel_selection = self.get_channel_idx(channel_label=channel_selection)
-        elif isinstance(channel_selection, tuple):
-            # For each check if it is a string (and if so convert to int)
-            channel_selection = [
-                self.get_channel_idx(channel_label=label)
-                if isinstance(label, str)
-                else label
-                for label in channel_selection
-            ]
-        if "c" not in slicing_kwargs and channel_selection is not None:
-            slicing_kwargs["c"] = channel_selection
-        elif "c" in slicing_kwargs and channel_selection is not None:
-            raise NgioValidationError(
-                "Both channel_selection and 'c' in slicing_kwargs are provided. "
-                "Which channel selection should be used is ambiguous. "
-                "Please provide only one."
-            )
-        return slicing_kwargs
-
     def get_as_numpy(
         self,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Sequence[int] | None,
+        **slicing_kwargs: slice | int | Sequence[int] | None,
     ) -> np.ndarray:
         """Get the image as a numpy array.
 
@@ -158,16 +157,16 @@ class Image(AbstractImage[ImageMetaHandler]):
                 using the slice_kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The array of the region of interest.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_as_numpy(
-            axes_order=axes_order, transforms=transforms, **slice_kwargs
+            axes_order=axes_order, transforms=transforms, **_slicing_kwargs
         )
 
     def get_roi_as_numpy(
@@ -191,11 +190,11 @@ class Image(AbstractImage[ImageMetaHandler]):
         Returns:
             The array of the region of interest.
         """
-        slicing_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slicing_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_roi_as_numpy(
-            roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
+            roi=roi, axes_order=axes_order, transforms=transforms, **_slicing_kwargs
         )
 
     def get_as_dask(
@@ -203,7 +202,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Get the image as a dask array.
 
@@ -212,16 +211,16 @@ class Image(AbstractImage[ImageMetaHandler]):
                 If None, all channels are returned.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The dask array of the region of interest.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_as_dask(
-            axes_order=axes_order, transforms=transforms, **slice_kwargs
+            axes_order=axes_order, transforms=transforms, **_slicing_kwargs
         )
 
     def get_roi_as_dask(
@@ -230,7 +229,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Get the image as a dask array for a region of interest.
 
@@ -240,16 +239,16 @@ class Image(AbstractImage[ImageMetaHandler]):
                 If None, all channels are returned.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The dask array of the region of interest.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_roi_as_dask(
-            roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+            roi=roi, axes_order=axes_order, transforms=transforms, **_slicing_kwargs
         )
 
     def get_array(
@@ -258,7 +257,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Get the image as a zarr array.
 
@@ -269,16 +268,16 @@ class Image(AbstractImage[ImageMetaHandler]):
             transforms: The transforms to apply to the array.
             mode: The object type to return.
                 Can be "dask", "numpy".
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The zarr array of the region of interest.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_array(
-            axes_order=axes_order, mode=mode, transforms=transforms, **slice_kwargs
+            axes_order=axes_order, mode=mode, transforms=transforms, **_slicing_kwargs
         )
 
     def get_roi(
@@ -288,7 +287,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Get the image as a zarr array for a region of interest.
 
@@ -300,20 +299,20 @@ class Image(AbstractImage[ImageMetaHandler]):
             transforms: The transforms to apply to the array.
             mode: The object type to return.
                 Can be "dask", "numpy".
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: The slices to get the array.
 
         Returns:
             The zarr array of the region of interest.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         return self._get_roi(
             roi=roi,
             axes_order=axes_order,
             mode=mode,
             transforms=transforms,
-            **slice_kwargs,
+            **_slicing_kwargs,
         )
 
     def set_array(
@@ -322,7 +321,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array.
 
@@ -332,13 +331,13 @@ class Image(AbstractImage[ImageMetaHandler]):
                 If None, all channels are set.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to set the array.
+            **slicing_kwargs: The slices to set the array.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         self._set_array(
-            patch=patch, axes_order=axes_order, transforms=transforms, **slice_kwargs
+            patch=patch, axes_order=axes_order, transforms=transforms, **_slicing_kwargs
         )
 
     def set_roi(
@@ -348,7 +347,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array for a region of interest.
 
@@ -358,17 +357,17 @@ class Image(AbstractImage[ImageMetaHandler]):
             channel_selection: Select a what subset of channels to return.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to set the array.
+            **slicing_kwargs: The slices to set the array.
         """
-        slice_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slice_kwargs
+        _slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         self._set_roi(
             roi=roi,
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            **_slicing_kwargs,
         )
 
     def consolidate(
@@ -815,3 +814,71 @@ def derive_image_container(
         end=end,
     )
     return image_container
+
+
+def _parse_str_or_model(
+    image: Image, channel_selection: int | str | ChannelSelectionModel
+) -> int:
+    """Parse a string or ChannelSelectionModel to an integer channel index."""
+    if isinstance(channel_selection, int):
+        if channel_selection < 0:
+            raise NgioValidationError("Channel index must be a non-negative integer.")
+        if channel_selection >= image.num_channels:
+            raise NgioValidationError(
+                "Channel index must be less than the number "
+                f"of channels ({image.num_channels})."
+            )
+        return channel_selection
+    elif isinstance(channel_selection, str):
+        return image.get_channel_idx(channel_label=channel_selection)
+    elif isinstance(channel_selection, ChannelSelectionModel):
+        if channel_selection.mode == "label":
+            return image.get_channel_idx(
+                channel_label=str(channel_selection.identifier)
+            )
+        elif channel_selection.mode == "wavelength_id":
+            return image.get_channel_idx(
+                channel_label=str(channel_selection.identifier)
+            )
+        elif channel_selection.mode == "index":
+            return int(channel_selection.identifier)
+    raise NgioValidationError(
+        "Invalid channel selection type. "
+        f"{channel_selection} is of type {type(channel_selection)} ",
+        "supported types are str, ChannelSelectionModel, and int.",
+    )
+
+
+def parse_channel_selection(
+    image: Image, channel_selection: ChannelSlicingInputType
+) -> dict[str, SlicingInputType]:
+    """Parse the channel selection input into a list of channel indices."""
+    if channel_selection is None:
+        return {}
+    if isinstance(channel_selection, int | str | ChannelSelectionModel):
+        channel_index = _parse_str_or_model(image, channel_selection)
+        return {"c": channel_index}
+    elif isinstance(channel_selection, Sequence):
+        _sequence = [_parse_str_or_model(image, cs) for cs in channel_selection]
+        return {"c": _sequence}
+    raise NgioValidationError(
+        f"Invalid channel selection type {type(channel_selection)}. "
+        "Supported types are int, str, ChannelSelectionModel, and Sequence."
+    )
+
+
+def add_channel_selection_to_slicing_dict(
+    image: Image,
+    channel_selection: ChannelSlicingInputType,
+    slicing_dict: dict[str, SlicingInputType],
+) -> dict[str, SlicingInputType]:
+    """Add channel selection information to the slicing dictionary."""
+    channel_info = parse_channel_selection(image, channel_selection)
+    if "c" in slicing_dict and channel_info:
+        raise NgioValidationError(
+            "Both channel_selection and 'c' in slicing_kwargs are provided. "
+            "Which channel selection should be used is ambiguous. "
+            "Please provide only one."
+        )
+    slicing_dict = slicing_dict | channel_info
+    return slicing_dict

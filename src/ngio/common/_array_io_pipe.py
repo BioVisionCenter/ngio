@@ -104,7 +104,6 @@ def _check_slicing_virtual_axes(slice_: SlicingInputType) -> bool:
     - 0: means the first element along the axis
     - slice([0, None], [1, None])
     """
-    print(f"Checking virtual axes for slice: {slice_}")
     if slice_ is None or slice_ == 0:
         return True
     if isinstance(slice_, slice):
@@ -115,6 +114,9 @@ def _check_slicing_virtual_axes(slice_: SlicingInputType) -> bool:
         if slice_.start is None and slice_.stop == 0:
             return True
         if slice_.start == 0 and slice_.stop == 1:
+            return True
+    if isinstance(slice_, Sequence):
+        if len(slice_) == 1 and slice_[0] == 0:
             return True
     return False
 
@@ -193,7 +195,6 @@ def _normalize_slice_input(
     value = slicing_dict[axis_name]
     if isinstance(value, int):
         value = _validate_int(value, dimensions.get(axis_name))
-        print(axis_name, axes_order)
         if requires_axes_ops or axis_name in axes_order:
             # Axes ops require all dimensions to be preserved
             value = slice(value, value + 1)
@@ -241,7 +242,6 @@ def _build_slicing_tuple(
         )
         for axis in dimensions.axes_mapper.on_disk_axes
     )
-    print(f"Slicing tuple: {slicing_tuple}")
     return slicing_tuple
 
 

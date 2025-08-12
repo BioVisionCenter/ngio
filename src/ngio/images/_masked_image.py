@@ -14,7 +14,12 @@ from ngio.common import (
     build_roi_masked_numpy_getter,
     build_roi_masked_numpy_setter,
 )
-from ngio.images._image import ChannelSlicingInputType, Image, SlicingInputType
+from ngio.images._image import (
+    ChannelSlicingInputType,
+    Image,
+    SlicingInputType,
+    add_channel_selection_to_slicing_dict,
+)
 from ngio.images._label import Label
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
@@ -151,8 +156,8 @@ class MaskedImage(Image):
         **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Return the masked array for a given label as a NumPy array."""
-        slicing_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slicing_kwargs
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
 
         roi = self._masking_roi_table.get_label(label)
@@ -182,8 +187,8 @@ class MaskedImage(Image):
         **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Return the masked array for a given label as a Dask array."""
-        slicing_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slicing_kwargs
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
 
         roi = self._masking_roi_table.get_label(label)
@@ -246,8 +251,8 @@ class MaskedImage(Image):
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the masked array for a given label."""
-        slicing_kwargs = self._add_channel_selection(
-            channel_selection=channel_selection, **slicing_kwargs
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
 
         roi = self._masking_roi_table.get_label(label)
