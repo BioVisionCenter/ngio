@@ -115,32 +115,6 @@ class Image(AbstractImage[ImageMetaHandler]):
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
-    def get_as_numpy(
-        self,
-        channel_selection: int | Sequence[int] | None = None,
-        axes_order: Sequence[str] | None = None,
-        transforms: Sequence[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Sequence[int] | None,
-    ) -> np.ndarray:
-        """Get the image as a numpy array.
-
-        Args:
-            channel_selection: Select a specific channel by label.
-                If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
-            axes_order: The order of the axes to return the array.
-            transforms: The transforms to apply to the array.
-            **slice_kwargs: The slices to get the array.
-
-        Returns:
-            The array of the region of interest.
-        """
-        slice_kwargs["c"] = channel_selection
-        return self._get_as_numpy(
-            axes_order=axes_order, transforms=transforms, **slice_kwargs
-        )
-
     def _add_channel_selection(
         self,
         channel_selection: ChannelSlicingInputType,
@@ -160,13 +134,41 @@ class Image(AbstractImage[ImageMetaHandler]):
             ]
         if "c" not in slicing_kwargs and channel_selection is not None:
             slicing_kwargs["c"] = channel_selection
-        elif "c" in slicing_kwargs and channel_selection is None:
+        elif "c" in slicing_kwargs and channel_selection is not None:
             raise NgioValidationError(
                 "Both channel_selection and 'c' in slicing_kwargs are provided. "
                 "Which channel selection should be used is ambiguous. "
                 "Please provide only one."
             )
         return slicing_kwargs
+
+    def get_as_numpy(
+        self,
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slice_kwargs: slice | int | Sequence[int] | None,
+    ) -> np.ndarray:
+        """Get the image as a numpy array.
+
+        Args:
+            channel_selection: Select a specific channel by label.
+                If None, all channels are returned.
+                Alternatively, you can slice arbitrary channels
+                using the slice_kwargs (c=[0, 2]).
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            **slice_kwargs: The slices to get the array.
+
+        Returns:
+            The array of the region of interest.
+        """
+        slice_kwargs = self._add_channel_selection(
+            channel_selection=channel_selection, **slice_kwargs
+        )
+        return self._get_as_numpy(
+            axes_order=axes_order, transforms=transforms, **slice_kwargs
+        )
 
     def get_roi_as_numpy(
         self,

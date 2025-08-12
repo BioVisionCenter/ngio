@@ -25,7 +25,7 @@ def test_rois():
     pixel_size = PixelSize(x=1.0, y=1.0, z=1.0)
     raster_roi = roi.to_pixel_roi(pixel_size, dims)
 
-    assert raster_roi.to_slices() == {
+    assert raster_roi.to_slicing_dict() == {
         "x": slice(0, 1),
         "y": slice(0, 1),
         "z": slice(0, 1),

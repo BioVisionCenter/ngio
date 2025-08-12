@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from ngio import OmeZarrContainer, create_empty_ome_zarr
-from ngio.common import (
+from ngio.images import (
     concatenate_image_tables,
     concatenate_image_tables_as,
     concatenate_image_tables_as_async,

@@ -8,6 +8,7 @@
 
 ### API Changes
 
+- Table ops moved to `ngio.images`
 - Make `label` an explicit attribute in `Roi` objects.
 - The image-like `get_*` api have been slightly changed.
   now if a single int is passed as slice_kwargs, it is interpreted as a single index. So the dimension is automatically squeezed.

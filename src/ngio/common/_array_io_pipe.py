@@ -94,6 +94,31 @@ def _remove_channel_slicing(
     return slicing_dict
 
 
+def _check_slicing_virtual_axes(slice_: SlicingInputType) -> bool:
+    """Check if the slice_ is compatible with virtual axes.
+
+    Virtual axes are axes that are not present in the actual data,
+    such as time or channel axes in some datasets.
+    So the only valid slices for virtual axes are:
+    - None: means all data along the axis
+    - 0: means the first element along the axis
+    - slice([0, None], [1, None])
+    """
+    print(f"Checking virtual axes for slice: {slice_}")
+    if slice_ is None or slice_ == 0:
+        return True
+    if isinstance(slice_, slice):
+        if slice_.start is None and slice_.stop is None:
+            return True
+        if slice_.start == 0 and slice_.stop is None:
+            return True
+        if slice_.start is None and slice_.stop == 0:
+            return True
+        if slice_.start == 0 and slice_.stop == 1:
+            return True
+    return False
+
+
 def _normalize_slicing_dict(
     dimensions: Dimensions,
     slicing_dict: Mapping[str, SlicingInputType],
@@ -104,10 +129,16 @@ def _normalize_slicing_dict(
     for axis_name, slice_ in slicing_dict.items():
         axis = dimensions.axes_mapper.get_axis(axis_name)
         if axis is None:
-            raise NgioValueError(
-                f"Invalid axis {axis_name}. "
-                f"Not found on the on-disk axes {dimensions.on_disk_axes}."
-            )
+            # Virtual axes should be allowed to be selected
+            # Common use case is still allowing channel_selection
+            # When the zarr has not channel axis.
+            if not _check_slicing_virtual_axes(slice_):
+                raise NgioValueError(
+                    f"Invalid axis selection:{axis_name}={slice_}. "
+                    f"Not found on the on-disk axes {dimensions.on_disk_axes}."
+                )
+            # Virtual axes can be safely ignored
+            continue
         on_disk_name = axis.on_disk_name
         if on_disk_name in normalized_slicing_dict:
             raise NgioValueError(
@@ -162,7 +193,8 @@ def _normalize_slice_input(
     value = slicing_dict[axis_name]
     if isinstance(value, int):
         value = _validate_int(value, dimensions.get(axis_name))
-        if requires_axes_ops or axis.on_disk_name not in axes_order:
+        print(axis_name, axes_order)
+        if requires_axes_ops or axis_name in axes_order:
             # Axes ops require all dimensions to be preserved
             value = slice(value, value + 1)
         return value
@@ -188,16 +220,15 @@ def _build_slicing_tuple(
     if len(slicing_dict) == 0:
         # Skip unnecessary computation if no slicing is requested
         return None
-
-    _slicing_dict = _normalize_slicing_dict(
-        dimensions=dimensions,
-        slicing_dict=slicing_dict,
-        remove_channel_selection=remove_channel_selection,
-    )
     _axes_order = (
         _normalize_axes_order(dimensions=dimensions, axes_order=axes_order)
         if axes_order is not None
         else []
+    )
+    _slicing_dict = _normalize_slicing_dict(
+        dimensions=dimensions,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=remove_channel_selection,
     )
 
     slicing_tuple = tuple(
@@ -210,6 +241,7 @@ def _build_slicing_tuple(
         )
         for axis in dimensions.axes_mapper.on_disk_axes
     )
+    print(f"Slicing tuple: {slicing_tuple}")
     return slicing_tuple
 
 
@@ -336,6 +368,7 @@ def setup_from_disk_pipe(
     slicing_tuple = _build_slicing_tuple(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
+        axes_order=axes_order,
         requires_axes_ops=slicing_ops.requires_axes_ops,
         remove_channel_selection=remove_channel_selection,
     )

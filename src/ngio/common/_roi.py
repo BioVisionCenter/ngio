@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ngio.common._array_io_pipe import (
     SlicingInputType,
-    _normalize_slicing_dict,
     build_dask_getter,
     build_dask_setter,
     build_masked_dask_getter,
@@ -172,7 +171,7 @@ class RoiPixels(BaseModel):
             **extra_dict,
         )
 
-    def to_slices(self) -> dict[str, slice]:
+    def to_slicing_dict(self) -> dict[str, SlicingInputType]:
         """Return the slices for the ROI."""
         return {
             "x": slice(self.x, self.x + self.x_length),
@@ -257,31 +256,6 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
     return new_roi
 
 
-def _roi_to_slice_kwargs(
-    roi: Roi | RoiPixels,
-    dimensions: Dimensions,
-    pixel_size: PixelSize | None = None,
-) -> dict[str, SlicingInputType]:
-    """Convert a ROI to slice_kwargs."""
-    if isinstance(roi, Roi):
-        if pixel_size is None:
-            raise NgioValueError(
-                "pixel_size must be provided when converting a Roi to slice_kwargs."
-            )
-        roi_slices = roi.to_pixel_roi(
-            pixel_size=pixel_size, dimensions=dimensions
-        ).to_slices()
-    elif isinstance(roi, RoiPixels):
-        roi_slices = roi.to_slices()
-    else:
-        raise TypeError(f"Unsupported ROI type: {type(roi)}")
-
-    _slicing_kwargs = _normalize_slicing_dict(
-        dimensions=dimensions, slicing_dict=roi_slices, remove_channel_selection=False
-    )
-    return _slicing_kwargs
-
-
 def roi_to_slicing_dict(
     roi: Roi | RoiPixels,
     dimensions: Dimensions,
@@ -289,21 +263,21 @@ def roi_to_slicing_dict(
     slicing_dict: dict[str, SlicingInputType] | None = None,
 ) -> dict[str, SlicingInputType]:
     """Convert a ROI to a slicing dictionary."""
-    _slicing_roi = _roi_to_slice_kwargs(
-        roi=roi,
-        dimensions=dimensions,
-        pixel_size=pixel_size,
-    )
+    if isinstance(roi, Roi):
+        if pixel_size is None:
+            raise NgioValueError(
+                "pixel_size must be provided when converting a Roi to slice_kwargs."
+            )
+        roi = roi.to_pixel_roi(pixel_size=pixel_size, dimensions=dimensions)
+
+    roi_slicing_dict = roi.to_slicing_dict()
     if slicing_dict is None:
-        return _slicing_roi
+        return roi_slicing_dict
 
     # Additional slice kwargs can be provided
     # and will override the ones from the ROI
-    _slicing_dict = _normalize_slicing_dict(
-        dimensions=dimensions, slicing_dict=slicing_dict, remove_channel_selection=False
-    )
-    _slicing_dict.update(_slicing_roi)
-    return _slicing_dict
+    roi_slicing_dict.update(slicing_dict)
+    return roi_slicing_dict
 
 
 def build_roi_numpy_getter(

@@ -74,16 +74,40 @@ def test_axes_base(
     shape = list(range(2, len(on_disk_axes) + 2))
     np.random.seed(0)
     x_in = np.random.rand(*shape)
-    x_inner = _apply_numpy_axes_ops(x_in, mapper.to_canonical())
+    axes_ops = mapper.to_canonical()
+    x_inner = _apply_numpy_axes_ops(
+        x_in,
+        squeeze_axes=axes_ops.squeeze_axes,
+        transpose_axes=axes_ops.transpose_axes,
+        expand_axes=axes_ops.expand_axes,
+    )
     assert len(x_inner.shape) == 5 + len(mapper._axes_setup.others)
-    x_out = _apply_numpy_axes_ops(x_inner, mapper.from_canonical())
+    axes_ops = mapper.from_canonical()
+    x_out = _apply_numpy_axes_ops(
+        x_inner,
+        squeeze_axes=axes_ops.squeeze_axes,
+        transpose_axes=axes_ops.transpose_axes,
+        expand_axes=axes_ops.expand_axes,
+    )
 
     np.testing.assert_allclose(x_in, x_out)
     # Test transformation with shuffle
-    shuffled_axes = np.random.permutation(on_disk_axes)
-    x_inner = _apply_numpy_axes_ops(x_in, mapper.to_order(shuffled_axes))
+    shuffled_axes = np.random.permutation(on_disk_axes).tolist()
+    axes_ops = mapper.to_order(shuffled_axes)
+    x_inner = _apply_numpy_axes_ops(
+        x_in,
+        squeeze_axes=axes_ops.squeeze_axes,
+        transpose_axes=axes_ops.transpose_axes,
+        expand_axes=axes_ops.expand_axes,
+    )
     assert len(x_inner.shape) == len(on_disk_axes)
-    x_out = _apply_numpy_axes_ops(x_inner, mapper.from_order(shuffled_axes))
+    axes_ops = mapper.from_order(shuffled_axes)
+    x_out = _apply_numpy_axes_ops(
+        x_inner,
+        squeeze_axes=axes_ops.squeeze_axes,
+        transpose_axes=axes_ops.transpose_axes,
+        expand_axes=axes_ops.expand_axes,
+    )
     np.testing.assert_allclose(x_in, x_out)
 
 
