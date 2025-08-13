@@ -1,5 +1,5 @@
 from collections.abc import Callable, Mapping, Sequence
-from typing import TypeAlias
+from typing import Protocol, TypeAlias, TypeVar
 
 import dask.array as da
 import numpy as np
@@ -7,11 +7,6 @@ import zarr
 from dask.array import Array as DaskArray
 
 from ngio.common._dimensions import Dimensions
-from ngio.common._io_transforms import (
-    TransformProtocol,
-    apply_dask_transforms,
-    apply_numpy_transforms,
-)
 from ngio.ome_zarr_meta.ngio_specs import Axis, SlicingOps
 from ngio.utils import NgioValueError
 
@@ -313,7 +308,7 @@ def _set_dask_patch(
 ##############################################################
 
 
-def _apply_numpy_axes_ops(
+def apply_numpy_axes_ops(
     array: np.ndarray,
     squeeze_axes: tuple[int, ...] | None = None,
     transpose_axes: tuple[int, ...] | None = None,
@@ -329,7 +324,7 @@ def _apply_numpy_axes_ops(
     return array
 
 
-def _apply_dask_axes_ops(
+def apply_dask_axes_ops(
     array: da.Array,
     squeeze_axes: tuple[int, ...] | None = None,
     transpose_axes: tuple[int, ...] | None = None,
@@ -342,6 +337,122 @@ def _apply_dask_axes_ops(
         array = da.transpose(array, axes=transpose_axes)
     if expand_axes is not None:
         array = da.expand_dims(array, axis=expand_axes)
+    return array
+
+
+T = TypeVar("T")
+
+
+def apply_sequence_axes_ops(
+    input_: Sequence[T],
+    default: T,
+    squeeze_axes: tuple[int, ...] | None = None,
+    transpose_axes: tuple[int, ...] | None = None,
+    expand_axes: tuple[int, ...] | None = None,
+) -> list[T]:
+    input_list = list(input_)
+    if squeeze_axes is not None:
+        for offset, ax in enumerate(squeeze_axes):
+            input_list.pop(ax - offset)
+
+    if transpose_axes is not None:
+        input_list = [input_list[i] for i in transpose_axes]
+
+    if expand_axes is not None:
+        for ax in expand_axes:
+            input_list.insert(ax, default)
+
+    return input_list
+
+
+#############################################################
+#
+# Transform Protocol
+#
+#############################################################
+
+
+class TransformProtocol(Protocol):
+    """Protocol for a generic transform."""
+
+    def apply_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps
+    ) -> np.ndarray:
+        """A transformation to be applied after loading a numpy array."""
+        ...
+
+    def apply_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps
+    ) -> da.Array:
+        """A transformation to be applied after loading a dask array."""
+        ...
+
+    def inverse_numpy_transformation(
+        self, array: np.ndarray, slicing_ops: SlicingOps
+    ) -> np.ndarray:
+        """A transformation to be applied before writing a numpy array."""
+        ...
+
+    def inverse_dask_transformation(
+        self, array: da.Array, slicing_ops: SlicingOps
+    ) -> da.Array:
+        """A transformation to be applied before writing a dask array."""
+        ...
+
+
+def apply_numpy_transforms(
+    array: np.ndarray,
+    slicing_ops: SlicingOps,
+    transforms: Sequence[TransformProtocol] | None = None,
+) -> np.ndarray:
+    """Apply a numpy transform to an array."""
+    if transforms is None:
+        return array
+
+    for transform in transforms:
+        array = transform.apply_numpy_transform(array, slicing_ops=slicing_ops)
+    return array
+
+
+def apply_dask_transforms(
+    array: da.Array,
+    slicing_ops: SlicingOps,
+    transforms: Sequence[TransformProtocol] | None = None,
+) -> da.Array:
+    """Apply a dask transform to an array."""
+    if transforms is None:
+        return array
+
+    for transform in transforms:
+        array = transform.apply_dask_transform(array, slicing_ops=slicing_ops)
+    return array
+
+
+def apply_inverse_numpy_transforms(
+    array: np.ndarray,
+    slicing_ops: SlicingOps,
+    transforms: Sequence[TransformProtocol] | None = None,
+) -> np.ndarray:
+    """Apply inverse numpy transforms to an array."""
+    if transforms is None:
+        return array
+
+    for transform in transforms:
+        array = transform.inverse_numpy_transformation(array, slicing_ops=slicing_ops)
+    return array
+
+
+def apply_inverse_dask_transforms(
+    array: da.Array,
+    slicing_ops: SlicingOps,
+    transforms: Sequence[TransformProtocol] | None = None,
+) -> da.Array:
+    """Apply inverse dask transforms to an array."""
+    if transforms is None:
+        return array
+
+    for transform in transforms:
+        array = transform.inverse_dask_transformation(array, slicing_ops=slicing_ops)
     return array
 
 
@@ -382,7 +493,7 @@ def _numpy_get_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> np.ndarray:
     _array = _get_slice_as_numpy(zarr_array, slice_tuple=slicing_ops.slice_tuple)
-    _array = _apply_numpy_axes_ops(
+    _array = apply_numpy_axes_ops(
         _array,
         squeeze_axes=slicing_ops.squeeze_axes,
         transpose_axes=slicing_ops.transpose_axes,
@@ -401,7 +512,7 @@ def _dask_get_pipe(
     transforms: Sequence[TransformProtocol] | None,
 ) -> DaskArray:
     _array = _get_slice_as_dask(zarr_array, slice_tuple=slicing_ops.slice_tuple)
-    _array = _apply_dask_axes_ops(
+    _array = apply_dask_axes_ops(
         _array,
         squeeze_axes=slicing_ops.squeeze_axes,
         transpose_axes=slicing_ops.transpose_axes,
@@ -498,10 +609,10 @@ def _numpy_set_pipe(
     slicing_ops: SlicingOps,
     transforms: Sequence[TransformProtocol] | None,
 ) -> None:
-    _patch = apply_numpy_transforms(
+    _patch = apply_inverse_numpy_transforms(
         patch, transforms=transforms, slicing_ops=slicing_ops
     )
-    _patch = _apply_numpy_axes_ops(
+    _patch = apply_numpy_axes_ops(
         _patch,
         squeeze_axes=slicing_ops.squeeze_axes,
         transpose_axes=slicing_ops.transpose_axes,
@@ -516,10 +627,10 @@ def _dask_set_pipe(
     slicing_ops: SlicingOps,
     transforms: Sequence[TransformProtocol] | None,
 ) -> None:
-    _patch = apply_dask_transforms(
+    _patch = apply_inverse_dask_transforms(
         patch, transforms=transforms, slicing_ops=slicing_ops
     )
-    _patch = _apply_dask_axes_ops(
+    _patch = apply_dask_axes_ops(
         _patch,
         squeeze_axes=slicing_ops.squeeze_axes,
         transpose_axes=slicing_ops.transpose_axes,

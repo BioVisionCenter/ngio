@@ -50,7 +50,7 @@ def fast_zoom(x, zoom, order=1, mode="grid-constant", grid_mode=True, auto_stack
 
 def _zoom_inputs_check(
     source_array: np.ndarray | da.Array,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[int | float, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
 ) -> tuple[np.ndarray, tuple[int, ...]]:
     if scale is None and target_shape is None:
@@ -78,7 +78,7 @@ def _zoom_inputs_check(
 
 def dask_zoom(
     source_array: da.Array,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[float | int, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
     order: Literal[0, 1, 2] = 1,
 ) -> da.Array:
@@ -129,7 +129,7 @@ def dask_zoom(
 
 def numpy_zoom(
     source_array: np.ndarray,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[int | float, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
     order: Literal[0, 1, 2] = 1,
 ) -> np.ndarray:

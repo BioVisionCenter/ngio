@@ -3,6 +3,10 @@
 from ngio.common._array_io_pipe import (
     ArrayLike,
     SlicingInputType,
+    TransformProtocol,
+    apply_dask_axes_ops,
+    apply_numpy_axes_ops,
+    apply_sequence_axes_ops,
     build_dask_getter,
     build_dask_setter,
     build_masked_dask_getter,
@@ -13,10 +17,6 @@ from ngio.common._array_io_pipe import (
     build_numpy_setter,
 )
 from ngio.common._dimensions import Dimensions
-from ngio.common._io_transforms import (
-    AbstractTransform,
-    TransformProtocol,
-)
 from ngio.common._masking_roi import compute_masking_roi
 from ngio.common._pyramid import consolidate_pyramid, init_empty_pyramid, on_disk_zoom
 from ngio.common._roi import (
@@ -35,13 +35,15 @@ from ngio.common._roi import (
 from ngio.common._zoom import dask_zoom, numpy_zoom
 
 __all__ = [
-    "AbstractTransform",
     "ArrayLike",
     "Dimensions",
     "Roi",
     "RoiPixels",
     "SlicingInputType",
     "TransformProtocol",
+    "apply_dask_axes_ops",
+    "apply_numpy_axes_ops",
+    "apply_sequence_axes_ops",
     "build_dask_getter",
     "build_dask_setter",
     "build_masked_dask_getter",

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ngio.common._array_io_pipe import _apply_numpy_axes_ops
+from ngio.common._array_io_pipe import apply_numpy_axes_ops
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesMapper,
     AxesSetup,
@@ -75,7 +75,7 @@ def test_axes_base(
     np.random.seed(0)
     x_in = np.random.rand(*shape)
     axes_ops = mapper.to_canonical()
-    x_inner = _apply_numpy_axes_ops(
+    x_inner = apply_numpy_axes_ops(
         x_in,
         squeeze_axes=axes_ops.squeeze_axes,
         transpose_axes=axes_ops.transpose_axes,
@@ -83,7 +83,7 @@ def test_axes_base(
     )
     assert len(x_inner.shape) == 5 + len(mapper._axes_setup.others)
     axes_ops = mapper.from_canonical()
-    x_out = _apply_numpy_axes_ops(
+    x_out = apply_numpy_axes_ops(
         x_inner,
         squeeze_axes=axes_ops.squeeze_axes,
         transpose_axes=axes_ops.transpose_axes,
@@ -94,7 +94,7 @@ def test_axes_base(
     # Test transformation with shuffle
     shuffled_axes = np.random.permutation(on_disk_axes).tolist()
     axes_ops = mapper.to_order(shuffled_axes)
-    x_inner = _apply_numpy_axes_ops(
+    x_inner = apply_numpy_axes_ops(
         x_in,
         squeeze_axes=axes_ops.squeeze_axes,
         transpose_axes=axes_ops.transpose_axes,
@@ -102,7 +102,7 @@ def test_axes_base(
     )
     assert len(x_inner.shape) == len(on_disk_axes)
     axes_ops = mapper.from_order(shuffled_axes)
-    x_out = _apply_numpy_axes_ops(
+    x_out = apply_numpy_axes_ops(
         x_inner,
         squeeze_axes=axes_ops.squeeze_axes,
         transpose_axes=axes_ops.transpose_axes,

@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ngio.common._array_io_pipe import (
     SlicingInputType,
+    TransformProtocol,
     build_dask_getter,
     build_dask_setter,
     build_masked_dask_getter,
@@ -23,7 +24,6 @@ from ngio.common._array_io_pipe import (
     build_numpy_setter,
 )
 from ngio.common._dimensions import Dimensions
-from ngio.common._io_transforms import TransformProtocol
 from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnits
 from ngio.utils import NgioValueError
 
