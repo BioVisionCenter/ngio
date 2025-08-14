@@ -73,6 +73,12 @@ def _zoom_inputs_check(
         _scale = np.array(scale)
         _target_shape = tuple(np.array(source_array.shape) * scale)
 
+    if len(_scale) != source_array.ndim:
+        raise NgioValueError(
+            f"Cannot scale array of shape {source_array.shape} with factors {_scale}."
+            " Target shape must have the same number of dimensions as the source array."
+        )
+
     return _scale, _target_shape
 
 

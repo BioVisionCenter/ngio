@@ -42,14 +42,6 @@ class ZoomTransform:
             scale.append(_scale)
         return cls(scale, order)
 
-    @staticmethod
-    def _check_if_valid(array: np.ndarray | da.Array, scale: tuple[float, ...]):
-        if array.ndim != len(scale):
-            raise ValueError(
-                f"Array of shape {array.shape} can not be scaled to "
-                f"with factors {scale}"
-            )
-
     def apply_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps
     ) -> np.ndarray:
@@ -63,7 +55,6 @@ class ZoomTransform:
                 expand_axes=slicing_ops.expand_axes,
             )
         )
-        self._check_if_valid(array=array, scale=scale)
         array = numpy_zoom(source_array=array, scale=scale, order=self._order)
         return array
 
@@ -80,7 +71,6 @@ class ZoomTransform:
                 expand_axes=slicing_ops.expand_axes,
             )
         )
-        self._check_if_valid(array=array, scale=scale)
         array = dask_zoom(source_array=array, scale=scale, order=self._order)
         return array
 
@@ -97,7 +87,6 @@ class ZoomTransform:
                 expand_axes=slicing_ops.expand_axes,
             )
         )
-        self._check_if_valid(array=array, scale=scale)
         array = numpy_zoom(source_array=array, scale=scale, order=self._order)
         return array
 
@@ -114,6 +103,5 @@ class ZoomTransform:
                 expand_axes=slicing_ops.expand_axes,
             )
         )
-        self._check_if_valid(array=array, scale=scale)
         array = dask_zoom(source_array=array, scale=scale, order=self._order)
         return array
