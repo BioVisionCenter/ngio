@@ -4,7 +4,7 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 
-from ngio.common._array_io_pipe import apply_sequence_axes_ops
+from ngio.common._array_io_utils import apply_sequence_axes_ops
 from ngio.common._dimensions import Dimensions
 from ngio.common._zoom import dask_zoom, numpy_zoom
 from ngio.ome_zarr_meta.ngio_specs import SlicingOps

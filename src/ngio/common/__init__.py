@@ -1,12 +1,6 @@
 """Common classes and functions that are used across the package."""
 
-from ngio.common._array_io_pipe import (
-    ArrayLike,
-    SlicingInputType,
-    TransformProtocol,
-    apply_dask_axes_ops,
-    apply_numpy_axes_ops,
-    apply_sequence_axes_ops,
+from ngio.common._array_io_pipes import (
     build_dask_getter,
     build_dask_setter,
     build_masked_dask_getter,
@@ -15,6 +9,14 @@ from ngio.common._array_io_pipe import (
     build_masked_numpy_setter,
     build_numpy_getter,
     build_numpy_setter,
+)
+from ngio.common._array_io_utils import (
+    ArrayLike,
+    SlicingInputType,
+    TransformProtocol,
+    apply_dask_axes_ops,
+    apply_numpy_axes_ops,
+    apply_sequence_axes_ops,
 )
 from ngio.common._dimensions import Dimensions
 from ngio.common._masking_roi import compute_masking_roi

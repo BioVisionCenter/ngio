@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from ngio.common._array_io_pipe import apply_numpy_axes_ops
+from ngio.common._array_io_utils import apply_numpy_axes_ops
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesMapper,
     AxesSetup,
