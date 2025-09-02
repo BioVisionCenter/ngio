@@ -188,18 +188,23 @@ def _normalize_slice_input(
         return slice(None)
 
     value = slicing_dict[axis_name]
+    if value is None:
+        return slice(None)
+
+    shape = dimensions.get(axis_name, default=None)
+    if shape is None:
+        raise NgioValueError(f"Unknown dimension {axis_name} for axis {axis}.")
+
     if isinstance(value, int):
-        value = _validate_int(value, dimensions.get(axis_name))
+        value = _validate_int(value, shape)
         if requires_axes_ops or axis_name in axes_order:
             # Axes ops require all dimensions to be preserved
             value = slice(value, value + 1)
         return value
     elif isinstance(value, Sequence):
-        return _validate_iter_of_ints(value, dimensions.get(axis_name))
+        return _validate_iter_of_ints(value, shape)
     elif isinstance(value, slice):
-        return _validate_slice(value, dimensions.get(axis_name))
-    elif value is None:
-        return slice(None)
+        return _validate_slice(value, shape)
 
     raise NgioValueError(f"Invalid slice definition {value} of type {type(value)}")
 

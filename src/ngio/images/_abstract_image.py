@@ -471,6 +471,7 @@ def build_image_roi_table(image: AbstractImage, name: str = "image") -> RoiTable
     """Build the ROI table for an image."""
     dim_x = image.dimensions.get("x")
     dim_y = image.dimensions.get("y")
+    assert dim_x is not None and dim_y is not None
     dim_z = image.dimensions.get("z", default=1)
     dim_t = image.dimensions.get("t", default=1)
     image_roi = RoiPixels(

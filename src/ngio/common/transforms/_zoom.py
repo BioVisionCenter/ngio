@@ -36,9 +36,10 @@ class ZoomTransform:
             if t_ax is None:
                 _scale = 1
             else:
-                _scale = target_dimension.get(o_ax_name) / original_dimension.get(
-                    o_ax_name
-                )
+                t_shape = target_dimension.get(o_ax_name)
+                o_shape = original_dimension.get(o_ax_name)
+                assert t_shape is not None and o_shape is not None
+                _scale = t_shape / o_shape
             scale.append(_scale)
         return cls(scale, order)
 

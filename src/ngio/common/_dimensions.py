@@ -4,6 +4,8 @@ This is not related to the NGFF metadata,
 but it is based on the actual metadata of the image data.
 """
 
+from typing import overload
+
 from ngio.ome_zarr_meta import AxesMapper
 from ngio.ome_zarr_meta.ngio_specs import AxisType
 from ngio.utils import NgioValueError
@@ -40,6 +42,14 @@ class Dimensions:
             for ax, s in zip(self._axes_mapper.axes, self._shape, strict=True)
         )
         return f"Dimensions({dims})"
+
+    @overload
+    def get(self, axis_name: str, default: None = None) -> int | None:
+        pass
+
+    @overload
+    def get(self, axis_name: str, default: int) -> int:
+        pass
 
     def get(self, axis_name: str, default: int | None = None) -> int | None:
         """Return the dimension of the given axis name.
