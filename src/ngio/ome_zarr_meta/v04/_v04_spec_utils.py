@@ -316,7 +316,7 @@ def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
     """
     ax_mapper = datasets[0].axes_mapper
     v04_axes = []
-    for axis in ax_mapper.on_disk_axes:
+    for axis in ax_mapper.axes:
         v04_axes.append(
             AxisV04(
                 name=axis.on_disk_name,

@@ -60,7 +60,7 @@ class AbstractNgioImageMeta:
     def __repr__(self):
         class_name = type(self).__name__
         paths = [dataset.path for dataset in self.datasets]
-        on_disk_axes = self.axes_mapper.on_disk_axes_names
+        on_disk_axes = self.axes_mapper.axes_names
         return f"{class_name}(name={self.name}, datasets={paths}, axes={on_disk_axes})"
 
     @classmethod
@@ -321,11 +321,11 @@ class AbstractNgioImageMeta:
     def scaling_factor(self, path: str | None = None) -> list[float]:
         """Get the scaling factors from a dataset to its lower resolution."""
         if self.levels == 1:
-            return [1.0] * len(self.axes_mapper.on_disk_axes_names)
+            return [1.0] * len(self.axes_mapper.axes_names)
         dataset, lr_dataset = self._get_closest_datasets(path=path)
 
         scaling_factors = []
-        for ax_name in self.axes_mapper.on_disk_axes_names:
+        for ax_name in self.axes_mapper.axes_names:
             s_d = dataset.get_scale(ax_name)
             s_lr_d = lr_dataset.get_scale(ax_name)
             scaling_factors.append(s_lr_d / s_d)

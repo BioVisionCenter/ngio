@@ -108,8 +108,11 @@ def _dataframe_to_rois(
         if len(extra_columns) > 0:
             extras = {col: getattr(row, col, None) for col in extra_columns}
 
-        t_second = getattr(row, "t_second", 0.0)
-        t_length_second = getattr(row, "len_t_second", 1.0)
+        z_micrometer = getattr(row, "z_micrometer", None)
+        z_length_micrometer = getattr(row, "len_z_micrometer", None)
+
+        t_second = getattr(row, "t_second", None)
+        t_length_second = getattr(row, "len_t_second", None)
 
         if label_is_index:
             label = int(row.Index)  # type: ignore (type can not be known here, but should be castable to int)
@@ -120,11 +123,11 @@ def _dataframe_to_rois(
             name=str(row.Index),
             x=row.x_micrometer,  # type: ignore (type can not be known here)
             y=row.y_micrometer,  # type: ignore (type can not be known here)
-            z=row.z_micrometer,  # type: ignore (type can not be known here)
+            z=z_micrometer,
             t=t_second,
             x_length=row.len_x_micrometer,  # type: ignore (type can not be known here)
             y_length=row.len_y_micrometer,  # type: ignore (type can not be known here)
-            z_length=row.len_z_micrometer,  # type: ignore (type can not be known here)
+            z_length=z_length_micrometer,
             t_length=t_length_second,
             unit="micrometer",
             label=label,
@@ -138,17 +141,25 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
     """Convert a list of WorldCooROI objects to a DataFrame."""
     data = []
     for roi in rois.values():
+        # This normalization is necessary for backward compatibility
+        z_micrometer = roi.z if roi.z is not None else 0.0
+        len_z_micrometer = roi.z_length if roi.z_length is not None else 1.0
+
         row = {
             index_key: roi.name,
             "x_micrometer": roi.x,
             "y_micrometer": roi.y,
-            "z_micrometer": roi.z,
-            "t_second": roi.t,
+            "z_micrometer": z_micrometer,
             "len_x_micrometer": roi.x_length,
             "len_y_micrometer": roi.y_length,
-            "len_z_micrometer": roi.z_length,
-            "len_t_second": roi.t_length,
+            "len_z_micrometer": len_z_micrometer,
         }
+
+        if roi.t is not None:
+            row["t_second"] = roi.t
+
+        if roi.t_length is not None:
+            row["len_t_second"] = roi.t_length
 
         if roi.label is not None and index_key != "label":
             row["label"] = roi.label

@@ -137,7 +137,7 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
 
     new_label = new_ome_zarr.derive_label("new_label")
     assert new_label.shape == image.shape
-    assert new_label.meta.axes_mapper.on_disk_axes_names == ["z", "y", "x"]
+    assert new_label.meta.axes_mapper.axes_names == ("z", "y", "x")
 
     assert new_ome_zarr.list_labels() == ["new_label"]
     assert new_ome_zarr.list_tables() == []

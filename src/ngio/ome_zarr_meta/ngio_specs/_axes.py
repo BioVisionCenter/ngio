@@ -335,7 +335,7 @@ class AxesMapper:
             }
         """
         _index_mapping = {}
-        for i, ax in enumerate(self.on_disk_axes_names):
+        for i, ax in enumerate(self.axes_names):
             _index_mapping[ax] = i
         # If the axis is not in the canonical order we also set it.
         canonical_map = self._axes_setup.canonical_map()
@@ -350,12 +350,12 @@ class AxesMapper:
         return self._axes_setup
 
     @property
-    def on_disk_axes(self) -> list[Axis]:
-        return list(self._on_disk_axes)
+    def axes(self) -> tuple[Axis, ...]:
+        return tuple(self._on_disk_axes)
 
     @property
-    def on_disk_axes_names(self) -> list[str]:
-        return [ax.on_disk_name for ax in self._on_disk_axes]
+    def axes_names(self) -> tuple[str, ...]:
+        return tuple(ax.on_disk_name for ax in self._on_disk_axes)
 
     @property
     def allow_non_canonical_axes(self) -> bool:
@@ -376,7 +376,7 @@ class AxesMapper:
         index = self.get_index(name)
         if index is None:
             return None
-        return self.on_disk_axes[index]
+        return self.axes[index]
 
     def validate_axes_type(self):
         """Validate the axes type.
@@ -385,7 +385,7 @@ class AxesMapper:
         and the axis is implicitly cast to the correct type.
         """
         new_axes = []
-        for axes in self.on_disk_axes:
+        for axes in self.axes:
             for name in self._canonical_order:
                 if axes == self.get_axis(name):
                     new_axes.append(axes.canonical_axis_cast(name))
@@ -394,7 +394,7 @@ class AxesMapper:
                 new_axes.append(axes)
         self._on_disk_axes = new_axes
 
-    def _change_order(
+    def _reorder_axes(
         self, names: Sequence[str]
     ) -> tuple[tuple[int, ...] | None, tuple[int, ...] | None, tuple[int, ...] | None]:
         """Change the order of the axes."""
@@ -414,7 +414,7 @@ class AxesMapper:
         # Step 1: Check find squeeze axes
         _axes_to_squeeze: list[int] = []
         axes_names_after_squeeze = []
-        for i, ax in enumerate(self.on_disk_axes_names):
+        for i, ax in enumerate(self.axes_names):
             # If the axis is not in the names, it means we need to squeeze it
             ax_canonical = inv_canonical_map.get(ax, None)
             if ax not in names and ax_canonical not in names:
@@ -453,7 +453,7 @@ class AxesMapper:
 
     def to_order(self, names: Sequence[str]) -> SlicingOps:
         """Get the new order of the axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._change_order(names)
+        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
         return SlicingOps(
             transpose_axes=transposition_order,
             expand_axes=axes_to_expand,
@@ -462,7 +462,7 @@ class AxesMapper:
 
     def from_order(self, names: Sequence[str]) -> SlicingOps:
         """Get the new order of the axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._change_order(names)
+        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
         # Inverse transpose is just the transpose with the inverse indices
         if transposition_order is None:
             _reverse_indices = None

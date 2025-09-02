@@ -38,7 +38,7 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     image_data = image_3.get_array(c=0)
     image_data = np.squeeze(image_data)
     roi = roi_table.get("FOV_1")
-    roi = roi.to_pixel_roi(pixel_size=image_3.pixel_size, dimensions=image_3.dimensions)
+    roi = roi.to_roi_pixels(pixel_size=image_3.pixel_size, dimensions=image_3.dimensions)
     #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
     #label_data = label_3.get_array()
     #label_data = np.squeeze(label_data)

@@ -5,11 +5,13 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
 """
 
 from collections.abc import Callable, Sequence
+from typing import Generic, TypeVar
+from warnings import warn
 
 import dask.array as da
 import numpy as np
 import zarr
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from ngio.common._array_io_pipes import (
     build_dask_getter,
@@ -27,11 +29,13 @@ from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnit
 from ngio.utils import NgioValueError
 
 
-def _to_raster(value: float, pixel_size: float, max_shape: int) -> int:
+def _to_raster(value: float, pixel_size: float, max_shape: int | None) -> int:
     """Convert to raster coordinates."""
     round_value = int(np.round(value / pixel_size))
     # Ensure the value is within the image shape boundaries
-    return max(0, min(round_value, max_shape))
+    if max_shape is not None:
+        return max(0, min(round_value, max_shape))
+    return round_value
 
 
 def _to_world(value: int, pixel_size: float) -> float:
@@ -39,47 +43,192 @@ def _to_world(value: int, pixel_size: float) -> float:
     return value * pixel_size
 
 
-class Roi(BaseModel):
-    """Region of interest (ROI) metadata."""
+T = TypeVar("T", int, float)
+
+
+class GenericRoi(BaseModel, Generic[T]):
+    """A generic Region of Interest (ROI) model."""
 
     name: str
-    x_length: float
-    y_length: float
-    z_length: float = 1.0
-    t_length: float = 1.0
-    x: float = 0.0
-    y: float = 0.0
-    z: float = 0.0
-    t: float = 0.0
-    unit: SpaceUnits | str | None = Field(DefaultSpaceUnit, repr=False)
+    x: T
+    y: T
+    z: T | None = None
+    t: T | None = None
+    x_length: T
+    y_length: T
+    z_length: T | None = None
+    t_length: T | None = None
     label: int | None = None
+    unit: SpaceUnits | str | None = None
 
     model_config = ConfigDict(extra="allow")
 
-    def to_pixel_roi(
-        self, pixel_size: PixelSize, dimensions: Dimensions
+    def intersection(self, other: "GenericRoi[T]") -> "GenericRoi[T] | None":
+        """Calculate the intersection of this ROI with another ROI."""
+        return roi_intersection(self, other)
+
+
+def _1d_intersection(
+    a: T | None, a_length: T | None, b: T | None, b_length: T | None
+) -> tuple[T | None, T | None]:
+    """Calculate the intersection of two 1D intervals."""
+    if a is None:
+        if b is not None and b_length is not None:
+            return b, b_length
+        return None, None
+    if b is None:
+        if a is not None and a_length is not None:
+            return a, a_length
+        return None, None
+
+    assert (
+        a is not None
+        and a_length is not None
+        and b is not None
+        and b_length is not None
+    )
+    start = max(a, b)
+    end = min(a + a_length, b + b_length)
+    length = end - start
+
+    if length <= 0:
+        return None, None
+
+    return start, length
+
+
+def roi_intersection(
+    ref_roi: GenericRoi[T], other_roi: GenericRoi[T]
+) -> GenericRoi[T] | None:
+    """Calculate the intersection of two ROIs."""
+    if ref_roi.unit != other_roi.unit:
+        raise NgioValueError(
+            "Cannot calculate intersection of ROIs with different units."
+        )
+
+    x, x_length = _1d_intersection(
+        ref_roi.x, ref_roi.x_length, other_roi.x, other_roi.x_length
+    )
+    assert x is not None and x_length is not None
+
+    y, y_length = _1d_intersection(
+        ref_roi.y, ref_roi.y_length, other_roi.y, other_roi.y_length
+    )
+    assert y is not None and y_length is not None
+
+    z, z_length = _1d_intersection(
+        ref_roi.z, ref_roi.z_length, other_roi.z, other_roi.z_length
+    )
+    t, t_length = _1d_intersection(
+        ref_roi.t, ref_roi.t_length, other_roi.t, other_roi.t_length
+    )
+
+    if (
+        x_length <= 0
+        or y_length <= 0
+        or (z_length is not None and z_length <= 0)
+        or (t_length is not None and t_length <= 0)
+    ):
+        # No intersection
+        return None
+
+    # Find label
+    if ref_roi.label is not None and other_roi.label is not None:
+        if ref_roi.label != other_roi.label:
+            raise NgioValueError(
+                "Cannot calculate intersection of ROIs with different labels."
+            )
+    label = ref_roi.label or other_roi.label
+
+    cls_ref = ref_roi.__class__
+    return cls_ref(
+        name=f"[{ref_roi.name}_x_{other_roi.name}]",
+        x=x,
+        y=y,
+        z=z,
+        t=t,
+        x_length=x_length,
+        y_length=y_length,
+        z_length=z_length,
+        t_length=t_length,
+        unit=ref_roi.unit,
+        label=label,
+    )
+
+
+class Roi(GenericRoi[float]):
+    x: float = 0.0
+    y: float = 0.0
+    unit: SpaceUnits | str | None = DefaultSpaceUnit
+
+    def to_roi_pixels(
+        self, pixel_size: PixelSize, dimensions: Dimensions | None = None
     ) -> "RoiPixels":
         """Convert to raster coordinates."""
-        dim_x = dimensions.get("x")
-        dim_y = dimensions.get("y")
-        # Will default to 1 if z does not exist
-        dim_z = dimensions.get("z", default=1)
-        dim_t = dimensions.get("t", default=1)
-        extra_dict = self.model_extra if self.model_extra else {}
+        if dimensions is None:
+            # No check for dimensions
+            dim_x, dim_y, dim_z, dim_t = None, None, None, None
+        else:
+            dim_x, dim_y, dim_z, dim_t = (
+                dimensions.get("x"),
+                dimensions.get("y"),
+                dimensions.get("z"),
+                dimensions.get("t"),
+            )
 
+        x = _to_raster(self.x, pixel_size.x, dim_x)
+        x_length = _to_raster(self.x_length, pixel_size.x, dim_x)
+        y = _to_raster(self.y, pixel_size.y, dim_y)
+        y_length = _to_raster(self.y_length, pixel_size.y, dim_y)
+
+        if self.z is None:
+            z = None
+        else:
+            z = _to_raster(self.z, pixel_size.z, dim_z)
+
+        if self.z_length is None:
+            z_length = None
+        else:
+            z_length = _to_raster(self.z_length, pixel_size.z, dim_z)
+
+        if self.t is None:
+            t = None
+        else:
+            t = _to_raster(self.t, pixel_size.t, dim_t)
+
+        if self.t_length is None:
+            t_length = None
+        else:
+            t_length = _to_raster(self.t_length, pixel_size.t, dim_t)
+
+        extra_dict = self.model_extra if self.model_extra else {}
         return RoiPixels(
             name=self.name,
-            x=_to_raster(self.x, pixel_size.x, dim_x),
-            y=_to_raster(self.y, pixel_size.y, dim_y),
-            z=_to_raster(self.z, pixel_size.z, dim_z),
-            t=_to_raster(self.t, pixel_size.t, dim_t),
-            x_length=_to_raster(self.x_length, pixel_size.x, dim_x),
-            y_length=_to_raster(self.y_length, pixel_size.y, dim_y),
-            z_length=_to_raster(self.z_length, pixel_size.z, dim_z),
-            t_length=_to_raster(self.t_length, pixel_size.t, dim_t),
+            x=x,
+            y=y,
+            z=z,
+            t=t,
+            x_length=x_length,
+            y_length=y_length,
+            z_length=z_length,
+            t_length=t_length,
             label=self.label,
+            unit=self.unit,
             **extra_dict,
         )
+
+    def to_pixel_roi(
+        self, pixel_size: PixelSize, dimensions: Dimensions | None = None
+    ) -> "RoiPixels":
+        """Convert to raster coordinates."""
+        warn(
+            "to_pixel_roi is deprecated and will be removed in a future release. "
+            "Use to_roi_pixels instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+        return self.to_roi_pixels(pixel_size=pixel_size, dimensions=dimensions)
 
     def zoom(self, zoom_factor: float = 1) -> "Roi":
         """Zoom the ROI by a factor.
@@ -92,37 +241,44 @@ class Roi(BaseModel):
         """
         return zoom_roi(self, zoom_factor)
 
-    def intersection(self, other: "Roi") -> "Roi | None":
-        """Calculate the intersection of two ROIs."""
-        if self.unit != other.unit:
-            raise NgioValueError(
-                "Cannot calculate intersection of ROIs with different units."
-            )
 
-        x = max(self.x, other.x)
-        y = max(self.y, other.y)
-        z = max(self.z, other.z)
-        t = max(self.t, other.t)
+class RoiPixels(GenericRoi[int]):
+    """Region of interest (ROI) in pixel coordinates."""
 
-        x_length = min(self.x + self.x_length, other.x + other.x_length) - x
-        y_length = min(self.y + self.y_length, other.y + other.y_length) - y
-        z_length = min(self.z + self.z_length, other.z + other.z_length) - z
-        t_length = min(self.t + self.t_length, other.t + other.t_length) - t
+    x: int = 0
+    y: int = 0
+    unit: SpaceUnits | str | None = None
 
-        if x_length <= 0 or y_length <= 0 or z_length <= 0 or t_length <= 0:
-            # No intersection
-            return None
+    def to_roi(self, pixel_size: PixelSize) -> "Roi":
+        """Convert to raster coordinates."""
+        x = _to_world(self.x, pixel_size.x)
+        x_length = _to_world(self.x_length, pixel_size.x)
+        y = _to_world(self.y, pixel_size.y)
+        y_length = _to_world(self.y_length, pixel_size.y)
 
-        # Find label
-        if self.label is not None and other.label is not None:
-            if self.label != other.label:
-                raise NgioValueError(
-                    "Cannot calculate intersection of ROIs with different labels."
-                )
-        label = self.label or other.label
+        if self.z is None:
+            z = None
+        else:
+            z = _to_world(self.z, pixel_size.z)
 
+        if self.z_length is None:
+            z_length = None
+        else:
+            z_length = _to_world(self.z_length, pixel_size.z)
+
+        if self.t is None:
+            t = None
+        else:
+            t = _to_world(self.t, pixel_size.t)
+
+        if self.t_length is None:
+            t_length = None
+        else:
+            t_length = _to_world(self.t_length, pixel_size.t)
+
+        extra_dict = self.model_extra if self.model_extra else {}
         return Roi(
-            name=f"[{self.name}_x_{other.name}]",
+            name=self.name,
             x=x,
             y=y,
             z=z,
@@ -131,90 +287,28 @@ class Roi(BaseModel):
             y_length=y_length,
             z_length=z_length,
             t_length=t_length,
-            unit=self.unit,
-            label=label,
-        )
-
-
-class RoiPixels(BaseModel):
-    """Region of interest (ROI) metadata."""
-
-    name: str
-    x_length: int
-    y_length: int
-    z_length: int = 1
-    t_length: int = 1
-    x: int = 0
-    y: int = 0
-    z: int = 0
-    t: int = 0
-    label: int | None = None
-
-    model_config = ConfigDict(extra="allow")
-
-    def to_roi(self, pixel_size: PixelSize) -> Roi:
-        """Convert to world coordinates."""
-        extra_dict = self.model_extra if self.model_extra else {}
-        return Roi(
-            name=self.name,
-            x=_to_world(self.x, pixel_size.x),
-            y=_to_world(self.y, pixel_size.y),
-            z=_to_world(self.z, pixel_size.z),
-            t=_to_world(self.t, pixel_size.t),
-            x_length=_to_world(self.x_length, pixel_size.x),
-            y_length=_to_world(self.y_length, pixel_size.y),
-            z_length=_to_world(self.z_length, pixel_size.z),
-            t_length=_to_world(self.t_length, pixel_size.t),
-            unit=pixel_size.space_unit,
             label=self.label,
+            unit=self.unit,
             **extra_dict,
         )
 
     def to_slicing_dict(self) -> dict[str, SlicingInputType]:
-        """Return the slices for the ROI."""
+        x_slice = slice(self.x, self.x + self.x_length)
+        y_slice = slice(self.y, self.y + self.y_length)
+        if self.z is not None and self.z_length is not None:
+            z_slice = slice(self.z, self.z + self.z_length)
+        else:
+            z_slice = slice(None)
+        if self.t is not None and self.t_length is not None:
+            t_slice = slice(self.t, self.t + self.t_length)
+        else:
+            t_slice = slice(None)
         return {
-            "x": slice(self.x, self.x + self.x_length),
-            "y": slice(self.y, self.y + self.y_length),
-            "z": slice(self.z, self.z + self.z_length),
-            "t": slice(self.t, self.t + self.t_length),
+            "x": x_slice,
+            "y": y_slice,
+            "z": z_slice,
+            "t": t_slice,
         }
-
-    def intersection(self, other: "RoiPixels") -> "RoiPixels | None":
-        """Calculate the intersection of two ROIs."""
-        x = max(self.x, other.x)
-        y = max(self.y, other.y)
-        z = max(self.z, other.z)
-        t = max(self.t, other.t)
-
-        x_length = min(self.x + self.x_length, other.x + other.x_length) - x
-        y_length = min(self.y + self.y_length, other.y + other.y_length) - y
-        z_length = min(self.z + self.z_length, other.z + other.z_length) - z
-        t_length = min(self.t + self.t_length, other.t + other.t_length) - t
-
-        if x_length <= 0 or y_length <= 0 or z_length <= 0 or t_length <= 0:
-            # No intersection
-            return None
-
-        # Find label
-        if self.label is not None and other.label is not None:
-            if self.label != other.label:
-                raise NgioValueError(
-                    "Cannot calculate intersection of ROIs with different labels."
-                )
-        label = self.label or other.label
-
-        return RoiPixels(
-            name=f"[{self.name}_x_{other.name}]",
-            x=x,
-            y=y,
-            z=z,
-            t=t,
-            x_length=x_length,
-            y_length=y_length,
-            z_length=z_length,
-            t_length=t_length,
-            label=label,
-        )
 
 
 def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
@@ -267,7 +361,7 @@ def roi_to_slicing_dict(
             raise NgioValueError(
                 "pixel_size must be provided when converting a Roi to slice_kwargs."
             )
-        roi = roi.to_pixel_roi(pixel_size=pixel_size, dimensions=dimensions)
+        roi = roi.to_roi_pixels(pixel_size=pixel_size, dimensions=dimensions)
 
     roi_slicing_dict = roi.to_slicing_dict()
     if slicing_dict is None:

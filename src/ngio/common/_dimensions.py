@@ -6,7 +6,7 @@ but it is based on the actual metadata of the image data.
 
 from ngio.ome_zarr_meta import AxesMapper
 from ngio.ome_zarr_meta.ngio_specs import AxisType
-from ngio.utils import NgioValidationError, NgioValueError
+from ngio.utils import NgioValueError
 
 
 class Dimensions:
@@ -26,10 +26,10 @@ class Dimensions:
         self._shape = shape
         self._axes_mapper = axes_mapper
 
-        if len(self._shape) != len(self._axes_mapper.on_disk_axes):
-            raise NgioValidationError(
+        if len(self._shape) != len(self._axes_mapper.axes):
+            raise NgioValueError(
                 "The number of dimensions must match the number of axes. "
-                f"Expected Axis {self._axes_mapper.on_disk_axes_names} but got shape "
+                f"Expected Axis {self._axes_mapper.axes_names} but got shape "
                 f"{self._shape}."
             )
 
@@ -37,24 +37,20 @@ class Dimensions:
         """Return the string representation of the object."""
         dims = ", ".join(
             f"{ax.on_disk_name}: {s}"
-            for ax, s in zip(self._axes_mapper.on_disk_axes, self._shape, strict=True)
+            for ax, s in zip(self._axes_mapper.axes, self._shape, strict=True)
         )
         return f"Dimensions({dims})"
 
-    def get(self, axis_name: str, default: int | None = None) -> int:
+    def get(self, axis_name: str, default: int | None = None) -> int | None:
         """Return the dimension of the given axis name.
 
         Args:
             axis_name: The name of the axis (either canonical or non-canonical).
-            default: The default value to return if the axis does not exist. If None,
-                an error is raised.
+            default: The default value to return if the axis does not exist.
         """
         index = self._axes_mapper.get_index(axis_name)
         if index is None:
-            if default is not None:
-                return default
-            raise NgioValueError(f"Axis {axis_name} does not exist.")
-
+            return default
         return self._shape[index]
 
     def get_index(self, axis_name: str) -> int | None:
@@ -82,14 +78,14 @@ class Dimensions:
         return self._axes_mapper
 
     @property
-    def on_disk_shape(self) -> tuple[int, ...]:
+    def shape(self) -> tuple[int, ...]:
         """Return the shape as a tuple."""
         return tuple(self._shape)
 
     @property
-    def on_disk_axes(self) -> tuple[str, ...]:
+    def axes(self) -> tuple[str, ...]:
         """Return the axes as a tuple of strings."""
-        return tuple(ax.on_disk_name for ax in self._axes_mapper.on_disk_axes)
+        return self._axes_mapper.axes_names
 
     @property
     def is_time_series(self) -> bool:
@@ -134,12 +130,12 @@ class Dimensions:
             - they have the same number of axes (excluding channels)
             - the shape of each axis is the same
         """
-        if abs(len(self.on_disk_shape) - len(other.on_disk_shape)) > 1:
+        if abs(len(self.shape) - len(other.shape)) > 1:
             # Since channels are not considered in compatibility
             # we allow a difference of 0, 1 n-dimension in the shapes.
             return False
 
-        for ax in self._axes_mapper.on_disk_axes:
+        for ax in self._axes_mapper.axes:
             if ax.axis_type == AxisType.channel:
                 continue
 

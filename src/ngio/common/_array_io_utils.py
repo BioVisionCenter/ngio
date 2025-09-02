@@ -132,7 +132,7 @@ def _normalize_slicing_dict(
             if not _check_slicing_virtual_axes(slice_):
                 raise NgioValueError(
                     f"Invalid axis selection:{axis_name}={slice_}. "
-                    f"Not found on the on-disk axes {dimensions.on_disk_axes}."
+                    f"Not found on the on-disk axes {dimensions.axes}."
                 )
             # Virtual axes can be safely ignored
             continue
@@ -235,7 +235,7 @@ def _build_slicing_tuple(
             requires_axes_ops=requires_axes_ops,
             axes_order=_axes_order,
         )
-        for axis in dimensions.axes_mapper.on_disk_axes
+        for axis in dimensions.axes_mapper.axes
     )
     return slicing_tuple
 

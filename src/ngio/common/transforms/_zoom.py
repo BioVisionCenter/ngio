@@ -31,7 +31,7 @@ class ZoomTransform:
         order: Literal[0, 1, 2],
     ):
         scale = []
-        for o_ax_name in original_dimension.axes_mapper.on_disk_axes_names:
+        for o_ax_name in original_dimension.axes_mapper.axes_names:
             t_ax = target_dimension.axes_mapper.get_axis(name=o_ax_name)
             if t_ax is None:
                 _scale = 1

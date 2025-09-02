@@ -145,7 +145,7 @@ class Dataset:
             time_unit(str): The time unit to convert to.
         """
         new_axes = []
-        for ax in self.axes_mapper.on_disk_axes:
+        for ax in self.axes_mapper.axes:
             if ax.axis_type == AxisType.space:
                 new_ax = Axis(
                     on_disk_name=ax.on_disk_name,

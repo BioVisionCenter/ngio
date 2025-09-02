@@ -69,7 +69,7 @@ def test_axes_base(
     for i, ax in enumerate(on_disk_axes):
         assert mapper.get_index(ax) == i
 
-    assert len(mapper.on_disk_axes) == len(on_disk_axes)
+    assert len(mapper.axes) == len(on_disk_axes)
     # Test the transformation
     shape = list(range(2, len(on_disk_axes) + 2))
     np.random.seed(0)

@@ -3,7 +3,7 @@ import pytest
 from ngio.common import Dimensions
 from ngio.ome_zarr_meta import AxesMapper
 from ngio.ome_zarr_meta.ngio_specs import Axis
-from ngio.utils import NgioValidationError, NgioValueError
+from ngio.utils import NgioValueError
 
 
 @pytest.mark.parametrize(
@@ -50,22 +50,20 @@ def test_dimensions(axes_names):
     if dim_dict.get("z", 1) == 1 and dim_dict.get("t", 1) > 1:
         assert dims.is_2d_time_series
 
-    assert dims.on_disk_shape == shape
+    assert dims.shape == shape
 
 
 def test_dimensions_error():
     axes = [Axis(on_disk_name="x"), Axis(on_disk_name="y")]
     shape = (1, 2, 3)
 
-    with pytest.raises(NgioValidationError):
+    with pytest.raises(NgioValueError):
         Dimensions(shape=shape, axes_mapper=AxesMapper(on_disk_axes=axes))
 
     shape = (3, 4)
     dims = Dimensions(shape=shape, axes_mapper=AxesMapper(on_disk_axes=axes))
 
-    with pytest.raises(NgioValueError):
-        dims.get("c", default=None)
-
+    assert dims.get("c", default=None) is None
     assert not dims.is_3d
     assert not dims.is_multi_channels
     assert not dims.is_time_series
