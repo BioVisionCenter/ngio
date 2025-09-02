@@ -41,6 +41,7 @@ class ZoomTransform:
                 assert t_shape is not None and o_shape is not None
                 _scale = t_shape / o_shape
             scale.append(_scale)
+
         return cls(scale, order)
 
     def apply_numpy_transform(

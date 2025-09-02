@@ -67,6 +67,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
         self._input = input_image
         self._output = output_label
         self._ref_image = input_image
+        self._rois = input_image.build_image_roi_table().rois()
 
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -83,9 +84,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
                 "Input image and output label have incompatible dimensions. "
                 f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
             )
-
-    def __repr__(self) -> str:
-        return f"SegmentationIterator(regions={len(self.rois)})"
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
@@ -222,9 +220,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
                 "Input image and output label have incompatible dimensions. "
                 f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
             )
-
-    def __repr__(self) -> str:
-        return f"SegmentationIterator(regions={len(self.rois)})"
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
