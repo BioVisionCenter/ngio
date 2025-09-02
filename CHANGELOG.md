@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [Unreleased]
 
 ### Features
@@ -28,6 +29,10 @@
 ### Bug Fixes
 
 - improve type consistency and remove non-necessary "type: ignore"
+
+## [v0.3.5]
+
+- Remove path normalization for images in wells. While the spec requires paths to be alphanumeric, this patch removes the normalization to allow for arbitrary image paths.
 
 ## [v0.3.4]
 
