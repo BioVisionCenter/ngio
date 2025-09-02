@@ -634,7 +634,7 @@ class OmeZarrContainer:
         pixel_size: PixelSize | None = None,
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
-        dtype: str | None = None,
+        dtype: str = "uint32",
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -650,7 +650,7 @@ class OmeZarrContainer:
             axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
             chunks (Sequence[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            dtype (str): The data type of the new label.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:

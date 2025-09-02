@@ -166,7 +166,7 @@ class LabelsContainer:
         pixel_size: PixelSize | None = None,
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
-        dtype: str | None = None,
+        dtype: str = "uint32",
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -183,7 +183,7 @@ class LabelsContainer:
             axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
             chunks (Sequence[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            dtype (str): The data type of the new label.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -226,7 +226,7 @@ def derive_label(
     pixel_size: PixelSize | None = None,
     axes_names: Sequence[str] | None = None,
     chunks: Sequence[int] | None = None,
-    dtype: str | None = None,
+    dtype: str = "uint32",
     overwrite: bool = False,
 ) -> None:
     """Create an empty OME-Zarr label from a reference image.
@@ -241,7 +241,7 @@ def derive_label(
         axes_names (Sequence[str] | None): The axes names of the new image.
             For labels, the channel axis is not allowed.
         chunks (Sequence[int] | None): The chunk shape of the new image.
-        dtype (str | None): The data type of the new image.
+        dtype (str): The data type of the new label.
         overwrite (bool): Whether to overwrite an existing image.
 
     Returns:
@@ -281,9 +281,6 @@ def derive_label(
             "The chunks of the new image does not match the reference image."
             f"Got {chunks} for shape {shape}."
         )
-
-    if dtype is None:
-        dtype = ref_image.dtype
 
     if c_axis is not None:
         # remove channel if present

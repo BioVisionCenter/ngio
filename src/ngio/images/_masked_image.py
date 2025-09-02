@@ -74,7 +74,6 @@ class MaskedImage(Image):
         """Return the array for a given ROI."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        print("get_roi_as_numpy", roi.label)
         return super().get_roi_as_numpy(
             roi=roi,
             channel_selection=channel_selection,
@@ -163,7 +162,6 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        print("get_roi_masked_as_numpy", roi.label)
         masked_getter = build_roi_masked_numpy_getter(
             roi=roi,
             zarr_array=self.zarr_array,
@@ -257,7 +255,6 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        print(roi.label)
         if isinstance(patch, da.Array):
             path_setter = build_roi_masked_dask_setter(
                 roi=roi,
@@ -495,9 +492,7 @@ class MaskedLabel(Label):
         """Set the masked array for a given label."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        print(roi.label)
         if isinstance(patch, da.Array):
-            print("masked image", roi.label)
             path_setter = build_roi_masked_dask_setter(
                 roi=roi,
                 zarr_array=self.zarr_array,
@@ -512,7 +507,6 @@ class MaskedLabel(Label):
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            print("masked image", roi.label)
             path_setter = build_roi_masked_numpy_setter(
                 roi=roi,
                 zarr_array=self.zarr_array,
