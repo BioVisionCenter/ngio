@@ -92,7 +92,7 @@ def create_empty_label_container(
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
     chunks: Sequence[int] | None = None,
-    dtype: str = "uint16",
+    dtype: str = "uint32",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:

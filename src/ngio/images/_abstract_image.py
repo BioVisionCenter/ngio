@@ -472,14 +472,16 @@ def build_image_roi_table(image: AbstractImage, name: str = "image") -> RoiTable
     dim_x = image.dimensions.get("x")
     dim_y = image.dimensions.get("y")
     assert dim_x is not None and dim_y is not None
-    dim_z = image.dimensions.get("z", default=1)
-    dim_t = image.dimensions.get("t", default=1)
+    dim_z = image.dimensions.get("z")
+    z = None if dim_z is None else 0
+    dim_t = image.dimensions.get("t")
+    t = None if dim_t is None else 0
     image_roi = RoiPixels(
         name=name,
         x=0,
         y=0,
-        z=0,
-        t=0,
+        z=z,
+        t=t,
         x_length=dim_x,
         y_length=dim_y,
         z_length=dim_z,

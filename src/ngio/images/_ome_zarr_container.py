@@ -254,6 +254,8 @@ class OmeZarrContainer:
         self._images_container.set_channel_meta(
             labels=labels,
             wavelength_id=wavelength_id,
+            start=None,
+            end=None,
             percentiles=percentiles,
             colors=colors,
             active=active,
