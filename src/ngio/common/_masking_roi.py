@@ -150,6 +150,7 @@ def compute_masking_roi(
             x=min_x,
             y=min_y,
             z=min_z,
+            label=label,
         )
 
         roi = roi.to_roi(pixel_size)

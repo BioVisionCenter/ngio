@@ -137,7 +137,7 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
 
     new_label = new_ome_zarr.derive_label("new_label")
     assert new_label.shape == image.shape
-    assert new_label.meta.axes_mapper.on_disk_axes_names == ["z", "y", "x"]
+    assert new_label.meta.axes_mapper.axes_names == ("z", "y", "x")
 
     assert new_ome_zarr.list_labels() == ["new_label"]
     assert new_ome_zarr.list_tables() == []
@@ -200,19 +200,32 @@ def test_get_and_squeeze(tmp_path: Path, array_mode: str):
         np.ones((20, 30), dtype="uint8"),
         axes_order=["y", "x"],
     )
-    assert image.get_array(axes_order=["x", "y"]).shape == (30, 20)
+    assert image.get_array(axes_order=["y", "x"]).shape == (20, 30)
     image.set_array(
-        np.ones((30, 20), dtype="uint8"),
-        axes_order=["x", "y"],
+        np.ones((20, 30), dtype="uint8"),
+        axes_order=["y", "x"],
     )
-    assert image.get_array(axes_order=["x"], y=0).shape == (30,)
+    assert image.get_array(axes_order=["x"], y=0, c=0).shape == (30,)
     image.set_array(
         np.ones((30,), dtype="uint8"),
         axes_order=["x"],
         y=0,
+        c=0,
+    )
+
+    assert image.get_array(c=0, axes_order=["c", "y", "x"]).shape == (1, 20, 30)
+    assert image.get_array(c=0, axes_order=["y", "x"]).shape == (20, 30)
+    assert image.get_array(c=(0,), axes_order=None).shape == (1, 20, 30)
+    assert image.get_array(c=0, axes_order=None).shape == (20, 30)
+
+    # Reordering axes and adding a virtual axis
+    assert image.get_array(c=0, axes_order=["c", "x", "y", "virtual"]).shape == (
+        1,
+        30,
+        20,
+        1,
     )
 
     # Test channel_labels
-    image.get_as_numpy(channel_label="channel_0")
-    image.get_as_dask(channel_label="channel_0")
-    image.get_as_delayed(channel_label="channel_0")
+    image.get_as_numpy(channel_selection="channel_0")
+    image.get_as_dask(channel_selection="channel_0")

@@ -21,21 +21,12 @@ from ngio.utils import NgioValueError, ngio_logger
 
 def path_in_well_validation(path: str) -> str:
     """Validate the path in the well."""
-    if path.find("_") != -1:
-        # Remove underscores from the path
-        # This is a custom serialization step
-        old_value = path
-        path = path.replace("_", "")
-        ngio_logger.warning(
-            f"Underscores in well-paths are not allowed. "
-            f"Path '{old_value}' was changed to '{path}'"
-            f" to comply with the specification."
-        )
     # Check if the value contains only alphanumeric characters
     if not path.isalnum():
-        raise NgioValueError(
+        ngio_logger.warning(
             f"Path '{path}' contains non-alphanumeric characters. "
-            f"Only alphanumeric characters are allowed."
+            "This may cause issues with some tools. "
+            "Consider using only alphanumeric characters in the path."
         )
     return path
 

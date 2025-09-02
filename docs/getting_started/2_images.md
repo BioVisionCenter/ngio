@@ -84,13 +84,6 @@ Once you have the `Image` object, you can access the image data as a:
     >>> print(dask_array) # markdown-exec: hide
     ```
 
-=== "Dask Delayed"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> dask_delayed = image.get_as_delayed() # Get the image as a dask delayed object
-    >>> dask_delayed
-    >>> print(dask_delayed) # markdown-exec: hide
-    ```
-
 === "Legacy"
     A generic `get_array` method is still available for backwards compatibility.
 

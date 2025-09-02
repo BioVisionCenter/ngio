@@ -1,6 +1,6 @@
 """Fractal internal module for dataset metadata handling."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesMapper,
@@ -28,9 +28,9 @@ class Dataset:
         *,
         # args coming from ngff specs
         path: str,
-        on_disk_axes: Collection[Axis],
-        on_disk_scale: Collection[float],
-        on_disk_translation: Collection[float] | None = None,
+        on_disk_axes: Sequence[Axis],
+        on_disk_scale: Sequence[float],
+        on_disk_translation: Sequence[float] | None = None,
         # user defined args
         axes_setup: AxesSetup | None = None,
         allow_non_canonical_axes: bool = False,
@@ -145,7 +145,7 @@ class Dataset:
             time_unit(str): The time unit to convert to.
         """
         new_axes = []
-        for ax in self.axes_mapper.on_disk_axes:
+        for ax in self.axes_mapper.axes:
             if ax.axis_type == AxisType.space:
                 new_ax = Axis(
                     on_disk_name=ax.on_disk_name,

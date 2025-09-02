@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import Counter
-from collections.abc import Collection
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -76,7 +76,7 @@ def _add_const_columns_pl(
 
 
 def _pd_concat(
-    tables: Collection[TableWithExtras], index_key: str | None = None
+    tables: Sequence[TableWithExtras], index_key: str | None = None
 ) -> pd.DataFrame:
     """Concatenate tables from different plates into a single table."""
     if len(tables) == 0:
@@ -93,7 +93,7 @@ def _pd_concat(
 
 
 def _pl_concat(
-    tables: Collection[TableWithExtras], index_key: str | None = None
+    tables: Sequence[TableWithExtras], index_key: str | None = None
 ) -> pl.LazyFrame:
     """Concatenate tables from different plates into a single table."""
     if len(tables) == 0:
@@ -113,7 +113,7 @@ def _pl_concat(
 
 
 def conctatenate_tables(
-    tables: Collection[TableWithExtras],
+    tables: Sequence[TableWithExtras],
     mode: Literal["eager", "lazy"] = "eager",
     index_key: str | None = None,
     table_cls: type[TableType] | None = None,
@@ -147,8 +147,8 @@ def conctatenate_tables(
 
 
 def _check_images_and_extras(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
 ) -> None:
     """Check if the images and extras are valid."""
     if len(images) == 0:
@@ -159,8 +159,8 @@ def _check_images_and_extras(
 
 
 def _concatenate_image_tables(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     table_cls: type[TableType] | None = None,
     index_key: str | None = None,
@@ -186,8 +186,8 @@ def _concatenate_image_tables(
 
 
 def concatenate_image_tables(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     index_key: str | None = None,
     strict: bool = True,
@@ -219,8 +219,8 @@ def concatenate_image_tables(
 
 
 def concatenate_image_tables_as(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     table_cls: type[TableType],
     index_key: str | None = None,
@@ -258,8 +258,8 @@ def concatenate_image_tables_as(
 
 
 async def _concatenate_image_tables_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     table_cls: type[TableType] | None = None,
     index_key: str | None = None,
@@ -315,8 +315,8 @@ async def _concatenate_image_tables_async(
 
 
 async def concatenate_image_tables_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     index_key: str | None = None,
     strict: bool = True,
@@ -348,8 +348,8 @@ async def concatenate_image_tables_async(
 
 
 async def concatenate_image_tables_as_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
     name: str,
     table_cls: type[TableType],
     index_key: str | None = None,
@@ -411,7 +411,7 @@ def _tables_names_coalesce(
 
 
 def list_image_tables(
-    images: Collection[OmeZarrContainer],
+    images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
 ) -> list[str]:
@@ -436,7 +436,7 @@ def list_image_tables(
 
 
 async def list_image_tables_async(
-    images: Collection[OmeZarrContainer],
+    images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
 ) -> list[str]:

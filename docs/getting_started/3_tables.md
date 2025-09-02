@@ -38,7 +38,7 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     image_data = image_3.get_array(c=0)
     image_data = np.squeeze(image_data)
     roi = roi_table.get("FOV_1")
-    roi = roi.to_pixel_roi(pixel_size=image_3.pixel_size, dimensions=image_3.dimensions)
+    roi = roi.to_roi_pixels(pixel_size=image_3.pixel_size, dimensions=image_3.dimensions)
     #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
     #label_data = label_3.get_array()
     #label_data = np.squeeze(label_data)
@@ -98,12 +98,12 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     The `nuclei_ROI_table` contains the masks for the `nuclei` label in the image, and is indexed by the label id.
     ```pycon exec="true" source="console" session="get_started"
     >>> masking_table = ome_zarr_container.get_table("nuclei_ROI_table") # Get a mask table
-    >>> masking_table.get(1)
-    >>> print(masking_table.get(100)) # markdown-exec: hide
+    >>> masking_table.get_label(1)
+    >>> print(masking_table.get_label(100)) # markdown-exec: hide
     ```
     ROIs can be used to slice the image data:
     ```pycon exec="true" source="console" session="get_started"
-    >>> roi = masking_table.get(100)
+    >>> roi = masking_table.get_label(100)
     >>> roi_data = image.get_roi(roi)
     >>> roi_data.shape
     >>> print(roi_data.shape) # markdown-exec: hide
@@ -120,7 +120,7 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     cmap_array = np.random.rand(1000, 3)
     cmap_array[0] = 0
     cmap = ListedColormap(cmap_array)
-    roi = masking_table.get(100)
+    roi = masking_table.get_label(100)
     image_3 = ome_zarr_container.get_image(path="2")
     image_data = image_3.get_roi(roi, c=0)
     image_data = np.squeeze(image_data)

@@ -1,22 +1,25 @@
 """A module for handling label images in OME-NGFF files."""
 
-from collections.abc import Collection, Iterable
+from collections.abc import Sequence
 from typing import Literal
 
 import dask.array as da
 import numpy as np
-from dask.delayed import Delayed
 
 from ngio.common import (
     ArrayLike,
     TransformProtocol,
-    get_masked_as_dask,
-    get_masked_as_numpy,
-    roi_to_slice_kwargs,
-    set_dask_masked,
-    set_numpy_masked,
+    build_roi_masked_dask_getter,
+    build_roi_masked_dask_setter,
+    build_roi_masked_numpy_getter,
+    build_roi_masked_numpy_setter,
 )
-from ngio.images._image import Image
+from ngio.images._image import (
+    ChannelSlicingInputType,
+    Image,
+    SlicingInputType,
+    add_channel_selection_to_slicing_dict,
+)
 from ngio.images._label import Label
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
@@ -62,83 +65,63 @@ class MaskedImage(Image):
     def get_roi_as_numpy(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
-        channel_label: str | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> ArrayLike:
         """Return the array for a given ROI."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi_as_numpy(
             roi=roi,
-            channel_label=channel_label,
+            channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def get_roi_as_dask(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
-        channel_label: str | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> da.Array:
         """Return the array for a given ROI as a Dask array."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi_as_dask(
             roi=roi,
-            channel_label=channel_label,
+            channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
-        )
-
-    def get_roi_as_delayed(  # type: ignore (this ignore the method override issue)
-        self,
-        label: int,
-        channel_label: str | None = None,
-        zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
-    ) -> Delayed:
-        """Return the array for a given ROI as a delayed object."""
-        roi = self._masking_roi_table.get(label)
-        roi = roi.zoom(zoom_factor)
-        return super().get_roi_as_delayed(
-            roi=roi,
-            channel_label=channel_label,
-            axes_order=axes_order,
-            transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def get_roi(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
         zoom_factor: float = 1.0,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        mode: Literal["numpy", "dask", "delayed"] = "numpy",
-        **slice_kwargs: slice | int | Iterable[int],
+        channel_selection: ChannelSlicingInputType | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        mode: Literal["numpy", "dask"] = "numpy",
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> ArrayLike:
         """Return the array for a given ROI."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi(
             roi=roi,
-            channel_label=channel_label,
+            channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
             mode=mode,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def set_roi(  # type: ignore (this ignore the method override issue)
@@ -146,126 +129,118 @@ class MaskedImage(Image):
         label: int,
         patch: ArrayLike,
         zoom_factor: float = 1.0,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        channel_selection: ChannelSlicingInputType | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().set_roi(
             roi=roi,
             patch=patch,
-            channel_label=channel_label,
+            channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
-
-    def _build_slice_kwargs(
-        self,
-        label: int,
-        channel_label: str | None = None,
-        zoom_factor: float = 1.0,
-        **slice_kwargs: slice | int | Iterable[int],
-    ) -> dict[str, slice | int | Iterable[int]]:
-        """Build the slice kwargs for the ROI."""
-        roi = self._masking_roi_table.get(label)
-        roi = roi.zoom(zoom_factor)
-        slice_kwargs = roi_to_slice_kwargs(
-            roi=roi,
-            pixel_size=self.pixel_size,
-            dimensions=self.dimensions,
-            **slice_kwargs,
-        )
-        slice_kwargs = self._add_channel_label(
-            channel_label=channel_label, **slice_kwargs
-        )
-        return slice_kwargs
 
     def get_roi_masked_as_numpy(
         self,
         label: int,
-        channel_label: str | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Return the masked array for a given label as a NumPy array."""
-        slice_kwargs = self._build_slice_kwargs(
-            channel_label=channel_label,
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
-        return get_masked_as_numpy(
-            array=self.zarr_array,
-            label_array=self._label.zarr_array,
-            label=label,
-            dimensions_array=self.dimensions,
-            dimensions_label=self._label.dimensions,
+
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
+        masked_getter = build_roi_masked_numpy_getter(
+            roi=roi,
+            zarr_array=self.zarr_array,
+            label_zarr_array=self._label.zarr_array,
+            dimensions=self.dimensions,
+            pixel_size=self.pixel_size,
+            label_dimensions=self._label.dimensions,
+            label_pixel_size=self._label.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
+        return masked_getter()
 
     def get_roi_masked_as_dask(
         self,
         label: int,
-        channel_label: str | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Return the masked array for a given label as a Dask array."""
-        slice_kwargs = self._build_slice_kwargs(
-            channel_label=channel_label,
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
-        return get_masked_as_dask(
-            array=self.zarr_array,
-            label_array=self._label.zarr_array,
-            label=label,
-            dimensions_array=self.dimensions,
-            dimensions_label=self._label.dimensions,
+
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
+        masked_getter = build_roi_masked_dask_getter(
+            roi=roi,
+            zarr_array=self.zarr_array,
+            label_zarr_array=self._label.zarr_array,
+            dimensions=self.dimensions,
+            pixel_size=self.pixel_size,
+            label_dimensions=self._label.dimensions,
+            label_pixel_size=self._label.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
+        return masked_getter()
 
     def get_roi_masked(
         self,
         label: int,
-        channel_label: str | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: slice | int | Iterable[int],
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Return the masked array for a given label."""
         if mode == "numpy":
             return self.get_roi_masked_as_numpy(
                 label=label,
-                channel_label=channel_label,
+                channel_selection=channel_selection,
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                allow_scaling=allow_scaling,
+                **slicing_kwargs,
             )
         elif mode == "dask":
             return self.get_roi_masked_as_dask(
                 label=label,
-                channel_label=channel_label,
+                channel_selection=channel_selection,
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                allow_scaling=allow_scaling,
+                **slicing_kwargs,
             )
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -274,43 +249,50 @@ class MaskedImage(Image):
         self,
         label: int,
         patch: ArrayLike,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
+        channel_selection: ChannelSlicingInputType | None = None,
+        axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the masked array for a given label."""
-        slice_kwargs = self._build_slice_kwargs(
-            label=label,
-            channel_label=channel_label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
+
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            set_dask_masked(
-                array=self.zarr_array,
-                label_array=self._label.zarr_array,
-                label=label,
-                patch=patch,
-                dimensions_array=self.dimensions,
-                dimensions_label=self._label.dimensions,
+            path_setter = build_roi_masked_dask_setter(
+                roi=roi,
+                zarr_array=self.zarr_array,
+                label_zarr_array=self._label.zarr_array,
+                dimensions=self.dimensions,
+                pixel_size=self.pixel_size,
+                label_dimensions=self._label.dimensions,
+                label_pixel_size=self._label.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
+            path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            set_numpy_masked(
-                array=self.zarr_array,
-                label_array=self._label.zarr_array,
-                label=label,
-                patch=patch,
-                dimensions_array=self.dimensions,
-                dimensions_label=self._label.dimensions,
+            path_setter = build_roi_masked_numpy_setter(
+                roi=roi,
+                zarr_array=self.zarr_array,
+                label_zarr_array=self._label.zarr_array,
+                dimensions=self.dimensions,
+                pixel_size=self.pixel_size,
+                label_dimensions=self._label.dimensions,
+                label_pixel_size=self._label.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
+            path_setter(patch)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -356,74 +338,56 @@ class MaskedLabel(Label):
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> np.ndarray:
         """Return the ROI as a NumPy array."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi_as_numpy(
             roi=roi,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def get_roi_as_dask(
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> da.Array:
         """Return the ROI as a Dask array."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi_as_dask(
             roi=roi,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
-        )
-
-    def get_roi_as_delayed(
-        self,
-        label: int,
-        zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
-    ) -> Delayed:
-        """Return the ROI as a delayed object."""
-        roi = self._masking_roi_table.get(label)
-        roi = roi.zoom(zoom_factor)
-        return super().get_roi_as_delayed(
-            roi=roi,
-            axes_order=axes_order,
-            transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def get_roi(
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        mode: Literal["numpy", "dask", "delayed"] = "numpy",
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        mode: Literal["numpy", "dask"] = "numpy",
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> ArrayLike:
         """Return the array for a given ROI."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().get_roi(
             roi=roi,
             axes_order=axes_order,
             mode=mode,
             transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
 
     def set_roi(
@@ -431,118 +395,104 @@ class MaskedLabel(Label):
         label: int,
         patch: ArrayLike,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
-        roi = self._masking_roi_table.get(label)
+        roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().set_roi(
             roi=roi,
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            **slicing_kwargs,
         )
-
-    def _build_slice_kwargs(
-        self,
-        label: int,
-        zoom_factor: float = 1.0,
-        **slice_kwargs: slice | int | Iterable[int],
-    ) -> dict[str, slice | int | Iterable[int]]:
-        """Build the slice kwargs for the ROI."""
-        roi = self._masking_roi_table.get(label)
-        roi = roi.zoom(zoom_factor)
-        slice_kwargs = roi_to_slice_kwargs(
-            roi=roi,
-            pixel_size=self.pixel_size,
-            dimensions=self.dimensions,
-            **slice_kwargs,
-        )
-        return slice_kwargs
 
     def get_roi_masked_as_numpy(
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Return the masked array for a given label as a NumPy array."""
-        slice_kwargs = self._build_slice_kwargs(
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
-        )
-        return get_masked_as_numpy(
-            array=self.zarr_array,
-            label_array=self._label.zarr_array,
-            label=label,
-            dimensions_array=self.dimensions,
-            dimensions_label=self._label.dimensions,
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
+        masked_getter = build_roi_masked_numpy_getter(
+            roi=roi,
+            zarr_array=self.zarr_array,
+            label_zarr_array=self._label.zarr_array,
+            dimensions=self.dimensions,
+            pixel_size=self.pixel_size,
+            label_dimensions=self._label.dimensions,
+            label_pixel_size=self._label.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
+        return masked_getter()
 
     def get_roi_masked_as_dask(
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Return the masked array for a given label as a Dask array."""
-        slice_kwargs = self._build_slice_kwargs(
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
-        )
-        return get_masked_as_dask(
-            array=self.zarr_array,
-            label_array=self._label.zarr_array,
-            label=label,
-            dimensions_array=self.dimensions,
-            dimensions_label=self._label.dimensions,
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
+        masked_getter = build_roi_masked_dask_getter(
+            roi=roi,
+            zarr_array=self.zarr_array,
+            label_zarr_array=self._label.zarr_array,
+            dimensions=self.dimensions,
+            pixel_size=self.pixel_size,
+            label_dimensions=self._label.dimensions,
+            label_pixel_size=self._label.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
-            **slice_kwargs,
+            slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
+        return masked_getter()
 
     def get_roi_masked(
         self,
         label: int,
         zoom_factor: float = 1.0,
-        axes_order: Collection[str] | None = None,
+        axes_order: Sequence[str] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Return the masked array for a given label."""
-        slice_kwargs = self._build_slice_kwargs(
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
-        )
         if mode == "numpy":
             return self.get_roi_masked_as_numpy(
                 label=label,
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                allow_scaling=allow_scaling,
+                **slicing_kwargs,
             )
+
         elif mode == "dask":
             return self.get_roi_masked_as_dask(
                 label=label,
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                allow_scaling=allow_scaling,
+                **slicing_kwargs,
             )
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -551,41 +501,45 @@ class MaskedLabel(Label):
         self,
         label: int,
         patch: ArrayLike,
-        axes_order: Collection[str] | None = None,
+        axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
-        transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Iterable[int],
+        transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
+        **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the masked array for a given label."""
-        slice_kwargs = self._build_slice_kwargs(
-            label=label,
-            zoom_factor=zoom_factor,
-            **slice_kwargs,
-        )
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            set_dask_masked(
-                array=self.zarr_array,
-                label_array=self._label.zarr_array,
-                label=label,
-                patch=patch,
-                dimensions_array=self.dimensions,
-                dimensions_label=self._label.dimensions,
+            path_setter = build_roi_masked_dask_setter(
+                roi=roi,
+                zarr_array=self.zarr_array,
+                label_zarr_array=self._label.zarr_array,
+                dimensions=self.dimensions,
+                pixel_size=self.pixel_size,
+                label_dimensions=self._label.dimensions,
+                label_pixel_size=self._label.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
+            path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            set_numpy_masked(
-                array=self.zarr_array,
-                label_array=self._label.zarr_array,
-                label=label,
-                patch=patch,
-                dimensions_array=self.dimensions,
-                dimensions_label=self._label.dimensions,
+            path_setter = build_roi_masked_numpy_setter(
+                roi=roi,
+                zarr_array=self.zarr_array,
+                label_zarr_array=self._label.zarr_array,
+                dimensions=self.dimensions,
+                pixel_size=self.pixel_size,
+                label_dimensions=self._label.dimensions,
+                label_pixel_size=self._label.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
-                **slice_kwargs,
+                slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
+            path_setter(patch)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "

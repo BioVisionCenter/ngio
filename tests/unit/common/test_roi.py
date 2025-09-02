@@ -23,13 +23,13 @@ def test_rois():
     dims = Dimensions(shape=(30, 30), axes_mapper=ax_mapper)
 
     pixel_size = PixelSize(x=1.0, y=1.0, z=1.0)
-    raster_roi = roi.to_pixel_roi(pixel_size, dims)
+    raster_roi = roi.to_roi_pixels(pixel_size, dims)
 
-    assert raster_roi.to_slices() == {
+    assert raster_roi.to_slicing_dict() == {
         "x": slice(0, 1),
         "y": slice(0, 1),
         "z": slice(0, 1),
-        "t": slice(0, 1),
+        "t": slice(None),
     }
     assert roi.model_extra is not None
     assert roi.model_extra["other"] == "other"

@@ -1,4 +1,6 @@
 import logging
+import time
+from functools import cache
 
 from ngio.utils._errors import NgioValueError
 
@@ -29,3 +31,20 @@ def set_logger_level(level: str) -> None:
         raise NgioValueError(f"Invalid log level: {level}")
 
     ngio_logger.setLevel(level)
+
+
+@cache
+def _warn(message: str, ttl_hash: int) -> None:
+    """Log a warning message with a time-to-live (TTL) hash."""
+    ngio_logger.warning(message, stacklevel=3)
+
+
+def ngio_warn(message: str, cooldown: int = 2) -> None:
+    """Log a warning message.
+
+    Args:
+        message: The warning message to log.
+        cooldown: The cooldown period in seconds to avoid repeated logging.
+    """
+    ttl_hash = time.time() // cooldown
+    _warn(message, ttl_hash)

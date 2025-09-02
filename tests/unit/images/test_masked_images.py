@@ -54,7 +54,6 @@ def test_masking(
 
     _ = masked_image.get_roi_as_numpy(label=1)
     _ = masked_image.get_roi_as_dask(label=1)
-    _ = masked_image.get_roi_as_delayed(label=1)
     _ = masked_image.get_roi_masked_as_numpy(label=1)
     _ = masked_image.get_roi_masked_as_dask(label=1)
 

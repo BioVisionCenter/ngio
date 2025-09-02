@@ -1,7 +1,7 @@
 """Abstract class for handling OME-NGFF images."""
 
 import warnings
-from collections.abc import Collection
+from collections.abc import Sequence
 
 import numpy as np
 
@@ -243,17 +243,19 @@ class OmeZarrContainer:
 
     def set_channel_meta(
         self,
-        labels: Collection[str] | int | None = None,
-        wavelength_id: Collection[str] | None = None,
+        labels: Sequence[str] | int | None = None,
+        wavelength_id: Sequence[str] | None = None,
         percentiles: tuple[float, float] | None = None,
-        colors: Collection[str] | None = None,
-        active: Collection[bool] | None = None,
+        colors: Sequence[str] | None = None,
+        active: Sequence[bool] | None = None,
         **omero_kwargs: dict,
     ) -> None:
         """Create a ChannelsMeta object with the default unit."""
         self._images_container.set_channel_meta(
             labels=labels,
             wavelength_id=wavelength_id,
+            start=None,
+            end=None,
             percentiles=percentiles,
             colors=colors,
             active=active,
@@ -331,7 +333,7 @@ class OmeZarrContainer:
         """
         image = self.get_image(path=path, pixel_size=pixel_size, strict=strict)
         masking_label = self.get_label(
-            name=masking_label_name, path=path, pixel_size=pixel_size, strict=strict
+            name=masking_label_name, pixel_size=image.pixel_size, strict=strict
         )
         if masking_table_name is None:
             masking_table = masking_label.build_masking_roi_table()
@@ -340,7 +342,7 @@ class OmeZarrContainer:
 
         return MaskedImage(
             group_handler=image._group_handler,
-            path=masking_label.path,
+            path=image.path,
             meta_handler=image.meta_handler,
             label=masking_label,
             masking_roi_table=masking_table,
@@ -350,12 +352,12 @@ class OmeZarrContainer:
         self,
         store: StoreOrGroup,
         ref_path: str | None = None,
-        shape: Collection[int] | None = None,
-        labels: Collection[str] | None = None,
+        shape: Sequence[int] | None = None,
+        labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
+        axes_names: Sequence[str] | None = None,
         name: str | None = None,
-        chunks: Collection[int] | None = None,
+        chunks: Sequence[int] | None = None,
         dtype: str | None = None,
         copy_labels: bool = False,
         copy_tables: bool = False,
@@ -367,11 +369,11 @@ class OmeZarrContainer:
             store (StoreOrGroup): The Zarr store or group to create the image in.
             ref_path (str | None): The path to the reference image in
                 the image container.
-            shape (Collection[int] | None): The shape of the new image.
-            labels (Collection[str] | None): The labels of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
+            labels (Sequence[str] | None): The labels of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
-            chunks (Collection[int] | None): The chunk shape of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
             dtype (str | None): The data type of the new image.
             name (str | None): The name of the new image.
             copy_labels (bool): Whether to copy the labels from the reference image.
@@ -630,11 +632,11 @@ class OmeZarrContainer:
         self,
         name: str,
         ref_image: Image | Label | None = None,
-        shape: Collection[int] | None = None,
+        shape: Sequence[int] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
-        chunks: Collection[int] | None = None,
-        dtype: str | None = None,
+        axes_names: Sequence[str] | None = None,
+        chunks: Sequence[int] | None = None,
+        dtype: str = "uint32",
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -645,12 +647,12 @@ class OmeZarrContainer:
             name (str): The name of the new image.
             ref_image (Image | Label | None): A reference image that will be used
                 to create the new image.
-            shape (Collection[int] | None): The shape of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
-            chunks (Collection[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
+            dtype (str): The data type of the new label.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -758,7 +760,7 @@ def open_label(
 
 def create_empty_ome_zarr(
     store: StoreOrGroup,
-    shape: Collection[int],
+    shape: Sequence[int],
     xy_pixelsize: float,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
@@ -767,14 +769,14 @@ def create_empty_ome_zarr(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
-    channel_colors: Collection[str] | None = None,
-    channel_active: Collection[bool] | None = None,
+    channel_colors: Sequence[str] | None = None,
+    channel_active: Sequence[bool] | None = None,
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
@@ -782,7 +784,7 @@ def create_empty_ome_zarr(
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
-        shape (Collection[int]): The shape of the image.
+        shape (Sequence[int]): The shape of the image.
         xy_pixelsize (float): The pixel size in x and y dimensions.
         z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
         time_spacing (float, optional): The spacing between time points.
@@ -797,19 +799,19 @@ def create_empty_ome_zarr(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         channel_labels (list[str] | None, optional): The labels of the channels.
             Defaults to None.
         channel_wavelengths (list[str] | None, optional): The wavelengths of the
             channels. Defaults to None.
-        channel_colors (Collection[str] | None, optional): The colors of the channels.
+        channel_colors (Sequence[str] | None, optional): The colors of the channels.
             Defaults to None.
-        channel_active (Collection[bool] | None, optional): Whether the channels are
+        channel_active (Sequence[bool] | None, optional): Whether the channels are
             active. Defaults to None.
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
@@ -857,14 +859,14 @@ def create_ome_zarr_from_array(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
     percentiles: tuple[float, float] | None = (0.1, 99.9),
-    channel_colors: Collection[str] | None = None,
-    channel_active: Collection[bool] | None = None,
+    channel_colors: Sequence[str] | None = None,
+    channel_active: Sequence[bool] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
@@ -887,10 +889,10 @@ def create_ome_zarr_from_array(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         channel_labels (list[str] | None, optional): The labels of the channels.
             Defaults to None.
@@ -898,9 +900,9 @@ def create_ome_zarr_from_array(
             channels. Defaults to None.
         percentiles (tuple[float, float] | None, optional): The percentiles of the
             channels. Defaults to None.
-        channel_colors (Collection[str] | None, optional): The colors of the channels.
+        channel_colors (Sequence[str] | None, optional): The colors of the channels.
             Defaults to None.
-        channel_active (Collection[bool] | None, optional): Whether the channels are
+        channel_active (Sequence[bool] | None, optional): Whether the channels are
             active. Defaults to None.
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.

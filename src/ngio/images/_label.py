@@ -1,6 +1,6 @@
 """A module for handling label images in OME-NGFF files."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Literal
 
 from ngio.common import compute_masking_roi
@@ -33,11 +33,9 @@ class Label(AbstractImage[LabelMetaHandler]):
 
     get_as_numpy = AbstractImage._get_as_numpy
     get_as_dask = AbstractImage._get_as_dask
-    get_as_delayed = AbstractImage._get_as_delayed
     get_array = AbstractImage._get_array
     get_roi_as_numpy = AbstractImage._get_roi_as_numpy
     get_roi_as_dask = AbstractImage._get_roi_as_dask
-    get_roi_as_delayed = AbstractImage._get_roi_as_delayed
     get_roi = AbstractImage._get_roi
     set_array = AbstractImage._set_array
     set_roi = AbstractImage._set_roi
@@ -164,11 +162,11 @@ class LabelsContainer:
         self,
         name: str,
         ref_image: Image | Label,
-        shape: Collection[int] | None = None,
+        shape: Sequence[int] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
-        chunks: Collection[int] | None = None,
-        dtype: str | None = None,
+        axes_names: Sequence[str] | None = None,
+        chunks: Sequence[int] | None = None,
+        dtype: str = "uint32",
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -180,12 +178,12 @@ class LabelsContainer:
             ref_image (Image | Label): A reference image that will be used to create
                 the new image.
             name (str): The name of the new image.
-            shape (Collection[int] | None): The shape of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
-            chunks (Collection[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
+            dtype (str): The data type of the new label.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -224,11 +222,11 @@ def derive_label(
     store: StoreOrGroup,
     ref_image: Image | Label,
     name: str,
-    shape: Collection[int] | None = None,
+    shape: Sequence[int] | None = None,
     pixel_size: PixelSize | None = None,
-    axes_names: Collection[str] | None = None,
-    chunks: Collection[int] | None = None,
-    dtype: str | None = None,
+    axes_names: Sequence[str] | None = None,
+    chunks: Sequence[int] | None = None,
+    dtype: str = "uint32",
     overwrite: bool = False,
 ) -> None:
     """Create an empty OME-Zarr label from a reference image.
@@ -238,12 +236,12 @@ def derive_label(
         ref_image (Image | Label): A reference image that will be used to
             create the new image.
         name (str): The name of the new image.
-        shape (Collection[int] | None): The shape of the new image.
+        shape (Sequence[int] | None): The shape of the new image.
         pixel_size (PixelSize | None): The pixel size of the new image.
-        axes_names (Collection[str] | None): The axes names of the new image.
+        axes_names (Sequence[str] | None): The axes names of the new image.
             For labels, the channel axis is not allowed.
-        chunks (Collection[int] | None): The chunk shape of the new image.
-        dtype (str | None): The data type of the new image.
+        chunks (Sequence[int] | None): The chunk shape of the new image.
+        dtype (str): The data type of the new label.
         overwrite (bool): Whether to overwrite an existing image.
 
     Returns:
@@ -259,7 +257,7 @@ def derive_label(
         pixel_size = ref_image.pixel_size
 
     if axes_names is None:
-        axes_names = ref_meta.axes_mapper.on_disk_axes_names
+        axes_names = ref_meta.axes_mapper.axes_names
         c_axis = ref_meta.axes_mapper.get_index("c")
     else:
         if "c" in axes_names:
@@ -283,9 +281,6 @@ def derive_label(
             "The chunks of the new image does not match the reference image."
             f"Got {chunks} for shape {shape}."
         )
-
-    if dtype is None:
-        dtype = ref_image.dtype
 
     if c_axis is not None:
         # remove channel if present

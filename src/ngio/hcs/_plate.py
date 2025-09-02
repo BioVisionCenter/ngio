@@ -1,11 +1,12 @@
-"""A module for handling the Plate Collection in an OME-Zarr file."""
+"""A module for handling the Plate Sequence in an OME-Zarr file."""
 
 import asyncio
 import warnings
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Literal
 
-from ngio.common import (
+from ngio.images import (
+    OmeZarrContainer,
     concatenate_image_tables,
     concatenate_image_tables_as,
     concatenate_image_tables_as_async,
@@ -13,7 +14,6 @@ from ngio.common import (
     list_image_tables,
     list_image_tables_async,
 )
-from ngio.images import OmeZarrContainer
 from ngio.ome_zarr_meta import (
     ImageInWellPath,
     NgffVersions,
@@ -67,7 +67,7 @@ class MockLock:
 
 
 class OmeZarrWell:
-    """A class to handle the Well Collection in an OME-Zarr file."""
+    """A class to handle the Well Sequence in an OME-Zarr file."""
 
     def __init__(self, group_handler: ZarrGroupHandler) -> None:
         """Initialize the LabelGroupHandler.
@@ -200,11 +200,11 @@ class OmeZarrWell:
         )
 
 
-def _build_extras(paths: Collection[str]) -> list[dict[str, str]]:
+def _build_extras(paths: Sequence[str]) -> list[dict[str, str]]:
     """Build the extras for the images.
 
     Args:
-        paths (Collection[str]): The paths of the images.
+        paths (Sequence[str]): The paths of the images.
 
     Returns:
         list[dict[str, str]]: The extras for the images.
@@ -223,7 +223,7 @@ def _build_extras(paths: Collection[str]) -> list[dict[str, str]]:
 
 
 class OmeZarrPlate:
-    """A class to handle the Plate Collection in an OME-Zarr file."""
+    """A class to handle the Plate Sequence in an OME-Zarr file."""
 
     def __init__(
         self,

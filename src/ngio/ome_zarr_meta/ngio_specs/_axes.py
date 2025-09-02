@@ -1,15 +1,16 @@
 """Fractal internal module for axes handling."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from enum import Enum
-from typing import Literal, TypeVar
+from typing import Literal, TypeAlias, TypeVar
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
-from ngio.utils import NgioValidationError, NgioValueError, ngio_logger
+from ngio.utils import NgioValidationError, NgioValueError
 
 T = TypeVar("T")
+SlicingType: TypeAlias = slice | tuple[int, ...] | int
 
 ################################################################################################
 #
@@ -98,24 +99,10 @@ class Axis(BaseModel):
 
     def implicit_type_cast(self, cast_type: AxisType) -> "Axis":
         unit = self.unit
-        if self.axis_type != cast_type:
-            ngio_logger.warning(
-                f"Axis {self.on_disk_name} has type {self.axis_type}. "
-                f"Casting to {cast_type}."
-            )
-
         if cast_type == AxisType.time and unit is None:
-            ngio_logger.warning(
-                f"Time axis {self.on_disk_name} has unit {self.unit}. "
-                f"Casting to {DefaultSpaceUnit}."
-            )
             unit = DefaultTimeUnit
 
         if cast_type == AxisType.space and unit is None:
-            ngio_logger.warning(
-                f"Space axis {self.on_disk_name} has unit {unit}. "
-                f"Casting to {DefaultSpaceUnit}."
-            )
             unit = DefaultSpaceUnit
 
         return Axis(on_disk_name=self.on_disk_name, axis_type=cast_type, unit=unit)
@@ -191,7 +178,7 @@ class AxesSetup(BaseModel):
         }
 
 
-def _check_unique_names(axes: Collection[Axis]):
+def _check_unique_names(axes: Sequence[Axis]):
     """Check if all axes on disk have unique names."""
     names = [ax.on_disk_name for ax in axes]
     if len(set(names)) != len(names):
@@ -210,7 +197,7 @@ def _check_non_canonical_axes(axes_setup: AxesSetup, allow_non_canonical_axes: b
         )
 
 
-def _check_axes_validity(axes: Collection[Axis], axes_setup: AxesSetup):
+def _check_axes_validity(axes: Sequence[Axis], axes_setup: AxesSetup):
     """Check if all axes are valid."""
     _axes_setup = axes_setup.model_dump(exclude={"others"})
     _all_known_axes = [*_axes_setup.values(), *axes_setup.others]
@@ -224,7 +211,7 @@ def _check_axes_validity(axes: Collection[Axis], axes_setup: AxesSetup):
 
 
 def _check_canonical_order(
-    axes: Collection[Axis], axes_setup: AxesSetup, strict_canonical_order: bool
+    axes: Sequence[Axis], axes_setup: AxesSetup, strict_canonical_order: bool
 ):
     """Check if the axes are in the canonical order."""
     if not strict_canonical_order:
@@ -244,7 +231,7 @@ def _check_canonical_order(
 
 
 def validate_axes(
-    axes: Collection[Axis],
+    axes: Sequence[Axis],
     axes_setup: AxesSetup,
     allow_non_canonical_axes: bool = False,
     strict_canonical_order: bool = False,
@@ -266,11 +253,19 @@ def validate_axes(
     )
 
 
-class AxesOps(BaseModel):
+class SlicingOps(BaseModel):
+    slice_tuple: tuple[SlicingType, ...] | None = None
     transpose_axes: tuple[int, ...] | None = None
     expand_axes: tuple[int, ...] | None = None
     squeeze_axes: tuple[int, ...] | None = None
-    model_config = ConfigDict(extra="forbid", frozen=True, arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    @property
+    def requires_axes_ops(self) -> bool:
+        """Check if the slicing operations require axes operations."""
+        if self.expand_axes or self.transpose_axes or self.squeeze_axes:
+            return True
+        return False
 
 
 class AxesMapper:
@@ -283,7 +278,7 @@ class AxesMapper:
     def __init__(
         self,
         # spec dictated args
-        on_disk_axes: Collection[Axis],
+        on_disk_axes: Sequence[Axis],
         # user defined args
         axes_setup: AxesSetup | None = None,
         allow_non_canonical_axes: bool = False,
@@ -340,7 +335,7 @@ class AxesMapper:
             }
         """
         _index_mapping = {}
-        for i, ax in enumerate(self.on_disk_axes_names):
+        for i, ax in enumerate(self.axes_names):
             _index_mapping[ax] = i
         # If the axis is not in the canonical order we also set it.
         canonical_map = self._axes_setup.canonical_map()
@@ -355,12 +350,12 @@ class AxesMapper:
         return self._axes_setup
 
     @property
-    def on_disk_axes(self) -> list[Axis]:
-        return list(self._on_disk_axes)
+    def axes(self) -> tuple[Axis, ...]:
+        return tuple(self._on_disk_axes)
 
     @property
-    def on_disk_axes_names(self) -> list[str]:
-        return [ax.on_disk_name for ax in self._on_disk_axes]
+    def axes_names(self) -> tuple[str, ...]:
+        return tuple(ax.on_disk_name for ax in self._on_disk_axes)
 
     @property
     def allow_non_canonical_axes(self) -> bool:
@@ -381,7 +376,7 @@ class AxesMapper:
         index = self.get_index(name)
         if index is None:
             return None
-        return self.on_disk_axes[index]
+        return self.axes[index]
 
     def validate_axes_type(self):
         """Validate the axes type.
@@ -390,7 +385,7 @@ class AxesMapper:
         and the axis is implicitly cast to the correct type.
         """
         new_axes = []
-        for axes in self.on_disk_axes:
+        for axes in self.axes:
             for name in self._canonical_order:
                 if axes == self.get_axis(name):
                     new_axes.append(axes.canonical_axis_cast(name))
@@ -399,8 +394,8 @@ class AxesMapper:
                 new_axes.append(axes)
         self._on_disk_axes = new_axes
 
-    def _change_order(
-        self, names: Collection[str]
+    def _reorder_axes(
+        self, names: Sequence[str]
     ) -> tuple[tuple[int, ...] | None, tuple[int, ...] | None, tuple[int, ...] | None]:
         """Change the order of the axes."""
         # Validate the names
@@ -419,7 +414,7 @@ class AxesMapper:
         # Step 1: Check find squeeze axes
         _axes_to_squeeze: list[int] = []
         axes_names_after_squeeze = []
-        for i, ax in enumerate(self.on_disk_axes_names):
+        for i, ax in enumerate(self.axes_names):
             # If the axis is not in the names, it means we need to squeeze it
             ax_canonical = inv_canonical_map.get(ax, None)
             if ax not in names and ax_canonical not in names:
@@ -456,50 +451,50 @@ class AxesMapper:
         axes_to_expand = tuple(_axes_to_expand) if len(_axes_to_expand) > 0 else None
         return axes_to_squeeze, transposition_order, axes_to_expand
 
-    def to_order(self, names: Collection[str]) -> AxesOps:
+    def to_order(self, names: Sequence[str]) -> SlicingOps:
         """Get the new order of the axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._change_order(names)
-        return AxesOps(
+        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
+        return SlicingOps(
             transpose_axes=transposition_order,
             expand_axes=axes_to_expand,
             squeeze_axes=axes_to_squeeze,
         )
 
-    def from_order(self, names: Collection[str]) -> AxesOps:
+    def from_order(self, names: Sequence[str]) -> SlicingOps:
         """Get the new order of the axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._change_order(names)
+        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
         # Inverse transpose is just the transpose with the inverse indices
         if transposition_order is None:
             _reverse_indices = None
         else:
             _reverse_indices = tuple(np.argsort(transposition_order))
 
-        return AxesOps(
+        return SlicingOps(
             transpose_axes=_reverse_indices,
             expand_axes=axes_to_squeeze,
             squeeze_axes=axes_to_expand,
         )
 
-    def to_canonical(self) -> AxesOps:
+    def to_canonical(self) -> SlicingOps:
         """Get the new order of the axes."""
         other = self._axes_setup.others
         return self.to_order(other + list(self._canonical_order))
 
-    def from_canonical(self) -> AxesOps:
+    def from_canonical(self) -> SlicingOps:
         """Get the new order of the axes."""
         other = self._axes_setup.others
         return self.from_order(other + list(self._canonical_order))
 
 
 def canonical_axes(
-    axes_names: Collection[str],
+    axes_names: Sequence[str],
     space_units: SpaceUnits | str | None = DefaultSpaceUnit,
     time_units: TimeUnits | str | None = DefaultTimeUnit,
 ) -> list[Axis]:
     """Create a new canonical axes mapper.
 
     Args:
-        axes_names (Collection[str] | int): The axes names on disk.
+        axes_names (Sequence[str] | int): The axes names on disk.
             - The axes should be in ['t', 'c', 'z', 'y', 'x']
             - The axes should be in strict canonical order.
             - If an integer is provided, the axes are created from the last axis

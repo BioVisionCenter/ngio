@@ -8,11 +8,17 @@
 
 ### API Changes
 
-- change `table_name` keyword argument to `name` for consistency in all table concatenation functions, e.g. `concatenate_image_tables`, `concatenate_image_tables_as`, etc.
-- change to `Dimension` class. `get_shape` and `get_canonical_shape` have been removed, `get` uses new keyword arguments `default` instead of `strict`.
-- Image like objects now have a more clean API to load data. Instead of `get_array` and `set_array`, they now use `get_as_numpy`, `get_as_dask`, and `get_as_delayed` for delayed arrays.
+- Table ops moved to `ngio.images`
+- Make `label` an explicit attribute in `Roi` objects.
+- The image-like `get_*` api have been slightly changed.
+  now if a single int is passed as slice_kwargs, it is interpreted as a single index. So the dimension is automatically squeezed.
+- Remove the `get_*_delayed` methods, now data cam only be loaded as numpy or dask array.
+  Use the `get_as_dask` method instead, which returns a dask array that can be used with dask delayed.
+- Change `table_name` keyword argument to `name` for consistency in all table concatenation functions, e.g. `concatenate_image_tables`, `concatenate_image_tables_as`, etc.
+- Change to `Dimension` class. `get_shape` and `get_canonical_shape` have been removed, `get` uses new keyword arguments `default` instead of `strict`.
+- Image like objects now have a more clean API to load data. Instead of `get_array` and `set_array`, they now use `get_as_numpy`, and `get_as_dask` for delayed arrays.
 - Same for `get_roi` now specific methods are available:
-  - for ROI objects, the `get_roi_as_numpy`, `get_roi_as_dask`, and `get_roi_as_delayed` methods
+  - for ROI objects, the `get_roi_as_numpy`, and `get_roi_as_dask` methods
 - for Image objects, the `get_*` methods now have a new `channel_name` keyword argument to specify the channel to load not by index but by name.
 
 ### Table specs
