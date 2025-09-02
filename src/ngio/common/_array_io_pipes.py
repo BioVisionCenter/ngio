@@ -22,6 +22,7 @@ from ngio.common._array_io_utils import (
     setup_to_disk_pipe,
 )
 from ngio.common._dimensions import Dimensions
+from ngio.common._zoom import dask_zoom, numpy_zoom
 from ngio.ome_zarr_meta.ngio_specs import SlicingOps
 
 ##############################################################
@@ -217,6 +218,28 @@ def build_dask_setter(
 ################################################################
 
 
+def _match_data_shape(mask: np.ndarray, data_shape: tuple[int, ...]) -> np.ndarray:
+    """Scale the mask data to match the shape of the data."""
+    if mask.ndim < len(data_shape):
+        mask = np.reshape(mask, (1,) * (len(data_shape) - mask.ndim) + mask.shape)
+    elif mask.ndim > len(data_shape):
+        raise ValueError(
+            "The mask has more dimensions than the data and cannot be matched."
+        )
+
+    zoom_factors = []
+    for s_d, s_m in zip(data_shape, mask.shape, strict=True):
+        if s_m == s_d:
+            zoom_factors.append(1.0)
+        elif s_m == 1:
+            zoom_factors.append(s_d)  # expand singleton
+        else:
+            zoom_factors.append(s_d / s_m)
+
+    mask_matched: np.ndarray = numpy_zoom(mask, scale=tuple(zoom_factors), order=0)
+    return mask_matched
+
+
 def _label_to_bool_mask_numpy(
     label_data: np.ndarray | DaskArray,
     label: int | None = None,
@@ -229,7 +252,7 @@ def _label_to_bool_mask_numpy(
         bool_mask = label_data != 0
 
     if data_shape is not None and label_data.shape != data_shape:
-        bool_mask = np.broadcast_to(bool_mask, data_shape)
+        bool_mask = _match_data_shape(bool_mask, data_shape)
     return bool_mask
 
 
@@ -281,6 +304,28 @@ def build_masked_numpy_getter(
     return get_masked_data_as_numpy
 
 
+def _match_data_shape_dask(mask: da.Array, data_shape: tuple[int, ...]) -> da.Array:
+    """Scale the mask data to match the shape of the data."""
+    if mask.ndim < len(data_shape):
+        mask = da.reshape(mask, (1,) * (len(data_shape) - mask.ndim) + mask.shape)
+    elif mask.ndim > len(data_shape):
+        raise ValueError(
+            "The mask has more dimensions than the data and cannot be matched."
+        )
+
+    zoom_factors = []
+    for s_d, s_m in zip(data_shape, mask.shape, strict=True):
+        if s_m == s_d:
+            zoom_factors.append(1.0)
+        elif s_m == 1:
+            zoom_factors.append(s_d)  # expand singleton
+        else:
+            zoom_factors.append(s_d / s_m)
+
+    mask_matched: da.Array = dask_zoom(mask, scale=tuple(zoom_factors), order=0)
+    return mask_matched
+
+
 def _label_to_bool_mask_dask(
     label_data: DaskArray,
     label: int | None = None,
@@ -293,7 +338,7 @@ def _label_to_bool_mask_dask(
         bool_mask = label_data != 0
 
     if data_shape is not None and label_data.shape != data_shape:
-        bool_mask = da.broadcast_to(bool_mask, data_shape)
+        bool_mask = _match_data_shape_dask(bool_mask, data_shape)
     return bool_mask
 
 
