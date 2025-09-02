@@ -503,6 +503,7 @@ def build_roi_masked_numpy_getter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
+    allow_scaling: bool = True,
 ) -> Callable[[], np.ndarray]:
     """Prepare slice kwargs for getting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -529,6 +530,7 @@ def build_roi_masked_numpy_getter(
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
         fill_value=fill_value,
+        allow_scaling=allow_scaling,
     )
 
 
@@ -546,6 +548,7 @@ def build_roi_masked_numpy_setter(
     label_transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    allow_scaling: bool = True,
 ) -> Callable[[np.ndarray], None]:
     """Prepare slice kwargs for setting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -560,7 +563,6 @@ def build_roi_masked_numpy_setter(
         pixel_size=label_pixel_size,
         slicing_dict=label_slicing_dict,
     )
-    print("label", roi.label)
     return build_masked_numpy_setter(
         zarr_array=zarr_array,
         dimensions=dimensions,
@@ -572,6 +574,7 @@ def build_roi_masked_numpy_setter(
         label_transforms=label_transforms,
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
+        allow_scaling=allow_scaling,
     )
 
 
@@ -589,6 +592,7 @@ def build_roi_masked_dask_getter(
     label_transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    allow_scaling: bool = True,
 ) -> Callable[[], da.Array]:
     """Prepare slice kwargs for getting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -614,6 +618,7 @@ def build_roi_masked_dask_getter(
         label_transforms=label_transforms,
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
+        allow_scaling=allow_scaling,
     )
 
 
@@ -631,6 +636,7 @@ def build_roi_masked_dask_setter(
     label_transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    allow_scaling: bool = True,
 ) -> Callable[[da.Array], None]:
     """Prepare slice kwargs for setting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -656,4 +662,5 @@ def build_roi_masked_dask_setter(
         label_transforms=label_transforms,
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
+        allow_scaling=allow_scaling,
     )

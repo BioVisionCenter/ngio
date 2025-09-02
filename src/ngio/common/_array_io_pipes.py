@@ -244,6 +244,7 @@ def _label_to_bool_mask_numpy(
     label_data: np.ndarray | DaskArray,
     label: int | None = None,
     data_shape: tuple[int, ...] | None = None,
+    allow_scaling: bool = True,
 ) -> np.ndarray:
     """Convert label data to a boolean mask."""
     if label is not None:
@@ -252,7 +253,10 @@ def _label_to_bool_mask_numpy(
         bool_mask = label_data != 0
 
     if data_shape is not None and label_data.shape != data_shape:
-        bool_mask = _match_data_shape(bool_mask, data_shape)
+        if allow_scaling:
+            bool_mask = _match_data_shape(bool_mask, data_shape)
+        else:
+            bool_mask = np.broadcast_to(bool_mask, data_shape)
     return bool_mask
 
 
@@ -269,6 +273,7 @@ def build_masked_numpy_getter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
+    allow_scaling: bool = True,
 ) -> Callable[[], np.ndarray]:
     """Get a numpy array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -296,7 +301,10 @@ def build_masked_numpy_getter(
         data = data_getter()
         label_data = label_data_getter()
         bool_mask = _label_to_bool_mask_numpy(
-            label_data=label_data, label=label_id, data_shape=data.shape
+            label_data=label_data,
+            label=label_id,
+            data_shape=data.shape,
+            allow_scaling=allow_scaling,
         )
         masked_data = np.where(bool_mask, data, fill_value)
         return masked_data
@@ -330,6 +338,7 @@ def _label_to_bool_mask_dask(
     label_data: DaskArray,
     label: int | None = None,
     data_shape: tuple[int, ...] | None = None,
+    allow_scaling: bool = True,
 ) -> DaskArray:
     """Convert label data to a boolean mask for Dask arrays."""
     if label is not None:
@@ -338,7 +347,10 @@ def _label_to_bool_mask_dask(
         bool_mask = label_data != 0
 
     if data_shape is not None and label_data.shape != data_shape:
-        bool_mask = _match_data_shape_dask(bool_mask, data_shape)
+        if allow_scaling:
+            bool_mask = _match_data_shape_dask(bool_mask, data_shape)
+        else:
+            bool_mask = da.broadcast_to(bool_mask, data_shape)
     return bool_mask
 
 
@@ -355,6 +367,7 @@ def build_masked_dask_getter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
+    allow_scaling: bool = True,
 ) -> Callable[[], DaskArray]:
     """Get a dask array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -383,7 +396,10 @@ def build_masked_dask_getter(
         label_data = label_data_getter()
         data_shape = tuple(int(dim) for dim in data.shape)
         bool_mask = _label_to_bool_mask_dask(
-            label_data=label_data, label=label_id, data_shape=data_shape
+            label_data=label_data,
+            label=label_id,
+            data_shape=data_shape,
+            allow_scaling=allow_scaling,
         )
         masked_data = da.where(bool_mask, data, fill_value)
         return masked_data
@@ -405,6 +421,7 @@ def build_masked_numpy_setter(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     data_getter: Callable[[], np.ndarray] | None = None,
     label_data_getter: Callable[[], np.ndarray] | None = None,
+    allow_scaling: bool = True,
 ) -> Callable[[np.ndarray], None]:
     """Set a numpy array to the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -444,7 +461,10 @@ def build_masked_numpy_setter(
         data = data_getter()
         label_data = label_data_getter()
         bool_mask = _label_to_bool_mask_numpy(
-            label_data=label_data, label=label_id, data_shape=data.shape
+            label_data=label_data,
+            label=label_id,
+            data_shape=data.shape,
+            allow_scaling=allow_scaling,
         )
         mask_data = np.where(bool_mask, patch, data)
         masked_data_setter(mask_data)
@@ -466,6 +486,7 @@ def build_masked_dask_setter(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     data_getter: Callable[[], DaskArray] | None = None,
     label_data_getter: Callable[[], DaskArray] | None = None,
+    allow_scaling: bool = True,
 ) -> Callable[[DaskArray], None]:
     """Set a dask array to the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -506,7 +527,10 @@ def build_masked_dask_setter(
         label_data = label_data_getter()
         data_shape = tuple(int(dim) for dim in data.shape)
         bool_mask = _label_to_bool_mask_dask(
-            label_data=label_data, label=label_id, data_shape=data_shape
+            label_data=label_data,
+            label=label_id,
+            data_shape=data_shape,
+            allow_scaling=allow_scaling,
         )
         mask_data = da.where(bool_mask, patch, data)
         data_setter(mask_data)

@@ -153,6 +153,7 @@ class MaskedImage(Image):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Return the masked array for a given label as a NumPy array."""
@@ -173,6 +174,7 @@ class MaskedImage(Image):
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
         return masked_getter()
 
@@ -183,6 +185,7 @@ class MaskedImage(Image):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Return the masked array for a given label as a Dask array."""
@@ -203,6 +206,7 @@ class MaskedImage(Image):
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
         return masked_getter()
 
@@ -214,6 +218,7 @@ class MaskedImage(Image):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Return the masked array for a given label."""
@@ -224,6 +229,7 @@ class MaskedImage(Image):
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
+                allow_scaling=allow_scaling,
                 **slicing_kwargs,
             )
         elif mode == "dask":
@@ -233,6 +239,7 @@ class MaskedImage(Image):
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
+                allow_scaling=allow_scaling,
                 **slicing_kwargs,
             )
         else:
@@ -246,6 +253,7 @@ class MaskedImage(Image):
         axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the masked array for a given label."""
@@ -267,6 +275,7 @@ class MaskedImage(Image):
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
@@ -281,6 +290,7 @@ class MaskedImage(Image):
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
             path_setter(patch)
         else:
@@ -406,6 +416,7 @@ class MaskedLabel(Label):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray:
         """Return the masked array for a given label as a NumPy array."""
@@ -422,6 +433,7 @@ class MaskedLabel(Label):
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
         return masked_getter()
 
@@ -431,6 +443,7 @@ class MaskedLabel(Label):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> da.Array:
         """Return the masked array for a given label as a Dask array."""
@@ -447,6 +460,7 @@ class MaskedLabel(Label):
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
         )
         return masked_getter()
 
@@ -457,6 +471,7 @@ class MaskedLabel(Label):
         axes_order: Sequence[str] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> ArrayLike:
         """Return the masked array for a given label."""
@@ -466,6 +481,7 @@ class MaskedLabel(Label):
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
+                allow_scaling=allow_scaling,
                 **slicing_kwargs,
             )
 
@@ -475,6 +491,7 @@ class MaskedLabel(Label):
                 zoom_factor=zoom_factor,
                 axes_order=axes_order,
                 transforms=transforms,
+                allow_scaling=allow_scaling,
                 **slicing_kwargs,
             )
         else:
@@ -487,6 +504,7 @@ class MaskedLabel(Label):
         axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
         transforms: Sequence[TransformProtocol] | None = None,
+        allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the masked array for a given label."""
@@ -504,6 +522,7 @@ class MaskedLabel(Label):
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
@@ -518,6 +537,7 @@ class MaskedLabel(Label):
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,
+                allow_scaling=allow_scaling,
             )
             path_setter(patch)
         else:
