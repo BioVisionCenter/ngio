@@ -101,7 +101,11 @@ def roi_intersection(
     ref_roi: GenericRoi[T], other_roi: GenericRoi[T]
 ) -> GenericRoi[T] | None:
     """Calculate the intersection of two ROIs."""
-    if ref_roi.unit != other_roi.unit:
+    if (
+        ref_roi.unit is not None
+        and other_roi.unit is not None
+        and ref_roi.unit != other_roi.unit
+    ):
         raise NgioValueError(
             "Cannot calculate intersection of ROIs with different units."
         )

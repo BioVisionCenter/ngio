@@ -1,30 +1,27 @@
-from collections.abc import Callable, Collection, Generator
+from collections.abc import Callable, Generator, Sequence
 
 import dask.array as da
 import numpy as np
 
-from ngio import PixelSize
 from ngio.common import (
-    Dimensions,
     Roi,
-    add_channel_label_to_slice_kwargs,
-    roi_to_slice_kwargs,
+    TransformProtocol,
+    build_roi_dask_getter,
+    build_roi_dask_setter,
+    build_roi_masked_dask_getter,
+    build_roi_masked_dask_setter,
+    build_roi_masked_numpy_getter,
+    build_roi_masked_numpy_setter,
+    build_roi_numpy_getter,
+    build_roi_numpy_setter,
 )
-from ngio.common._io_transforms import TransformProtocol
-from ngio.experimental.iterators._abstract_iterator import AbstractIteratorFactory
-from ngio.experimental.iterators._read_and_write import (
-    DaskReader,
-    DaskWriter,
-    NumpyReader,
-    NumpyWriter,
-    build_dask_reader,
-    build_dask_writer,
-    build_numpy_reader,
-    build_numpy_writer,
-)
-from ngio.experimental.iterators._rois_handler import RoisHandler
+from ngio.experimental.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.images import Image, Label
-from ngio.tables import RoiTable
+from ngio.images._image import (
+    ChannelSlicingInputType,
+    add_channel_selection_to_slicing_dict,
+)
+from ngio.images._masked_image import MaskedImage
 from ngio.utils._errors import NgioValidationError
 
 
@@ -40,14 +37,17 @@ def make_unique_label_da(x: da.Array, p: int, n: int) -> da.Array:
     return x
 
 
-class SegmentationIterator(AbstractIteratorFactory):
+class SegmentationIterator(AbstractIteratorBuilder):
     """Base class for iterators over ROIs."""
 
     def __init__(
         self,
         input_image: Image,
         output_label: Label,
-        roi_base: RoiTable | list[Roi] | None = None,
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        input_transforms: Sequence[TransformProtocol] | None = None,
+        output_transforms: Sequence[TransformProtocol] | None = None,
     ) -> None:
         """Initialize the iterator with a ROI table and input/output images.
 
@@ -55,11 +55,27 @@ class SegmentationIterator(AbstractIteratorFactory):
             input_image (Image): The input image to be used as input for the
                 segmentation.
             output_label (Label): The label image where the ROIs will be written.
-            roi_base (RoiTable | None): Optional table containing ROI definitions.
+            channel_selection (ChannelSlicingInputType): Optional
+                selection of channels to use for the segmentation.
+            axes_order (Sequence[str] | None): Optional axes order for the
+                segmentation.
+            input_transforms (Sequence[TransformProtocol] | None): Optional
+                transforms to apply to the input image.
+            output_transforms (Sequence[TransformProtocol] | None): Optional
+                transforms to apply to the output label.
         """
         self._input = input_image
         self._output = output_label
-        self._set_rois_handler(RoisHandler(ref_image=input_image, rois_base=roi_base))
+        self._ref_image = input_image
+
+        # Set iteration parameters
+        self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self._input, channel_selection=channel_selection, slicing_dict={}
+        )
+        self._channel_selection = channel_selection
+        self._axes_order = axes_order
+        self._input_transforms = input_transforms
+        self._output_transforms = output_transforms
 
         # Check compatibility between input and output images
         if not self._input.dimensions.is_compatible_with(self._output.dimensions):
@@ -69,277 +85,211 @@ class SegmentationIterator(AbstractIteratorFactory):
             )
 
     def __repr__(self) -> str:
-        return f"SegmentationIterator(regions={len(self._rois_handler.rois)})"
+        return f"SegmentationIterator(regions={len(self.rois)})"
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
             "input_image": self._input,
             "output_label": self._output,
-            "roi_base": self._rois_handler.rois,
+            "channel_selection": self._channel_selection,
+            "axes_order": self._axes_order,
+            "input_transforms": self._input_transforms,
+            "output_transforms": self._output_transforms,
         }
 
-    def by_masking_label(
-        self,
-        masking_label: Label,
-        masking_roi: RoiTable | None = None,
-    ) -> "SegmentationIterator":
-        """Return a new iterator that iterates over ROIs by masking a label."""
-        self._masking_label = masking_label
-        if masking_roi is not None:
-            rois = masking_roi.rois()
-        else:
-            rois = masking_label.build_masking_roi_table().rois()
-        rois_handler = self._rois_handler.product(rois)
-        return self._new_from_rois_handler(rois_handler)
-
-    def _setup_slice_kwargs(
-        self,
-        roi: Roi,
-        dimensions: Dimensions,
-        pixel_size: PixelSize,
-        channel_label: str | None = None,
-        channel_idx: int | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> dict[str, slice | int | Collection[int]]:
-        """Prepare slice kwargs for the ROI."""
-        input_slice_kwargs = roi_to_slice_kwargs(
+    def build_numpy_getter(self, roi: Roi):
+        return build_roi_numpy_getter(
+            zarr_array=self._input.zarr_array,
+            dimensions=self._input.dimensions,
+            axes_order=self._axes_order,
+            transforms=self._input_transforms,
+            pixel_size=self._input.pixel_size,
             roi=roi,
-            dimensions=dimensions,
-            pixel_size=pixel_size,
-            **slice_kwargs,
+            slicing_dict=self._input_slicing_kwargs,
         )
-        input_slice_kwargs = add_channel_label_to_slice_kwargs(
-            channel_idx=channel_idx,
-            channel_label=channel_label,
-            **input_slice_kwargs,
+
+    def build_numpy_setter(self, roi: Roi):
+        return build_roi_numpy_setter(
+            zarr_array=self._output.zarr_array,
+            dimensions=self._output.dimensions,
+            axes_order=self._axes_order,
+            transforms=self._output_transforms,
+            pixel_size=self._output.pixel_size,
+            roi=roi,
         )
-        return input_slice_kwargs
 
-    def _iter_as_numpy(
-        self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Generator[tuple[NumpyReader, NumpyWriter]]:
-        """Create an iterator over the pixels of the ROIs.
+    def build_dask_getter(self, roi: Roi):
+        return build_roi_dask_getter(
+            zarr_array=self._input.zarr_array,
+            dimensions=self._input.dimensions,
+            axes_order=self._axes_order,
+            transforms=self._input_transforms,
+            pixel_size=self._input.pixel_size,
+            roi=roi,
+            slicing_dict=self._input_slicing_kwargs,
+        )
 
-        Args:
-            channel_label: Select a specific channel by label.
-                If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
-            axes_order: The order of the axes to return the array.
-            input_transforms: The transforms to apply to the input array.
-            output_transforms: The transforms to apply to the output array.
-            **slice_kwargs: The slices to get the array.
+    def build_dask_setter(self, roi: Roi):
+        return build_roi_dask_setter(
+            zarr_array=self._output.zarr_array,
+            dimensions=self._output.dimensions,
+            axes_order=self._axes_order,
+            transforms=self._output_transforms,
+            pixel_size=self._output.pixel_size,
+            roi=roi,
+        )
 
-        Returns:
-            RoiPixels: An iterator over the pixels of the ROIs.
-        """
-        for roi in self._rois_handler.rois:
-            input_slice_kwargs = self._setup_slice_kwargs(
-                roi=roi,
-                dimensions=self._input.dimensions,
-                pixel_size=self._input.pixel_size,
-                channel_label=channel_label,
-                channel_idx=self._input.get_channel_idx(channel_label=channel_label),
-                **slice_kwargs,
-            )
-
-            output_slice_kwargs = self._setup_slice_kwargs(
-                roi=roi,
-                dimensions=self._output.dimensions,
-                pixel_size=self._output.pixel_size,
-                channel_label=None,
-                channel_idx=None,
-                **slice_kwargs,
-            )
-
-            reader = build_numpy_reader(
-                array=self._input.zarr_array,
-                dimensions=self._input.dimensions,
-                axes_order=axes_order,
-                transforms=input_transforms,
-                **input_slice_kwargs,
-            )
-            writer = build_numpy_writer(
-                array=self._output.zarr_array,
-                dimensions=self._output.dimensions,
-                axes_order=axes_order,
-                transforms=output_transforms,
-                **output_slice_kwargs,
-            )
-
-            yield (reader, writer)
-
+    def post_consolidate(self):
         self._output.consolidate()
 
     def iter_as_numpy(
         self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Generator[tuple[np.ndarray, NumpyWriter]]:
-        """Create an iterator over the pixels of the ROIs as NumPy arrays.
-
-        Args:
-            channel_label: Select a specific channel by label.
-                If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
-            axes_order: The order of the axes to return the array.
-            input_transforms: The transforms to apply to the input array.
-            output_transforms: The transforms to apply to the output array.
-            **slice_kwargs: The slices to get the array.
-
-        Returns:
-            RoiPixels: An iterator over the pixels of the ROIs as NumPy arrays.
-        """
-        for reader, writer in self._iter_as_numpy(
-            channel_label=channel_label,
-            axes_order=axes_order,
-            input_transforms=input_transforms,
-            output_transforms=output_transforms,
-            **slice_kwargs,
-        ):
-            yield (reader(), writer)
-
-    def _iter_as_dask(
-        self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Generator[tuple[DaskReader, DaskWriter]]:
+    ) -> Generator[tuple[np.ndarray, Callable[[np.ndarray], None]]]:
         """Create an iterator over the pixels of the ROIs as Dask arrays.
 
-        Args:
-            channel_label: Select a specific channel by label.
-                If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
-            axes_order: The order of the axes to return the array.
-            input_transforms: The transforms to apply to the input array.
-            output_transforms: The transforms to apply to the output array.
-            **slice_kwargs: The slices to get the array.
+        Returns:
+            Generator[tuple[da.Array, DaskWriter]]: An iterator the input
+                image as Dask arrays and a writer to write the output
+                to the label image.
+        """
+        return super().iter_as_numpy()
+
+    def map_as_numpy(self, func: Callable[[np.ndarray], np.ndarray]) -> None:
+        """Apply a transformation function to the ROI pixels."""
+        return super().map_as_numpy(func)
+
+    def iter_as_dask(self) -> Generator[tuple[da.Array, Callable[[da.Array], None]]]:
+        """Create an iterator over the pixels of the ROIs as Dask arrays.
 
         Returns:
-            RoiPixels: An iterator over the pixels of the ROIs as Dask arrays.
+            Generator[tuple[da.Array, DaskWriter]]: An iterator the input
+                image as Dask arrays and a writer to write the output
+                to the label image.
         """
-        for roi in self._rois_handler.rois:
-            input_slice_kwargs = roi_to_slice_kwargs(
-                roi=roi,
-                dimensions=self._input.dimensions,
-                pixel_size=self._input.pixel_size,
-                **slice_kwargs,
-            )
-            input_slice_kwargs = add_channel_label_to_slice_kwargs(
-                channel_idx=self._input.get_channel_idx(channel_label=channel_label),
-                channel_label=channel_label,
-                **input_slice_kwargs,
+        return super().iter_as_dask()
+
+    def map_as_dask(self, func: Callable[[da.Array], da.Array]) -> None:
+        """Apply a transformation function to the ROI pixels."""
+        return super().map_as_dask(func)
+
+
+class MaskedSegmentationIterator(SegmentationIterator):
+    """Base class for iterators over ROIs."""
+
+    def __init__(
+        self,
+        input_image: MaskedImage,
+        output_label: Label,
+        channel_selection: ChannelSlicingInputType = None,
+        axes_order: Sequence[str] | None = None,
+        input_transforms: Sequence[TransformProtocol] | None = None,
+        output_transforms: Sequence[TransformProtocol] | None = None,
+    ) -> None:
+        """Initialize the iterator with a ROI table and input/output images.
+
+        Args:
+            input_image (MaskedImage): The input image to be used as input for the
+                segmentation.
+            output_label (Label): The label image where the ROIs will be written.
+            channel_selection (ChannelSlicingInputType): Optional
+                selection of channels to use for the segmentation.
+            axes_order (Sequence[str] | None): Optional axes order for the
+                segmentation.
+            input_transforms (Sequence[TransformProtocol] | None): Optional
+                transforms to apply to the input image.
+            output_transforms (Sequence[TransformProtocol] | None): Optional
+                transforms to apply to the output label.
+        """
+        self._input = input_image
+        self._output = output_label
+
+        self._ref_image = input_image
+        self._set_rois(input_image._masking_roi_table.rois())
+
+        # Set iteration parameters
+        self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self._input, channel_selection=channel_selection, slicing_dict={}
+        )
+        self._channel_selection = channel_selection
+        self._axes_order = axes_order
+        self._input_transforms = input_transforms
+        self._output_transforms = output_transforms
+
+        # Check compatibility between input and output images
+        if not self._input.dimensions.is_compatible_with(self._output.dimensions):
+            raise NgioValidationError(
+                "Input image and output label have incompatible dimensions. "
+                f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
             )
 
-            output_slice_kwargs = roi_to_slice_kwargs(
-                roi=roi,
-                dimensions=self._output.dimensions,
-                pixel_size=self._output.pixel_size,
-                **slice_kwargs,
-            )
+    def __repr__(self) -> str:
+        return f"SegmentationIterator(regions={len(self.rois)})"
 
-            reader = build_dask_reader(
-                array=self._input.zarr_array,
-                dimensions=self._input.dimensions,
-                axes_order=axes_order,
-                transforms=input_transforms,
-                **input_slice_kwargs,
-            )
-            writer = build_dask_writer(
-                array=self._output.zarr_array,
-                dimensions=self._output.dimensions,
-                axes_order=axes_order,
-                transforms=output_transforms,
-                **output_slice_kwargs,
-            )
+    def get_init_kwargs(self) -> dict:
+        """Return the initialization arguments for the iterator."""
+        return {
+            "input_image": self._input,
+            "output_label": self._output,
+            "channel_selection": self._channel_selection,
+            "axes_order": self._axes_order,
+            "input_transforms": self._input_transforms,
+            "output_transforms": self._output_transforms,
+        }
 
-            yield (reader, writer)
+    def build_numpy_getter(self, roi: Roi):
+        return build_roi_masked_numpy_getter(
+            roi=roi,
+            zarr_array=self._input.zarr_array,
+            dimensions=self._input.dimensions,
+            label_zarr_array=self._input._label.zarr_array,
+            label_dimensions=self._input._label.dimensions,
+            label_pixel_size=self._input._label.pixel_size,
+            axes_order=self._axes_order,
+            transforms=self._input_transforms,
+            pixel_size=self._input.pixel_size,
+            slicing_dict=self._input_slicing_kwargs,
+        )
 
+    def build_numpy_setter(self, roi: Roi):
+        return build_roi_masked_numpy_setter(
+            roi=roi,
+            zarr_array=self._output.zarr_array,
+            dimensions=self._output.dimensions,
+            label_zarr_array=self._input._label.zarr_array,
+            label_dimensions=self._input._label.dimensions,
+            label_pixel_size=self._input._label.pixel_size,
+            axes_order=self._axes_order,
+            transforms=self._output_transforms,
+            pixel_size=self._output.pixel_size,
+        )
+
+    def build_dask_getter(self, roi: Roi):
+        return build_roi_masked_dask_getter(
+            roi=roi,
+            zarr_array=self._input.zarr_array,
+            dimensions=self._input.dimensions,
+            label_zarr_array=self._input._label.zarr_array,
+            label_dimensions=self._input._label.dimensions,
+            label_pixel_size=self._input._label.pixel_size,
+            axes_order=self._axes_order,
+            transforms=self._input_transforms,
+            pixel_size=self._input.pixel_size,
+            slicing_dict=self._input_slicing_kwargs,
+        )
+
+    def build_dask_setter(self, roi: Roi):
+        return build_roi_masked_dask_setter(
+            roi=roi,
+            zarr_array=self._output.zarr_array,
+            dimensions=self._output.dimensions,
+            label_zarr_array=self._input._label.zarr_array,
+            label_dimensions=self._input._label.dimensions,
+            label_pixel_size=self._input._label.pixel_size,
+            axes_order=self._axes_order,
+            transforms=self._output_transforms,
+            pixel_size=self._output.pixel_size,
+        )
+
+    def post_consolidate(self):
         self._output.consolidate()
-
-    def iter_as_dask(
-        self,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Generator[tuple[da.Array, DaskWriter]]:
-        """Create an iterator over the pixels of the ROIs as Dask arrays.
-
-        Args:
-            channel_label: Select a specific channel by label.
-                If None, all channels are returned.
-                Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
-            axes_order: The order of the axes to return the array.
-            input_transforms: The transforms to apply to the input array.
-            output_transforms: The transforms to apply to the output array.
-            **slice_kwargs: The slices to get the array.
-        """
-        for reader, writer in self._iter_as_dask(
-            channel_label=channel_label,
-            axes_order=axes_order,
-            input_transforms=input_transforms,
-            output_transforms=output_transforms,
-            **slice_kwargs,
-        ):
-            yield (reader(), writer)
-
-    def map_as_numpy(
-        self,
-        func: Callable,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Label:
-        """Apply a transformation function to the ROI pixels."""
-        for reader, writer in self._iter_as_numpy(
-            channel_label=channel_label,
-            axes_order=axes_order,
-            input_transforms=input_transforms,
-            output_transforms=output_transforms,
-            **slice_kwargs,
-        ):
-            input_patch = reader()
-            transformed_patch = func(input_patch)
-            writer(transformed_patch)
-        return self._output
-
-    def map_as_dask(
-        self,
-        func: Callable,
-        channel_label: str | None = None,
-        axes_order: Collection[str] | None = None,
-        input_transforms: Collection[TransformProtocol] | None = None,
-        output_transforms: Collection[TransformProtocol] | None = None,
-        **slice_kwargs: slice | int | Collection[int],
-    ) -> Label:
-        """Apply a transformation function to the ROI pixels."""
-        for reader, writer in self._iter_as_dask(
-            channel_label=channel_label,
-            axes_order=axes_order,
-            input_transforms=input_transforms,
-            output_transforms=output_transforms,
-            **slice_kwargs,
-        ):
-            input_patch = reader()
-            transformed_patch = func(input_patch)
-            writer(transformed_patch)
-        return self._output
