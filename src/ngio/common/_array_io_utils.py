@@ -245,7 +245,7 @@ def _build_slicing_tuple(
     return slicing_tuple
 
 
-def _get_slice_as_numpy(
+def get_slice_as_numpy(
     zarr_array: zarr.Array, slice_tuple: tuple[SlicingType, ...] | None
 ) -> np.ndarray:
     if slice_tuple is None:
@@ -273,7 +273,7 @@ def _get_slice_as_numpy(
     return zarr_array[tuple(first_slice_tuple)][tuple(second_slice_tuple)]
 
 
-def _get_slice_as_dask(
+def get_slice_as_dask(
     zarr_array: zarr.Array, slice_tuple: tuple[SlicingType, ...] | None
 ) -> da.Array:
     da_array = da.from_zarr(zarr_array)
@@ -281,15 +281,15 @@ def _get_slice_as_dask(
         return da_array
 
     if any(isinstance(s, tuple) for s in slice_tuple):
-        raise NgioValueError(
+        raise NotImplementedError(
             "Slicing with non-contiguous tuples/lists "
-            "is not supported for Dask arrays. Use the "
+            "is not supported yet for Dask arrays. Use the "
             "numpy api to get the correct array slice."
         )
     return da_array[slice_tuple]
 
 
-def _set_numpy_patch(
+def set_numpy_patch(
     zarr_array: zarr.Array,
     patch: np.ndarray,
     slice_tuple: tuple[SlicingType, ...] | None,
@@ -300,7 +300,7 @@ def _set_numpy_patch(
     zarr_array[slice_tuple] = patch
 
 
-def _set_dask_patch(
+def set_dask_patch(
     zarr_array: zarr.Array, patch: da.Array, slice_tuple: tuple[SlicingType, ...] | None
 ) -> None:
     da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)

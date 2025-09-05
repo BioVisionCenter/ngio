@@ -8,16 +8,16 @@ from dask.array import Array as DaskArray
 from ngio.common._array_io_utils import (
     SlicingInputType,
     TransformProtocol,
-    _get_slice_as_dask,
-    _get_slice_as_numpy,
-    _set_dask_patch,
-    _set_numpy_patch,
     apply_dask_axes_ops,
     apply_dask_transforms,
     apply_inverse_dask_transforms,
     apply_inverse_numpy_transforms,
     apply_numpy_axes_ops,
     apply_numpy_transforms,
+    get_slice_as_dask,
+    get_slice_as_numpy,
+    set_dask_patch,
+    set_numpy_patch,
     setup_from_disk_pipe,
     setup_to_disk_pipe,
 )
@@ -37,7 +37,7 @@ def _numpy_get_pipe(
     slicing_ops: SlicingOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> np.ndarray:
-    _array = _get_slice_as_numpy(zarr_array, slice_tuple=slicing_ops.slice_tuple)
+    _array = get_slice_as_numpy(zarr_array, slice_tuple=slicing_ops.slice_tuple)
     _array = apply_numpy_axes_ops(
         _array,
         squeeze_axes=slicing_ops.squeeze_axes,
@@ -56,7 +56,7 @@ def _dask_get_pipe(
     slicing_ops: SlicingOps,
     transforms: Sequence[TransformProtocol] | None,
 ) -> DaskArray:
-    _array = _get_slice_as_dask(zarr_array, slice_tuple=slicing_ops.slice_tuple)
+    _array = get_slice_as_dask(zarr_array, slice_tuple=slicing_ops.slice_tuple)
     _array = apply_dask_axes_ops(
         _array,
         squeeze_axes=slicing_ops.squeeze_axes,
@@ -140,7 +140,7 @@ def _numpy_set_pipe(
         transpose_axes=slicing_ops.transpose_axes,
         expand_axes=slicing_ops.expand_axes,
     )
-    _set_numpy_patch(zarr_array, _patch, slicing_ops.slice_tuple)
+    set_numpy_patch(zarr_array, _patch, slicing_ops.slice_tuple)
 
 
 def _dask_set_pipe(
@@ -158,7 +158,7 @@ def _dask_set_pipe(
         transpose_axes=slicing_ops.transpose_axes,
         expand_axes=slicing_ops.expand_axes,
     )
-    _set_dask_patch(zarr_array, _patch, slicing_ops.slice_tuple)
+    set_dask_patch(zarr_array, _patch, slicing_ops.slice_tuple)
 
 
 def build_numpy_setter(
