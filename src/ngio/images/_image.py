@@ -40,16 +40,27 @@ from ngio.utils import (
 
 
 class ChannelSelectionModel(BaseModel):
-    """Model for channel selection."""
+    """Model for channel selection.
 
-    identifier: str | int
-    mode: Literal["label", "wavelength_id", "index"]
+    This model is used to select a channel by label, wavelength ID, or index.
+
+    Args:
+        identifier (str): Unique identifier for the channel.
+            This can be a channel label, wavelength ID, or index.
+        mode (Literal["label", "wavelength_id", "index"]): Specifies how to
+            interpret the identifier. Can be "label", "wavelength_id", or
+            "index" (must be an integer).
+
+    """
+
+    identifier: str
+    mode: Literal["label", "wavelength_id", "index"] = "label"
 
     @model_validator(mode="after")
     def check_channel_selection(self):
         if self.mode == "index":
             try:
-                self.identifier = int(self.identifier)
+                int(self.identifier)
             except ValueError as e:
                 raise ValueError(
                     "Identifier must be an integer when mode is 'index'"

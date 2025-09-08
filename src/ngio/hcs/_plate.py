@@ -973,9 +973,9 @@ class OmeZarrPlate:
                 If 'common', return only common tables between all images.
                 If 'all', return all tables. Defaults to 'common'.
         """
-        images = self.get_images(acquisition=acquisition)
+        images = tuple(self.get_images(acquisition=acquisition).values())
         return list_image_tables(
-            images=images.values(),
+            images=images,
             filter_types=filter_types,
             mode=mode,
         )
@@ -997,8 +997,9 @@ class OmeZarrPlate:
                 If 'all', return all tables. Defaults to 'common'.
         """
         images = await self.get_images_async(acquisition=acquisition)
+        images = tuple(images.values())
         return await list_image_tables_async(
-            images=images.values(),
+            images=images,
             filter_types=filter_types,
             mode=mode,
         )
@@ -1025,9 +1026,9 @@ class OmeZarrPlate:
                 if 'lazy', the table will be loaded as a lazy frame.
         """
         images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(images.keys())
+        extras = _build_extras(tuple(images.keys()))
         return concatenate_image_tables(
-            images=images.values(),
+            images=tuple(images.values()),
             extras=extras,
             name=name,
             index_key=index_key,
@@ -1059,9 +1060,9 @@ class OmeZarrPlate:
                 if 'lazy', the table will be loaded as a lazy frame.
         """
         images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(images.keys())
+        extras = _build_extras(tuple(images.keys()))
         return concatenate_image_tables_as(
-            images=images.values(),
+            images=tuple(images.values()),
             extras=extras,
             name=name,
             table_cls=table_cls,
@@ -1092,9 +1093,9 @@ class OmeZarrPlate:
                 if 'lazy', the table will be loaded as a lazy frame.
         """
         images = await self.get_images_async(acquisition=acquisition)
-        extras = _build_extras(images.keys())
+        extras = _build_extras(tuple(images.keys()))
         return await concatenate_image_tables_async(
-            images=images.values(),
+            images=tuple(images.values()),
             extras=extras,
             name=name,
             index_key=index_key,
@@ -1126,9 +1127,9 @@ class OmeZarrPlate:
                 if 'lazy', the table will be loaded as a lazy frame.
         """
         images = await self.get_images_async(acquisition=acquisition)
-        extras = _build_extras(images.keys())
+        extras = _build_extras(tuple(images.keys()))
         return await concatenate_image_tables_as_async(
-            images=images.values(),
+            images=tuple(images.values()),
             extras=extras,
             name=name,
             table_cls=table_cls,

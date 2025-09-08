@@ -19,6 +19,7 @@ from ngio.hcs import (
     open_ome_zarr_well,
 )
 from ngio.images import (
+    ChannelSelectionModel,
     Image,
     Label,
     OmeZarrContainer,
@@ -39,6 +40,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
 __all__ = [
     "ArrayLike",
     "AxesSetup",
+    "ChannelSelectionModel",
     "DefaultNgffVersion",
     "Dimensions",
     "Image",

@@ -1,6 +1,6 @@
 """OME-Zarr object models."""
 
-from ngio.images._image import Image, ImagesContainer
+from ngio.images._image import ChannelSelectionModel, Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
 from ngio.images._ome_zarr_container import (
     OmeZarrContainer,
@@ -21,6 +21,7 @@ from ngio.images._table_ops import (
 )
 
 __all__ = [
+    "ChannelSelectionModel",
     "Image",
     "ImagesContainer",
     "Label",

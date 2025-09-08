@@ -82,9 +82,15 @@ class AbstractIteratorBuilder(ABC):
         rois = by_yx(self.rois, self.ref_image)
         return self._new_from_rois(rois)
 
-    def by_zyx(self) -> Self:
-        """Return a new iterator that iterates over ROIs by ZYX coordinates."""
-        rois = by_zyx(self.rois, self.ref_image)
+    def by_zyx(self, strict: bool = True) -> Self:
+        """Return a new iterator that iterates over ROIs by ZYX coordinates.
+
+        Args:
+            strict (bool): If True, only iterate over ZYX if a Z axis
+                is present and not of size 1.
+
+        """
+        rois = by_zyx(self.rois, self.ref_image, strict=strict)
         return self._new_from_rois(rois)
 
     def by_chunks(self, overlap_xy: int = 0, overlap_z: int = 0) -> Self:
