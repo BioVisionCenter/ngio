@@ -1826,8 +1826,7 @@ access mode for the image. Defaults to "r+".</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1141</span>
-<span class="normal">1142</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1142</span>
 <span class="normal">1143</span>
 <span class="normal">1144</span>
 <span class="normal">1145</span>
@@ -1844,7 +1843,8 @@ access mode for the image. Defaults to "r+".</p>
 <span class="normal">1156</span>
 <span class="normal">1157</span>
 <span class="normal">1158</span>
-<span class="normal">1159</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_plate</span><span class="p">(</span>
+<span class="normal">1159</span>
+<span class="normal">1160</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_plate</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="n">AccessModeLiteral</span> <span class="o">=</span> <span class="s2">&quot;r+&quot;</span><span class="p">,</span>
@@ -4700,9 +4700,9 @@ If 'all', return all tables. Defaults to 'common'.</p>
 <span class="sd">            If &#39;common&#39;, return only common tables between all images.</span>
 <span class="sd">            If &#39;all&#39;, return all tables. Defaults to &#39;common&#39;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">images</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
+    <span class="n">images</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
     <span class="k">return</span> <span class="n">list_image_tables</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="p">,</span>
         <span class="n">filter_types</span><span class="o">=</span><span class="n">filter_types</span><span class="p">,</span>
         <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
     <span class="p">)</span>
@@ -4797,7 +4797,8 @@ If 'all', return all tables. Defaults to 'common'.</p>
 <span class="normal">1001</span>
 <span class="normal">1002</span>
 <span class="normal">1003</span>
-<span class="normal">1004</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_image_tables_async</span><span class="p">(</span>
+<span class="normal">1004</span>
+<span class="normal">1005</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">list_image_tables_async</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">acquisition</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">filter_types</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4814,8 +4815,9 @@ If 'all', return all tables. Defaults to 'common'.</p>
 <span class="sd">            If &#39;all&#39;, return all tables. Defaults to &#39;common&#39;.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">images</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images_async</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
+    <span class="n">images</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
     <span class="k">return</span> <span class="k">await</span> <span class="n">list_image_tables_async</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="p">,</span>
         <span class="n">filter_types</span><span class="o">=</span><span class="n">filter_types</span><span class="p">,</span>
         <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
     <span class="p">)</span>
@@ -4915,8 +4917,7 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1006</span>
-<span class="normal">1007</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1007</span>
 <span class="normal">1008</span>
 <span class="normal">1009</span>
 <span class="normal">1010</span>
@@ -4945,7 +4946,8 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="normal">1033</span>
 <span class="normal">1034</span>
 <span class="normal">1035</span>
-<span class="normal">1036</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables</span><span class="p">(</span>
+<span class="normal">1036</span>
+<span class="normal">1037</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">acquisition</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -4967,9 +4969,9 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="sd">            if &#39;lazy&#39;, the table will be loaded as a lazy frame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">images</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
-    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
     <span class="k">return</span> <span class="n">concatenate_image_tables</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
         <span class="n">extras</span><span class="o">=</span><span class="n">extras</span><span class="p">,</span>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
         <span class="n">index_key</span><span class="o">=</span><span class="n">index_key</span><span class="p">,</span>
@@ -5096,8 +5098,7 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1038</span>
-<span class="normal">1039</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1039</span>
 <span class="normal">1040</span>
 <span class="normal">1041</span>
 <span class="normal">1042</span>
@@ -5129,7 +5130,8 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="normal">1068</span>
 <span class="normal">1069</span>
 <span class="normal">1070</span>
-<span class="normal">1071</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_as</span><span class="p">(</span>
+<span class="normal">1071</span>
+<span class="normal">1072</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_as</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">table_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">TableType</span><span class="p">],</span>
@@ -5153,9 +5155,9 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="sd">            if &#39;lazy&#39;, the table will be loaded as a lazy frame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">images</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
-    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
     <span class="k">return</span> <span class="n">concatenate_image_tables_as</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
         <span class="n">extras</span><span class="o">=</span><span class="n">extras</span><span class="p">,</span>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
         <span class="n">table_cls</span><span class="o">=</span><span class="n">table_cls</span><span class="p">,</span>
@@ -5263,8 +5265,7 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1073</span>
-<span class="normal">1074</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1074</span>
 <span class="normal">1075</span>
 <span class="normal">1076</span>
 <span class="normal">1077</span>
@@ -5293,7 +5294,8 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="normal">1100</span>
 <span class="normal">1101</span>
 <span class="normal">1102</span>
-<span class="normal">1103</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_async</span><span class="p">(</span>
+<span class="normal">1103</span>
+<span class="normal">1104</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_async</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">acquisition</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5315,9 +5317,9 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="sd">            if &#39;lazy&#39;, the table will be loaded as a lazy frame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">images</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images_async</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
-    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
     <span class="k">return</span> <span class="k">await</span> <span class="n">concatenate_image_tables_async</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
         <span class="n">extras</span><span class="o">=</span><span class="n">extras</span><span class="p">,</span>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
         <span class="n">index_key</span><span class="o">=</span><span class="n">index_key</span><span class="p">,</span>
@@ -5448,8 +5450,7 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1105</span>
-<span class="normal">1106</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1106</span>
 <span class="normal">1107</span>
 <span class="normal">1108</span>
 <span class="normal">1109</span>
@@ -5481,7 +5482,8 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="normal">1135</span>
 <span class="normal">1136</span>
 <span class="normal">1137</span>
-<span class="normal">1138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_as_async</span><span class="p">(</span>
+<span class="normal">1138</span>
+<span class="normal">1139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">concatenate_image_tables_as_async</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">table_cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">TableType</span><span class="p">],</span>
@@ -5505,9 +5507,9 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="sd">            if &#39;lazy&#39;, the table will be loaded as a lazy frame.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">images</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_images_async</span><span class="p">(</span><span class="n">acquisition</span><span class="o">=</span><span class="n">acquisition</span><span class="p">)</span>
-    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
+    <span class="n">extras</span> <span class="o">=</span> <span class="n">_build_extras</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">keys</span><span class="p">()))</span>
     <span class="k">return</span> <span class="k">await</span> <span class="n">concatenate_image_tables_as_async</span><span class="p">(</span>
-        <span class="n">images</span><span class="o">=</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">(),</span>
+        <span class="n">images</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">images</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span>
         <span class="n">extras</span><span class="o">=</span><span class="n">extras</span><span class="p">,</span>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
         <span class="n">table_cls</span><span class="o">=</span><span class="n">table_cls</span><span class="p">,</span>
@@ -5616,8 +5618,7 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1261</span>
-<span class="normal">1262</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1262</span>
 <span class="normal">1263</span>
 <span class="normal">1264</span>
 <span class="normal">1265</span>
@@ -5633,7 +5634,8 @@ if 'lazy', the table will be loaded as a lazy frame.</p>
 <span class="normal">1275</span>
 <span class="normal">1276</span>
 <span class="normal">1277</span>
-<span class="normal">1278</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_well</span><span class="p">(</span>
+<span class="normal">1278</span>
+<span class="normal">1279</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_well</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="n">AccessModeLiteral</span> <span class="o">=</span> <span class="s2">&quot;r+&quot;</span><span class="p">,</span>
@@ -6167,7 +6169,7 @@ Else, return the images paths in the well for the given acquisition.</p>
           <div class="doc-md-description">
             <p>Whether to check if the acquisition id is already exists
 in the well. Defaults to True. If False this might lead to
-acquision in a well that does not exist at the plate level.</p>
+acquisition in a well that does not exist at the plate level.</p>
           </div>
         </li>
     </ul>
@@ -6208,7 +6210,7 @@ acquision in a well that does not exist at the plate level.</p>
 <span class="sd">        acquisition_id (int | None): The acquisition id to filter the images.</span>
 <span class="sd">        strict (bool): Whether to check if the acquisition id is already exists</span>
 <span class="sd">            in the well. Defaults to True. If False this might lead to</span>
-<span class="sd">            acquision in a well that does not exist at the plate level.</span>
+<span class="sd">            acquisition in a well that does not exist at the plate level.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_image</span><span class="p">(</span>
         <span class="n">image_path</span><span class="o">=</span><span class="n">image_path</span><span class="p">,</span>
