@@ -190,7 +190,7 @@ class OmeZarrWell:
             acquisition_id (int | None): The acquisition id to filter the images.
             strict (bool): Whether to check if the acquisition id is already exists
                 in the well. Defaults to True. If False this might lead to
-                acquision in a well that does not exist at the plate level.
+                acquisition in a well that does not exist at the plate level.
         """
         return self._add_image(
             image_path=image_path,
