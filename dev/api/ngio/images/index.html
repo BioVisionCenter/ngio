@@ -20,7 +20,7 @@
       
       
       <link rel="icon" href="../../../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.18">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.19">
     
     
       
@@ -4042,8 +4042,10 @@ If None a channel label must be provided.</p>
 <p><span class="doc-section-title">Parameters:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-            <b><code>labels(Sequence[str</code></b>
-              (<code>| None] | int</code>)
+            <b><code>labels</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> | None] | <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The list of channels names
@@ -4052,8 +4054,10 @@ be named "channel_i".</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>wavelength_id(Sequence[str</code></b>
-              (<code>| None]</code>)
+            <b><code>wavelength_id</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> | None]</code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The wavelength ID of the channel.
@@ -4061,8 +4065,10 @@ If None, the wavelength ID will be the same as the channel name.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>start(Sequence[float</code></b>
-              (<code>| None]</code>)
+            <b><code>start</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a> | None]</code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The start value for each channel.
@@ -4070,8 +4076,10 @@ If None, the start value will be computed from the image.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>end(Sequence[float</code></b>
-              (<code>| None]</code>)
+            <b><code>end</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a> | None]</code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The end value for each channel.
@@ -4079,8 +4087,10 @@ If None, the end value will be computed from the image.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>percentiles(tuple[float,</code></b>
-              (<code>float] | None</code>)
+            <b><code>percentiles</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#tuple">tuple</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>, <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a>] | None</code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The start and end
@@ -4089,8 +4099,10 @@ not be computed.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>colors(Sequence[str</code></b>
-              (<code>| None]</code>)
+            <b><code>colors</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a> | None]</code>, default:
+                  <code>None</code>
+)
           –
           <div class="doc-md-description">
             <p>The list of colors for the
@@ -4109,7 +4121,10 @@ be shown by default.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>omero_kwargs(dict)</code></b>
+            <b><code>omero_kwargs</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#dict">dict</a></code>, default:
+                  <code>{}</code>
+)
           –
           <div class="doc-md-description">
             <p>Extra fields to store in the omero attributes.</p>
