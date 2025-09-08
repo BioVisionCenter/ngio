@@ -16,8 +16,8 @@ def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
     for i, (y, x) in enumerate(seeds_list, start=1):
         markers[y, x] = i
 
-    image = ndimage.distance_transform_edt(markers == 0).astype("uint16")
-    labels = watershed(image, markers)
+    image = ndimage.distance_transform_edt(markers == 0).astype("uint32")
+    labels = watershed(image, markers).astype("uint32")
     return image, labels
 
 

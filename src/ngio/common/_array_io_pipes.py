@@ -140,6 +140,12 @@ def _numpy_set_pipe(
         transpose_axes=slicing_ops.transpose_axes,
         expand_axes=slicing_ops.expand_axes,
     )
+
+    if not np.can_cast(_patch.dtype, zarr_array.dtype, casting="safe"):
+        raise ValueError(
+            f"Cannot safely cast patch of dtype {_patch.dtype} to "
+            f"zarr array of dtype {zarr_array.dtype}."
+        )
     set_numpy_patch(zarr_array, _patch, slicing_ops.slice_tuple)
 
 
@@ -158,6 +164,11 @@ def _dask_set_pipe(
         transpose_axes=slicing_ops.transpose_axes,
         expand_axes=slicing_ops.expand_axes,
     )
+    if not np.can_cast(_patch.dtype, zarr_array.dtype, casting="safe"):
+        raise ValueError(
+            f"Cannot safely cast patch of dtype {_patch.dtype} to "
+            f"zarr array of dtype {zarr_array.dtype}."
+        )
     set_dask_patch(zarr_array, _patch, slicing_ops.slice_tuple)
 
 
