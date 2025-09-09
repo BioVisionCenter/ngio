@@ -32,6 +32,9 @@ def test_dimensions(axes_names):
     for ax, s in dim_dict.items():
         assert dims.get(ax) == s
 
+    assert dims.get_index("x") == axes_names.index("x")
+    assert dims.get_index("-") is None
+
     if dim_dict.get("z", 1) > 1:
         assert dims.is_3d
 

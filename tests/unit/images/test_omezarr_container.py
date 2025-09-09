@@ -69,6 +69,23 @@ def test_open_ome_zarr_container(images_v04: dict[str, Path], zarr_name: str):
 def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
     cardiomyocyte_tiny_path = cardiomyocyte_tiny_path / "B" / "03" / "0"
     ome_zarr = open_ome_zarr_container(cardiomyocyte_tiny_path)
+
+    assert isinstance(ome_zarr.__repr__(), str)
+    _ = ome_zarr.images_container
+
+    assert not ome_zarr.is_2d
+    assert ome_zarr.is_3d
+    assert not ome_zarr.is_time_series
+    assert not ome_zarr.is_multi_channels
+    assert not ome_zarr.is_2d_time_series
+    assert not ome_zarr.is_3d_time_series
+    assert ome_zarr.channel_labels == ["DAPI"]
+    assert ome_zarr.wavelength_ids == ["A01_C01"]
+    assert ome_zarr.get_channel_idx("DAPI") == 0
+    assert ome_zarr.get_channel_idx(wavelength_id="A01_C01") == 0
+    assert ome_zarr.num_channels == 1
+    ome_zarr.set_axes_units(space_unit="micrometer")
+
     assert ome_zarr.list_tables() == ["FOV_ROI_table", "well_ROI_table"], (
         ome_zarr.list_tables()
     )
@@ -76,12 +93,13 @@ def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
         ome_zarr.list_roi_tables()
     )
 
+    assert ome_zarr.list_labels() == []
+
     fov_roi = ome_zarr.get_table("FOV_ROI_table")
-    assert len(fov_roi.rois()) == 2  # type: ignore
-    roi_table_1 = ome_zarr.get_table("well_ROI_table")
-    assert len(roi_table_1.rois()) == 1  # type: ignore
-    roi_table_2 = ome_zarr.get_table("well_ROI_table")
-    assert len(roi_table_2.rois()) == 1  # type: ignore
+    fov_roi = ome_zarr.get_roi_table("FOV_ROI_table")
+    assert len(fov_roi.rois()) == 2
+    roi_table_1 = ome_zarr.get_roi_table("well_ROI_table")
+    assert len(roi_table_1.rois()) == 1
 
     new_well_roi_table = ome_zarr.build_image_roi_table()
     ome_zarr.add_table("new_well_ROI_table", new_well_roi_table)
@@ -209,8 +227,7 @@ def test_remote_ome_zarr_container():
     _ = ome_zarr.get_table("well_ROI_table")
 
 
-@pytest.mark.parametrize("array_mode", ["numpy", "dask"])
-def test_get_and_squeeze(tmp_path: Path, array_mode: str):
+def test_get_and_squeeze(tmp_path: Path):
     # Very basic test to check if the container is working
     # to be expanded with more meaningful tests
     store = tmp_path / "ome_zarr.zarr"
