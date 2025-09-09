@@ -1,10 +1,38 @@
 from pathlib import Path
 
+import dask.array as da
 import numpy as np
 import pytest
 
 from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio.ome_zarr_meta.ngio_specs import SlicingOps
 from ngio.utils import fractal_fsspec_store
+
+
+class IdentityTransform:
+    def apply_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps
+    ) -> np.ndarray:
+        """Apply the scaling transformation to a numpy array."""
+        return array
+
+    def apply_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps
+    ) -> da.Array:
+        """Apply the scaling transformation to a dask array."""
+        return array
+
+    def apply_inverse_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps
+    ) -> np.ndarray:
+        """Apply the inverse scaling transformation to a numpy array."""
+        return array
+
+    def apply_inverse_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps
+    ) -> da.Array:
+        """Apply the inverse scaling transformation to a dask array."""
+        return array
 
 
 @pytest.mark.parametrize(
@@ -102,11 +130,11 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert image.meta.get_highest_resolution_dataset().path == "0"
     assert image.meta.get_lowest_resolution_dataset().path == "2"
 
-    array = image.get_as_numpy()
+    array = image.get_as_numpy(transforms=[IdentityTransform()])
     assert isinstance(array, np.ndarray)
     assert array.shape == (10, 20, 30)
 
-    array_dask = image.get_as_dask()
+    array_dask = image.get_as_dask(transforms=[IdentityTransform()])
     assert array_dask.shape == (10, 20, 30)
 
     array = image.get_array(
@@ -117,7 +145,12 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
 
     array = array + 1  # type: ignore
 
-    image.set_array(array, x=slice(None), axes_order=["c", "z", "y", "x"])
+    image.set_array(
+        array,
+        x=slice(None),
+        axes_order=["c", "z", "y", "x"],
+        transforms=[IdentityTransform()],
+    )
     image.consolidate(mode=array_mode)  # type: ignore
 
     # Omemeta
