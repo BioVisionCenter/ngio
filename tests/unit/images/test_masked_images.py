@@ -22,6 +22,36 @@ def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
 
 
 @pytest.mark.parametrize(
+    "shape",
+    [(64, 64), (16, 32, 32)],
+)
+def test_get_masking(tmp_path: Path, shape: tuple[int, ...]):
+    store = tmp_path / "test_image_yx_random_label.zarr"
+    # Create a new ome_zarr with the mask
+    mask, label_image = _draw_random_labels(shape=shape, num_regions=20)
+    ome_zarr = create_ome_zarr_from_array(
+        store=store,
+        array=mask,
+        xy_pixelsize=0.5,
+        levels=2,
+        overwrite=True,
+    )
+    label = ome_zarr.derive_label("label")
+    label.set_array(label_image)
+    label.consolidate()
+
+    masking_roi = label.build_masking_roi_table()
+    ome_zarr.add_table("label_ROI_table", masking_roi)
+    # Masking image test
+    _ = ome_zarr.get_masked_image(masking_label_name="label")
+    _ = ome_zarr.get_masked_image(masking_table_name="label_ROI_table")
+    _ = ome_zarr.get_masked_image(
+        masking_table_name="label_ROI_table", masking_label_name="label"
+    )
+    _ = ome_zarr.get_masked_image(masking_label_name="label", path="1")
+
+
+@pytest.mark.parametrize(
     "array_mode, shape",
     [("numpy", (64, 64)), ("dask", (64, 64)), ("numpy", (16, 32, 32))],
 )
