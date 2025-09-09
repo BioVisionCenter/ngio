@@ -312,6 +312,54 @@ class OmeZarrContainer:
             path=path, pixel_size=pixel_size, strict=strict
         )
 
+    def _find_matching_masking_label(
+        self,
+        masking_label_name: str | None = None,
+        masking_table_name: str | None = None,
+        pixel_size: PixelSize | None = None,
+    ) -> tuple[Label, MaskingRoiTable]:
+        if masking_label_name is not None and masking_table_name is not None:
+            # Both provided
+            masking_label = self.get_label(
+                name=masking_label_name, pixel_size=pixel_size, strict=False
+            )
+            masking_table = self.get_masking_roi_table(name=masking_table_name)
+
+        elif masking_label_name is not None and masking_table_name is None:
+            # Only the label provided
+            masking_label = self.get_label(
+                name=masking_label_name, pixel_size=pixel_size, strict=False
+            )
+
+            for table_name in self.list_roi_tables():
+                table = self.get_generic_roi_table(name=table_name)
+                if isinstance(table, MaskingRoiTable):
+                    if table.reference_label == masking_label_name:
+                        masking_table = table
+                        break
+            else:
+                masking_table = masking_label.build_masking_roi_table()
+
+        elif masking_table_name is not None and masking_label_name is None:
+            # Only the table provided
+            masking_table = self.get_masking_roi_table(name=masking_table_name)
+
+            if masking_table.reference_label is None:
+                raise NgioValueError(
+                    f"Masking table {masking_table_name} does not have a reference "
+                    "label. Please provide the masking_label_name explicitly."
+                )
+            masking_label = self.get_label(
+                name=masking_table.reference_label,
+                pixel_size=pixel_size,
+                strict=False,
+            )
+        else:
+            raise NgioValueError(
+                "Neither masking_label_name nor masking_table_name were provided."
+            )
+        return masking_label, masking_table
+
     def get_masked_image(
         self,
         masking_label_name: str | None = None,
@@ -336,47 +384,11 @@ class OmeZarrContainer:
                 closest pixel size level will be returned.
         """
         image = self.get_image(path=path, pixel_size=pixel_size, strict=strict)
-
-        if masking_label_name is not None and masking_table_name is not None:
-            # Both provided
-            masking_label = self.get_label(
-                name=masking_label_name, pixel_size=image.pixel_size, strict=False
-            )
-            masking_table = self.get_masking_roi_table(name=masking_table_name)
-
-        elif masking_label_name is not None and masking_table_name is None:
-            # Only the label provided
-            masking_label = self.get_label(
-                name=masking_label_name, pixel_size=image.pixel_size, strict=False
-            )
-
-            for table_name in self.list_roi_tables():
-                table = self.get_generic_roi_table(name=table_name)
-                if isinstance(table, MaskingRoiTable):
-                    if table.reference_label == masking_label_name:
-                        masking_table = table
-                        break
-            else:
-                masking_table = masking_label.build_masking_roi_table()
-
-        elif masking_table_name is not None and masking_label_name is None:
-            # Only the table provided
-            masking_table = self.get_masking_roi_table(name=masking_table_name)
-
-            if masking_table.reference_label is None:
-                raise NgioValueError(
-                    f"Masking table {masking_table_name} does not have a reference "
-                    "label. Please provide the masking_label_name explicitly."
-                )
-            masking_label = self.get_label(
-                name=masking_table.reference_label,
-                pixel_size=image.pixel_size,
-                strict=False,
-            )
-        else:
-            raise NgioValueError(
-                "Neither masking_label_name nor masking_table_name were provided."
-            )
+        masking_label, masking_table = self._find_matching_masking_label(
+            masking_label_name=masking_label_name,
+            masking_table_name=masking_table_name,
+            pixel_size=pixel_size,
+        )
         return MaskedImage(
             group_handler=image._group_handler,
             path=image.path,
@@ -628,7 +640,7 @@ class OmeZarrContainer:
     def get_masked_label(
         self,
         label_name: str,
-        masking_label_name: str,
+        masking_label_name: str | None = None,
         masking_table_name: str | None = None,
         path: str | None = None,
         pixel_size: PixelSize | None = None,
@@ -638,7 +650,7 @@ class OmeZarrContainer:
 
         Args:
             label_name (str): The name of the label.
-            masking_label_name (str): The name of the masking label.
+            masking_label_name (str | None): The name of the masking label.
             masking_table_name (str | None): The name of the masking table.
             path (str | None): The path to the image in the ome_zarr file.
             pixel_size (PixelSize | None): The pixel size of the image.
@@ -649,14 +661,11 @@ class OmeZarrContainer:
         label = self.get_label(
             name=label_name, path=path, pixel_size=pixel_size, strict=strict
         )
-        masking_label = self.get_label(
-            name=masking_label_name, path=path, pixel_size=pixel_size, strict=strict
+        masking_label, masking_table = self._find_matching_masking_label(
+            masking_label_name=masking_label_name,
+            masking_table_name=masking_table_name,
+            pixel_size=pixel_size,
         )
-        if masking_table_name is None:
-            masking_table = masking_label.build_masking_roi_table()
-        else:
-            masking_table = self.get_masking_roi_table(name=masking_table_name)
-
         return MaskedLabel(
             group_handler=label._group_handler,
             path=label.path,
