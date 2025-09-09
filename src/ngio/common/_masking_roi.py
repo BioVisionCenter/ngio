@@ -124,8 +124,8 @@ def compute_masking_roi(
     Other axes orders are not supported.
 
     """
-    if segmentation.ndim not in [2, 3]:
-        raise NgioValueError("Only 2D and 3D segmentations are supported.")
+    if segmentation.ndim not in [2, 3, 4]:
+        raise NgioValueError("Only 2D, 3D, and 4D segmentations are supported.")
 
     if isinstance(segmentation, da.Array):
         slices = lazy_compute_slices(segmentation)
@@ -135,18 +135,46 @@ def compute_masking_roi(
     rois = []
     for label, slice_ in slices.items():
         if len(slice_) == 2:
-            min_z, min_y, min_x = 0, slice_[0].start, slice_[1].start
-            max_z, max_y, max_x = 1, slice_[0].stop, slice_[1].stop
+            min_t, max_t = None, None
+            min_z, max_z = None, None
+            min_y, min_x = slice_[0].start, slice_[1].start
+            max_y, max_x = slice_[0].stop, slice_[1].stop
         elif len(slice_) == 3:
+            min_t, max_t = None, None
             min_z, min_y, min_x = slice_[0].start, slice_[1].start, slice_[2].start
             max_z, max_y, max_x = slice_[0].stop, slice_[1].stop, slice_[2].stop
+        elif len(slice_) == 4:
+            min_t, min_z, min_y, min_x = (
+                slice_[0].start,
+                slice_[1].start,
+                slice_[2].start,
+                slice_[3].start,
+            )
+            max_t, max_z, max_y, max_x = (
+                slice_[0].stop,
+                slice_[1].stop,
+                slice_[2].stop,
+                slice_[3].stop,
+            )
         else:
             raise ValueError("Invalid slice length.")
+
+        if max_t is None:
+            t_length = None
+        else:
+            t_length = max_t - min_t
+
+        if max_z is None:
+            z_length = None
+        else:
+            z_length = max_z - min_z
+
         roi = RoiPixels(
             name=str(label),
             x_length=max_x - min_x,
             y_length=max_y - min_y,
-            z_length=max_z - min_z,
+            z_length=z_length,
+            t_length=t_length,
             x=min_x,
             y=min_y,
             z=min_z,

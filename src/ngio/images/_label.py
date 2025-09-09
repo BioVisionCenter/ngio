@@ -314,9 +314,6 @@ def derive_label(
 
 def build_masking_roi_table(label: Label) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
-    if label.dimensions.is_time_series:
-        raise NgioValueError("Time series labels are not supported.")
-
-    array = label.get_as_dask(axes_order=["z", "y", "x"])
+    array = label.get_as_dask(axes_order=["t", "z", "y", "x"])
     rois = compute_masking_roi(array, label.pixel_size)
     return MaskingRoiTable(rois, reference_label=label.meta.name)

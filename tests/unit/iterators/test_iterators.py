@@ -58,10 +58,10 @@ def test_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
         "test_image_zyx.zarr",
         "test_image_czyx.zarr",
         "test_image_c1yx.zarr",
-        # "test_image_tyx.zarr",
-        # "test_image_tcyx.zarr",
-        # "test_image_tzyx.zarr",
-        # "test_image_tczyx.zarr",
+        "test_image_tyx.zarr",
+        "test_image_tcyx.zarr",
+        "test_image_tzyx.zarr",
+        "test_image_tczyx.zarr",
     ],
 )
 def test_masked_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
