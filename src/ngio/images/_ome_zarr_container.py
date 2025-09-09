@@ -314,7 +314,7 @@ class OmeZarrContainer:
 
     def get_masked_image(
         self,
-        masking_label_name: str,
+        masking_label_name: str | None = None,
         masking_table_name: str | None = None,
         path: str | None = None,
         pixel_size: PixelSize | None = None,
@@ -323,23 +323,60 @@ class OmeZarrContainer:
         """Get a masked image at a specific level.
 
         Args:
-            masking_label_name (str): The name of the label.
-            masking_table_name (str | None): The name of the masking table.
+            masking_label_name (str | None): The name of the masking label to use.
+                If None, the masking table must be provided.
+            masking_table_name (str | None): The name of the masking table to use.
+                If None, the masking label must be provided.
             path (str | None): The path to the image in the ome_zarr file.
+                If None, the first level will be used.
             pixel_size (PixelSize | None): The pixel size of the image.
+                This is only used if path is None.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
         """
         image = self.get_image(path=path, pixel_size=pixel_size, strict=strict)
-        masking_label = self.get_label(
-            name=masking_label_name, pixel_size=image.pixel_size, strict=strict
-        )
-        if masking_table_name is None:
-            masking_table = masking_label.build_masking_roi_table()
-        else:
+
+        if masking_label_name is not None and masking_table_name is not None:
+            # Both provided
+            masking_label = self.get_label(
+                name=masking_label_name, pixel_size=image.pixel_size, strict=False
+            )
             masking_table = self.get_masking_roi_table(name=masking_table_name)
 
+        elif masking_label_name is not None and masking_table_name is None:
+            # Only the label provided
+            masking_label = self.get_label(
+                name=masking_label_name, pixel_size=image.pixel_size, strict=False
+            )
+
+            for table_name in self.list_roi_tables():
+                table = self.get_generic_roi_table(name=table_name)
+                if isinstance(table, MaskingRoiTable):
+                    if table.reference_label == masking_label_name:
+                        masking_table = table
+                        break
+            else:
+                masking_table = masking_label.build_masking_roi_table()
+
+        elif masking_table_name is not None and masking_label_name is None:
+            # Only the table provided
+            masking_table = self.get_masking_roi_table(name=masking_table_name)
+
+            if masking_table.reference_label is None:
+                raise NgioValueError(
+                    f"Masking table {masking_table_name} does not have a reference "
+                    "label. Please provide the masking_label_name explicitly."
+                )
+            masking_label = self.get_label(
+                name=masking_table.reference_label,
+                pixel_size=image.pixel_size,
+                strict=False,
+            )
+        else:
+            raise NgioValueError(
+                "Neither masking_label_name nor masking_table_name were provided."
+            )
         return MaskedImage(
             group_handler=image._group_handler,
             path=image.path,
