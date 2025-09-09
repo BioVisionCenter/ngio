@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import dask.array as da
 import numpy as np
 import pytest
 
@@ -22,6 +23,7 @@ from ngio.experimental.iterators import SegmentationIterator
     ],
 )
 def test_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
+    # Base test only the API, not the actual segmentation logic
     path = images_v04[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
     image = ome_zarr.get_image()
@@ -31,3 +33,11 @@ def test_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
     for i, (img_chunk, writer) in enumerate(iterator.iter_as_numpy()):
         label_patch = np.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
         writer(label_patch)
+
+    iterator.map_as_numpy(lambda x: np.zeros_like(x, dtype=np.uint8))
+
+    for i, (img_chunk, writer) in enumerate(iterator.iter_as_dask()):
+        label_patch = da.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
+        writer(label_patch)
+
+    iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
