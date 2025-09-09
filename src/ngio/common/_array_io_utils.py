@@ -392,13 +392,13 @@ class TransformProtocol(Protocol):
         """A transformation to be applied after loading a dask array."""
         ...
 
-    def inverse_numpy_transformation(
+    def apply_inverse_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps
     ) -> np.ndarray:
         """A transformation to be applied before writing a numpy array."""
         ...
 
-    def inverse_dask_transformation(
+    def apply_inverse_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps
     ) -> da.Array:
         """A transformation to be applied before writing a dask array."""
@@ -443,7 +443,7 @@ def apply_inverse_numpy_transforms(
         return array
 
     for transform in transforms:
-        array = transform.inverse_numpy_transformation(array, slicing_ops=slicing_ops)
+        array = transform.apply_inverse_numpy_transform(array, slicing_ops=slicing_ops)
     return array
 
 
@@ -457,7 +457,7 @@ def apply_inverse_dask_transforms(
         return array
 
     for transform in transforms:
-        array = transform.inverse_dask_transformation(array, slicing_ops=slicing_ops)
+        array = transform.apply_inverse_dask_transform(array, slicing_ops=slicing_ops)
     return array
 
 

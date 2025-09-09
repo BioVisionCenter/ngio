@@ -76,7 +76,7 @@ class ZoomTransform:
         array = dask_zoom(source_array=array, scale=scale, order=self._order)
         return array
 
-    def inverse_numpy_transformation(
+    def apply_inverse_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps
     ) -> np.ndarray:
         """Apply the inverse scaling transformation to a numpy array."""
@@ -92,7 +92,7 @@ class ZoomTransform:
         array = numpy_zoom(source_array=array, scale=scale, order=self._order)
         return array
 
-    def inverse_dask_transformation(
+    def apply_inverse_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps
     ) -> da.Array:
         """Apply the inverse scaling transformation to a dask array."""
