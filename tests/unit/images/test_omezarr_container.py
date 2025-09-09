@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio.images._image import ChannelSelectionModel
 from ngio.ome_zarr_meta.ngio_specs import SlicingOps
 from ngio.utils import fractal_fsspec_store
 
@@ -246,13 +247,22 @@ def test_get_and_squeeze(tmp_path: Path, array_mode: str):
         c=0,
     )
 
-    assert image.get_array(c=0, axes_order=["c", "y", "x"]).shape == (1, 20, 30)
-    assert image.get_array(c=0, axes_order=["y", "x"]).shape == (20, 30)
-    assert image.get_array(c=(0,), axes_order=None).shape == (1, 20, 30)
-    assert image.get_array(c=0, axes_order=None).shape == (20, 30)
+    assert image.get_array(channel_selection=0, axes_order=["c", "y", "x"]).shape == (
+        1,
+        20,
+        30,
+    )
+    assert image.get_array(channel_selection=(0,), axes_order=["y", "x"]).shape == (
+        20,
+        30,
+    )
+    assert image.get_array(channel_selection=(0,), axes_order=None).shape == (1, 20, 30)
+    assert image.get_array(channel_selection=0, axes_order=None).shape == (20, 30)
 
     # Reordering axes and adding a virtual axis
-    assert image.get_array(c=0, axes_order=["c", "x", "y", "virtual"]).shape == (
+    assert image.get_array(
+        channel_selection=0, axes_order=["c", "x", "y", "virtual"]
+    ).shape == (
         1,
         30,
         20,
@@ -262,3 +272,9 @@ def test_get_and_squeeze(tmp_path: Path, array_mode: str):
     # Test channel_labels
     image.get_as_numpy(channel_selection="channel_0")
     image.get_as_dask(channel_selection="channel_0")
+    image.get_as_dask(
+        channel_selection=ChannelSelectionModel(identifier="channel_0", mode="label")
+    )
+    image.get_as_dask(
+        channel_selection=ChannelSelectionModel(identifier="0", mode="index")
+    )

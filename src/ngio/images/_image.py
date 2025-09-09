@@ -860,7 +860,7 @@ def _parse_str_or_model(
     )
 
 
-def parse_channel_selection(
+def _parse_channel_selection(
     image: Image, channel_selection: ChannelSlicingInputType
 ) -> dict[str, SlicingInputType]:
     """Parse the channel selection input into a list of channel indices."""
@@ -884,7 +884,7 @@ def add_channel_selection_to_slicing_dict(
     slicing_dict: dict[str, SlicingInputType],
 ) -> dict[str, SlicingInputType]:
     """Add channel selection information to the slicing dictionary."""
-    channel_info = parse_channel_selection(image, channel_selection)
+    channel_info = _parse_channel_selection(image, channel_selection)
     if "c" in slicing_dict and channel_info:
         raise NgioValidationError(
             "Both channel_selection and 'c' in slicing_kwargs are provided. "
