@@ -1757,12 +1757,12 @@
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.common.TransformProtocol.inverse_numpy_transformation" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">inverse_numpy_transformation</span>
+<h5 id="ngio.common.TransformProtocol.apply_inverse_numpy_transform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">apply_inverse_numpy_transform</span>
 
 
-<a href="#ngio.common.TransformProtocol.inverse_numpy_transformation" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">inverse_numpy_transformation</span><span class="p">(</span>
+<a href="#ngio.common.TransformProtocol.apply_inverse_numpy_transform" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">apply_inverse_numpy_transform</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;numpy.ndarray&lt;/code&gt;" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a></span><span class="p">,</span> <span class="n">slicing_ops</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.ngio_specs.SlicingOps">SlicingOps</span></span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;numpy.ndarray&lt;/code&gt;" href="https://numpy.org/doc/stable/reference/generated/numpy.ndarray.html#numpy.ndarray">ndarray</a></span>
 </code></pre></div>
@@ -1778,7 +1778,7 @@
 <span class="normal">396</span>
 <span class="normal">397</span>
 <span class="normal">398</span>
-<span class="normal">399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inverse_numpy_transformation</span><span class="p">(</span>
+<span class="normal">399</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_inverse_numpy_transform</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">slicing_ops</span><span class="p">:</span> <span class="n">SlicingOps</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A transformation to be applied before writing a numpy array.&quot;&quot;&quot;</span>
@@ -1792,12 +1792,12 @@
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.common.TransformProtocol.inverse_dask_transformation" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">inverse_dask_transformation</span>
+<h5 id="ngio.common.TransformProtocol.apply_inverse_dask_transform" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">apply_inverse_dask_transform</span>
 
 
-<a href="#ngio.common.TransformProtocol.inverse_dask_transformation" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">inverse_dask_transformation</span><span class="p">(</span>
+<a href="#ngio.common.TransformProtocol.apply_inverse_dask_transform" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">apply_inverse_dask_transform</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n"><span title="dask.array.Array">Array</span></span><span class="p">,</span> <span class="n">slicing_ops</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.ngio_specs.SlicingOps">SlicingOps</span></span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="dask.array.Array">Array</span></span>
 </code></pre></div>
@@ -1813,7 +1813,7 @@
 <span class="normal">402</span>
 <span class="normal">403</span>
 <span class="normal">404</span>
-<span class="normal">405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">inverse_dask_transformation</span><span class="p">(</span>
+<span class="normal">405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">apply_inverse_dask_transform</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span> <span class="n">slicing_ops</span><span class="p">:</span> <span class="n">SlicingOps</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;A transformation to be applied before writing a dask array.&quot;&quot;&quot;</span>
