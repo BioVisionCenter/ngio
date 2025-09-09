@@ -44,6 +44,7 @@ def test_get_masking(tmp_path: Path, shape: tuple[int, ...]):
     ome_zarr.add_table("label_ROI_table", masking_roi)
     # Masking image test
     _ = ome_zarr.get_masked_image(masking_label_name="label")
+    _ = ome_zarr.get_masked_image(masking_label_name="label")
     _ = ome_zarr.get_masked_image(masking_table_name="label_ROI_table")
     _ = ome_zarr.get_masked_image(
         masking_table_name="label_ROI_table", masking_label_name="label"
@@ -111,3 +112,7 @@ def test_masking(
     unique_labels, counts = np.unique(masked_new_label.get_array(), return_counts=True)
     labels_stats_masked = dict(zip(unique_labels, counts, strict=True))
     assert labels_stats == labels_stats_masked
+
+    for label_id in labels_stats.keys():
+        x = masked_new_label.get_roi_masked(label_id, mode=array_mode, zoom_factor=1.1)
+        masked_new_label.set_roi(label_id, x, zoom_factor=1.1)
