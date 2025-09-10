@@ -1,5 +1,6 @@
 """OME-Zarr object models."""
 
+from ngio.images._create_synt_container import create_synthetic_ome_zarr
 from ngio.images._image import ChannelSelectionModel, Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
 from ngio.images._ome_zarr_container import (
@@ -34,6 +35,7 @@ __all__ = [
     "conctatenate_tables",
     "create_empty_ome_zarr",
     "create_ome_zarr_from_array",
+    "create_synthetic_ome_zarr",
     "list_image_tables",
     "list_image_tables_async",
     "open_image",

@@ -3,7 +3,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from ngio import create_empty_ome_zarr, create_ome_zarr_from_array
+from ngio import (
+    create_empty_ome_zarr,
+    create_ome_zarr_from_array,
+    create_synthetic_ome_zarr,
+)
 from ngio.utils import NgioValueError
 
 
@@ -88,6 +92,9 @@ def test_create_empty(tmp_path: Path, create_kwargs: dict):
     shape = create_kwargs.pop("shape")
     array = np.random.randint(0, 255, shape, dtype="uint8")
     create_ome_zarr_from_array(array=array, **create_kwargs, levels=1, overwrite=True)
+
+    store = create_kwargs["store"]
+    create_synthetic_ome_zarr(store=store, shape=shape, overwrite=True)
 
 
 def test_create_fail(tmp_path: Path):
