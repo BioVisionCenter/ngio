@@ -7637,16 +7637,17 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
 
 
-<h5 id="ngio.ChannelSelectionModel.identifier" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">identifier</span>
+<h5 id="ngio.ChannelSelectionModel.mode" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">mode</span>
 
 
   <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#ngio.ChannelSelectionModel.identifier" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">identifier</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span>
+<a href="#ngio.ChannelSelectionModel.mode" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">mode</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Literal&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Literal">Literal</a></span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="s1">&#39;wavelength_id&#39;</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;label&#39;</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -7659,17 +7660,16 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
 
 
-<h5 id="ngio.ChannelSelectionModel.mode" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">mode</span>
+<h5 id="ngio.ChannelSelectionModel.identifier" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">identifier</span>
 
 
   <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small>
       <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small>
   </span>
 
-<a href="#ngio.ChannelSelectionModel.mode" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">mode</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;typing.Literal&lt;/code&gt;" href="https://docs.python.org/3/library/typing.html#typing.Literal">Literal</a></span><span class="p">[</span><span class="s1">&#39;label&#39;</span><span class="p">,</span> <span class="s1">&#39;wavelength_id&#39;</span><span class="p">,</span> <span class="s1">&#39;index&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="s1">&#39;label&#39;</span>
+<a href="#ngio.ChannelSelectionModel.identifier" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">identifier</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -15907,6 +15907,463 @@ Defaults to DefaultNgffVersion.</p>
         <span class="n">colors</span><span class="o">=</span><span class="n">channel_colors</span><span class="p">,</span>
         <span class="n">active</span><span class="o">=</span><span class="n">channel_active</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="k">return</span> <span class="n">ome_zarr</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h4 id="ngio.create_synthetic_ome_zarr" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-function"></code>            <span class="doc doc-object-name doc-function-name">create_synthetic_ome_zarr</span>
+
+
+<a href="#ngio.create_synthetic_ome_zarr" class="headerlink" title="Permanent link">&para;</a></h4>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">create_synthetic_ome_zarr</span><span class="p">(</span>
+    <span class="n">store</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;StoreOrGroup&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.utils.StoreOrGroup&lt;/code&gt;)" href="../utils/#ngio.utils.StoreOrGroup">StoreOrGroup</a></span><span class="p">,</span>
+    <span class="n">shape</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">],</span>
+    <span class="n">reference_sample</span><span class="p">:</span> <span class="n"><span title="ngio.resources.AVAILABLE_SAMPLES">AVAILABLE_SAMPLES</span></span>
+    <span class="o">|</span> <span class="n"><span title="ngio.resources.SampleInfo">SampleInfo</span></span> <span class="o">=</span> <span class="s2">&quot;Cardiomyocyte&quot;</span><span class="p">,</span>
+    <span class="n">levels</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">]</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">xy_scaling_factor</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">z_scaling_factor</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">axes_names</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">chunks</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_labels</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_wavelengths</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_colors</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_active</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a></span><span class="p">[</span><span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">table_backend</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;TableBackend&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.tables.TableBackend&lt;/code&gt;)" href="../tables/#ngio.tables.TableBackend">TableBackend</a></span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DefaultTableBackend&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.tables.DefaultTableBackend&lt;/code&gt;)" href="../tables/#ngio.tables.DefaultTableBackend">DefaultTableBackend</a></span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">version</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;NgffVersions&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.ngio_specs.NgffVersions&lt;/code&gt;)" href="#ngio.NgffVersions">NgffVersions</a></span> <span class="o">=</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DefaultNgffVersion&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.ngio_specs.DefaultNgffVersion&lt;/code&gt;)" href="#ngio.DefaultNgffVersion">DefaultNgffVersion</a></span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;OmeZarrContainer&lt;/span&gt; (&lt;code&gt;ngio.images._ome_zarr_container.OmeZarrContainer&lt;/code&gt;)" href="#ngio.OmeZarrContainer">OmeZarrContainer</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Create an empty OME-Zarr image with the given shape and metadata.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>store</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;StoreOrGroup&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.utils.StoreOrGroup&lt;/code&gt;)" href="../utils/#ngio.utils.StoreOrGroup">StoreOrGroup</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The Zarr store or group to create the image in.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>shape</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a>]</code>)
+          –
+          <div class="doc-md-description">
+            <p>The shape of the image.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>reference_sample</code></b>
+              (<code><span title="ngio.resources.AVAILABLE_SAMPLES">AVAILABLE_SAMPLES</span> | <span title="ngio.resources.SampleInfo">SampleInfo</span></code>, default:
+                  <code>&#39;Cardiomyocyte&#39;</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The reference sample to use.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>levels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a> | <a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>]</code>, default:
+                  <code>5</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The number of levels in the pyramid or a
+list of level names. Defaults to 5.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>xy_scaling_factor</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                  <code>2</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The down-scaling factor in x and y
+dimensions. Defaults to 2.0.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>z_scaling_factor</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#float">float</a></code>, default:
+                  <code>1.0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The down-scaling factor in z dimension.
+Defaults to 1.0.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>axes_names</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The names of the axes.
+If None the canonical names are used. Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>chunks</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#int">int</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The chunk shape. If None the shape
+is used. Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>channel_labels</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The labels of the channels.
+Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>channel_wavelengths</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#list">list</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The wavelengths of the
+channels. Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>channel_colors</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The colors of the channels.
+Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>channel_active</code></b>
+              (<code><a class="autorefs autorefs-external" title="&lt;code&gt;collections.abc.Sequence&lt;/code&gt;" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence">Sequence</a>[<a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a>] | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Whether the channels are
+active. Defaults to None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>table_backend</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;TableBackend&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.tables.TableBackend&lt;/code&gt;)" href="../tables/#ngio.tables.TableBackend">TableBackend</a></code>, default:
+                  <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DefaultTableBackend&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.tables.DefaultTableBackend&lt;/code&gt;)" href="../tables/#ngio.tables.DefaultTableBackend">DefaultTableBackend</a></code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Table backend to be used to store tables</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>overwrite</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Whether to overwrite an existing image.
+Defaults to True.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>version</code></b>
+              (<code><span title="NgffVersion">NgffVersion</span></code>, default:
+                  <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;DefaultNgffVersion&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.ngio_specs.DefaultNgffVersion&lt;/code&gt;)" href="#ngio.DefaultNgffVersion">DefaultNgffVersion</a></code>
+)
+          –
+          <div class="doc-md-description">
+            <p>The version of the OME-Zarr specification.
+Defaults to DefaultNgffVersion.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_create_synt_container.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 24</span>
+<span class="normal"> 25</span>
+<span class="normal"> 26</span>
+<span class="normal"> 27</span>
+<span class="normal"> 28</span>
+<span class="normal"> 29</span>
+<span class="normal"> 30</span>
+<span class="normal"> 31</span>
+<span class="normal"> 32</span>
+<span class="normal"> 33</span>
+<span class="normal"> 34</span>
+<span class="normal"> 35</span>
+<span class="normal"> 36</span>
+<span class="normal"> 37</span>
+<span class="normal"> 38</span>
+<span class="normal"> 39</span>
+<span class="normal"> 40</span>
+<span class="normal"> 41</span>
+<span class="normal"> 42</span>
+<span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span>
+<span class="normal">117</span>
+<span class="normal">118</span>
+<span class="normal">119</span>
+<span class="normal">120</span>
+<span class="normal">121</span>
+<span class="normal">122</span>
+<span class="normal">123</span>
+<span class="normal">124</span>
+<span class="normal">125</span>
+<span class="normal">126</span>
+<span class="normal">127</span>
+<span class="normal">128</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_synthetic_ome_zarr</span><span class="p">(</span>
+    <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
+    <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
+    <span class="n">reference_sample</span><span class="p">:</span> <span class="n">AVAILABLE_SAMPLES</span> <span class="o">|</span> <span class="n">SampleInfo</span> <span class="o">=</span> <span class="s2">&quot;Cardiomyocyte&quot;</span><span class="p">,</span>
+    <span class="n">levels</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="mi">5</span><span class="p">,</span>
+    <span class="n">xy_scaling_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span>
+    <span class="n">z_scaling_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">axes_names</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">chunks</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_labels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_wavelengths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_colors</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">channel_active</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">bool</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">table_backend</span><span class="p">:</span> <span class="n">TableBackend</span> <span class="o">=</span> <span class="n">DefaultTableBackend</span><span class="p">,</span>
+    <span class="n">overwrite</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">version</span><span class="p">:</span> <span class="n">NgffVersions</span> <span class="o">=</span> <span class="n">DefaultNgffVersion</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OmeZarrContainer</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an empty OME-Zarr image with the given shape and metadata.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        store (StoreOrGroup): The Zarr store or group to create the image in.</span>
+<span class="sd">        shape (Sequence[int]): The shape of the image.</span>
+<span class="sd">        reference_sample (AVAILABLE_SAMPLES | SampleInfo): The reference sample to use.</span>
+<span class="sd">        levels (int | list[str], optional): The number of levels in the pyramid or a</span>
+<span class="sd">            list of level names. Defaults to 5.</span>
+<span class="sd">        xy_scaling_factor (float, optional): The down-scaling factor in x and y</span>
+<span class="sd">            dimensions. Defaults to 2.0.</span>
+<span class="sd">        z_scaling_factor (float, optional): The down-scaling factor in z dimension.</span>
+<span class="sd">            Defaults to 1.0.</span>
+<span class="sd">        axes_names (Sequence[str] | None, optional): The names of the axes.</span>
+<span class="sd">            If None the canonical names are used. Defaults to None.</span>
+<span class="sd">        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape</span>
+<span class="sd">            is used. Defaults to None.</span>
+<span class="sd">        channel_labels (list[str] | None, optional): The labels of the channels.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        channel_wavelengths (list[str] | None, optional): The wavelengths of the</span>
+<span class="sd">            channels. Defaults to None.</span>
+<span class="sd">        channel_colors (Sequence[str] | None, optional): The colors of the channels.</span>
+<span class="sd">            Defaults to None.</span>
+<span class="sd">        channel_active (Sequence[bool] | None, optional): Whether the channels are</span>
+<span class="sd">            active. Defaults to None.</span>
+<span class="sd">        table_backend (TableBackend): Table backend to be used to store tables</span>
+<span class="sd">        overwrite (bool, optional): Whether to overwrite an existing image.</span>
+<span class="sd">            Defaults to True.</span>
+<span class="sd">        version (NgffVersion, optional): The version of the OME-Zarr specification.</span>
+<span class="sd">            Defaults to DefaultNgffVersion.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">reference_sample</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+        <span class="n">sample_info</span> <span class="o">=</span> <span class="n">get_sample_info</span><span class="p">(</span><span class="n">reference_sample</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sample_info</span> <span class="o">=</span> <span class="n">reference_sample</span>
+
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">sample_info</span><span class="o">.</span><span class="n">img_path</span><span class="p">))</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">fit_to_shape</span><span class="p">(</span><span class="n">arr</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span> <span class="n">out_shape</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="n">shape</span><span class="p">))</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">raw</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">raw</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">16</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">raw</span> <span class="o">=</span> <span class="n">raw</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint16</span><span class="p">)</span>
+    <span class="n">ome_zarr</span> <span class="o">=</span> <span class="n">create_ome_zarr_from_array</span><span class="p">(</span>
+        <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
+        <span class="n">array</span><span class="o">=</span><span class="n">raw</span><span class="p">,</span>
+        <span class="n">xy_pixelsize</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">xy_pixelsize</span><span class="p">,</span>
+        <span class="n">z_spacing</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">z_spacing</span><span class="p">,</span>
+        <span class="n">time_spacing</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">time_spacing</span><span class="p">,</span>
+        <span class="n">levels</span><span class="o">=</span><span class="n">levels</span><span class="p">,</span>
+        <span class="n">xy_scaling_factor</span><span class="o">=</span><span class="n">xy_scaling_factor</span><span class="p">,</span>
+        <span class="n">z_scaling_factor</span><span class="o">=</span><span class="n">z_scaling_factor</span><span class="p">,</span>
+        <span class="n">space_unit</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">space_unit</span><span class="p">,</span>
+        <span class="n">time_unit</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">time_unit</span><span class="p">,</span>
+        <span class="n">axes_names</span><span class="o">=</span><span class="n">axes_names</span><span class="p">,</span>
+        <span class="n">channel_labels</span><span class="o">=</span><span class="n">channel_labels</span><span class="p">,</span>
+        <span class="n">channel_wavelengths</span><span class="o">=</span><span class="n">channel_wavelengths</span><span class="p">,</span>
+        <span class="n">channel_colors</span><span class="o">=</span><span class="n">channel_colors</span><span class="p">,</span>
+        <span class="n">channel_active</span><span class="o">=</span><span class="n">channel_active</span><span class="p">,</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">sample_info</span><span class="o">.</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
+        <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span>
+        <span class="n">version</span><span class="o">=</span><span class="n">version</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="n">image</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span>
+    <span class="n">well_table</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">build_image_roi_table</span><span class="p">()</span>
+    <span class="n">ome_zarr</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;well_ROI_table&quot;</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">well_table</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="n">table_backend</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">label_info</span> <span class="ow">in</span> <span class="n">sample_info</span><span class="o">.</span><span class="n">labels</span><span class="p">:</span>
+        <span class="n">ome_zarr</span><span class="o">.</span><span class="n">derive_label</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">label_info</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_label</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">label_info</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">ref_label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">label_info</span><span class="o">.</span><span class="n">label_path</span><span class="p">))</span>
+        <span class="n">ref_label</span> <span class="o">=</span> <span class="n">fit_to_shape</span><span class="p">(</span>
+            <span class="n">arr</span><span class="o">=</span><span class="n">ref_label</span><span class="p">,</span>
+            <span class="n">out_shape</span><span class="o">=</span><span class="n">label</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
+            <span class="n">ensure_unique_info</span><span class="o">=</span><span class="n">label_info</span><span class="o">.</span><span class="n">ensure_unique_labels</span><span class="p">,</span>
+        <span class="p">)</span>
+        <span class="n">ref_label</span> <span class="o">=</span> <span class="n">ref_label</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">uint32</span><span class="p">)</span>
+        <span class="n">label</span><span class="o">.</span><span class="n">set_array</span><span class="p">(</span><span class="n">ref_label</span><span class="p">)</span>
+        <span class="n">label</span><span class="o">.</span><span class="n">consolidate</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">label_info</span><span class="o">.</span><span class="n">create_masking_table</span><span class="p">:</span>
+            <span class="n">masking_table</span> <span class="o">=</span> <span class="n">label</span><span class="o">.</span><span class="n">build_masking_roi_table</span><span class="p">()</span>
+            <span class="n">ome_zarr</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span>
+                <span class="n">name</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">label_info</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">_masking_table&quot;</span><span class="p">,</span>
+                <span class="n">table</span><span class="o">=</span><span class="n">masking_table</span><span class="p">,</span>
+                <span class="n">backend</span><span class="o">=</span><span class="n">table_backend</span><span class="p">,</span>
+            <span class="p">)</span>
+
     <span class="k">return</span> <span class="n">ome_zarr</span>
 </code></pre></div></td></tr></table></div>
             </details>
