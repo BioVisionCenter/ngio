@@ -97,6 +97,11 @@ def test_create_empty(tmp_path: Path, create_kwargs: dict):
     create_synthetic_ome_zarr(store=store, shape=shape, overwrite=True)
 
 
+def test_large_synt(tmp_path: Path):
+    store = tmp_path / "test_image_large.zarr"
+    create_synthetic_ome_zarr(store=store, shape=(1, 1, 513, 513), overwrite=True)
+
+
 def test_create_fail(tmp_path: Path):
     with pytest.raises(NgioValueError):
         create_ome_zarr_from_array(
