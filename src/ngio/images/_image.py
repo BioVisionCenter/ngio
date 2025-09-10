@@ -53,8 +53,8 @@ class ChannelSelectionModel(BaseModel):
 
     """
 
-    identifier: str
     mode: Literal["label", "wavelength_id", "index"] = "label"
+    identifier: str
 
     @model_validator(mode="after")
     def check_channel_selection(self):
