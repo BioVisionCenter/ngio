@@ -504,6 +504,7 @@ def build_roi_masked_numpy_getter(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[], np.ndarray]:
     """Prepare slice kwargs for getting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -531,6 +532,7 @@ def build_roi_masked_numpy_getter(
         label_slicing_dict=label_slice_kwargs,
         fill_value=fill_value,
         allow_scaling=allow_scaling,
+        remove_channel_selection=remove_channel_selection,
     )
 
 
@@ -549,6 +551,7 @@ def build_roi_masked_numpy_setter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[np.ndarray], None]:
     """Prepare slice kwargs for setting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -575,6 +578,7 @@ def build_roi_masked_numpy_setter(
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
         allow_scaling=allow_scaling,
+        remove_channel_selection=remove_channel_selection,
     )
 
 
@@ -593,6 +597,7 @@ def build_roi_masked_dask_getter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[], da.Array]:
     """Prepare slice kwargs for getting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -619,6 +624,7 @@ def build_roi_masked_dask_getter(
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
         allow_scaling=allow_scaling,
+        remove_channel_selection=remove_channel_selection,
     )
 
 
@@ -637,6 +643,7 @@ def build_roi_masked_dask_setter(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[da.Array], None]:
     """Prepare slice kwargs for setting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -663,4 +670,5 @@ def build_roi_masked_dask_setter(
         slicing_dict=input_slice_kwargs,
         label_slicing_dict=label_slice_kwargs,
         allow_scaling=allow_scaling,
+        remove_channel_selection=remove_channel_selection,
     )

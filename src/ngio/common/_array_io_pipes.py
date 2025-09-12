@@ -285,6 +285,7 @@ def build_masked_numpy_getter(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[], np.ndarray]:
     """Get a numpy array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -296,7 +297,7 @@ def build_masked_numpy_getter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=slicing_dict,
-        remove_channel_selection=False,
+        remove_channel_selection=remove_channel_selection,
     )
 
     label_data_getter = build_numpy_getter(
@@ -379,6 +380,7 @@ def build_masked_dask_getter(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     fill_value: int | float = 0,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[], DaskArray]:
     """Get a dask array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -390,7 +392,7 @@ def build_masked_dask_getter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=slicing_dict,
-        remove_channel_selection=False,
+        remove_channel_selection=remove_channel_selection,
     )
 
     label_data_getter = build_dask_getter(
@@ -433,6 +435,7 @@ def build_masked_numpy_setter(
     data_getter: Callable[[], np.ndarray] | None = None,
     label_data_getter: Callable[[], np.ndarray] | None = None,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[np.ndarray], None]:
     """Set a numpy array to the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -445,7 +448,7 @@ def build_masked_numpy_setter(
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_dict,
-            remove_channel_selection=False,
+            remove_channel_selection=remove_channel_selection,
         )
 
     if label_data_getter is None:
@@ -464,7 +467,7 @@ def build_masked_numpy_setter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=slicing_dict,
-        remove_channel_selection=False,
+        remove_channel_selection=remove_channel_selection,
     )
 
     def set_patch_masked_as_numpy(patch: np.ndarray) -> None:
@@ -498,6 +501,7 @@ def build_masked_dask_setter(
     data_getter: Callable[[], DaskArray] | None = None,
     label_data_getter: Callable[[], DaskArray] | None = None,
     allow_scaling: bool = True,
+    remove_channel_selection: bool = False,
 ) -> Callable[[DaskArray], None]:
     """Set a dask array to the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
@@ -510,7 +514,7 @@ def build_masked_dask_setter(
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_dict,
-            remove_channel_selection=False,
+            remove_channel_selection=remove_channel_selection,
         )
 
     if label_data_getter is None:
@@ -529,7 +533,7 @@ def build_masked_dask_setter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=slicing_dict,
-        remove_channel_selection=False,
+        remove_channel_selection=remove_channel_selection,
     )
 
     def set_patch_masked_as_dask(patch: DaskArray) -> None:
