@@ -103,6 +103,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
             roi=roi,
+            remove_channel_selection=True,
         )
 
     def build_dask_getter(self, roi: Roi):
@@ -124,6 +125,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
             roi=roi,
+            remove_channel_selection=True,
         )
 
     def post_consolidate(self):
@@ -245,6 +247,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
+            remove_channel_selection=True,
         )
 
     def build_dask_getter(self, roi: Roi):
@@ -272,6 +275,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
+            remove_channel_selection=True,
         )
 
     def post_consolidate(self):

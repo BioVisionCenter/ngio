@@ -412,6 +412,7 @@ def build_roi_numpy_setter(
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
+    remove_channel_selection: bool = False,
 ) -> Callable[[np.ndarray], None]:
     """Prepare slice kwargs for setting an array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -426,6 +427,7 @@ def build_roi_numpy_setter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=input_slice_kwargs,
+        remove_channel_selection=remove_channel_selection,
     )
 
 
@@ -464,6 +466,7 @@ def build_roi_dask_setter(
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
+    remove_channel_selection: bool = False,
 ) -> Callable[[da.Array], None]:
     """Prepare slice kwargs for setting an array."""
     input_slice_kwargs = roi_to_slicing_dict(
@@ -478,6 +481,7 @@ def build_roi_dask_setter(
         axes_order=axes_order,
         transforms=transforms,
         slicing_dict=input_slice_kwargs,
+        remove_channel_selection=remove_channel_selection,
     )
 
 

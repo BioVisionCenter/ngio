@@ -87,6 +87,7 @@ def build_numpy_getter(
         slicing_dict=slicing_dict,
         remove_channel_selection=remove_channel_selection,
     )
+
     return lambda: _numpy_get_pipe(
         zarr_array=zarr_array,
         slicing_ops=slicing_ops,
