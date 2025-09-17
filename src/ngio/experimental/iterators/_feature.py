@@ -47,7 +47,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         self._input = input_image
         self._input_label = input_label
         self._ref_image = input_image
-        self._rois = input_image.build_image_roi_table().rois()
+        self._rois = input_image.build_image_roi_table(name=None).rois()
 
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(

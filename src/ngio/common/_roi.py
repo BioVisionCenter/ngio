@@ -49,7 +49,7 @@ T = TypeVar("T", int, float)
 class GenericRoi(BaseModel, Generic[T]):
     """A generic Region of Interest (ROI) model."""
 
-    name: str
+    name: str | None
     x: T
     y: T
     z: T | None = None
@@ -66,6 +66,37 @@ class GenericRoi(BaseModel, Generic[T]):
     def intersection(self, other: "GenericRoi[T]") -> "GenericRoi[T] | None":
         """Calculate the intersection of this ROI with another ROI."""
         return roi_intersection(self, other)
+
+    def _nice_str(self) -> str:
+        if self.name is not None:
+            return self.name
+        if self.t is not None:
+            t_str = f"t={self.t}->{self.t_length}"
+        else:
+            t_str = "t=None"
+        if self.z is not None:
+            z_str = f"z={self.z}->{self.z_length}"
+        else:
+            z_str = "z=None"
+
+        y_str = f"y={self.y}->{self.y_length}"
+        x_str = f"x={self.x}->{self.x_length}"
+
+        if self.label is not None:
+            label_str = f", label={self.label}"
+        else:
+            label_str = ""
+        cls_name = self.__class__.__name__
+        return f"{cls_name}({t_str}, {z_str}, {y_str}, {x_str}{label_str})"
+
+    def get_name(self) -> str:
+        """Get the name of the ROI, or a default if not set."""
+        if self.name is not None:
+            return self.name
+        return self._nice_str()
+
+    def __repr__(self) -> str:
+        return self._nice_str()
 
 
 def _1d_intersection(
@@ -144,9 +175,14 @@ def roi_intersection(
             )
     label = ref_roi.label or other_roi.label
 
+    if ref_roi.name is not None and other_roi.name is not None:
+        name = f"{ref_roi.name}:{other_roi.name}"
+    else:
+        name = ref_roi.name or other_roi.name
+
     cls_ref = ref_roi.__class__
     return cls_ref(
-        name=f"[{ref_roi.name}_x_{other_roi.name}]",
+        name=name,
         x=x,
         y=y,
         z=z,

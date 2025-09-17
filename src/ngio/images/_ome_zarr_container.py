@@ -589,7 +589,7 @@ class OmeZarrContainer:
             backend=backend,
         )
 
-    def build_image_roi_table(self, name: str = "image") -> RoiTable:
+    def build_image_roi_table(self, name: str | None = "image") -> RoiTable:
         """Compute the ROI table for an image."""
         return self.get_image().build_image_roi_table(name=name)
 

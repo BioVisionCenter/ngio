@@ -24,7 +24,7 @@ def grid(
     stride_y: int | None = None,
     stride_z: int | None = None,
     stride_t: int | None = None,
-    base_name: str = "",
+    base_name: str | None = None,
 ) -> list[Roi]:
     """This method is a placeholder for creating a regular grid of ROIs."""
     t_dim = ref_image.dimensions.get("t", default=1)
@@ -49,7 +49,7 @@ def grid(
             for y in range(0, y_dim, stride_y):
                 for x in range(0, x_dim, stride_x):
                     roi = RoiPixels(
-                        name=f"{base_name}({t}, {z}, {y}, {x})",
+                        name=base_name,
                         x=x,
                         y=y,
                         z=z,

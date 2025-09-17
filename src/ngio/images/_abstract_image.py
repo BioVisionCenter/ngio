@@ -445,7 +445,7 @@ class AbstractImage(Generic[_image_handler]):
         """
         consolidate_image(image=self, order=order, mode=mode)
 
-    def build_image_roi_table(self, name: str = "image") -> RoiTable:
+    def build_image_roi_table(self, name: str | None = "image") -> RoiTable:
         """Build the ROI table for an image."""
         return build_image_roi_table(image=self, name=name)
 
@@ -467,7 +467,7 @@ def consolidate_image(
     )
 
 
-def build_image_roi_table(image: AbstractImage, name: str = "image") -> RoiTable:
+def build_image_roi_table(image: AbstractImage, name: str | None = "image") -> RoiTable:
     """Build the ROI table for an image."""
     dim_x = image.dimensions.get("x")
     dim_y = image.dimensions.get("y")

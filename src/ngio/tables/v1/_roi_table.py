@@ -6,6 +6,7 @@ https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/
 
 from collections.abc import Iterable
 from typing import Literal
+from uuid import uuid4
 
 import pandas as pd
 from pydantic import BaseModel
@@ -146,7 +147,7 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
         len_z_micrometer = roi.z_length if roi.z_length is not None else 1.0
 
         row = {
-            index_key: roi.name,
+            index_key: roi.get_name(),
             "x_micrometer": roi.x,
             "y_micrometer": roi.y,
             "z_micrometer": z_micrometer,
@@ -179,8 +180,15 @@ class RoiDictWrapper:
     """A wrapper for a dictionary of ROIs to provide a consistent interface."""
 
     def __init__(self, rois: Iterable[Roi]) -> None:
-        self._rois_by_name = {roi.name: roi for roi in rois}
-        self._rois_by_label = {roi.label: roi for roi in rois if roi.label is not None}
+        self._rois_by_name = {}
+        self._rois_by_label = {}
+        for roi in rois:
+            name = roi.get_name()
+            if name in self._rois_by_name:
+                name = f"{name}_{uuid4().hex[:8]}"
+            self._rois_by_name[name] = roi
+            if roi.label is not None:
+                self._rois_by_label[roi.label] = roi
 
     def get_by_name(self, name: str, default: Roi | None = None) -> Roi | None:
         """Get an ROI by its name."""
