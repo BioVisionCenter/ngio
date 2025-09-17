@@ -2787,10 +2787,7 @@
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
 <span class="normal">209</span>
 <span class="normal">210</span>
 <span class="normal">211</span>
@@ -2841,7 +2838,10 @@
 <span class="normal">256</span>
 <span class="normal">257</span>
 <span class="normal">258</span>
-<span class="normal">259</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_roi_pixels</span><span class="p">(</span>
+<span class="normal">259</span>
+<span class="normal">260</span>
+<span class="normal">261</span>
+<span class="normal">262</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_roi_pixels</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiPixels&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to raster coordinates.&quot;&quot;&quot;</span>
@@ -2923,10 +2923,7 @@
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">264</span>
 <span class="normal">265</span>
 <span class="normal">266</span>
 <span class="normal">267</span>
@@ -2934,7 +2931,10 @@
 <span class="normal">269</span>
 <span class="normal">270</span>
 <span class="normal">271</span>
-<span class="normal">272</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel_roi</span><span class="p">(</span>
+<span class="normal">272</span>
+<span class="normal">273</span>
+<span class="normal">274</span>
+<span class="normal">275</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel_roi</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiPixels&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to raster coordinates.&quot;&quot;&quot;</span>
@@ -2988,16 +2988,16 @@ If the zoom factor is 1 the ROI will not be changed.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">277</span>
 <span class="normal">278</span>
 <span class="normal">279</span>
 <span class="normal">280</span>
 <span class="normal">281</span>
 <span class="normal">282</span>
-<span class="normal">283</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">zoom_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Roi&quot;</span><span class="p">:</span>
+<span class="normal">283</span>
+<span class="normal">284</span>
+<span class="normal">285</span>
+<span class="normal">286</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">zoom_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">1</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Roi&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Zoom the ROI by a factor.</span>
 
 <span class="sd">    Args:</span>
@@ -3415,10 +3415,7 @@ If the zoom factor is 1 the ROI will not be changed.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">296</span>
 <span class="normal">297</span>
 <span class="normal">298</span>
 <span class="normal">299</span>
@@ -3456,7 +3453,10 @@ If the zoom factor is 1 the ROI will not be changed.</p>
 <span class="normal">331</span>
 <span class="normal">332</span>
 <span class="normal">333</span>
-<span class="normal">334</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_roi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Roi&quot;</span><span class="p">:</span>
+<span class="normal">334</span>
+<span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_roi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;Roi&quot;</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to raster coordinates.&quot;&quot;&quot;</span>
     <span class="n">x</span> <span class="o">=</span> <span class="n">_to_world</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
     <span class="n">x_length</span> <span class="o">=</span> <span class="n">_to_world</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x_length</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">.</span><span class="n">x</span><span class="p">)</span>
@@ -3525,10 +3525,7 @@ If the zoom factor is 1 the ROI will not be changed.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">336</span>
-<span class="normal">337</span>
-<span class="normal">338</span>
-<span class="normal">339</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">339</span>
 <span class="normal">340</span>
 <span class="normal">341</span>
 <span class="normal">342</span>
@@ -3541,7 +3538,10 @@ If the zoom factor is 1 the ROI will not be changed.</p>
 <span class="normal">349</span>
 <span class="normal">350</span>
 <span class="normal">351</span>
-<span class="normal">352</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slicing_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SlicingInputType</span><span class="p">]:</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slicing_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SlicingInputType</span><span class="p">]:</span>
     <span class="n">x_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_length</span><span class="p">)</span>
     <span class="n">y_slice</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">y_length</span><span class="p">)</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">z</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">z_length</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -5306,10 +5306,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">471</span>
-<span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">474</span>
 <span class="normal">475</span>
 <span class="normal">476</span>
 <span class="normal">477</span>
@@ -5330,7 +5327,10 @@ Other axes orders are not supported.</p>
 <span class="normal">492</span>
 <span class="normal">493</span>
 <span class="normal">494</span>
-<span class="normal">495</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_dask_getter</span><span class="p">(</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_dask_getter</span><span class="p">(</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
@@ -5393,10 +5393,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">501</span>
 <span class="normal">502</span>
 <span class="normal">503</span>
 <span class="normal">504</span>
@@ -5417,7 +5414,10 @@ Other axes orders are not supported.</p>
 <span class="normal">519</span>
 <span class="normal">520</span>
 <span class="normal">521</span>
-<span class="normal">522</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_dask_setter</span><span class="p">(</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_dask_setter</span><span class="p">(</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
@@ -5494,10 +5494,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">626</span>
-<span class="normal">627</span>
-<span class="normal">628</span>
-<span class="normal">629</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">629</span>
 <span class="normal">630</span>
 <span class="normal">631</span>
 <span class="normal">632</span>
@@ -5537,7 +5534,10 @@ Other axes orders are not supported.</p>
 <span class="normal">666</span>
 <span class="normal">667</span>
 <span class="normal">668</span>
-<span class="normal">669</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_dask_getter</span><span class="p">(</span>
+<span class="normal">669</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_dask_getter</span><span class="p">(</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
@@ -5633,10 +5633,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">672</span>
-<span class="normal">673</span>
-<span class="normal">674</span>
-<span class="normal">675</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">675</span>
 <span class="normal">676</span>
 <span class="normal">677</span>
 <span class="normal">678</span>
@@ -5676,7 +5673,10 @@ Other axes orders are not supported.</p>
 <span class="normal">712</span>
 <span class="normal">713</span>
 <span class="normal">714</span>
-<span class="normal">715</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_dask_setter</span><span class="p">(</span>
+<span class="normal">715</span>
+<span class="normal">716</span>
+<span class="normal">717</span>
+<span class="normal">718</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_dask_setter</span><span class="p">(</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
@@ -5773,10 +5773,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">532</span>
-<span class="normal">533</span>
-<span class="normal">534</span>
-<span class="normal">535</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">535</span>
 <span class="normal">536</span>
 <span class="normal">537</span>
 <span class="normal">538</span>
@@ -5818,7 +5815,10 @@ Other axes orders are not supported.</p>
 <span class="normal">574</span>
 <span class="normal">575</span>
 <span class="normal">576</span>
-<span class="normal">577</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_numpy_getter</span><span class="p">(</span>
+<span class="normal">577</span>
+<span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_numpy_getter</span><span class="p">(</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
@@ -5916,10 +5916,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">580</span>
-<span class="normal">581</span>
-<span class="normal">582</span>
-<span class="normal">583</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">583</span>
 <span class="normal">584</span>
 <span class="normal">585</span>
 <span class="normal">586</span>
@@ -5959,7 +5956,10 @@ Other axes orders are not supported.</p>
 <span class="normal">620</span>
 <span class="normal">621</span>
 <span class="normal">622</span>
-<span class="normal">623</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_numpy_setter</span><span class="p">(</span>
+<span class="normal">623</span>
+<span class="normal">624</span>
+<span class="normal">625</span>
+<span class="normal">626</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_masked_numpy_setter</span><span class="p">(</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
@@ -6041,10 +6041,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">417</span>
-<span class="normal">418</span>
-<span class="normal">419</span>
-<span class="normal">420</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">420</span>
 <span class="normal">421</span>
 <span class="normal">422</span>
 <span class="normal">423</span>
@@ -6065,7 +6062,10 @@ Other axes orders are not supported.</p>
 <span class="normal">438</span>
 <span class="normal">439</span>
 <span class="normal">440</span>
-<span class="normal">441</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_numpy_getter</span><span class="p">(</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_numpy_getter</span><span class="p">(</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
@@ -6128,10 +6128,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span>
-<span class="normal">447</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">447</span>
 <span class="normal">448</span>
 <span class="normal">449</span>
 <span class="normal">450</span>
@@ -6152,7 +6149,10 @@ Other axes orders are not supported.</p>
 <span class="normal">465</span>
 <span class="normal">466</span>
 <span class="normal">467</span>
-<span class="normal">468</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_numpy_setter</span><span class="p">(</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_roi_numpy_setter</span><span class="p">(</span>
     <span class="n">zarr_array</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span><span class="p">,</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
@@ -6216,10 +6216,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">393</span>
-<span class="normal">394</span>
-<span class="normal">395</span>
-<span class="normal">396</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">396</span>
 <span class="normal">397</span>
 <span class="normal">398</span>
 <span class="normal">399</span>
@@ -6237,7 +6234,10 @@ Other axes orders are not supported.</p>
 <span class="normal">411</span>
 <span class="normal">412</span>
 <span class="normal">413</span>
-<span class="normal">414</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">roi_to_slicing_dict</span><span class="p">(</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">roi_to_slicing_dict</span><span class="p">(</span>
     <span class="n">roi</span><span class="p">:</span> <span class="n">Roi</span> <span class="o">|</span> <span class="n">RoiPixels</span><span class="p">,</span>
     <span class="n">dimensions</span><span class="p">:</span> <span class="n">Dimensions</span><span class="p">,</span>
     <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
