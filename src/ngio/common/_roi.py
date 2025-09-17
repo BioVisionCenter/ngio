@@ -68,8 +68,6 @@ class GenericRoi(BaseModel, Generic[T]):
         return roi_intersection(self, other)
 
     def _nice_str(self) -> str:
-        if self.name is not None:
-            return self.name
         if self.t is not None:
             t_str = f"t={self.t}->{self.t_length}"
         else:
@@ -96,6 +94,9 @@ class GenericRoi(BaseModel, Generic[T]):
         return self._nice_str()
 
     def __repr__(self) -> str:
+        return self._nice_str()
+
+    def __str__(self) -> str:
         return self._nice_str()
 
 
