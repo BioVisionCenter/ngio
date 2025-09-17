@@ -145,11 +145,17 @@ def roi_intersection(
     x, x_length = _1d_intersection(
         ref_roi.x, ref_roi.x_length, other_roi.x, other_roi.x_length
     )
+    if x is None and x_length is None:
+        # No intersection
+        return None
     assert x is not None and x_length is not None
 
     y, y_length = _1d_intersection(
         ref_roi.y, ref_roi.y_length, other_roi.y, other_roi.y_length
     )
+    if y is None and y_length is None:
+        # No intersection
+        return None
     assert y is not None and y_length is not None
 
     z, z_length = _1d_intersection(
@@ -159,11 +165,8 @@ def roi_intersection(
         ref_roi.t, ref_roi.t_length, other_roi.t, other_roi.t_length
     )
 
-    if (
-        x_length <= 0
-        or y_length <= 0
-        or (z_length is not None and z_length <= 0)
-        or (t_length is not None and t_length <= 0)
+    if (z_length is not None and z_length <= 0) or (
+        t_length is not None and t_length <= 0
     ):
         # No intersection
         return None
