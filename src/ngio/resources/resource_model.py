@@ -19,6 +19,7 @@ class LabelsInfo(BaseModel):
     label_path: Path
     ensure_unique_labels: bool = True
     create_masking_table: bool = False
+    dtype: str = "uint32"
 
 
 class SampleInfo(BaseModel):

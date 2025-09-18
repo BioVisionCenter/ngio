@@ -108,6 +108,8 @@ def create_synthetic_ome_zarr(
         label = ome_zarr.get_label(name=label_info.name)
 
         ref_label = np.asarray(PIL.Image.open(label_info.label_path))
+        ref_label = ref_label.astype(label_info.dtype)
+
         ref_label = fit_to_shape(
             arr=ref_label,
             out_shape=label.shape,

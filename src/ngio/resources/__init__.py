@@ -28,6 +28,7 @@ _resources = {
                 / "mask.png",
                 create_masking_table=True,
                 ensure_unique_labels=False,
+                dtype="uint8",
             ),
         ],
         xy_pixelsize=0.325,
