@@ -16332,7 +16332,9 @@ Defaults to DefaultNgffVersion.</p>
 <span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
-<span class="normal">128</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_synthetic_ome_zarr</span><span class="p">(</span>
+<span class="normal">128</span>
+<span class="normal">129</span>
+<span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_synthetic_ome_zarr</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
     <span class="n">reference_sample</span><span class="p">:</span> <span class="n">AVAILABLE_SAMPLES</span> <span class="o">|</span> <span class="n">SampleInfo</span> <span class="o">=</span> <span class="s2">&quot;Cardiomyocyte&quot;</span><span class="p">,</span>
@@ -16419,6 +16421,8 @@ Defaults to DefaultNgffVersion.</p>
         <span class="n">label</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_label</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">label_info</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
         <span class="n">ref_label</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">PIL</span><span class="o">.</span><span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">label_info</span><span class="o">.</span><span class="n">label_path</span><span class="p">))</span>
+        <span class="n">ref_label</span> <span class="o">=</span> <span class="n">ref_label</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="n">label_info</span><span class="o">.</span><span class="n">dtype</span><span class="p">)</span>
+
         <span class="n">ref_label</span> <span class="o">=</span> <span class="n">fit_to_shape</span><span class="p">(</span>
             <span class="n">arr</span><span class="o">=</span><span class="n">ref_label</span><span class="p">,</span>
             <span class="n">out_shape</span><span class="o">=</span><span class="n">label</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
