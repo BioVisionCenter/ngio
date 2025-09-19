@@ -488,3 +488,59 @@ def build_image_roi_table(image: AbstractImage, name: str | None = "image") -> R
         t_length=dim_t,
     )
     return RoiTable(rois=[image_roi.to_roi(pixel_size=image.pixel_size)])
+
+
+def assert_compatible_images(
+    image1: AbstractImage,
+    image2: AbstractImage,
+    allow_singleton: bool = False,
+) -> None:
+    """Assert that two images have compatible dimensions.
+
+    Args:
+        image1: The first image.
+        image2: The second image.
+        allow_singleton: If True, allow singleton dimensions to be
+            compatible with non-singleton dimensions.
+
+    Raises:
+        NgioValueError: If the images do not have compatible dimensions.
+    """
+    image1.dimensions.assert_dimensions_match(
+        other=image2.dimensions, allow_singleton=allow_singleton
+    )
+
+
+def assert_compatible_axes(
+    image1: AbstractImage,
+    image2: AbstractImage,
+) -> None:
+    """Assert that two images have compatible axes.
+
+    Args:
+        image1: The first image.
+        image2: The second image.
+
+    Raises:
+        NgioValueError: If the images do not have compatible axes.
+    """
+    image1.dimensions.assert_axes_match(other=image2.dimensions)
+
+
+def assert_can_scaled(
+    image1: AbstractImage,
+    image2: AbstractImage,
+) -> None:
+    """Assert that two images can be scaled to each other.
+
+    For this to be true, the images must have the same axes, and
+    the pixel sizes must be compatible (i.e. one can be scaled to the other).
+
+    Args:
+        image1: The first image.
+        image2: The second image.
+
+    Raises:
+        NgioValueError: If the images cannot be scaled to each other.
+    """
+    pass

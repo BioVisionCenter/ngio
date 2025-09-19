@@ -7,7 +7,6 @@ but it is based on the actual metadata of the image data.
 from typing import overload
 
 from ngio.ome_zarr_meta import AxesMapper
-from ngio.ome_zarr_meta.ngio_specs import AxisType
 from ngio.utils import NgioValueError
 
 
@@ -133,24 +132,67 @@ class Dimensions:
             return False
         return True
 
-    def is_compatible_with(self, other: "Dimensions") -> bool:
-        """Check if the dimensions are compatible with another Dimensions object.
+    def assert_axes_match(self, other: "Dimensions") -> None:
+        """Check if two Dimensions objects have the same axes.
 
-        Two dimensions are compatible if:
-            - they have the same number of axes (excluding channels)
-            - the shape of each axis is the same
+        Besides the channel axis (which is a special case), all axes must be
+        present in both Dimensions objects.
+
+        Args:
+            other (Dimensions): The other dimensions object to compare against.
+
+        Raises:
+            NgioValueError: If the axes do not match.
         """
-        if abs(len(self.shape) - len(other.shape)) > 1:
-            # Since channels are not considered in compatibility
-            # we allow a difference of 0, 1 n-dimension in the shapes.
-            return False
-
-        for ax in self._axes_mapper.axes:
-            if ax.axis_type == AxisType.channel:
+        for s_axis in self.axes_mapper.axes:
+            if s_axis.axis_type == "channel":
                 continue
+            o_axis = other.axes_mapper.get_axis(s_axis.on_disk_name)
+            if o_axis is None:
+                raise NgioValueError(
+                    f"Axes do not match. The axis {s_axis.on_disk_name} "
+                    f"is not present in either dimensions."
+                )
+        # Check for axes present in the other dimensions but not in this one
+        for o_axis in other.axes_mapper.axes:
+            if o_axis.axis_type == "channel":
+                continue
+            s_axis = self.axes_mapper.get_axis(o_axis.on_disk_name)
+            if s_axis is None:
+                raise NgioValueError(
+                    f"Axes do not match. The axis {o_axis.on_disk_name} "
+                    f"is not present in either dimensions."
+                )
 
-            self_shape = self.get(ax.on_disk_name, default=None)
-            other_shape = other.get(ax.on_disk_name, default=None)
-            if self_shape != other_shape:
-                return False
-        return True
+    def assert_dimensions_match(
+        self, other: "Dimensions", allow_singleton: bool = False
+    ) -> None:
+        """Check if two Dimensions objects have the same axes and dimensions.
+
+        Besides the channel axis, all axes must have the same dimension in
+        both images.
+
+        Args:
+            other (Dimensions): The other dimensions object to compare against.
+            allow_singleton (bool): Whether to allow singleton dimensions to be
+                different. For example, if the input image has shape
+                (5, 100, 100) and the label has shape (1, 100, 100).
+
+        Raises:
+            NgioValueError: If the dimensions do not match.
+        """
+        self.assert_axes_match(other)
+        for s_axis in self.axes_mapper.axes:
+            o_axis = other.axes_mapper.get_axis(s_axis.on_disk_name)
+            assert o_axis is not None  # already checked in assert_axes_match
+
+            i_dim = self.get(s_axis.on_disk_name, default=1)
+            o_dim = other.get(o_axis.on_disk_name, default=1)
+
+            if i_dim != o_dim:
+                if allow_singleton and (i_dim == 1 or o_dim == 1):
+                    continue
+                raise NgioValueError(
+                    f"Dimensions do not match for axis "
+                    f"{s_axis.on_disk_name}. Got {i_dim} and {o_dim}."
+                )

@@ -22,7 +22,7 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.images._masked_image import MaskedImage
-from ngio.utils._errors import NgioValidationError
+from ngio.utils._errors import NgioValidationError, NgioValueError
 
 
 class SegmentationIterator(AbstractIteratorBuilder):
@@ -67,11 +67,12 @@ class SegmentationIterator(AbstractIteratorBuilder):
         self._output_transforms = output_transforms
 
         # Check compatibility between input and output images
-        if not self._input.dimensions.is_compatible_with(self._output.dimensions):
-            raise NgioValidationError(
-                "Input image and output label have incompatible dimensions. "
-                f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
-            )
+        # if not input_image.dimensions.is_compatible_with(output_label.dimensions):
+        #    raise NgioValueError(
+        #        "Input image and label must have the compatible dimensions. "
+        #        f"Input image dimensions: {input_image.dimensions}, "
+        #        f"label dimensions: {output_label.dimensions}."
+        #    )
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
@@ -205,11 +206,11 @@ class MaskedSegmentationIterator(SegmentationIterator):
         self._output_transforms = output_transforms
 
         # Check compatibility between input and output images
-        if not self._input.dimensions.is_compatible_with(self._output.dimensions):
-            raise NgioValidationError(
-                "Input image and output label have incompatible dimensions. "
-                f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
-            )
+        # if not self._input.dimensions.is_compatible_with(self._output.dimensions):
+        #    raise NgioValidationError(
+        #        "Input image and output label have incompatible dimensions. "
+        #        f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
+        #    )
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
