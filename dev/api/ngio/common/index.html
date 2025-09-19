@@ -1881,7 +1881,8 @@
 
                   <details class="quote">
                     <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">17</span>
+                    <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">16</span>
+<span class="normal">17</span>
 <span class="normal">18</span>
 <span class="normal">19</span>
 <span class="normal">20</span>
@@ -1899,8 +1900,7 @@
 <span class="normal">32</span>
 <span class="normal">33</span>
 <span class="normal">34</span>
-<span class="normal">35</span>
-<span class="normal">36</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">35</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">axes_mapper</span><span class="p">:</span> <span class="n">AxesMapper</span><span class="p">,</span>
@@ -2199,7 +2199,8 @@
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">54</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">53</span>
+<span class="normal">54</span>
 <span class="normal">55</span>
 <span class="normal">56</span>
 <span class="normal">57</span>
@@ -2208,8 +2209,7 @@
 <span class="normal">60</span>
 <span class="normal">61</span>
 <span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">63</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the dimension of the given axis name.</span>
 
 <span class="sd">    Args:</span>
@@ -2257,13 +2257,13 @@
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">66</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">65</span>
+<span class="normal">66</span>
 <span class="normal">67</span>
 <span class="normal">68</span>
 <span class="normal">69</span>
 <span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">71</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_index</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the index of the given axis name.</span>
 
 <span class="sd">    Args:</span>
@@ -2294,12 +2294,12 @@
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">74</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">73</span>
+<span class="normal">74</span>
 <span class="normal">75</span>
 <span class="normal">76</span>
 <span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="normal">78</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return whether the axis exists.&quot;&quot;&quot;</span>
     <span class="n">index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_axes_mapper</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">axis_name</span><span class="p">)</span>
     <span class="k">if</span> <span class="n">index</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -2314,30 +2314,50 @@
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.common.Dimensions.is_compatible_with" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">is_compatible_with</span>
+<h5 id="ngio.common.Dimensions.assert_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_axes_match</span>
 
 
-<a href="#ngio.common.Dimensions.is_compatible_with" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">is_compatible_with</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.common.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+<a href="#ngio.common.Dimensions.assert_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.common.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Check if the dimensions are compatible with another Dimensions object.</p>
+        <p>Check if two Dimensions objects have the same axes.</p>
+<p>Besides the channel axis (which is a special case), all axes must be
+present in both Dimensions objects.</p>
 
 
-<details class="two-dimensions-are-compatible-if" open>
-  <summary>Two dimensions are compatible if</summary>
-  <ul>
-<li>they have the same number of axes (excluding channels)</li>
-<li>the shape of each axis is the same</li>
-</ul>
-</details>
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.common.Dimensions">Dimensions</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other dimensions object to compare against.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the axes do not match.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">136</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">135</span>
+<span class="normal">136</span>
 <span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span>
@@ -2357,27 +2377,174 @@
 <span class="normal">153</span>
 <span class="normal">154</span>
 <span class="normal">155</span>
-<span class="normal">156</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">is_compatible_with</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if the dimensions are compatible with another Dimensions object.</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_axes_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two Dimensions objects have the same axes.</span>
 
-<span class="sd">    Two dimensions are compatible if:</span>
-<span class="sd">        - they have the same number of axes (excluding channels)</span>
-<span class="sd">        - the shape of each axis is the same</span>
+<span class="sd">    Besides the channel axis (which is a special case), all axes must be</span>
+<span class="sd">    present in both Dimensions objects.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other (Dimensions): The other dimensions object to compare against.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the axes do not match.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
-        <span class="c1"># Since channels are not considered in compatibility</span>
-        <span class="c1"># we allow a difference of 0, 1 n-dimension in the shapes.</span>
-        <span class="k">return</span> <span class="kc">False</span>
-
-    <span class="k">for</span> <span class="n">ax</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_axes_mapper</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">ax</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="n">AxisType</span><span class="o">.</span><span class="n">channel</span><span class="p">:</span>
+    <span class="k">for</span> <span class="n">s_axis</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">s_axis</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
             <span class="k">continue</span>
+        <span class="n">o_axis</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">o_axis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Axes do not match. The axis </span><span class="si">{</span><span class="n">s_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;is not present in either dimensions.&quot;</span>
+            <span class="p">)</span>
+    <span class="c1"># Check for axes present in the other dimensions but not in this one</span>
+    <span class="k">for</span> <span class="n">o_axis</span> <span class="ow">in</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">o_axis</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
+            <span class="k">continue</span>
+        <span class="n">s_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">o_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">s_axis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Axes do not match. The axis </span><span class="si">{</span><span class="n">o_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="si">}</span><span class="s2"> &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;is not present in either dimensions.&quot;</span>
+            <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
 
-        <span class="n">self_shape</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-        <span class="n">other_shape</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">self_shape</span> <span class="o">!=</span> <span class="n">other_shape</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">False</span>
-    <span class="k">return</span> <span class="kc">True</span>
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.common.Dimensions.assert_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_dimensions_match</span>
+
+
+<a href="#ngio.common.Dimensions.assert_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+    <span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.common.Dimensions">Dimensions</a></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two Dimensions objects have the same axes and dimensions.</p>
+<p>Besides the channel axis, all axes must have the same dimension in
+both images.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.common.Dimensions">Dimensions</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other dimensions object to compare against.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>allow_singleton</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Whether to allow singleton dimensions to be
+different. For example, if the input image has shape
+(5, 100, 100) and the label has shape (1, 100, 100).</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the dimensions do not match.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two Dimensions objects have the same axes and dimensions.</span>
+
+<span class="sd">    Besides the channel axis, all axes must have the same dimension in</span>
+<span class="sd">    both images.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other (Dimensions): The other dimensions object to compare against.</span>
+<span class="sd">        allow_singleton (bool): Whether to allow singleton dimensions to be</span>
+<span class="sd">            different. For example, if the input image has shape</span>
+<span class="sd">            (5, 100, 100) and the label has shape (1, 100, 100).</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the dimensions do not match.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">s_axis</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
+        <span class="n">o_axis</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">)</span>
+        <span class="k">assert</span> <span class="n">o_axis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># already checked in assert_axes_match</span>
+
+        <span class="n">i_dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">o_dim</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">o_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">i_dim</span> <span class="o">!=</span> <span class="n">o_dim</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">allow_singleton</span> <span class="ow">and</span> <span class="p">(</span><span class="n">i_dim</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">o_dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">continue</span>
+            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Dimensions do not match for axis &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">s_axis</span><span class="o">.</span><span class="n">on_disk_name</span><span class="si">}</span><span class="s2">. Got </span><span class="si">{</span><span class="n">i_dim</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">o_dim</span><span class="si">}</span><span class="s2">.&quot;</span>
+            <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
