@@ -749,7 +749,7 @@ def derive_image_container(
         pixel_size = ref_image.pixel_size
 
     if axes_names is None:
-        axes_names = ref_meta.axes_mapper.axes_names
+        axes_names = ref_meta.axes_handler.axes_names
 
     if len(axes_names) != len(shape):
         raise NgioValidationError(

@@ -257,8 +257,8 @@ def derive_label(
         pixel_size = ref_image.pixel_size
 
     if axes_names is None:
-        axes_names = ref_meta.axes_mapper.axes_names
-        c_axis = ref_meta.axes_mapper.get_index("c")
+        axes_names = ref_meta.axes_handler.axes_names
+        c_axis = ref_meta.axes_handler.get_index("c")
     else:
         if "c" in axes_names:
             raise NgioValidationError(

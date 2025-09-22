@@ -124,7 +124,7 @@ def _normalize_slicing_dict(
     """Convert slice kwargs to the on-disk axes names."""
     normalized_slicing_dict: dict[str, SlicingInputType] = {}
     for axis_name, slice_ in slicing_dict.items():
-        axis = dimensions.axes_mapper.get_axis(axis_name)
+        axis = dimensions.axes_handler.get_axis(axis_name)
         if axis is None:
             # Virtual axes should be allowed to be selected
             # Common use case is still allowing channel_selection
@@ -136,13 +136,12 @@ def _normalize_slicing_dict(
                 )
             # Virtual axes can be safely ignored
             continue
-        on_disk_name = axis.on_disk_name
-        if on_disk_name in normalized_slicing_dict:
+        if axis.name in normalized_slicing_dict:
             raise NgioValueError(
-                f"Duplicate axis {on_disk_name} in slice kwargs. "
+                f"Duplicate axis {axis.name} in slice kwargs. "
                 "Please provide unique axis names."
             )
-        normalized_slicing_dict[axis.on_disk_name] = slice_
+        normalized_slicing_dict[axis.name] = slice_
 
     if remove_channel_selection:
         normalized_slicing_dict = _remove_channel_slicing(
@@ -161,11 +160,11 @@ def _normalize_axes_order(
     """
     new_axes_order = []
     for axis_name in axes_order:
-        axis = dimensions.axes_mapper.get_axis(axis_name)
+        axis = dimensions.axes_handler.get_axis(axis_name)
         if axis is None:
             new_axes_order.append(axis_name)
         else:
-            new_axes_order.append(axis.on_disk_name)
+            new_axes_order.append(axis.name)
     return new_axes_order
 
 
@@ -182,7 +181,7 @@ def _normalize_slice_input(
     And transform it to either a slice or a tuple of integers.
     If the axis is not present in the slicing_dict, return a full slice.
     """
-    axis_name = axis.on_disk_name
+    axis_name = axis.name
     if axis_name not in slicing_dict:
         # If no slice is provided for the axis, use a full slice
         return slice(None)
@@ -240,7 +239,7 @@ def _build_slicing_tuple(
             requires_axes_ops=requires_axes_ops,
             axes_order=_axes_order,
         )
-        for axis in dimensions.axes_mapper.axes
+        for axis in dimensions.axes_handler.axes
     )
     return slicing_tuple
 
@@ -470,7 +469,7 @@ def setup_from_disk_pipe(
 ) -> SlicingOps:
     if axes_order is not None:
         axes_order = _normalize_axes_order(dimensions=dimensions, axes_order=axes_order)
-        slicing_ops = dimensions.axes_mapper.to_order(axes_order)
+        slicing_ops = dimensions.axes_handler.to_order(axes_order)
     else:
         slicing_ops = SlicingOps()
 
@@ -494,7 +493,7 @@ def setup_to_disk_pipe(
 ) -> SlicingOps:
     if axes_order is not None:
         axes_order = _normalize_axes_order(dimensions=dimensions, axes_order=axes_order)
-        slicing_ops = dimensions.axes_mapper.from_order(axes_order)
+        slicing_ops = dimensions.axes_handler.from_order(axes_order)
     else:
         slicing_ops = SlicingOps()
 

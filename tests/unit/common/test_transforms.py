@@ -39,16 +39,16 @@ def test_zoom_transform():
 
 def test_zoom_from_dimensions():
     from ngio.common import Dimensions
-    from ngio.ome_zarr_meta import AxesMapper
+    from ngio.ome_zarr_meta import AxesHandler
     from ngio.ome_zarr_meta.ngio_specs import Axis
 
-    original_axes = [Axis(on_disk_name=ax) for ax in ("t", "z", "y", "x")]
-    target_axes = [Axis(on_disk_name=ax) for ax in ("z", "y", "x")]
+    original_axes = [Axis(name=ax) for ax in ("t", "z", "y", "x")]
+    target_axes = [Axis(name=ax) for ax in ("z", "y", "x")]
 
     original_dim = Dimensions(
-        shape=(10, 3, 10, 10), axes_mapper=AxesMapper(original_axes)
+        shape=(10, 3, 10, 10), axes_handler=AxesHandler(original_axes)
     )
-    target_dim = Dimensions(shape=(3, 5, 5), axes_mapper=AxesMapper(target_axes))
+    target_dim = Dimensions(shape=(3, 5, 5), axes_handler=AxesHandler(target_axes))
 
     zoom = ZoomTransform.from_dimensions(
         original_dimension=original_dim,

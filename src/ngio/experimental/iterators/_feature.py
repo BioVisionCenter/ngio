@@ -81,13 +81,11 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         for axis in self._input.dimensions._axes_mapper.axes:
             if axis.axis_type == "channel":
                 continue
-            l_axis = self._input_label.dimensions._axes_mapper.get_axis(
-                axis.on_disk_name
-            )
+            l_axis = self._input_label.dimensions._axes_mapper.get_axis(axis.name)
             if l_axis is None:
                 raise NgioValueError(
                     f"Input image and label must have the same axes. "
-                    f"Axis {axis.on_disk_name} is missing in the label."
+                    f"Axis {axis.name} is missing in the label."
                 )
 
     def assert_dimensions_match(self, allow_singleton: bool = False) -> None:
@@ -106,18 +104,16 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         """
         self.assert_axes_match()
         for axis in self._input.dimensions._axes_mapper.axes:
-            l_axis = self._input_label.dimensions._axes_mapper.get_axis(
-                axis.on_disk_name
-            )
+            l_axis = self._input_label.dimensions._axes_mapper.get_axis(axis.name)
             assert l_axis is not None  # already checked in assert_axes_match
-            i_dim = self._input.dimensions.get(axis.on_disk_name)
-            l_dim = self._input_label.dimensions.get(axis.on_disk_name)
+            i_dim = self._input.dimensions.get(axis.name)
+            l_dim = self._input_label.dimensions.get(axis.name)
             if i_dim != l_dim:
                 if allow_singleton and (i_dim == 1 or l_dim == 1):
                     continue
                 raise NgioValueError(
                     f"Input image and label must have the same dimensions. "
-                    f"Axis {axis.on_disk_name} has dimension {i_dim} in the "
+                    f"Axis {axis.name} has dimension {i_dim} in the "
                     f"input image and {l_dim} in the label."
                 )
 

@@ -17,7 +17,7 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
-    canonical_axes,
+    build_canonical_axes_handler,
 )
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.ome_zarr_meta.ngio_specs._dataset import Dataset
@@ -55,13 +55,13 @@ class AbstractNgioImageMeta:
             raise NgioValidationError("At least one dataset must be provided.")
 
         self._datasets = datasets
-        self._axes_mapper = datasets[0].axes_mapper
+        self._axes_handler = datasets[0].axes_handler
 
     def __repr__(self):
         class_name = type(self).__name__
         paths = [dataset.path for dataset in self.datasets]
-        on_disk_axes = self.axes_mapper.axes_names
-        return f"{class_name}(name={self.name}, datasets={paths}, axes={on_disk_axes})"
+        axes = self.axes_handler.axes_names
+        return f"{class_name}(name={self.name}, datasets={paths}, axes={axes})"
 
     @classmethod
     def default_init(
@@ -74,19 +74,20 @@ class AbstractNgioImageMeta:
         version: NgffVersions = DefaultNgffVersion,
     ):
         """Initialize the ImageMeta object."""
-        axes = canonical_axes(
+        axes_handler = build_canonical_axes_handler(
             axes_names,
             space_units=pixel_size.space_unit,
             time_units=pixel_size.time_unit,
         )
 
         px_size_dict = pixel_size.as_dict()
-        scale = [px_size_dict.get(ax.on_disk_name, 1.0) for ax in axes]
-        translation = [0.0] * len(scale)
+        scale = [px_size_dict.get(name, 1.0) for name in axes_handler.axes_names]
 
         if scaling_factors is None:
             _default = {"x": 2.0, "y": 2.0}
-            scaling_factors = [_default.get(ax.on_disk_name, 1.0) for ax in axes]
+            scaling_factors = [
+                _default.get(name, 1.0) for name in axes_handler.axes_names
+            ]
 
         if isinstance(levels, int):
             levels = [str(i) for i in range(levels)]
@@ -95,11 +96,9 @@ class AbstractNgioImageMeta:
         for level in levels:
             dataset = Dataset(
                 path=level,
-                on_disk_axes=axes,
-                on_disk_scale=scale,
-                on_disk_translation=translation,
-                allow_non_canonical_axes=False,
-                strict_canonical_order=True,
+                axes_handler=axes_handler,
+                scale=scale,
+                translation=None,
             )
             datasets.append(dataset)
             scale = [s * f for s, f in zip(scale, scaling_factors, strict=True)]
@@ -149,9 +148,9 @@ class AbstractNgioImageMeta:
         return self._datasets
 
     @property
-    def axes_mapper(self):
+    def axes_handler(self):
         """Return the axes mapper."""
-        return self._axes_mapper
+        return self._axes_handler
 
     @property
     def levels(self) -> int:
@@ -166,12 +165,12 @@ class AbstractNgioImageMeta:
     @property
     def space_unit(self) -> str | None:
         """Get the space unit of the pixel size."""
-        return self.datasets[0].pixel_size.space_unit
+        return self.axes_handler.space_unit
 
     @property
     def time_unit(self) -> str | None:
         """Get the time unit of the pixel size."""
-        return self.datasets[0].pixel_size.time_unit
+        return self.axes_handler.time_unit
 
     def _get_dataset_by_path(self, path: str) -> Dataset:
         """Get a dataset by its path."""
@@ -321,11 +320,11 @@ class AbstractNgioImageMeta:
     def scaling_factor(self, path: str | None = None) -> list[float]:
         """Get the scaling factors from a dataset to its lower resolution."""
         if self.levels == 1:
-            return [1.0] * len(self.axes_mapper.axes_names)
+            return [1.0] * len(self.axes_handler.axes_names)
         dataset, lr_dataset = self._get_closest_datasets(path=path)
 
         scaling_factors = []
-        for ax_name in self.axes_mapper.axes_names:
+        for ax_name in self.axes_handler.axes_names:
             s_d = dataset.get_scale(ax_name)
             s_lr_d = lr_dataset.get_scale(ax_name)
             scaling_factors.append(s_lr_d / s_d)
@@ -359,8 +358,8 @@ class AbstractNgioImageMeta:
             return 1.0
         dataset, lr_dataset = self._get_closest_datasets(path=path)
 
-        s_d = dataset.get_scale("z")
-        s_lr_d = lr_dataset.get_scale("z")
+        s_d = dataset.get_scale("z", default=1.0)
+        s_lr_d = lr_dataset.get_scale("z", default=1.0)
         return s_lr_d / s_d
 
 

@@ -26,6 +26,7 @@ from ome_zarr_models.v04.omero import Window as WindowV04
 from pydantic import ValidationError
 
 from ngio.ome_zarr_meta.ngio_specs import (
+    AxesHandler,
     AxesSetup,
     Axis,
     AxisType,
@@ -160,34 +161,38 @@ def _v04_to_ngio_datasets(
             v04_multiscale.coordinateTransformations, global_scale, global_translation
         )
 
-    for v04_dataset in v04_multiscale.datasets:
-        axes = []
-        for v04_axis in v04_multiscale.axes:
-            unit = v04_axis.unit
-            if unit is not None and not isinstance(unit, str):
-                unit = str(unit)
-            axes.append(
-                Axis(
-                    on_disk_name=v04_axis.name,
-                    axis_type=AxisType(v04_axis.type),
-                    # (for some reason the type is a generic JsonValue,
-                    # but it should be a string or None)
-                    unit=v04_axis.unit,  # type: ignore
-                )
+    # Prepare axes handler
+    axes = []
+    for v04_axis in v04_multiscale.axes:
+        unit = v04_axis.unit
+        if unit is not None and not isinstance(unit, str):
+            unit = str(unit)
+        axes.append(
+            Axis(
+                name=v04_axis.name,
+                axis_type=AxisType(v04_axis.type),
+                # (for some reason the type is a generic JsonValue,
+                # but it should be a string or None)
+                unit=v04_axis.unit,  # type: ignore
             )
+        )
+    axes_handler = AxesHandler(
+        axes=axes,
+        axes_setup=axes_setup,
+        allow_non_canonical_axes=allow_non_canonical_axes,
+        strict_canonical_order=strict_canonical_order,
+    )
 
-        _on_disk_scale, _on_disk_translation = _compute_scale_translation(
+    for v04_dataset in v04_multiscale.datasets:
+        _scale, _translation = _compute_scale_translation(
             v04_dataset.coordinateTransformations, global_scale, global_translation
         )
         datasets.append(
             Dataset(
                 path=v04_dataset.path,
-                on_disk_axes=axes,
-                on_disk_scale=_on_disk_scale,
-                on_disk_translation=_on_disk_translation,
-                axes_setup=axes_setup,
-                allow_non_canonical_axes=allow_non_canonical_axes,
-                strict_canonical_order=strict_canonical_order,
+                axes_handler=axes_handler,
+                scale=_scale,
+                translation=_translation,
             )
         )
     return datasets
@@ -314,12 +319,12 @@ def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
     Returns:
         MultiscaleV04: The v04 multiscale.
     """
-    ax_mapper = datasets[0].axes_mapper
+    ax_mapper = datasets[0].axes_handler
     v04_axes = []
     for axis in ax_mapper.axes:
         v04_axes.append(
             AxisV04(
-                name=axis.on_disk_name,
+                name=axis.name,
                 type=axis.axis_type.value if axis.axis_type is not None else None,
                 unit=axis.unit if axis.unit is not None else None,
             )
@@ -327,18 +332,16 @@ def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
 
     v04_datasets = []
     for dataset in datasets:
-        transform = [VectorScaleV04(type="scale", scale=list(dataset._on_disk_scale))]
-        if sum(dataset._on_disk_translation) > 0:
+        transform = [VectorScaleV04(type="scale", scale=list(dataset._scale))]
+        if sum(dataset._translation) > 0:
             transform = (
-                VectorScaleV04(type="scale", scale=list(dataset._on_disk_scale)),
+                VectorScaleV04(type="scale", scale=list(dataset._scale)),
                 VectorTranslationV04(
-                    type="translation", translation=list(dataset._on_disk_translation)
+                    type="translation", translation=list(dataset._translation)
                 ),
             )
         else:
-            transform = (
-                VectorScaleV04(type="scale", scale=list(dataset._on_disk_scale)),
-            )
+            transform = (VectorScaleV04(type="scale", scale=list(dataset._scale)),)
 
         v04_datasets.append(
             DatasetV04(path=dataset.path, coordinateTransformations=transform)

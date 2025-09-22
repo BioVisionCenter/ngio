@@ -4,10 +4,29 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 
+from ngio import PixelSize
 from ngio.common._array_io_utils import apply_sequence_axes_ops
 from ngio.common._dimensions import Dimensions
 from ngio.common._zoom import dask_zoom, numpy_zoom
 from ngio.ome_zarr_meta.ngio_specs import SlicingOps
+
+
+def _compute_scale(
+    original_dimension: Dimensions,
+    target_dimension: Dimensions,
+) -> tuple[float, ...]:
+    scale = []
+    for o_ax_name in original_dimension.axes_handler.axes_names:
+        t_ax = target_dimension.axes_handler.get_axis(name=o_ax_name)
+        if t_ax is None:
+            _scale = 1
+        else:
+            t_shape = target_dimension.get(o_ax_name)
+            o_shape = original_dimension.get(o_ax_name)
+            assert t_shape is not None and o_shape is not None
+            _scale = t_shape / o_shape
+        scale.append(_scale)
+    return tuple(scale)
 
 
 class ZoomTransform:
@@ -30,18 +49,10 @@ class ZoomTransform:
         target_dimension: Dimensions,
         order: Literal[0, 1, 2],
     ):
-        scale = []
-        for o_ax_name in original_dimension.axes_mapper.axes_names:
-            t_ax = target_dimension.axes_mapper.get_axis(name=o_ax_name)
-            if t_ax is None:
-                _scale = 1
-            else:
-                t_shape = target_dimension.get(o_ax_name)
-                o_shape = original_dimension.get(o_ax_name)
-                assert t_shape is not None and o_shape is not None
-                _scale = t_shape / o_shape
-            scale.append(_scale)
-
+        scale = _compute_scale(
+            original_dimension=original_dimension,
+            target_dimension=target_dimension,
+        )
         return cls(scale, order)
 
     def apply_numpy_transform(

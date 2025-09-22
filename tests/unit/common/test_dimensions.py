@@ -1,7 +1,7 @@
 import pytest
 
 from ngio.common import Dimensions
-from ngio.ome_zarr_meta import AxesMapper
+from ngio.ome_zarr_meta import AxesHandler
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
 
@@ -17,15 +17,15 @@ from ngio.utils import NgioValueError
     ],
 )
 def test_dimensions(axes_names):
-    axes = [Axis(on_disk_name=name) for name in axes_names]
+    axes = [Axis(name=name) for name in axes_names]
     canonic_dim_dict = dict(zip("tczyx", (2, 3, 4, 5, 6), strict=True))
     dim_dict = {ax: canonic_dim_dict.get(ax, 1) for ax in axes_names}
 
     shape = tuple(dim_dict.get(ax) for ax in axes_names)
     shape = tuple(s for s in shape if s is not None)
 
-    ax_mapper = AxesMapper(on_disk_axes=axes)
-    dims = Dimensions(shape=shape, axes_mapper=ax_mapper)
+    ax_mapper = AxesHandler(axes=axes)
+    dims = Dimensions(shape=shape, axes_handler=ax_mapper)
 
     assert isinstance(dims.__repr__(), str)
 
@@ -57,14 +57,14 @@ def test_dimensions(axes_names):
 
 
 def test_dimensions_error():
-    axes = [Axis(on_disk_name="x"), Axis(on_disk_name="y")]
+    axes = [Axis(name="x"), Axis(name="y")]
     shape = (1, 2, 3)
 
     with pytest.raises(NgioValueError):
-        Dimensions(shape=shape, axes_mapper=AxesMapper(on_disk_axes=axes))
+        Dimensions(shape=shape, axes_handler=AxesHandler(axes=axes))
 
     shape = (3, 4)
-    dims = Dimensions(shape=shape, axes_mapper=AxesMapper(on_disk_axes=axes))
+    dims = Dimensions(shape=shape, axes_handler=AxesHandler(axes=axes))
 
     assert dims.get("c", default=None) is None
     assert not dims.is_3d

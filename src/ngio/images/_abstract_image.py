@@ -25,7 +25,7 @@ from ngio.common import (
     consolidate_pyramid,
 )
 from ngio.ome_zarr_meta import (
-    AxesMapper,
+    AxesHandler,
     Dataset,
     ImageMetaHandler,
     LabelMetaHandler,
@@ -70,10 +70,9 @@ class AbstractImage(Generic[_image_handler]):
             raise NgioFileExistsError(f"Could not find the dataset at {path}.") from e
 
         self._dimensions = Dimensions(
-            shape=self._zarr_array.shape, axes_mapper=self._dataset.axes_mapper
+            shape=self._zarr_array.shape, axes_handler=self._dataset.axes_handler
         )
-
-        self._axes_mapper = self._dataset.axes_mapper
+        self._axes_mapper = self._dataset.axes_handler
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
@@ -110,7 +109,7 @@ class AbstractImage(Generic[_image_handler]):
         return self._dimensions
 
     @property
-    def axes_mapper(self) -> AxesMapper:
+    def axes_mapper(self) -> AxesHandler:
         """Return the axes mapper of the image."""
         return self._axes_mapper
 
@@ -490,12 +489,12 @@ def build_image_roi_table(image: AbstractImage, name: str | None = "image") -> R
     return RoiTable(rois=[image_roi.to_roi(pixel_size=image.pixel_size)])
 
 
-def assert_compatible_images(
+def assert_dimensions_match(
     image1: AbstractImage,
     image2: AbstractImage,
     allow_singleton: bool = False,
 ) -> None:
-    """Assert that two images have compatible dimensions.
+    """Assert that two images have matching spatial dimensions.
 
     Args:
         image1: The first image.
@@ -511,7 +510,7 @@ def assert_compatible_images(
     )
 
 
-def assert_compatible_axes(
+def assert_axes_match(
     image1: AbstractImage,
     image2: AbstractImage,
 ) -> None:
@@ -527,11 +526,11 @@ def assert_compatible_axes(
     image1.dimensions.assert_axes_match(other=image2.dimensions)
 
 
-def assert_can_scaled(
+def assert_can_be_rescaled(
     image1: AbstractImage,
     image2: AbstractImage,
 ) -> None:
-    """Assert that two images can be scaled to each other.
+    """Assert that two images can be rescaled to each other.
 
     For this to be true, the images must have the same axes, and
     the pixel sizes must be compatible (i.e. one can be scaled to the other).

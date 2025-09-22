@@ -91,7 +91,7 @@ DefaultTimeUnit = "second"
 class Axis(BaseModel):
     """Axis infos model."""
 
-    on_disk_name: str
+    name: str
     unit: str | None = None
     axis_type: AxisType | None = None
 
@@ -105,7 +105,7 @@ class Axis(BaseModel):
         if cast_type == AxisType.space and unit is None:
             unit = DefaultSpaceUnit
 
-        return Axis(on_disk_name=self.on_disk_name, axis_type=cast_type, unit=unit)
+        return Axis(name=self.name, axis_type=cast_type, unit=unit)
 
     def canonical_axis_cast(self, canonical_name: str) -> "Axis":
         """Cast the implicit axis to the correct type."""
@@ -167,6 +167,11 @@ class AxesSetup(BaseModel):
             "x": self.x,
         }
 
+    def get_on_disk_name(self, canonical_name: str) -> str | None:
+        """Get the on disk name of the axis by its canonical name."""
+        canonical_map = self.canonical_map()
+        return canonical_map.get(canonical_name, None)
+
     def inverse_canonical_map(self) -> dict[str, str]:
         """Get the on disk map of axes."""
         return {
@@ -177,10 +182,15 @@ class AxesSetup(BaseModel):
             self.x: "x",
         }
 
+    def get_canonical_name(self, on_disk_name: str) -> str | None:
+        """Get the canonical name of the axis by its on disk name."""
+        inv_map = self.inverse_canonical_map()
+        return inv_map.get(on_disk_name, None)
+
 
 def _check_unique_names(axes: Sequence[Axis]):
     """Check if all axes on disk have unique names."""
-    names = [ax.on_disk_name for ax in axes]
+    names = [ax.name for ax in axes]
     if len(set(names)) != len(names):
         duplicates = {item for item in names if names.count(item) > 1}
         raise NgioValidationError(
@@ -202,10 +212,10 @@ def _check_axes_validity(axes: Sequence[Axis], axes_setup: AxesSetup):
     _axes_setup = axes_setup.model_dump(exclude={"others"})
     _all_known_axes = [*_axes_setup.values(), *axes_setup.others]
     for ax in axes:
-        if ax.on_disk_name not in _all_known_axes:
+        if ax.name not in _all_known_axes:
             raise NgioValidationError(
-                f"Invalid axis name '{ax.on_disk_name}'. "
-                f"Please correct map `{ax.on_disk_name}` "
+                f"Invalid axis name '{ax.name}'. "
+                f"Please correct map `{ax.name}` "
                 f"using the AxesSetup model {axes_setup}"
             )
 
@@ -216,17 +226,17 @@ def _check_canonical_order(
     """Check if the axes are in the canonical order."""
     if not strict_canonical_order:
         return
-    _on_disk_names = [ax.on_disk_name for ax in axes]
+    _names = [ax.name for ax in axes]
     _canonical_order = []
     for name in canonical_axes_order():
         mapped_name = getattr(axes_setup, name)
-        if mapped_name in _on_disk_names:
+        if mapped_name in _names:
             _canonical_order.append(mapped_name)
 
-    if _on_disk_names != _canonical_order:
+    if _names != _canonical_order:
         raise NgioValidationError(
             f"Invalid axes order. The axes must be in the canonical order. "
-            f"Expected {_canonical_order}, but found {_on_disk_names}"
+            f"Expected {_canonical_order}, but found {_names}"
         )
 
 
@@ -268,17 +278,20 @@ class SlicingOps(BaseModel):
         return False
 
 
-class AxesMapper:
-    """Map on disk axes to canonical axes.
+class AxesHandler:
+    """This class is used to handle and operate on OME-Zarr axes.
 
-    This class is used to map the on disk axes to the canonical axes.
-
+    The class also provides:
+        - methods to reorder, squeeze and expand axes.
+        - methods to validate the axes.
+        - methods to get axis by name or index.
+        - methods to operate on the axes.
     """
 
     def __init__(
         self,
         # spec dictated args
-        on_disk_axes: Sequence[Axis],
+        axes: Sequence[Axis],
         # user defined args
         axes_setup: AxesSetup | None = None,
         allow_non_canonical_axes: bool = False,
@@ -287,7 +300,7 @@ class AxesMapper:
         """Create a new AxesMapper object.
 
         Args:
-            on_disk_axes (list[Axis]): The axes on disk.
+            axes (list[Axis]): The axes on disk.
             axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
             allow_non_canonical_axes (bool, optional): Allow non canonical axes.
             strict_canonical_order (bool, optional): Check if the axes are in the
@@ -296,7 +309,7 @@ class AxesMapper:
         axes_setup = axes_setup if axes_setup is not None else AxesSetup()
 
         validate_axes(
-            axes=on_disk_axes,
+            axes=axes,
             axes_setup=axes_setup,
             allow_non_canonical_axes=allow_non_canonical_axes,
             strict_canonical_order=strict_canonical_order,
@@ -307,7 +320,7 @@ class AxesMapper:
 
         self._canonical_order = canonical_axes_order()
 
-        self._on_disk_axes = on_disk_axes
+        self._axes = axes
         self._axes_setup = axes_setup
 
         self._index_mapping = self._compute_index_mapping()
@@ -339,9 +352,9 @@ class AxesMapper:
             _index_mapping[ax] = i
         # If the axis is not in the canonical order we also set it.
         canonical_map = self._axes_setup.canonical_map()
-        for canonical_key, on_disk_value in canonical_map.items():
-            if on_disk_value in _index_mapping.keys():
-                _index_mapping[canonical_key] = _index_mapping[on_disk_value]
+        for canonical_name, on_disk_name in canonical_map.items():
+            if on_disk_name in _index_mapping.keys():
+                _index_mapping[canonical_name] = _index_mapping[on_disk_name]
         return _index_mapping
 
     @property
@@ -351,11 +364,11 @@ class AxesMapper:
 
     @property
     def axes(self) -> tuple[Axis, ...]:
-        return tuple(self._on_disk_axes)
+        return tuple(self._axes)
 
     @property
     def axes_names(self) -> tuple[str, ...]:
-        return tuple(ax.on_disk_name for ax in self._on_disk_axes)
+        return tuple(ax.name for ax in self._axes)
 
     @property
     def allow_non_canonical_axes(self) -> bool:
@@ -367,9 +380,74 @@ class AxesMapper:
         """Return if strict canonical order is enforced."""
         return self._strict_canonical_order
 
+    @property
+    def space_unit(self) -> str | None:
+        """Return the space unit for a given axis."""
+        x_axis = self.get_axis("x")
+        y_axis = self.get_axis("y")
+
+        if x_axis is None or y_axis is None:
+            raise NgioValidationError(
+                "The dataset must have x and y axes to determine the space unit."
+            )
+
+        if x_axis.unit == y_axis.unit:
+            return x_axis.unit
+        else:
+            raise NgioValidationError(
+                "Inconsistent space units. "
+                f"x={x_axis.unit} and y={y_axis.unit} should have the same unit."
+            )
+
+    @property
+    def time_unit(self) -> str | None:
+        """Return the time unit for a given axis."""
+        t_axis = self.get_axis("t")
+        if t_axis is None:
+            return None
+        return t_axis.unit
+
+    def to_units(
+        self,
+        *,
+        space_unit: SpaceUnits = DefaultSpaceUnit,
+        time_unit: TimeUnits = DefaultTimeUnit,
+    ) -> "AxesHandler":
+        """Convert the pixel size to the given units.
+
+        Args:
+            space_unit(str): The space unit to convert to.
+            time_unit(str): The time unit to convert to.
+        """
+        new_axes = []
+        for ax in self.axes:
+            if ax.axis_type == AxisType.space:
+                new_ax = Axis(
+                    name=ax.name,
+                    axis_type=ax.axis_type,
+                    unit=space_unit,
+                )
+                new_axes.append(new_ax)
+            elif ax.axis_type == AxisType.time:
+                new_ax = Axis(name=ax.name, axis_type=ax.axis_type, unit=time_unit)
+                new_axes.append(new_ax)
+            else:
+                new_axes.append(ax)
+
+        return AxesHandler(
+            axes=new_axes,
+            axes_setup=self.axes_setup,
+            allow_non_canonical_axes=self.allow_non_canonical_axes,
+            strict_canonical_order=self.strict_canonical_order,
+        )
+
     def get_index(self, name: str) -> int | None:
         """Get the index of the axis by name."""
         return self._index_mapping.get(name, None)
+
+    def get_canonical_name(self, name: str) -> str | None:
+        """Get the canonical name of the axis by name."""
+        return self._axes_setup.get_canonical_name(name)
 
     def get_axis(self, name: str) -> Axis | None:
         """Get the axis object by name."""
@@ -392,7 +470,7 @@ class AxesMapper:
                     break
             else:
                 new_axes.append(axes)
-        self._on_disk_axes = new_axes
+        self._axes = new_axes
 
     def _reorder_axes(
         self, names: Sequence[str]
@@ -486,11 +564,15 @@ class AxesMapper:
         return self.from_order(other + list(self._canonical_order))
 
 
-def canonical_axes(
+def build_canonical_axes_handler(
     axes_names: Sequence[str],
     space_units: SpaceUnits | str | None = DefaultSpaceUnit,
     time_units: TimeUnits | str | None = DefaultTimeUnit,
-) -> list[Axis]:
+    # user defined args
+    axes_setup: AxesSetup | None = None,
+    allow_non_canonical_axes: bool = False,
+    strict_canonical_order: bool = False,
+) -> AxesHandler:
     """Create a new canonical axes mapper.
 
     Args:
@@ -502,25 +584,31 @@ def canonical_axes(
                 e.g. 3 -> ["z", "y", "x"]
         space_units (SpaceUnits, optional): The space units. Defaults to None.
         time_units (TimeUnits, optional): The time units. Defaults to None.
+        axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
+        allow_non_canonical_axes (bool, optional): Allow non canonical axes.
+            Defaults to False.
+        strict_canonical_order (bool, optional): Check if the axes are in the
+            canonical order. Defaults to False.
 
     """
     axes = []
     for name in axes_names:
         match name:
             case "t":
-                axes.append(
-                    Axis(on_disk_name=name, axis_type=AxisType.time, unit=time_units)
-                )
+                axes.append(Axis(name=name, axis_type=AxisType.time, unit=time_units))
             case "c":
-                axes.append(Axis(on_disk_name=name, axis_type=AxisType.channel))
+                axes.append(Axis(name=name, axis_type=AxisType.channel))
             case "z" | "y" | "x":
-                axes.append(
-                    Axis(on_disk_name=name, axis_type=AxisType.space, unit=space_units)
-                )
+                axes.append(Axis(name=name, axis_type=AxisType.space, unit=space_units))
             case _:
                 raise NgioValueError(
                     f"Invalid axis name '{name}'. "
                     "Only 't', 'c', 'z', 'y', 'x' are allowed."
                 )
 
-    return axes
+    return AxesHandler(
+        axes=axes,
+        axes_setup=axes_setup,
+        allow_non_canonical_axes=allow_non_canonical_axes,
+        strict_canonical_order=strict_canonical_order,
+    )
