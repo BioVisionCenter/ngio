@@ -6,7 +6,7 @@ from ngio.ome_zarr_meta.ngio_specs import SlicingOps
 
 
 def test_zoom_transform():
-    zoom = ZoomTransform(scale=(1, 2, 2), order=0)
+    zoom = ZoomTransform(scale=(1, 2, 2), order="nearest")
     assert zoom.scale == (1, 2, 2)
     assert zoom.inv_scale == (1.0, 0.5, 0.5)
 
@@ -53,7 +53,7 @@ def test_zoom_from_dimensions():
     zoom = ZoomTransform.from_dimensions(
         original_dimension=original_dim,
         target_dimension=target_dim,
-        order=1,
+        order="linear",
     )
 
     assert np.allclose(zoom.scale, (1, 1, 0.5, 0.5))

@@ -10,6 +10,7 @@ from pydantic import BaseModel, model_validator
 from ngio.common import (
     ArrayLike,
     Dimensions,
+    InterpolationOrder,
     Roi,
     RoiPixels,
     SlicingInputType,
@@ -383,7 +384,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def consolidate(
         self,
-        order: Literal[0, 1, 2] = 1,
+        order: InterpolationOrder = "linear",
         mode: Literal["dask", "numpy", "coarsen"] = "dask",
     ) -> None:
         """Consolidate the label on disk."""

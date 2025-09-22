@@ -1,23 +1,26 @@
 from pathlib import Path
+from typing import Literal
 
 import pytest
 import zarr
 
-from ngio.common._pyramid import on_disk_zoom
+from ngio.common._pyramid import InterpolationOrder, on_disk_zoom
 
 
 @pytest.mark.parametrize(
     "order, mode",
     [
-        (0, "dask"),
-        (1, "dask"),
-        (0, "numpy"),
-        (1, "numpy"),
-        (0, "coarsen"),
-        (1, "coarsen"),
+        ("nearest", "dask"),
+        ("linear", "dask"),
+        ("nearest", "numpy"),
+        ("linear", "numpy"),
+        ("nearest", "coarsen"),
+        ("linear", "coarsen"),
     ],
 )
-def test_on_disk_zooms(tmp_path: Path, order: int, mode: str):
+def test_on_disk_zooms(
+    tmp_path: Path, order: InterpolationOrder, mode: Literal["dask", "numpy", "coarsen"]
+):
     source = tmp_path / "source.zarr"
     source_array = zarr.open_array(source, shape=(16, 128, 128), dtype="uint8")
 

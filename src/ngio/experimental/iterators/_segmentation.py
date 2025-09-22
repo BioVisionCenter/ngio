@@ -22,7 +22,6 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.images._masked_image import MaskedImage
-from ngio.utils._errors import NgioValidationError, NgioValueError
 
 
 class SegmentationIterator(AbstractIteratorBuilder):

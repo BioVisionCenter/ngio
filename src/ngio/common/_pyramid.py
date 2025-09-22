@@ -6,7 +6,12 @@ import dask.array as da
 import numpy as np
 import zarr
 
-from ngio.common._zoom import _zoom_inputs_check, dask_zoom, numpy_zoom
+from ngio.common._zoom import (
+    InterpolationOrder,
+    _zoom_inputs_check,
+    dask_zoom,
+    numpy_zoom,
+)
 from ngio.utils import (
     AccessModeLiteral,
     NgioValueError,
@@ -18,7 +23,7 @@ from ngio.utils import (
 def _on_disk_numpy_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder,
 ) -> None:
     target[...] = numpy_zoom(source[...], target_shape=target.shape, order=order)
 
@@ -26,7 +31,7 @@ def _on_disk_numpy_zoom(
 def _on_disk_dask_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder,
 ) -> None:
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
@@ -39,7 +44,7 @@ def _on_disk_dask_zoom(
 def _on_disk_coarsen(
     source: zarr.Array,
     target: zarr.Array,
-    _order: Literal[0, 1] = 1,
+    order: InterpolationOrder = "linear",
     aggregation_function: Callable | None = None,
 ) -> None:
     """Apply a coarsening operation from a source zarr array to a target zarr array.
@@ -47,10 +52,10 @@ def _on_disk_coarsen(
     Args:
         source (zarr.Array): The source array to coarsen.
         target (zarr.Array): The target array to save the coarsened result to.
-        _order (Literal[0, 1]): The order of interpolation is not really implemented
+        order (InterpolationOrder): The order of interpolation is not really implemented
             for coarsening, but it is kept for compatibility with the zoom function.
-            _order=1 -> linear interpolation ~ np.mean
-            _order=0 -> nearest interpolation ~ np.max
+            order="linear" -> linear interpolation ~ np.mean
+            order="nearest" -> nearest interpolation ~ np.max
         aggregation_function (np.ufunc): The aggregation function to use.
     """
     source_array = da.from_zarr(source)
@@ -64,13 +69,15 @@ def _on_disk_coarsen(
     )
 
     if aggregation_function is None:
-        if _order == 1:
+        if order == "linear":
             aggregation_function = np.mean
-        elif _order == 0:
+        elif order == "nearest":
             aggregation_function = np.max
+        elif order == "cubic":
+            raise NgioValueError("Cubic interpolation is not supported for coarsening.")
         else:
             raise NgioValueError(
-                f"Aggregation function must be provided for order {_order}"
+                f"Aggregation function must be provided for order {order}"
             )
 
     coarsening_setup = {}
@@ -96,7 +103,7 @@ def _on_disk_coarsen(
 def on_disk_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Apply a zoom operation from a source zarr array to a target zarr array.
@@ -104,7 +111,7 @@ def on_disk_zoom(
     Args:
         source (zarr.Array): The source array to zoom.
         target (zarr.Array): The target array to save the zoomed result to.
-        order (Literal[0, 1, 2]): The order of interpolation. Defaults to 1.
+        order (InterpolationOrder): The order of interpolation. Defaults to "linear".
         mode (Literal["dask", "numpy", "coarsen"]): The mode to use. Defaults to "dask".
     """
     if not isinstance(source, zarr.Array):
@@ -155,7 +162,7 @@ def _find_closest_arrays(
 def consolidate_pyramid(
     source: zarr.Array,
     targets: list[zarr.Array],
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Consolidate the Zarr array."""

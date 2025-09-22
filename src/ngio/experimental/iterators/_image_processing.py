@@ -17,7 +17,6 @@ from ngio.images._image import (
     ChannelSlicingInputType,
     add_channel_selection_to_slicing_dict,
 )
-from ngio.utils import NgioValueError
 
 
 class ImageProcessingIterator(AbstractIteratorBuilder):

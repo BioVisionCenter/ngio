@@ -34,11 +34,12 @@ from ngio.common._roi import (
     build_roi_numpy_setter,
     roi_to_slicing_dict,
 )
-from ngio.common._zoom import dask_zoom, numpy_zoom
+from ngio.common._zoom import InterpolationOrder, dask_zoom, numpy_zoom
 
 __all__ = [
     "ArrayLike",
     "Dimensions",
+    "InterpolationOrder",
     "Roi",
     "RoiPixels",
     "SlicingInputType",

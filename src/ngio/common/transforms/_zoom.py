@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from typing import Literal
 
 import dask.array as da
 import numpy as np
@@ -7,11 +6,11 @@ import numpy as np
 from ngio import PixelSize
 from ngio.common._array_io_utils import apply_sequence_axes_ops
 from ngio.common._dimensions import Dimensions
-from ngio.common._zoom import dask_zoom, numpy_zoom
+from ngio.common._zoom import InterpolationOrder, dask_zoom, numpy_zoom
 from ngio.ome_zarr_meta.ngio_specs import SlicingOps
 
 
-def _compute_scale(
+def scale_factor_from_dimensions(
     original_dimension: Dimensions,
     target_dimension: Dimensions,
 ) -> tuple[float, ...]:
@@ -29,10 +28,25 @@ def _compute_scale(
     return tuple(scale)
 
 
+def scale_factor_from_pixel_size(
+    original_dimension: Dimensions,
+    original_pixel_size: PixelSize,
+    target_pixel_size: PixelSize,
+) -> tuple[float, ...]:
+    scale = []
+    for o_ax_name in original_dimension.axes_handler.axes_names:
+        t_px = target_pixel_size.get(o_ax_name, default=1.0)
+        o_px = original_pixel_size.get(o_ax_name, default=1.0)
+        assert t_px is not None and o_px is not None
+        _scale = o_px / t_px
+        scale.append(_scale)
+    return tuple(scale)
+
+
 class ZoomTransform:
-    def __init__(self, scale: Sequence[float], order: Literal[0, 1, 2]):
+    def __init__(self, scale: Sequence[float], order: InterpolationOrder):
         self._scale = tuple(scale)
-        self._order: Literal[0, 1, 2] = order
+        self._order: InterpolationOrder = order
 
     @property
     def scale(self) -> tuple[float, ...]:
@@ -47,11 +61,26 @@ class ZoomTransform:
         cls,
         original_dimension: Dimensions,
         target_dimension: Dimensions,
-        order: Literal[0, 1, 2],
+        order: InterpolationOrder,
     ):
-        scale = _compute_scale(
+        scale = scale_factor_from_dimensions(
             original_dimension=original_dimension,
             target_dimension=target_dimension,
+        )
+        return cls(scale, order)
+
+    @classmethod
+    def from_pixel_sizes(
+        cls,
+        original_dimension: Dimensions,
+        original_pixel_size: PixelSize,
+        target_pixel_size: PixelSize,
+        order: InterpolationOrder,
+    ):
+        scale = scale_factor_from_pixel_size(
+            original_dimension=original_dimension,
+            original_pixel_size=original_pixel_size,
+            target_pixel_size=target_pixel_size,
         )
         return cls(scale, order)
 

@@ -10,6 +10,7 @@ import zarr
 from ngio.common import (
     ArrayLike,
     Dimensions,
+    InterpolationOrder,
     Roi,
     RoiPixels,
     SlicingInputType,
@@ -433,7 +434,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def _consolidate(
         self,
-        order: Literal[0, 1, 2] = 1,
+        order: InterpolationOrder = "linear",
         mode: Literal["dask", "numpy", "coarsen"] = "dask",
     ) -> None:
         """Consolidate the image on disk.
@@ -451,7 +452,7 @@ class AbstractImage(Generic[_image_handler]):
 
 def consolidate_image(
     image: AbstractImage,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Consolidate the image on disk."""

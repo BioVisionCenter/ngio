@@ -248,7 +248,9 @@ def _match_data_shape(mask: np.ndarray, data_shape: tuple[int, ...]) -> np.ndarr
         else:
             zoom_factors.append(s_d / s_m)
 
-    mask_matched: np.ndarray = numpy_zoom(mask, scale=tuple(zoom_factors), order=0)
+    mask_matched: np.ndarray = numpy_zoom(
+        mask, scale=tuple(zoom_factors), order="nearest"
+    )
     return mask_matched
 
 
@@ -343,7 +345,7 @@ def _match_data_shape_dask(mask: da.Array, data_shape: tuple[int, ...]) -> da.Ar
         else:
             zoom_factors.append(s_d / s_m)
 
-    mask_matched: da.Array = dask_zoom(mask, scale=tuple(zoom_factors), order=0)
+    mask_matched: da.Array = dask_zoom(mask, scale=tuple(zoom_factors), order="nearest")
     return mask_matched
 
 

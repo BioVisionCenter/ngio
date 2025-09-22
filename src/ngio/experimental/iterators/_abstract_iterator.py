@@ -3,7 +3,6 @@ from collections.abc import Callable
 from typing import Self
 
 from ngio import Roi
-from ngio.common import Dimensions
 from ngio.experimental.iterators._rois_utils import (
     by_chunks,
     by_yx,

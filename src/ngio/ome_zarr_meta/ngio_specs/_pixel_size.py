@@ -84,18 +84,18 @@ class PixelSize:
         )
         return self.distance(ref) < other.distance(ref)
 
-    def as_dict(self) -> dict:
+    def as_dict(self) -> dict[str, float]:
         """Return the pixel size as a dictionary."""
         return {"t": self.t, "z": self.z, "y": self.y, "x": self.x}
 
-    def get_pixel_size(self, axis: str) -> float | None:
+    def get(self, axis: str, default: float | None = None) -> float | None:
         """Get the pixel size for a given axis (in canonical name)."""
-        px_size = self.as_dict().get(axis, None)
-        if px_size is not None:
-            return px_size
-        raise ValueError(
-            f"Invalid axis name: {axis}, must be one of 'x', 'y', 'z', 't'."
-        )
+        px_size = self.as_dict().get(axis, default)
+        if px_size is None:
+            raise ValueError(
+                f"Invalid axis name: {axis}, must be one of 'x', 'y', 'z', 't'."
+            )
+        return px_size
 
     @property
     def space_unit(self) -> SpaceUnits | str | None:

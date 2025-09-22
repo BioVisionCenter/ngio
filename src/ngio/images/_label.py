@@ -94,7 +94,7 @@ class Label(AbstractImage[LabelMetaHandler]):
     ) -> None:
         """Consolidate the label on disk."""
         self._consolidate(
-            order=0,
+            order="nearest",
             mode=mode,
         )
 
