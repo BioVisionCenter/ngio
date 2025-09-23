@@ -2,7 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from ngio import Image, open_image
+from ngio import Image, create_empty_ome_zarr, open_image
+from ngio.common.transforms import ZoomTransform
+from ngio.utils import NgioValueError
 
 
 @pytest.mark.parametrize(
@@ -23,3 +25,163 @@ def test_open_image(images_v04: dict[str, Path], zarr_name: str):
     path = images_v04[zarr_name]
     image = open_image(path)
     assert isinstance(image, Image)
+
+
+@pytest.mark.parametrize(
+    ("shape1", "shape2", "axes1", "axes2", "should_raise"),
+    [
+        ((1, 3, 10, 10), (1, 3, 12, 10), "czyx", "czyx", False),
+        ((1, 10, 10), (1, 1, 10, 10), "cyx", "czyx", True),
+        ((3, 10, 10), (3, 3, 10, 10), "zyx", "czyx", False),
+        ((1, 1, 10, 10), (1, 1, 10, 10), "tcyx", "czyx", True),
+    ],
+)
+def test_image_asserts_axes_match(
+    tmp_path: Path, shape1, shape2, axes1, axes2, should_raise: bool
+):
+    path1 = tmp_path / "image1.zarr"
+    path2 = tmp_path / "image2.zarr"
+    create_empty_ome_zarr(
+        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=0.5, levels=1
+    )
+    create_empty_ome_zarr(
+        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=0.5, levels=1
+    )
+    img1 = open_image(path1)
+    img2 = open_image(path2)
+
+    if should_raise:
+        with pytest.raises(NgioValueError):
+            img1.assert_axes_match(img2)
+    else:
+        img1.assert_axes_match(img2)
+
+
+@pytest.mark.parametrize(
+    ("shape1", "shape2", "axes1", "axes2", "allow_singleton", "should_raise"),
+    [
+        ((1, 3, 10, 10), (1, 3, 10, 10), "czyx", "czyx", False, False),
+        ((1, 3, 10, 10), (1, 3, 10, 10), "czyx", "czyx", True, False),
+        ((1, 1, 10, 10), (1, 3, 10, 10), "czyx", "czyx", True, False),
+        ((3, 10, 10), (3, 3, 10, 10), "zyx", "czyx", True, False),
+        ((1, 1, 10, 10), (1, 3, 10, 10), "czyx", "czyx", False, True),
+        ((1, 2, 10, 10), (1, 3, 10, 10), "czyx", "czyx", False, True),
+    ],
+)
+def test_image_asserts_dimensions_match(
+    tmp_path: Path, shape1, shape2, axes1, axes2, allow_singleton, should_raise: bool
+):
+    path1 = tmp_path / "image1.zarr"
+    path2 = tmp_path / "image2.zarr"
+    create_empty_ome_zarr(
+        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=0.5, levels=1
+    )
+    create_empty_ome_zarr(
+        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=0.5, levels=1
+    )
+    img1 = open_image(path1)
+    img2 = open_image(path2)
+
+    if should_raise:
+        with pytest.raises(NgioValueError):
+            img1.assert_dimensions_match(img2, allow_singleton=allow_singleton)
+    else:
+        img1.assert_dimensions_match(img2, allow_singleton=allow_singleton)
+
+
+@pytest.mark.parametrize(
+    ("shape1", "shape2", "axes1", "axes2", "xy_pixelsize", "should_raise"),
+    [
+        ((1, 3, 10, 10), (1, 3, 10, 10), "czyx", "czyx", 1.0, False),
+        ((1, 3, 10, 10), (1, 3, 20, 20), "czyx", "czyx", 0.5, False),
+        ((1, 3, 10, 10), (1, 3, 20, 20), "czyx", "czyx", 2.0, True),
+    ],
+)
+def test_image_assert_can_be_rescaled(
+    tmp_path: Path,
+    shape1,
+    shape2,
+    axes1,
+    axes2,
+    xy_pixelsize: float,
+    should_raise: bool,
+):
+    path1 = tmp_path / "image1.zarr"
+    path2 = tmp_path / "image2.zarr"
+    create_empty_ome_zarr(
+        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=1.0, levels=1
+    )
+    create_empty_ome_zarr(
+        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=xy_pixelsize, levels=1
+    )
+    img1 = open_image(path1)
+    img2 = open_image(path2)
+
+    # Also test with transforms
+    if should_raise:
+        with pytest.raises(NgioValueError):
+            img1.assert_can_be_rescaled(img2)
+        return None
+
+    img1.assert_can_be_rescaled(img2)
+
+    # Also test with transforms
+    zoom = ZoomTransform.from_pixel_sizes(
+        original_dimension=img2.dimensions,
+        original_pixel_size=img2.pixel_size,
+        target_pixel_size=img1.pixel_size,
+        order="nearest",
+    )
+    img1_data = img1.get_as_numpy()
+    img2_data = img2.get_as_numpy(transforms=[zoom])
+    assert img1_data.shape == img2_data.shape
+
+
+"""
+@pytest.mark.parametrize(
+    ("shape1", "shape2", "axes1", "axes2", "xy_pixelsize", "should_raise"),
+    [
+        ((111, 111), (112, 112), "yx", "yx", 0.99, False),
+    ],
+)
+def test_image_assert_can_be_rescaled2(
+    tmp_path: Path,
+    shape1,
+    shape2,
+    axes1,
+    axes2,
+    xy_pixelsize: float,
+    should_raise: bool,
+):
+    path1 = tmp_path / "image1.zarr"
+    path2 = tmp_path / "image2.zarr"
+    create_empty_ome_zarr(
+        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=1.0, levels=1
+    )
+    create_empty_ome_zarr(
+        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=xy_pixelsize, levels=1
+    )
+    img1 = open_image(path1)
+    img2 = open_image(path2)
+
+    # Also test with transforms
+    zoom_px = ZoomTransform.from_pixel_sizes(
+        original_dimension=img2.dimensions,
+        original_pixel_size=img2.pixel_size,
+        target_pixel_size=img1.pixel_size,
+        order="nearest",
+    )
+    zoom_d = ZoomTransform.from_dimensions(
+        original_dimension=img2.dimensions,
+        target_dimension=img1.dimensions,
+        order="nearest",
+    )
+
+    img1_data = img1.get_as_numpy()
+    img2_d_data = img2.get_as_numpy(transforms=[zoom_d])
+    img2_px_data = img2.get_as_numpy(transforms=[zoom_px])
+    assert img1_data.shape == img2_d_data.shape, "dimension-based zoom failed"
+    assert img1_data.shape == img2_px_data.shape, (
+        f"pixel-based zoom failed {zoom_px.scale}, {zoom_d.scale}"
+    )
+"""
