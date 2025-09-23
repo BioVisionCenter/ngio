@@ -15,7 +15,6 @@ from ngio.images._image import (
     ChannelSlicingInputType,
     add_channel_selection_to_slicing_dict,
 )
-from ngio.utils import NgioValueError
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder):
@@ -59,6 +58,9 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         self._input_transforms = input_transforms
         self._label_transforms = label_transforms
 
+        self._input.assert_axes_match(self._input_label)
+        self._input.assert_can_be_rescaled(self._input_label)
+
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
@@ -69,53 +71,6 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             "input_transforms": self._input_transforms,
             "label_transforms": self._label_transforms,
         }
-
-    def assert_axes_match(self) -> None:
-        """Check that the input image and label have the same axes.
-
-        Besides the channel axis, all axes must be present in both images.
-
-        Raises:
-            NgioValueError: If the axes do not match.
-        """
-        for axis in self._input.dimensions._axes_mapper.axes:
-            if axis.axis_type == "channel":
-                continue
-            l_axis = self._input_label.dimensions._axes_mapper.get_axis(axis.name)
-            if l_axis is None:
-                raise NgioValueError(
-                    f"Input image and label must have the same axes. "
-                    f"Axis {axis.name} is missing in the label."
-                )
-
-    def assert_dimensions_match(self, allow_singleton: bool = False) -> None:
-        """Check that the input image and label have compatible dimensions.
-
-        Besides the channel axis, all axes must have the same dimension in
-        both images.
-
-        Args:
-            allow_singleton: Whether to allow singleton dimensions to be
-                different. For example, if the input image has shape
-                (5, 100, 100) and the label has shape (1, 100, 100).
-
-        Raises:
-            NgioValueError: If the dimensions do not match.
-        """
-        self.assert_axes_match()
-        for axis in self._input.dimensions._axes_mapper.axes:
-            l_axis = self._input_label.dimensions._axes_mapper.get_axis(axis.name)
-            assert l_axis is not None  # already checked in assert_axes_match
-            i_dim = self._input.dimensions.get(axis.name)
-            l_dim = self._input_label.dimensions.get(axis.name)
-            if i_dim != l_dim:
-                if allow_singleton and (i_dim == 1 or l_dim == 1):
-                    continue
-                raise NgioValueError(
-                    f"Input image and label must have the same dimensions. "
-                    f"Axis {axis.name} has dimension {i_dim} in the "
-                    f"input image and {l_dim} in the label."
-                )
 
     def build_numpy_getter(self, roi: Roi):
         data_getter = build_roi_numpy_getter(

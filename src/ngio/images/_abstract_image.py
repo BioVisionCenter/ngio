@@ -25,6 +25,7 @@ from ngio.common import (
     build_roi_numpy_setter,
     consolidate_pyramid,
 )
+from ngio.common._zoom import scale_factor_from_dimensions, scale_factor_from_pixel_size
 from ngio.ome_zarr_meta import (
     AxesHandler,
     Dataset,
@@ -34,6 +35,7 @@ from ngio.ome_zarr_meta import (
 )
 from ngio.tables import RoiTable
 from ngio.utils import NgioFileExistsError, ZarrGroupHandler
+from ngio.utils._errors import NgioValueError
 
 _image_handler = TypeVar("_image_handler", ImageMetaHandler, LabelMetaHandler)
 
@@ -449,6 +451,56 @@ class AbstractImage(Generic[_image_handler]):
         """Build the ROI table for an image."""
         return build_image_roi_table(image=self, name=name)
 
+    def assert_dimensions_match(
+        self,
+        other: "AbstractImage",
+        allow_singleton: bool = False,
+    ) -> None:
+        """Assert that two images have matching spatial dimensions.
+
+        Args:
+            other: The other image to compare to.
+            allow_singleton: If True, allow singleton dimensions to be
+                compatible with non-singleton dimensions.
+
+        Raises:
+            NgioValueError: If the images do not have compatible dimensions.
+        """
+        assert_dimensions_match(
+            image1=self, image2=other, allow_singleton=allow_singleton
+        )
+
+    def assert_axes_match(
+        self,
+        other: "AbstractImage",
+    ) -> None:
+        """Assert that two images have compatible axes.
+
+        Args:
+            other: The other image to compare to.
+
+        Raises:
+            NgioValueError: If the images do not have compatible axes.
+        """
+        assert_axes_match(image1=self, image2=other)
+
+    def assert_can_be_rescaled(
+        self,
+        other: "AbstractImage",
+    ) -> None:
+        """Assert that two images can be rescaled to each other.
+
+        For this to be true, the images must have the same axes, and
+        the pixel sizes must be compatible (i.e. one can be scaled to the other).
+
+        Args:
+            other: The other image to compare to.
+
+        Raises:
+            NgioValueError: If the images cannot be scaled to each other.
+        """
+        assert_can_be_rescaled(image1=self, image2=other)
+
 
 def consolidate_image(
     image: AbstractImage,
@@ -543,4 +595,19 @@ def assert_can_be_rescaled(
     Raises:
         NgioValueError: If the images cannot be scaled to each other.
     """
-    pass
+    scale_from_dims = scale_factor_from_dimensions(
+        original_dimension=image1.dimensions,
+        target_dimension=image2.dimensions,
+    )
+    scale_from_px = scale_factor_from_pixel_size(
+        original_dimension=image1.dimensions,
+        original_pixel_size=image1.pixel_size,
+        target_pixel_size=image2.pixel_size,
+    )
+    if np.allclose(scale_from_dims, scale_from_px):
+        return None
+    raise NgioValueError(
+        "The images cannot be rescaled to each other. "
+        f"Scale from dimensions: {scale_from_dims}, "
+        f"scale from pixel sizes: {scale_from_px}."
+    )

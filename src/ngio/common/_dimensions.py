@@ -230,6 +230,8 @@ class Dimensions:
         """
         self.assert_axes_match(other)
         for s_axis in self.axes_handler.axes:
+            if s_axis.axis_type == "channel":
+                continue
             o_axis = other.axes_handler.get_axis(s_axis.name)
             assert o_axis is not None  # already checked in assert_axes_match
 

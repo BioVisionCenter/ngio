@@ -71,13 +71,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 
-        # Check compatibility between input and output images
-        # if not input_image.dimensions.is_compatible_with(output_image.dimensions):
-        #    raise NgioValueError(
-        #        "Input image and label must have the compatible dimensions. "
-        #        f"Input image dimensions: {input_image.dimensions}, "
-        #        f"label dimensions: {output_image.dimensions}."
-        #    )
+        self._input.assert_dimensions_match(self._output, allow_singleton=True)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""

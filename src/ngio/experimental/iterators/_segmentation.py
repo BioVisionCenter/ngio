@@ -65,13 +65,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 
-        # Check compatibility between input and output images
-        # if not input_image.dimensions.is_compatible_with(output_label.dimensions):
-        #    raise NgioValueError(
-        #        "Input image and label must have the compatible dimensions. "
-        #        f"Input image dimensions: {input_image.dimensions}, "
-        #        f"label dimensions: {output_label.dimensions}."
-        #    )
+        self._input.assert_dimensions_match(self._output, allow_singleton=False)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
