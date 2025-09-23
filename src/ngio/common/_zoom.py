@@ -82,6 +82,10 @@ def fast_zoom(x, zoom, order=1, mode="grid-constant", grid_mode=True, auto_stack
          it stacks the first dimensions to call zoom only on the last two.
     """
     mask = np.isclose(x.shape, 1)
+    # Always keep the last two dimensions
+    # To avoid issues with singleton x or y dimensions
+    mask[-1] = False
+    mask[-2] = False
     zoom = np.array(zoom)
     singletons = tuple(np.where(mask)[0])
     xs = np.squeeze(x, axis=singletons)
@@ -121,7 +125,7 @@ def _zoom_inputs_check(
         _target_shape = target_shape
     else:
         _scale = np.array(scale)
-        _target_shape = tuple(np.array(source_array.shape) * scale)
+        _target_shape = tuple(map(int, np.round(np.array(source_array.shape) * scale)))
 
     if len(_scale) != source_array.ndim:
         raise NgioValueError(
@@ -156,7 +160,6 @@ def dask_zoom(
     # https://github.com/ome/ome-zarr-py/blob/master/ome_zarr/dask_utils.py
     # The module was contributed by Andreas Eisenbarth @aeisenbarth
     # See https://github.com/toloudis/ome-zarr-py/pull/
-
     _scale, _target_shape = _zoom_inputs_check(
         source_array=source_array, scale=scale, target_shape=target_shape
     )
