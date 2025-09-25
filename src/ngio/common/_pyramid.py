@@ -184,6 +184,15 @@ def consolidate_pyramid(
         processed.append(target_image)
 
 
+def _maybe_int(value: float | int) -> float | int:
+    """Convert a float to an int if it is an integer."""
+    if isinstance(value, int):
+        return value
+    if value.is_integer():
+        return int(value)
+    return value
+
+
 def init_empty_pyramid(
     store: StoreOrGroup,
     paths: list[str],
@@ -207,6 +216,10 @@ def init_empty_pyramid(
             "The shape and scaling factor must have the same number of dimensions."
         )
 
+    # Ensure scaling factors are int if possible
+    # To reduce the risk of floating point issues
+    scaling_factors = [_maybe_int(s) for s in scaling_factors]
+
     root_group = open_group_wrapper(store, mode=mode)
 
     for path in paths:
@@ -224,18 +237,13 @@ def init_empty_pyramid(
             overwrite=True,
         )
 
-        # Todo redo this with when a proper build of pyramid is implemented
-        _shape = []
-        for s, sc in zip(ref_shape, scaling_factors, strict=True):
-            if math.floor(s / sc) % 2 == 0:
-                _shape.append(math.floor(s / sc))
-            else:
-                _shape.append(math.ceil(s / sc))
+        _shape = [
+            math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
+        ]
         ref_shape = _shape
 
         if chunks is None:
             chunks = new_arr.chunks
-            if chunks is None:
-                raise NgioValueError("Something went wrong with the chunks")
+            assert chunks is not None
         chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
     return None

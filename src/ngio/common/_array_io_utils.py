@@ -1,3 +1,4 @@
+import math
 from collections.abc import Mapping, Sequence
 from typing import Protocol, TypeAlias, TypeVar
 
@@ -22,7 +23,13 @@ ArrayLike: TypeAlias = np.ndarray | DaskArray
 
 
 def _validate_int(value: int, shape: int) -> int:
-    """Validate an integer value for slicing."""
+    """Validate an integer value for slicing.
+
+    An integer slicing value must be:
+    - of type int
+    - non-negative
+    - less than the shape of the axis it is applied to.
+    """
     if not isinstance(value, int):
         raise NgioValueError(f"Invalid value {value} of type {type(value)}")
     if value < 0 or value >= shape:
@@ -59,16 +66,30 @@ def _try_to_slice(input: Sequence[int]) -> slice | tuple[int, ...]:
 
 
 def _validate_iter_of_ints(value: Sequence, shape: int) -> slice | tuple[int, ...]:
+    """Validate a sequence of integers for slicing."""
     value = [_validate_int(v, shape=shape) for v in value]
     return _try_to_slice(value)
 
 
 def _validate_slice(value: slice, shape: int) -> slice:
-    """Validate a slice object and return it with adjusted start and stop."""
-    start = value.start if value.start is not None else 0
-    start = max(start, 0)
-    stop = value.stop if value.stop is not None else shape
-    return slice(start, stop)
+    """Validate a slice object and return it with adjusted start and stop.
+
+    Since when working with rois at multiple scales, it is common to have
+    slices that have a fractional start or stop, this function will adjust
+    the start and stop to be within the bounds of the shape, but will not
+    convert them to integers. The conversion to integer slices will be done
+    later when the actual array is being accessed.
+    """
+    if value.start is not None:
+        _start = max(0, min(value.start, shape))
+    else:
+        _start = 0
+
+    if value.stop is not None:
+        _stop = max(0, min(value.stop, shape))
+    else:
+        _stop = shape
+    return slice(_start, _stop)
 
 
 def _remove_channel_slicing(
@@ -244,18 +265,29 @@ def _build_slicing_tuple(
     return slicing_tuple
 
 
+def _to_int_slice(value: slice) -> slice:
+    """Convert a slice with float to a slice int."""
+    start = math.floor(value.start) if value.start is not None else None
+    stop = math.ceil(value.stop) if value.stop is not None else None
+    return slice(start, stop)
+
+
 def get_slice_as_numpy(
     zarr_array: zarr.Array, slice_tuple: tuple[SlicingType, ...] | None
 ) -> np.ndarray:
     if slice_tuple is None:
         return zarr_array[...]
 
+    slice_tuple = tuple(
+        _to_int_slice(s) if isinstance(s, slice) else s for s in slice_tuple
+    )
     if all(not isinstance(s, tuple) for s in slice_tuple):
         return zarr_array[slice_tuple]
 
-    # If there are tuple[int, ...] we need to handle them separately
+    # If there are tuple with int we need to handle them separately
     # this is a workaround for the fact that zarr does not support
     # non-contiguous slicing with tuples/lists.
+    # TODO to be redone properly
     first_slice_tuple = []
     for s in slice_tuple:
         if isinstance(s, tuple):
@@ -279,6 +311,11 @@ def get_slice_as_dask(
     if slice_tuple is None:
         return da_array
 
+    slice_tuple = tuple(
+        _to_int_slice(s) if isinstance(s, slice) else s for s in slice_tuple
+    )
+
+    # TODO add support for non-contiguous slicing with tuples/lists
     if any(isinstance(s, tuple) for s in slice_tuple):
         raise NotImplementedError(
             "Slicing with non-contiguous tuples/lists "
@@ -296,12 +333,20 @@ def set_numpy_patch(
     if slice_tuple is None:
         zarr_array[...] = patch
         return
+
+    slice_tuple = tuple(
+        _to_int_slice(s) if isinstance(s, slice) else s for s in slice_tuple
+    )
     zarr_array[slice_tuple] = patch
 
 
 def set_dask_patch(
     zarr_array: zarr.Array, patch: da.Array, slice_tuple: tuple[SlicingType, ...] | None
 ) -> None:
+    if slice_tuple is not None:
+        slice_tuple = tuple(
+            _to_int_slice(s) if isinstance(s, slice) else s for s in slice_tuple
+        )
     da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
 
 

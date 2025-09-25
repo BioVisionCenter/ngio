@@ -5,13 +5,13 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
 """
 
 from collections.abc import Callable, Sequence
-from typing import Generic, TypeVar
+from typing import TypeVar
 from warnings import warn
 
 import dask.array as da
 import numpy as np
 import zarr
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from ngio.common._array_io_pipes import (
     build_dask_getter,
@@ -29,16 +29,33 @@ from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnit
 from ngio.utils import NgioValueError
 
 
-def _to_raster(value: float, pixel_size: float, max_shape: int | None) -> int:
-    """Convert to raster coordinates."""
-    round_value = int(np.round(value / pixel_size))
-    # Ensure the value is within the image shape boundaries
+def _to_raster(
+    value: float, length: float, pixel_size: float, max_shape: int | None
+) -> tuple[float, float]:
+    raster_value = value / pixel_size
+    raster_length = length / pixel_size
     if max_shape is not None:
-        return max(0, min(round_value, max_shape))
-    return round_value
+        raster_value = max(0, min(raster_value, max_shape))
+        raster_length = max(0, min(raster_length, max_shape - raster_value))
+    return raster_value, raster_length
 
 
-def _to_world(value: int, pixel_size: float) -> float:
+def _to_slice(start: float | None, length: float | None) -> slice:
+    if start is not None:
+        _start = start  # math.floor(start)
+    else:
+        _start = None
+
+    if length is not None:
+        assert start is not None
+        end = start + length
+        # end = math.ceil(end)
+    else:
+        end = None
+    return slice(_start, end)
+
+
+def _to_world(value: int | float, pixel_size: float) -> float:
     """Convert to world coordinates."""
     return value * pixel_size
 
@@ -46,24 +63,31 @@ def _to_world(value: int, pixel_size: float) -> float:
 T = TypeVar("T", int, float)
 
 
-class GenericRoi(BaseModel, Generic[T]):
+class BaseDimensions(BaseModel):
+    dim_x: int | None = None
+    dim_y: int | None = None
+    dim_z: int | None = None
+    dim_t: int | None = None
+
+
+class GenericRoi(BaseModel):
     """A generic Region of Interest (ROI) model."""
 
     name: str | None
-    x: T
-    y: T
-    z: T | None = None
-    t: T | None = None
-    x_length: T
-    y_length: T
-    z_length: T | None = None
-    t_length: T | None = None
+    x: float
+    y: float
+    z: float | None = None
+    t: float | None = None
+    x_length: float
+    y_length: float
+    z_length: float | None = None
+    t_length: float | None = None
     label: int | None = None
     unit: SpaceUnits | str | None = None
 
     model_config = ConfigDict(extra="allow")
 
-    def intersection(self, other: "GenericRoi[T]") -> "GenericRoi[T] | None":
+    def intersection(self, other: "GenericRoi") -> "GenericRoi | None":
         """Calculate the intersection of this ROI with another ROI."""
         return roi_intersection(self, other)
 
@@ -129,9 +153,7 @@ def _1d_intersection(
     return start, length
 
 
-def roi_intersection(
-    ref_roi: GenericRoi[T], other_roi: GenericRoi[T]
-) -> GenericRoi[T] | None:
+def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi | None:
     """Calculate the intersection of two ROIs."""
     if (
         ref_roi.unit is not None
@@ -200,7 +222,7 @@ def roi_intersection(
     )
 
 
-class Roi(GenericRoi[float]):
+class Roi(GenericRoi):
     x: float = 0.0
     y: float = 0.0
     unit: SpaceUnits | str | None = DefaultSpaceUnit
@@ -210,42 +232,35 @@ class Roi(GenericRoi[float]):
     ) -> "RoiPixels":
         """Convert to raster coordinates."""
         if dimensions is None:
-            # No check for dimensions
-            dim_x, dim_y, dim_z, dim_t = None, None, None, None
+            _dimensions = BaseDimensions()
         else:
-            dim_x, dim_y, dim_z, dim_t = (
-                dimensions.get("x"),
-                dimensions.get("y"),
-                dimensions.get("z"),
-                dimensions.get("t"),
+            _dimensions = BaseDimensions(
+                dim_x=dimensions.get("x"),
+                dim_y=dimensions.get("y"),
+                dim_z=dimensions.get("z"),
+                dim_t=dimensions.get("t"),
             )
 
-        x = _to_raster(self.x, pixel_size.x, dim_x)
-        x_length = _to_raster(self.x_length, pixel_size.x, dim_x)
-        y = _to_raster(self.y, pixel_size.y, dim_y)
-        y_length = _to_raster(self.y_length, pixel_size.y, dim_y)
+        x, x_length = _to_raster(self.x, self.x_length, pixel_size.x, _dimensions.dim_x)
+        y, y_length = _to_raster(self.y, self.y_length, pixel_size.y, _dimensions.dim_y)
 
         if self.z is None:
-            z = None
+            z, z_length = None, None
         else:
-            z = _to_raster(self.z, pixel_size.z, dim_z)
-
-        if self.z_length is None:
-            z_length = None
-        else:
-            z_length = _to_raster(self.z_length, pixel_size.z, dim_z)
+            assert self.z_length is not None
+            z, z_length = _to_raster(
+                self.z, self.z_length, pixel_size.z, _dimensions.dim_z
+            )
 
         if self.t is None:
-            t = None
+            t, t_length = None, None
         else:
-            t = _to_raster(self.t, pixel_size.t, dim_t)
-
-        if self.t_length is None:
-            t_length = None
-        else:
-            t_length = _to_raster(self.t_length, pixel_size.t, dim_t)
-
+            assert self.t_length is not None
+            t, t_length = _to_raster(
+                self.t, self.t_length, pixel_size.t, _dimensions.dim_t
+            )
         extra_dict = self.model_extra if self.model_extra else {}
+
         return RoiPixels(
             name=self.name,
             x=x,
@@ -258,6 +273,7 @@ class Roi(GenericRoi[float]):
             t_length=t_length,
             label=self.label,
             unit=self.unit,
+            dimensions=_dimensions,
             **extra_dict,
         )
 
@@ -286,12 +302,13 @@ class Roi(GenericRoi[float]):
         return zoom_roi(self, zoom_factor)
 
 
-class RoiPixels(GenericRoi[int]):
+class RoiPixels(GenericRoi):
     """Region of interest (ROI) in pixel coordinates."""
 
-    x: int = 0
-    y: int = 0
+    x: float = 0
+    y: float = 0
     unit: SpaceUnits | str | None = None
+    dimensions: BaseDimensions = Field(default_factory=BaseDimensions)
 
     def to_roi(self, pixel_size: PixelSize) -> "Roi":
         """Convert to raster coordinates."""
@@ -337,16 +354,11 @@ class RoiPixels(GenericRoi[int]):
         )
 
     def to_slicing_dict(self) -> dict[str, SlicingInputType]:
-        x_slice = slice(self.x, self.x + self.x_length)
-        y_slice = slice(self.y, self.y + self.y_length)
-        if self.z is not None and self.z_length is not None:
-            z_slice = slice(self.z, self.z + self.z_length)
-        else:
-            z_slice = slice(None)
-        if self.t is not None and self.t_length is not None:
-            t_slice = slice(self.t, self.t + self.t_length)
-        else:
-            t_slice = slice(None)
+        """Convert to a slicing dictionary."""
+        x_slice = _to_slice(self.x, self.x_length)
+        y_slice = _to_slice(self.y, self.y_length)
+        z_slice = _to_slice(self.z, self.z_length)
+        t_slice = _to_slice(self.t, self.t_length)
         return {
             "x": x_slice,
             "y": y_slice,
@@ -434,6 +446,7 @@ def build_roi_numpy_getter(
         pixel_size=pixel_size,
         slicing_dict=slicing_dict,
     )
+    print(f"input_slice_kwargs: {input_slice_kwargs}")
     return build_numpy_getter(
         zarr_array=zarr_array,
         dimensions=dimensions,
