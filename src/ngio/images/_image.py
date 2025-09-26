@@ -8,16 +8,17 @@ import numpy as np
 from pydantic import BaseModel, model_validator
 
 from ngio.common import (
-    ArrayLike,
     Dimensions,
     InterpolationOrder,
     Roi,
     RoiPixels,
-    SlicingInputType,
-    TransformProtocol,
 )
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_image_container
+from ngio.io_pipes import (
+    SlicingInputType,
+    TransformProtocol,
+)
 from ngio.ome_zarr_meta import (
     ImageMetaHandler,
     NgioImageMeta,
@@ -270,7 +271,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         **slicing_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Get the image as a zarr array.
 
         Args:
@@ -300,7 +301,7 @@ class Image(AbstractImage[ImageMetaHandler]):
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         **slicing_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Get the image as a zarr array for a region of interest.
 
         Args:
@@ -329,7 +330,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def set_array(
         self,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -355,7 +356,7 @@ class Image(AbstractImage[ImageMetaHandler]):
     def set_roi(
         self,
         roi: Roi | RoiPixels,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,

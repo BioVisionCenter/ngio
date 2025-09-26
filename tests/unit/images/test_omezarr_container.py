@@ -6,31 +6,32 @@ import pytest
 
 from ngio import create_empty_ome_zarr, open_ome_zarr_container
 from ngio.images._image import ChannelSelectionModel
-from ngio.ome_zarr_meta.ngio_specs import SlicingOps
+from ngio.io_pipes._ops_axes import AxesOps
+from ngio.io_pipes._ops_slices import SlicingTupleType
 from ngio.utils import fractal_fsspec_store
 
 
 class IdentityTransform:
-    def apply_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps
+    def get_as_numpy_transform(
+        self, array: np.ndarray, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the scaling transformation to a numpy array."""
         return array
 
-    def apply_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps
+    def get_as_dask_transform(
+        self, array: da.Array, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the scaling transformation to a dask array."""
         return array
 
-    def apply_inverse_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps
+    def set_as_numpy_transform(
+        self, array: np.ndarray, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the inverse scaling transformation to a numpy array."""
         return array
 
-    def apply_inverse_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps
+    def set_as_dask_transform(
+        self, array: da.Array, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the inverse scaling transformation to a dask array."""
         return array

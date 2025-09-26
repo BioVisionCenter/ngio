@@ -2,6 +2,7 @@
 
 import math
 from functools import total_ordering
+from typing import overload
 
 import numpy as np
 
@@ -87,6 +88,12 @@ class PixelSize:
     def as_dict(self) -> dict[str, float]:
         """Return the pixel size as a dictionary."""
         return {"t": self.t, "z": self.z, "y": self.y, "x": self.x}
+
+    @overload
+    def get(self, axis: str, default: float) -> float: ...
+
+    @overload
+    def get(self, axis: str, default: None = None) -> float | None: ...
 
     def get(self, axis: str, default: float | None = None) -> float | None:
         """Get the pixel size for a given axis (in canonical name)."""

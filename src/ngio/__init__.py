@@ -9,7 +9,7 @@ except PackageNotFoundError:  # pragma: no cover
 __author__ = "Lorenzo Cerrone"
 __email__ = "lorenzo.cerrone@uzh.ch"
 
-from ngio.common import ArrayLike, Dimensions, Roi, RoiPixels
+from ngio.common import Dimensions, Roi, RoiPixels
 from ngio.hcs import (
     OmeZarrPlate,
     OmeZarrWell,
@@ -39,7 +39,6 @@ from ngio.ome_zarr_meta.ngio_specs import (
 )
 
 __all__ = [
-    "ArrayLike",
     "AxesSetup",
     "ChannelSelectionModel",
     "DefaultNgffVersion",

@@ -6,14 +6,6 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 
-from ngio.common import (
-    ArrayLike,
-    TransformProtocol,
-    build_roi_masked_dask_getter,
-    build_roi_masked_dask_setter,
-    build_roi_masked_numpy_getter,
-    build_roi_masked_numpy_setter,
-)
 from ngio.images._image import (
     ChannelSlicingInputType,
     Image,
@@ -21,6 +13,11 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.images._label import Label
+from ngio.io_pipes import (
+    TransformProtocol,
+    build_roi_masked_getter_pipe,
+    build_roi_masked_setter_pipe,
+)
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
@@ -70,7 +67,7 @@ class MaskedImage(Image):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
-    ) -> ArrayLike:
+    ) -> np.ndarray:
         """Return the array for a given ROI."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
@@ -111,7 +108,7 @@ class MaskedImage(Image):
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         **slicing_kwargs: slice | int | Sequence[int],
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Return the array for a given ROI."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
@@ -127,7 +124,7 @@ class MaskedImage(Image):
     def set_roi(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         zoom_factor: float = 1.0,
         channel_selection: ChannelSlicingInputType | None = None,
         axes_order: Sequence[str] | None = None,
@@ -163,7 +160,8 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_numpy_getter(
+        masked_getter = build_roi_masked_getter_pipe(
+            mode="numpy",
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -195,7 +193,8 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_dask_getter(
+        masked_getter = build_roi_masked_getter_pipe(
+            mode="dask",
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -220,35 +219,34 @@ class MaskedImage(Image):
         mode: Literal["numpy", "dask"] = "numpy",
         allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Return the masked array for a given label."""
-        if mode == "numpy":
-            return self.get_roi_masked_as_numpy(
-                label=label,
-                channel_selection=channel_selection,
-                zoom_factor=zoom_factor,
-                axes_order=axes_order,
-                transforms=transforms,
-                allow_scaling=allow_scaling,
-                **slicing_kwargs,
-            )
-        elif mode == "dask":
-            return self.get_roi_masked_as_dask(
-                label=label,
-                channel_selection=channel_selection,
-                zoom_factor=zoom_factor,
-                axes_order=axes_order,
-                transforms=transforms,
-                allow_scaling=allow_scaling,
-                **slicing_kwargs,
-            )
-        else:
-            raise ValueError(f"Unknown mode: {mode}")
+        slicing_kwargs = add_channel_selection_to_slicing_dict(
+            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
+        )
+
+        roi = self._masking_roi_table.get_label(label)
+        roi = roi.zoom(zoom_factor)
+        masked_getter = build_roi_masked_getter_pipe(
+            mode=mode,
+            roi=roi,
+            zarr_array=self.zarr_array,
+            label_zarr_array=self._label.zarr_array,
+            dimensions=self.dimensions,
+            pixel_size=self.pixel_size,
+            label_dimensions=self._label.dimensions,
+            label_pixel_size=self._label.pixel_size,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slicing_kwargs,
+            allow_scaling=allow_scaling,
+        )
+        return masked_getter()
 
     def set_roi_masked(
         self,
         label: int,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         channel_selection: ChannelSlicingInputType | None = None,
         axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
@@ -264,7 +262,8 @@ class MaskedImage(Image):
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            path_setter = build_roi_masked_dask_setter(
+            path_setter = build_roi_masked_setter_pipe(
+                mode="dask",
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -279,7 +278,8 @@ class MaskedImage(Image):
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            path_setter = build_roi_masked_numpy_setter(
+            path_setter = build_roi_masked_setter_pipe(
+                mode="numpy",
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -378,7 +378,7 @@ class MaskedLabel(Label):
         mode: Literal["numpy", "dask"] = "numpy",
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Return the array for a given ROI."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
@@ -393,7 +393,7 @@ class MaskedLabel(Label):
     def set_roi(
         self,
         label: int,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -422,7 +422,8 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a NumPy array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_numpy_getter(
+        masked_getter = build_roi_masked_getter_pipe(
+            mode="numpy",
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -449,7 +450,8 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a Dask array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_dask_getter(
+        masked_getter = build_roi_masked_getter_pipe(
+            mode="dask",
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -473,7 +475,7 @@ class MaskedLabel(Label):
         transforms: Sequence[TransformProtocol] | None = None,
         allow_scaling: bool = True,
         **slicing_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Return the masked array for a given label."""
         if mode == "numpy":
             return self.get_roi_masked_as_numpy(
@@ -500,7 +502,7 @@ class MaskedLabel(Label):
     def set_roi_masked(
         self,
         label: int,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         zoom_factor: float = 1.0,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -511,7 +513,8 @@ class MaskedLabel(Label):
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            path_setter = build_roi_masked_dask_setter(
+            path_setter = build_roi_masked_setter_pipe(
+                mode="dask",
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -526,7 +529,8 @@ class MaskedLabel(Label):
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            path_setter = build_roi_masked_numpy_setter(
+            path_setter = build_roi_masked_setter_pipe(
+                mode="numpy",
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,

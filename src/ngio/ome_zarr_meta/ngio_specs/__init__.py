@@ -8,12 +8,12 @@ This models can be tr
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesHandler,
+    AxesOps,
     AxesSetup,
     Axis,
     AxisType,
     DefaultSpaceUnit,
     DefaultTimeUnit,
-    SlicingOps,
     SpaceUnits,
     TimeUnits,
     build_canonical_axes_handler,
@@ -46,6 +46,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 
 __all__ = [
     "AxesHandler",
+    "AxesOps",
     "AxesSetup",
     "Axis",
     "AxisType",
@@ -66,7 +67,6 @@ __all__ = [
     "NgioPlateMeta",
     "NgioWellMeta",
     "PixelSize",
-    "SlicingOps",
     "SpaceUnits",
     "TimeUnits",
     "build_canonical_axes_handler",

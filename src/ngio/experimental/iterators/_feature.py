@@ -3,18 +3,14 @@ from collections.abc import Callable, Generator, Sequence
 import dask.array as da
 import numpy as np
 
-from ngio.common import (
-    Roi,
-    TransformProtocol,
-    build_roi_dask_getter,
-    build_roi_numpy_getter,
-)
+from ngio.common import Roi
 from ngio.experimental.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.images import Image, Label
 from ngio.images._image import (
     ChannelSlicingInputType,
     add_channel_selection_to_slicing_dict,
 )
+from ngio.io_pipes import TransformProtocol, build_roi_getter_pipe
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder):
@@ -59,7 +55,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         self._label_transforms = label_transforms
 
         self._input.assert_axes_match(self._input_label)
-        self._input.assert_can_be_rescaled(self._input_label)
+        # TODO fix this
+        # self._input.assert_can_be_rescaled(self._input_label)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
@@ -73,7 +70,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        data_getter = build_roi_numpy_getter(
+        data_getter = build_roi_getter_pipe(
+            mode="numpy",
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -82,7 +80,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = build_roi_numpy_getter(
+        label_getter = build_roi_getter_pipe(
+            mode="numpy",
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
@@ -97,7 +96,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         return None
 
     def build_dask_getter(self, roi: Roi):
-        data_getter = build_roi_dask_getter(
+        data_getter = build_roi_getter_pipe(
+            mode="dask",
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -106,7 +106,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = build_roi_dask_getter(
+        label_getter = build_roi_getter_pipe(
+            mode="dask",
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,

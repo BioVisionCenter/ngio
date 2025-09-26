@@ -3,18 +3,7 @@ from collections.abc import Callable, Generator, Sequence
 import dask.array as da
 import numpy as np
 
-from ngio.common import (
-    Roi,
-    TransformProtocol,
-    build_roi_dask_getter,
-    build_roi_dask_setter,
-    build_roi_masked_dask_getter,
-    build_roi_masked_dask_setter,
-    build_roi_masked_numpy_getter,
-    build_roi_masked_numpy_setter,
-    build_roi_numpy_getter,
-    build_roi_numpy_setter,
-)
+from ngio.common import Roi
 from ngio.experimental.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.images import Image, Label
 from ngio.images._image import (
@@ -22,6 +11,13 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.images._masked_image import MaskedImage
+from ngio.io_pipes import (
+    TransformProtocol,
+    build_roi_getter_pipe,
+    build_roi_masked_getter_pipe,
+    build_roi_masked_setter_pipe,
+    build_roi_setter_pipe,
+)
 
 
 class SegmentationIterator(AbstractIteratorBuilder):
@@ -79,7 +75,8 @@ class SegmentationIterator(AbstractIteratorBuilder):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        return build_roi_numpy_getter(
+        return build_roi_getter_pipe(
+            mode="numpy",
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -90,7 +87,8 @@ class SegmentationIterator(AbstractIteratorBuilder):
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return build_roi_numpy_setter(
+        return build_roi_setter_pipe(
+            mode="numpy",
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             axes_order=self._axes_order,
@@ -101,7 +99,8 @@ class SegmentationIterator(AbstractIteratorBuilder):
         )
 
     def build_dask_getter(self, roi: Roi):
-        return build_roi_dask_getter(
+        return build_roi_getter_pipe(
+            mode="dask",
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -112,7 +111,8 @@ class SegmentationIterator(AbstractIteratorBuilder):
         )
 
     def build_dask_setter(self, roi: Roi):
-        return build_roi_dask_setter(
+        return build_roi_setter_pipe(
+            mode="dask",
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             axes_order=self._axes_order,
@@ -217,7 +217,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        return build_roi_masked_numpy_getter(
+        return build_roi_masked_getter_pipe(
+            mode="numpy",
             roi=roi,
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -231,7 +232,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return build_roi_masked_numpy_setter(
+        return build_roi_masked_setter_pipe(
+            mode="numpy",
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
@@ -245,7 +247,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_dask_getter(self, roi: Roi):
-        return build_roi_masked_dask_getter(
+        return build_roi_masked_getter_pipe(
+            mode="dask",
             roi=roi,
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -259,7 +262,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_dask_setter(self, roi: Roi):
-        return build_roi_masked_dask_setter(
+        return build_roi_masked_setter_pipe(
+            mode="dask",
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,

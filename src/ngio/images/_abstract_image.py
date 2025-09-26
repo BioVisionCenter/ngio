@@ -1,5 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
+import math
 from collections.abc import Sequence
 from typing import Generic, Literal, TypeVar
 
@@ -8,24 +9,21 @@ import numpy as np
 import zarr
 
 from ngio.common import (
-    ArrayLike,
     Dimensions,
     InterpolationOrder,
     Roi,
     RoiPixels,
-    SlicingInputType,
-    TransformProtocol,
-    build_dask_getter,
-    build_dask_setter,
-    build_numpy_getter,
-    build_numpy_setter,
-    build_roi_dask_getter,
-    build_roi_dask_setter,
-    build_roi_numpy_getter,
-    build_roi_numpy_setter,
     consolidate_pyramid,
 )
-from ngio.common._zoom import scale_factor_from_dimensions, scale_factor_from_pixel_size
+from ngio.common._zoom import scale_factor_from_pixel_size
+from ngio.io_pipes import (
+    SlicingInputType,
+    TransformProtocol,
+    build_getter_pipe,
+    build_roi_getter_pipe,
+    build_roi_setter_pipe,
+    build_setter_pipe,
+)
 from ngio.ome_zarr_meta import (
     AxesHandler,
     Dataset,
@@ -192,7 +190,8 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        numpy_getter = build_numpy_getter(
+        numpy_getter = build_getter_pipe(
+            mode="numpy",
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             axes_order=axes_order,
@@ -219,7 +218,8 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        numpy_roi_getter = build_roi_numpy_getter(
+        numpy_roi_getter = build_roi_getter_pipe(
+            mode="numpy",
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -243,7 +243,8 @@ class AbstractImage(Generic[_image_handler]):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        dask_getter = build_dask_getter(
+        dask_getter = build_getter_pipe(
+            mode="dask",
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             axes_order=axes_order,
@@ -267,7 +268,8 @@ class AbstractImage(Generic[_image_handler]):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        roi_dask_getter = build_roi_dask_getter(
+        roi_dask_getter = build_roi_getter_pipe(
+            mode="dask",
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -284,7 +286,7 @@ class AbstractImage(Generic[_image_handler]):
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         **slicing_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Get a slice of the image.
 
         Args:
@@ -297,18 +299,15 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        if mode == "numpy":
-            return self._get_as_numpy(
-                axes_order=axes_order, transforms=transforms, **slicing_kwargs
-            )
-        elif mode == "dask":
-            return self._get_as_dask(
-                axes_order=axes_order, transforms=transforms, **slicing_kwargs
-            )
-        else:
-            raise ValueError(
-                f"Unknown mode: {mode}. Choose from 'numpy', 'dask', or 'delayed'."
-            )
+        pipe = build_getter_pipe(
+            mode=mode,
+            zarr_array=self.zarr_array,
+            dimensions=self.dimensions,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slicing_kwargs,
+        )
+        return pipe()
 
     def _get_roi(
         self,
@@ -317,7 +316,7 @@ class AbstractImage(Generic[_image_handler]):
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
         **slice_kwargs: SlicingInputType,
-    ) -> ArrayLike:
+    ) -> np.ndarray | da.Array:
         """Get a slice of the image.
 
         Args:
@@ -331,22 +330,21 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        if mode == "numpy":
-            return self._get_roi_as_numpy(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
-            )
-        elif mode == "dask":
-            return self._get_roi_as_dask(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
-            )
-        else:
-            raise ValueError(
-                f"Unknown mode: {mode}. Choose from 'numpy', 'dask', or 'delayed'."
-            )
+        pipe = build_roi_getter_pipe(
+            mode=mode,
+            zarr_array=self.zarr_array,
+            dimensions=self.dimensions,
+            roi=roi,
+            pixel_size=self.pixel_size,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slice_kwargs,
+        )
+        return pipe()
 
     def _set_array(
         self,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: SlicingInputType,
@@ -361,7 +359,8 @@ class AbstractImage(Generic[_image_handler]):
 
         """
         if isinstance(patch, np.ndarray):
-            numpy_setter = build_numpy_setter(
+            numpy_setter = build_setter_pipe(
+                mode="numpy",
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
@@ -371,7 +370,8 @@ class AbstractImage(Generic[_image_handler]):
             numpy_setter(patch)
 
         elif isinstance(patch, da.Array):
-            dask_setter = build_dask_setter(
+            dask_setter = build_setter_pipe(
+                mode="dask",
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
@@ -389,7 +389,7 @@ class AbstractImage(Generic[_image_handler]):
     def _set_roi(
         self,
         roi: Roi | RoiPixels,
-        patch: ArrayLike,
+        patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: SlicingInputType,
@@ -405,7 +405,8 @@ class AbstractImage(Generic[_image_handler]):
 
         """
         if isinstance(patch, np.ndarray):
-            roi_numpy_setter = build_roi_numpy_setter(
+            roi_numpy_setter = build_roi_setter_pipe(
+                mode="numpy",
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
@@ -417,7 +418,8 @@ class AbstractImage(Generic[_image_handler]):
             roi_numpy_setter(patch)
 
         elif isinstance(patch, da.Array):
-            roi_dask_setter = build_roi_dask_setter(
+            roi_dask_setter = build_roi_setter_pipe(
+                mode="dask",
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
@@ -579,6 +581,16 @@ def assert_axes_match(
     image1.dimensions.assert_axes_match(other=image2.dimensions)
 
 
+def _are_compatible(
+    shape1: tuple[int, ...], shape2: tuple[int, ...], scaling: tuple[float, ...]
+) -> bool:
+    """Check if shape2 is consistent with shape1 given pixel sizes."""
+    expected_shape2 = tuple(s1 * s for s1, s in zip(shape1, scaling, strict=True))
+    expected_shape2_floor = tuple(math.floor(s) for s in expected_shape2)
+    expected_shape2_ceil = tuple(math.ceil(s) for s in expected_shape2)
+    return shape2 in {expected_shape2_floor, expected_shape2_ceil}
+
+
 def assert_can_be_rescaled(
     image1: AbstractImage,
     image2: AbstractImage,
@@ -595,19 +607,17 @@ def assert_can_be_rescaled(
     Raises:
         NgioValueError: If the images cannot be scaled to each other.
     """
-    scale_from_dims = scale_factor_from_dimensions(
-        original_dimension=image1.dimensions,
-        target_dimension=image2.dimensions,
-    )
     scale_from_px = scale_factor_from_pixel_size(
         original_dimension=image1.dimensions,
         original_pixel_size=image1.pixel_size,
         target_pixel_size=image2.pixel_size,
     )
-    if np.allclose(scale_from_dims, scale_from_px):
+    if _are_compatible(shape1=image1.shape, shape2=image2.shape, scaling=scale_from_px):
         return None
+
     raise NgioValueError(
-        "The images cannot be rescaled to each other. "
-        f"Scale from dimensions: {scale_from_dims}, "
-        f"scale from pixel sizes: {scale_from_px}."
+        f"Images cannot be rescaled to each other. \n"
+        f"Scaling factor from pixel sizes = {scale_from_px} is not compatible with:\n"
+        f"Image 1 shape: {image1.shape}\n"
+        f"Image 2 shape: {image2.shape}\n"
     )

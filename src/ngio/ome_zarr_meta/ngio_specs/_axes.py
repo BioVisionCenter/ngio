@@ -263,19 +263,60 @@ def validate_axes(
     )
 
 
-class SlicingOps(BaseModel):
-    slice_tuple: tuple[SlicingType, ...] | None = None
-    transpose_axes: tuple[int, ...] | None = None
-    expand_axes: tuple[int, ...] | None = None
-    squeeze_axes: tuple[int, ...] | None = None
+class AxesOps(BaseModel):
+    """Model to represent axes operations.
+
+    This model will be used to transform objects from on disk axes to in memory axes.
+    """
+
+    on_disk_axes: tuple[str, ...]
+    in_memory_axes: tuple[str, ...]
+    transpose_op: tuple[int, ...] | None = None
+    expand_op: tuple[int, ...] | None = None
+    squeeze_op: tuple[int, ...] | None = None
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    @property
-    def requires_axes_ops(self) -> bool:
-        """Check if the slicing operations require axes operations."""
-        if self.expand_axes or self.transpose_axes or self.squeeze_axes:
+    def isnoop(self) -> bool:
+        """Check if the axes operations are no-op."""
+        if (
+            self.expand_op is None
+            and self.squeeze_op is None
+            and self.transpose_op is None
+        ):
             return True
         return False
+
+    @property
+    def get_transpose_op(self) -> tuple[int, ...] | None:
+        """Get the transpose axes."""
+        return self.transpose_op
+
+    @property
+    def get_expand_op(self) -> tuple[int, ...] | None:
+        """Get the expand axes."""
+        return self.expand_op
+
+    @property
+    def get_squeeze_op(self) -> tuple[int, ...] | None:
+        """Get the squeeze axes."""
+        return self.squeeze_op
+
+    @property
+    def set_transpose_op(self) -> tuple[int, ...] | None:
+        """Set the transpose axes."""
+        if self.transpose_op is None:
+            return None
+        return tuple(np.argsort(self.transpose_op))
+
+    @property
+    def set_expand_op(self) -> tuple[int, ...] | None:
+        """Set the expand axes."""
+        return self.squeeze_op
+
+    @property
+    def set_squeeze_op(self) -> tuple[int, ...] | None:
+        """Set the squeeze axes."""
+        return self.expand_op
 
 
 class AxesHandler:
@@ -529,39 +570,21 @@ class AxesHandler:
         axes_to_expand = tuple(_axes_to_expand) if len(_axes_to_expand) > 0 else None
         return axes_to_squeeze, transposition_order, axes_to_expand
 
-    def to_order(self, names: Sequence[str]) -> SlicingOps:
-        """Get the new order of the axes."""
+    def get_axes_ops(self, names: Sequence[str]) -> AxesOps:
+        """Get the axes operations to go from on-disk to in-memory axes."""
         axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
-        return SlicingOps(
-            transpose_axes=transposition_order,
-            expand_axes=axes_to_expand,
-            squeeze_axes=axes_to_squeeze,
+        return AxesOps(
+            on_disk_axes=self.axes_names,
+            in_memory_axes=tuple(names),
+            transpose_op=transposition_order,
+            expand_op=axes_to_expand,
+            squeeze_op=axes_to_squeeze,
         )
 
-    def from_order(self, names: Sequence[str]) -> SlicingOps:
-        """Get the new order of the axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
-        # Inverse transpose is just the transpose with the inverse indices
-        if transposition_order is None:
-            _reverse_indices = None
-        else:
-            _reverse_indices = tuple(np.argsort(transposition_order))
-
-        return SlicingOps(
-            transpose_axes=_reverse_indices,
-            expand_axes=axes_to_squeeze,
-            squeeze_axes=axes_to_expand,
-        )
-
-    def to_canonical(self) -> SlicingOps:
-        """Get the new order of the axes."""
+    def get_canonical_axes_ops(self) -> AxesOps:
+        """Get the axes operations to go from on-disk to canonical in-memory axes."""
         other = self._axes_setup.others
-        return self.to_order(other + list(self._canonical_order))
-
-    def from_canonical(self) -> SlicingOps:
-        """Get the new order of the axes."""
-        other = self._axes_setup.others
-        return self.from_order(other + list(self._canonical_order))
+        return self.get_axes_ops(list(self._canonical_order) + other)
 
 
 def build_canonical_axes_handler(
