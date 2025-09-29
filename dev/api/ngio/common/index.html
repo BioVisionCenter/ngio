@@ -3851,8 +3851,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_pyramid.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
-<span class="normal">163</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">163</span>
 <span class="normal">164</span>
 <span class="normal">165</span>
 <span class="normal">166</span>
@@ -3873,7 +3872,8 @@ Other axes orders are not supported.</p>
 <span class="normal">181</span>
 <span class="normal">182</span>
 <span class="normal">183</span>
-<span class="normal">184</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">consolidate_pyramid</span><span class="p">(</span>
+<span class="normal">184</span>
+<span class="normal">185</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">consolidate_pyramid</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">targets</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">],</span>
     <span class="n">order</span><span class="p">:</span> <span class="n">InterpolationOrder</span> <span class="o">=</span> <span class="s2">&quot;linear&quot;</span><span class="p">,</span>
@@ -3928,6 +3928,8 @@ Other axes orders are not supported.</p>
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt; (&lt;code&gt;ngio.utils.AccessModeLiteral&lt;/code&gt;)" href="../utils/#ngio.utils.AccessModeLiteral">AccessModeLiteral</a></span> <span class="o">=</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span>
+    <span class="n">dimension_separator</span><span class="p">:</span> <span class="n"><span title="zarr.types.DIMENSION_SEPARATOR">DIMENSION_SEPARATOR</span></span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="p">,</span>
+    <span class="n">compressor</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
@@ -3936,8 +3938,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_pyramid.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">196</span>
-<span class="normal">197</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">197</span>
 <span class="normal">198</span>
 <span class="normal">199</span>
 <span class="normal">200</span>
@@ -3989,7 +3990,11 @@ Other axes orders are not supported.</p>
 <span class="normal">246</span>
 <span class="normal">247</span>
 <span class="normal">248</span>
-<span class="normal">249</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">init_empty_pyramid</span><span class="p">(</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span>
+<span class="normal">252</span>
+<span class="normal">253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">init_empty_pyramid</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">paths</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
     <span class="n">ref_shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
@@ -3997,6 +4002,8 @@ Other axes orders are not supported.</p>
     <span class="n">chunks</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">dtype</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;uint16&quot;</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="n">AccessModeLiteral</span> <span class="o">=</span> <span class="s2">&quot;a&quot;</span><span class="p">,</span>
+    <span class="n">dimension_separator</span><span class="p">:</span> <span class="n">DIMENSION_SEPARATOR</span> <span class="o">=</span> <span class="s2">&quot;/&quot;</span><span class="p">,</span>
+    <span class="n">compressor</span><span class="o">=</span><span class="s2">&quot;default&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
     <span class="c1"># Return the an Image object</span>
     <span class="k">if</span> <span class="n">chunks</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ref_shape</span><span class="p">):</span>
@@ -4029,8 +4036,9 @@ Other axes orders are not supported.</p>
             <span class="n">shape</span><span class="o">=</span><span class="n">ref_shape</span><span class="p">,</span>
             <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
             <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
-            <span class="n">dimension_separator</span><span class="o">=</span><span class="s2">&quot;/&quot;</span><span class="p">,</span>
+            <span class="n">dimension_separator</span><span class="o">=</span><span class="n">dimension_separator</span><span class="p">,</span>
             <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">compressor</span><span class="o">=</span><span class="n">compressor</span><span class="p">,</span>
         <span class="p">)</span>
 
         <span class="n">_shape</span> <span class="o">=</span> <span class="p">[</span>
@@ -4123,8 +4131,7 @@ Other axes orders are not supported.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_pyramid.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">103</span>
-<span class="normal">104</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">104</span>
 <span class="normal">105</span>
 <span class="normal">106</span>
 <span class="normal">107</span>
@@ -4157,7 +4164,8 @@ Other axes orders are not supported.</p>
 <span class="normal">134</span>
 <span class="normal">135</span>
 <span class="normal">136</span>
-<span class="normal">137</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">on_disk_zoom</span><span class="p">(</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">on_disk_zoom</span><span class="p">(</span>
     <span class="n">source</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">target</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">order</span><span class="p">:</span> <span class="n">InterpolationOrder</span> <span class="o">=</span> <span class="s2">&quot;linear&quot;</span><span class="p">,</span>
