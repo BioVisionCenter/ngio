@@ -8,7 +8,10 @@ from dask.array import Array as DaskArray
 
 from ngio.common._dimensions import Dimensions
 from ngio.common._zoom import dask_zoom, numpy_zoom
-from ngio.io_pipes._io_pipes import build_getter_pipe, build_setter_pipe
+from ngio.io_pipes._io_pipes import (
+    build_getter_pipe,
+    build_setter_pipe,
+)
 from ngio.io_pipes._io_pipes_utils import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 

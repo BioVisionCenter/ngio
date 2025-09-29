@@ -108,6 +108,28 @@ class ZoomTransform:
             )
         return tuple(out_shape)
 
+    def _numpy_zoom(
+        self, array: np.ndarray, target_shape: tuple[int, ...]
+    ) -> np.ndarray:
+        print(array.shape, target_shape, array.shape == target_shape)
+        if array.shape == target_shape:
+            return array
+        return numpy_zoom(
+            source_array=array, target_shape=target_shape, order=self._order
+        )
+
+    def _dask_zoom(
+        self,
+        array: da.Array,
+        array_shape: tuple[int, ...],
+        target_shape: tuple[int, ...],
+    ) -> da.Array:
+        if array_shape == target_shape:
+            return array
+        return dask_zoom(
+            source_array=array, target_shape=target_shape, order=self._order
+        )
+
     def get_as_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
@@ -115,7 +137,7 @@ class ZoomTransform:
         out_shape = self._compute_zoom_shape(
             array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return numpy_zoom(source_array=array, target_shape=out_shape, order=self._order)
+        return self._numpy_zoom(array=array, target_shape=out_shape)
 
     def get_as_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
@@ -125,7 +147,9 @@ class ZoomTransform:
         out_shape = self._compute_zoom_shape(
             array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return dask_zoom(source_array=array, target_shape=out_shape, order=self._order)
+        return self._dask_zoom(
+            array=array, array_shape=array_shape, target_shape=out_shape
+        )
 
     def set_as_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
@@ -134,7 +158,7 @@ class ZoomTransform:
         out_shape = self._compute_inverse_zoom_shape(
             array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return numpy_zoom(source_array=array, target_shape=out_shape, order=self._order)
+        return self._numpy_zoom(array=array, target_shape=out_shape)
 
     def set_as_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
@@ -144,4 +168,6 @@ class ZoomTransform:
         out_shape = self._compute_inverse_zoom_shape(
             array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return dask_zoom(source_array=array, target_shape=out_shape, order=self._order)
+        return self._dask_zoom(
+            array=array, array_shape=array_shape, target_shape=out_shape
+        )
