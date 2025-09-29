@@ -278,6 +278,8 @@ def setup_io_pipe(
         remove_channel_selection=remove_channel_selection,
     )
     slicing_ops = SlicingOps(
-        on_disk_axes=axes_ops.on_disk_axes, slicing_tuple=slicing_tuple
+        on_disk_axes=axes_ops.on_disk_axes,
+        on_disk_shape=dimensions.shape,
+        slicing_tuple=slicing_tuple,
     )
     return slicing_ops, axes_ops

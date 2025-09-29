@@ -166,6 +166,9 @@ def _set_as_numpy_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> None:
     """Get a numpy array from the zarr array with the given slice tuple and axes ops."""
+    print("patch.shape", patch.shape)
+    print("slicing_ops.slicing_tuple", slicing_ops.slicing_tuple)
+    print("slicing_ops.normalized_slicing_tuple", slicing_ops.normalized_slicing_tuple)
     patch = set_as_numpy_transform(
         array=patch,
         slicing_ops=slicing_ops,
@@ -176,6 +179,8 @@ def _set_as_numpy_pipe(
         array=patch,
         axes_ops=axes_ops,
     )
+    print("patch.shape", patch.shape)
+    print("slicing_ops.slicing_tuple", slicing_ops.slicing_tuple)
     set_slice_as_numpy(
         zarr_array=zarr_array,
         patch=patch,

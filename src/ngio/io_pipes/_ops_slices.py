@@ -61,32 +61,35 @@ class SlicingOps(BaseModel):
     """Class to hold slicing operations."""
 
     on_disk_axes: tuple[str, ...]
+    on_disk_shape: tuple[int, ...]
     slicing_tuple: tuple[SlicingType, ...] | None = None
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    def normalize_slicing_tuple(
-        self, array_shape: tuple[int, ...]
-    ) -> None | tuple[SlicingType, ...]:
+    @property
+    def normalized_slicing_tuple(self) -> None | tuple[SlicingType, ...]:
         """Normalize the slicing tuple to be within the array shape boundaries."""
         if self.slicing_tuple is not None:
             return _slicing_tuple_boundary_check(
                 slicing_tuple=self.slicing_tuple,
-                array_shape=array_shape,
+                array_shape=self.on_disk_shape,
             )
         return None
 
-    def get(self, ax_name: str) -> SlicingType:
+    def get(self, ax_name: str, normalize: bool = False) -> SlicingType:
         """Get the slicing tuple."""
-        if self.slicing_tuple is None:
+        slicing_tuple = (
+            self.slicing_tuple if not normalize else self.normalized_slicing_tuple
+        )
+        if slicing_tuple is None:
             return slice(None)
         if ax_name not in self.on_disk_axes:
             return slice(None)
         ax_index = self.on_disk_axes.index(ax_name)
-        return self.slicing_tuple[ax_index]
+        return slicing_tuple[ax_index]
 
 
 def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
-    slicing_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
+    slicing_tuple = slicing_ops.normalized_slicing_tuple
     if slicing_tuple is None:
         return zarr_array[...]
 
@@ -115,11 +118,10 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     da_array = da.from_zarr(zarr_array)
-    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
+    slice_tuple = slicing_ops.normalized_slicing_tuple
     if slice_tuple is None:
         return da_array
 
-    slice_tuple = _slicing_tuple_boundary_check(slice_tuple, zarr_array.shape)
     # TODO add support for non-contiguous slicing with tuples/lists
     if any(isinstance(s, tuple) for s in slice_tuple):
         raise NotImplementedError(
@@ -135,19 +137,16 @@ def set_slice_as_numpy(
     patch: np.ndarray,
     slicing_ops: SlicingOps,
 ) -> None:
-    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
+    slice_tuple = slicing_ops.normalized_slicing_tuple
     if slice_tuple is None:
         zarr_array[...] = patch
         return
 
-    slice_tuple = _slicing_tuple_boundary_check(slice_tuple, zarr_array.shape)
     zarr_array[slice_tuple] = patch
 
 
 def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
-    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
-    if slice_tuple is not None:
-        slice_tuple = _slicing_tuple_boundary_check(slice_tuple, zarr_array.shape)
+    slice_tuple = slicing_ops.normalized_slicing_tuple
     da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
