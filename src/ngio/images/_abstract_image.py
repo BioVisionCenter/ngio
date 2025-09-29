@@ -15,7 +15,6 @@ from ngio.common import (
     RoiPixels,
     consolidate_pyramid,
 )
-from ngio.common._zoom import scale_factor_from_pixel_size
 from ngio.io_pipes import (
     SlicingInputType,
     TransformProtocol,
@@ -581,13 +580,17 @@ def assert_axes_match(
     image1.dimensions.assert_axes_match(other=image2.dimensions)
 
 
-def _are_compatible(
-    shape1: tuple[int, ...], shape2: tuple[int, ...], scaling: tuple[float, ...]
-) -> bool:
-    """Check if shape2 is consistent with shape1 given pixel sizes."""
-    expected_shape2 = tuple(s1 * s for s1, s in zip(shape1, scaling, strict=True))
-    expected_shape2_floor = tuple(math.floor(s) for s in expected_shape2)
-    expected_shape2_ceil = tuple(math.ceil(s) for s in expected_shape2)
+def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
+    """Check if shape2 is consistent with shape1 given pixel sizes.
+
+    Since we only deal with shape discrepancies due to rounding, we
+    shape1, needs to be larger than shape2.
+    """
+    if shape1 < shape2:
+        return _are_compatible(shape2, shape1, 1 / scaling)
+    expected_shape2 = shape1 * scaling
+    expected_shape2_floor = math.floor(expected_shape2)
+    expected_shape2_ceil = math.ceil(expected_shape2)
     return shape2 in {expected_shape2_floor, expected_shape2_ceil}
 
 
@@ -607,17 +610,27 @@ def assert_can_be_rescaled(
     Raises:
         NgioValueError: If the images cannot be scaled to each other.
     """
-    scale_from_px = scale_factor_from_pixel_size(
-        original_dimension=image1.dimensions,
-        original_pixel_size=image1.pixel_size,
-        target_pixel_size=image2.pixel_size,
-    )
-    if _are_compatible(shape1=image1.shape, shape2=image2.shape, scaling=scale_from_px):
-        return None
+    assert_axes_match(image1=image1, image2=image2)
+    errors, scale = [], None
+    for ax1 in image1.dimensions.axes_handler.axes:
+        if ax1.axis_type == "channel":
+            continue
+        ax2 = image2.dimensions.axes_handler.get_axis(ax1.name)
+        assert ax2 is not None, "Axes do not match."
+        px1 = image1.pixel_size.get(ax1.name, default=1.0)
+        px2 = image2.pixel_size.get(ax2.name, default=1.0)
+        scale = px1 / px2
+        if not _are_compatible(
+            shape1=image1.dimensions.get(ax1.name, default=1),
+            shape2=image2.dimensions.get(ax2.name, default=1),
+            scaling=scale,
+        ):
+            errors.append(f"Axis {ax1.name}: {image1.shape} vs {image2.shape}")
 
-    raise NgioValueError(
-        f"Images cannot be rescaled to each other. \n"
-        f"Scaling factor from pixel sizes = {scale_from_px} is not compatible with:\n"
-        f"Image 1 shape: {image1.shape}\n"
-        f"Image 2 shape: {image2.shape}\n"
-    )
+    if errors:
+        raise NgioValueError(
+            f"Images cannot be rescaled to each other. \n"
+            f"Scaling factor from pixel sizes = {scale} is not compatible with:\n"
+            f"Image 1 shape: {image1.shape}\n"
+            f"Image 2 shape: {image2.shape}\n"
+        )

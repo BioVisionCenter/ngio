@@ -8,11 +8,10 @@ from ngio.common._zoom import (
     InterpolationOrder,
     dask_zoom,
     numpy_zoom,
-    scale_factor_from_pixel_size,
 )
 from ngio.images._abstract_image import AbstractImage
-
-SlicingOps: None = None
+from ngio.io_pipes import SlicingOps
+from ngio.ome_zarr_meta import AxesOps
 
 
 class ZoomTransform:
@@ -26,164 +25,122 @@ class ZoomTransform:
         self._target_dimensions = target_image.dimensions
         self._input_pixel_size = input_image.pixel_size
         self._target_pixel_size = target_image.pixel_size
-
         self._order: InterpolationOrder = order
-        self._scale = scale_factor_from_pixel_size(
-            original_dimension=self._input_dimensions,
-            original_pixel_size=self._input_pixel_size,
-            target_pixel_size=self._target_pixel_size,
-        )
 
-    @property
-    def scale(self) -> tuple[float, ...]:
-        return self._scale
+    def _normalize_shape(
+        self, slice_: slice | int | tuple, shape: int, scale: float, out_dim: int
+    ) -> int:
+        if isinstance(slice_, slice):
+            _start = slice_.start or 0
+            _stop = slice_.stop or shape
+            out_shape = _stop - _start
+            out_shape = min(out_shape * scale, out_dim)
+        elif isinstance(slice_, int):
+            out_shape = 1
+        elif isinstance(slice_, tuple):
+            out_shape = len(slice_) * scale
+        else:
+            raise ValueError(f"Unsupported slice type: {type(slice_)}")
+        return math.ceil(out_shape)
 
-    @property
-    def inv_scale(self) -> tuple[float, ...]:
-        return tuple([1 / s for s in self._scale])
-
-    def _predict_zoomed_shape(
+    def _compute_zoom_shape(
         self,
         array_shape: Sequence[int],
+        axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(slicing_ops.in_memory_axes)
+        assert len(array_shape) == len(axes_ops.in_memory_axes)
 
-        if slicing_ops.slicing_tuple is None:
-            slice_tuple = tuple([slice(None)] * len(array_shape))
-        else:
-            slice_tuple = slicing_ops.slicing_tuple
-        print("fw before", slice_tuple)
-        slice_tuple = tuple(
-            apply_sequence_axes_ops(
-                slice_tuple,
-                default=slice(None),
-                squeeze_axes=slicing_ops.squeeze_axes,
-                transpose_axes=slicing_ops.transpose_axes,
-                expand_axes=slicing_ops.expand_axes,
-            )
-        )
-        print("fw after", slice_tuple)
-        print("slicing", slicing_ops)
         out_shape = []
-        for shape, ax_name, sl in zip(
-            array_shape, slicing_ops.in_memory_axes, slice_tuple, strict=True
-        ):
+        for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
+            ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
+            if ax_type is not None and ax_type.axis_type == "channel":
+                # Do not scale channel axis
+                out_shape.append(shape)
+                continue
             out_dim = self._target_dimensions.get(ax_name, default=1)
             in_pix = self._input_pixel_size.get(ax_name, default=1.0)
             out_pix = self._target_pixel_size.get(ax_name, default=1.0)
-
+            slice_ = slicing_ops.get(ax_name)
             scale = in_pix / out_pix
-
-            if isinstance(sl, slice):
-                _start = sl.start or 0
-                _stop = sl.stop or shape
-                _shape = _stop - _start
-                _shape = min(_shape * scale, out_dim)
-            elif isinstance(sl, int):
-                _shape = 1
-            elif isinstance(sl, tuple):
-                _shape = len(sl) * scale
-            else:
-                raise ValueError(f"Unsupported slice type: {type(sl)}")
-            _shape = math.ceil(_shape)
-            out_shape.append(_shape)
-
+            _out_shape = self._normalize_shape(
+                slice_=slice_, shape=shape, scale=scale, out_dim=out_dim
+            )
+            out_shape.append(_out_shape)
         return tuple(out_shape)
 
-    def _predict_inverse_zoomed_shape(
+    def _compute_inverse_zoom_shape(
         self,
         array_shape: Sequence[int],
+        axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(slicing_ops.in_memory_axes)
+        assert len(array_shape) == len(axes_ops.in_memory_axes)
 
-        if slicing_ops.sicing_tuple is None:
-            slice_tuple = tuple([slice(None)] * len(array_shape))
-        else:
-            slice_tuple = slicing_ops.sicing_tuple
-
-        print("inv before", slice_tuple)
-        slice_tuple = tuple(
-            apply_sequence_axes_ops(
-                slice_tuple,
-                default=slice(None),
-                squeeze_axes=slicing_ops.squeeze_axes,
-                transpose_axes=slicing_ops.transpose_axes,
-                expand_axes=slicing_ops.expand_axes,
-            )
-        )
-        print("inv after", slice_tuple)
-        print("slicing", slicing_ops)
         out_shape = []
-        for shape, ax_name, sl in zip(
-            array_shape, slicing_ops.in_memory_axes, slice_tuple, strict=True
-        ):
+        for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
+            ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
+            if ax_type is not None and ax_type.axis_type == "channel":
+                # Do not scale channel axis
+                out_shape.append(shape)
+                continue
             in_dim = self._input_dimensions.get(ax_name, default=1)
-            in_pix = self._input_pixel_size.get(ax_name, default=1.0)
-            out_pix = self._target_pixel_size.get(ax_name, default=1.0)
+            slice_ = slicing_ops.get(ax_name=ax_name)
+            out_shape.append(
+                self._normalize_shape(
+                    slice_=slice_, shape=shape, scale=1, out_dim=in_dim
+                )
+            )
 
-            scale = out_pix / in_pix
-            print(ax_name, scale, shape, sl, in_dim)
-
-            if isinstance(sl, slice):
-                _start = sl.start or 0
-                _stop = sl.stop or shape
-                _shape = _stop - _start
-                _shape = min(_shape * scale, in_dim)
-            elif isinstance(sl, int):
-                _shape = 1
-            elif isinstance(sl, tuple):
-                _shape = len(sl) * scale
-            else:
-                raise ValueError(f"Unsupported slice type: {type(sl)}")
-            _shape = math.ceil(_shape)
-            out_shape.append(_shape)
-            print(_shape)
+        # Since we are basing the rescaling on the slice, we need to ensure
+        # that the input image we got is roughly the right size.
+        # This is a safeguard against user errors.
+        expected_shape = self._compute_zoom_shape(
+            array_shape=out_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
+        )
+        if any(
+            abs(es - s) > 1 for es, s in zip(expected_shape, array_shape, strict=True)
+        ):
+            raise ValueError(
+                f"Input array shape {array_shape} is not compatible with the expected "
+                f"shape {expected_shape} based on the zoom transform.\n"
+            )
         return tuple(out_shape)
 
-    def apply_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps
+    def get_as_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the scaling transformation to a numpy array."""
-        predicted_shape = self._predict_zoomed_shape(
-            array_shape=array.shape, slicing_ops=slicing_ops
+        out_shape = self._compute_zoom_shape(
+            array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return numpy_zoom(
-            source_array=array, target_shape=predicted_shape, order=self._order
-        )
+        return numpy_zoom(source_array=array, target_shape=out_shape, order=self._order)
 
-    def apply_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps
+    def get_as_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the scaling transformation to a dask array."""
         array_shape = tuple(int(s) for s in array.shape)
-        predicted_shape = self._predict_zoomed_shape(
-            array_shape=array_shape, slicing_ops=slicing_ops
+        out_shape = self._compute_zoom_shape(
+            array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return dask_zoom(
-            source_array=array, target_shape=predicted_shape, order=self._order
-        )
+        return dask_zoom(source_array=array, target_shape=out_shape, order=self._order)
 
-    def apply_inverse_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps
+    def set_as_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the inverse scaling transformation to a numpy array."""
-        predicted_shape = self._predict_inverse_zoomed_shape(
-            array_shape=array.shape, slicing_ops=slicing_ops
+        out_shape = self._compute_inverse_zoom_shape(
+            array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return numpy_zoom(
-            source_array=array, target_shape=predicted_shape, order=self._order
-        )
+        return numpy_zoom(source_array=array, target_shape=out_shape, order=self._order)
 
-    def apply_inverse_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps
+    def set_as_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the inverse scaling transformation to a dask array."""
         array_shape = tuple(int(s) for s in array.shape)
-        predicted_shape = self._predict_inverse_zoomed_shape(
-            array_shape=array_shape, slicing_ops=slicing_ops
+        out_shape = self._compute_inverse_zoom_shape(
+            array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return dask_zoom(
-            source_array=array, target_shape=predicted_shape, order=self._order
-        )
+        return dask_zoom(source_array=array, target_shape=out_shape, order=self._order)

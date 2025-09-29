@@ -79,6 +79,8 @@ class SlicingOps(BaseModel):
         """Get the slicing tuple."""
         if self.slicing_tuple is None:
             return slice(None)
+        if ax_name not in self.on_disk_axes:
+            return slice(None)
         ax_index = self.on_disk_axes.index(ax_name)
         return self.slicing_tuple[ax_index]
 
