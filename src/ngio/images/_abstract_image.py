@@ -611,7 +611,6 @@ def assert_can_be_rescaled(
         NgioValueError: If the images cannot be scaled to each other.
     """
     assert_axes_match(image1=image1, image2=image2)
-    errors, scale = [], None
     for ax1 in image1.dimensions.axes_handler.axes:
         if ax1.axis_type == "channel":
             continue
@@ -619,18 +618,18 @@ def assert_can_be_rescaled(
         assert ax2 is not None, "Axes do not match."
         px1 = image1.pixel_size.get(ax1.name, default=1.0)
         px2 = image2.pixel_size.get(ax2.name, default=1.0)
+        shape1 = image1.dimensions.get(ax1.name, default=1)
+        shape2 = image2.dimensions.get(ax2.name, default=1)
         scale = px1 / px2
         if not _are_compatible(
-            shape1=image1.dimensions.get(ax1.name, default=1),
-            shape2=image2.dimensions.get(ax2.name, default=1),
+            shape1=shape1,
+            shape2=shape2,
             scaling=scale,
         ):
-            errors.append(f"Axis {ax1.name}: {image1.shape} vs {image2.shape}")
-
-    if errors:
-        raise NgioValueError(
-            f"Images cannot be rescaled to each other. \n"
-            f"Scaling factor from pixel sizes = {scale} is not compatible with:\n"
-            f"Image 1 shape: {image1.shape}\n"
-            f"Image 2 shape: {image2.shape}\n"
-        )
+            raise NgioValueError(
+                f"Image1 with shape {image1.shape}, "
+                f"and pixel size {image1.pixel_size}, "
+                f"cannot be rescaled to "
+                f"Image2 with shape {image2.shape}, "
+                f"and pixel size {image2.pixel_size}. "
+            )

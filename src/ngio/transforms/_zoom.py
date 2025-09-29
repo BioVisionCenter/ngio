@@ -33,8 +33,9 @@ class ZoomTransform:
         if isinstance(slice_, slice):
             _start = slice_.start or 0
             _stop = slice_.stop or shape
-            out_shape = _stop - _start
-            out_shape = min(out_shape * scale, out_dim)
+            out_shape = (_stop - _start) * scale
+            max_out_shape = out_dim - _start * scale
+            out_shape = min(out_shape, max_out_shape)
         elif isinstance(slice_, int):
             out_shape = 1
         elif isinstance(slice_, tuple):
