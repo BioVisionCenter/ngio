@@ -14,7 +14,7 @@ from ngio.io_pipes._ops_axes import (
     set_as_numpy_axes_ops,
 )
 from ngio.io_pipes._ops_slices import (
-    SlicingTupleType,
+    SlicingOps,
     get_slice_as_dask,
     get_slice_as_numpy,
     set_slice_as_dask,
@@ -38,19 +38,19 @@ from ngio.ome_zarr_meta.ngio_specs._axes import AxesOps
 
 def _get_as_numpy_pipe(
     zarr_array: zarr.Array,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> np.ndarray:
     """Get a numpy array from the zarr array with the given slice tuple and axes ops."""
-    array = get_slice_as_numpy(zarr_array, slice_tuple=slicing_tuple)
+    array = get_slice_as_numpy(zarr_array, slicing_ops=slicing_ops)
     array = get_as_numpy_axes_ops(
         array,
         axes_ops=axes_ops,
     )
     array = get_as_numpy_transform(
         array,
-        slicing_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
         axes_ops=axes_ops,
         transforms=transforms,
     )
@@ -60,19 +60,19 @@ def _get_as_numpy_pipe(
 
 def _get_as_dask_pipe(
     zarr_array: zarr.Array,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> DaskArray:
     """Get a numpy array from the zarr array with the given slice tuple and axes ops."""
-    array = get_slice_as_dask(zarr_array, slice_tuple=slicing_tuple)
+    array = get_slice_as_dask(zarr_array, slicing_ops=slicing_ops)
     array = get_as_dask_axes_ops(
         array,
         axes_ops=axes_ops,
     )
     array = get_as_dask_transform(
         array,
-        slicing_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
         axes_ops=axes_ops,
         transforms=transforms,
     )
@@ -117,7 +117,7 @@ def build_getter_pipe(
     remove_channel_selection: bool = False,
 ) -> Callable[[], np.ndarray] | Callable[[], DaskArray]:
     """Build a pipe to get a numpy or dask array from a zarr array."""
-    slicing_tuple, axes_ops = setup_io_pipe(
+    slicing_ops, axes_ops = setup_io_pipe(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
         axes_order=axes_order,
@@ -129,7 +129,7 @@ def build_getter_pipe(
             """Closure to get a numpy array from the zarr array."""
             return _get_as_numpy_pipe(
                 zarr_array=zarr_array,
-                slicing_tuple=slicing_tuple,
+                slicing_ops=slicing_ops,
                 axes_ops=axes_ops,
                 transforms=transforms,
             )
@@ -142,7 +142,7 @@ def build_getter_pipe(
             """Closure to get a dask array from the zarr array."""
             return _get_as_dask_pipe(
                 zarr_array=zarr_array,
-                slicing_tuple=slicing_tuple,
+                slicing_ops=slicing_ops,
                 axes_ops=axes_ops,
                 transforms=transforms,
             )
@@ -161,14 +161,14 @@ def build_getter_pipe(
 def _set_as_numpy_pipe(
     zarr_array: zarr.Array,
     patch: np.ndarray,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> None:
     """Get a numpy array from the zarr array with the given slice tuple and axes ops."""
     patch = set_as_numpy_transform(
         array=patch,
-        slicing_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
         axes_ops=axes_ops,
         transforms=transforms,
     )
@@ -179,21 +179,21 @@ def _set_as_numpy_pipe(
     set_slice_as_numpy(
         zarr_array=zarr_array,
         patch=patch,
-        slice_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
     )
 
 
 def _set_as_dask_pipe(
     zarr_array: zarr.Array,
     patch: DaskArray,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> None:
     """Get a numpy array from the zarr array with the given slice tuple and axes ops."""
     patch = set_as_dask_transform(
         array=patch,
-        slicing_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
         axes_ops=axes_ops,
         transforms=transforms,
     )
@@ -204,7 +204,7 @@ def _set_as_dask_pipe(
     set_slice_as_dask(
         zarr_array=zarr_array,
         patch=patch,
-        slice_tuple=slicing_tuple,
+        slicing_ops=slicing_ops,
     )
 
 
@@ -245,7 +245,7 @@ def build_setter_pipe(
     remove_channel_selection: bool = False,
 ) -> Callable[[np.ndarray], None] | Callable[[DaskArray], None]:
     """Build a pipe to get a numpy or dask array from a zarr array."""
-    slicing_tuple, axes_ops = setup_io_pipe(
+    slicing_ops, axes_ops = setup_io_pipe(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
         axes_order=axes_order,
@@ -258,7 +258,7 @@ def build_setter_pipe(
             return _set_as_numpy_pipe(
                 zarr_array=zarr_array,
                 patch=patch,
-                slicing_tuple=slicing_tuple,
+                slicing_ops=slicing_ops,
                 axes_ops=axes_ops,
                 transforms=transforms,
             )
@@ -271,7 +271,7 @@ def build_setter_pipe(
             return _set_as_dask_pipe(
                 zarr_array=zarr_array,
                 patch=patch,
-                slicing_tuple=slicing_tuple,
+                slicing_ops=slicing_ops,
                 axes_ops=axes_ops,
                 transforms=transforms,
             )

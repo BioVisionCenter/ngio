@@ -4,11 +4,11 @@ from typing import TypeAlias, assert_never
 import dask.array as da
 import numpy as np
 import zarr
+from pydantic import BaseModel, ConfigDict
 
 from ngio.utils import NgioValueError
 
 SlicingType: TypeAlias = slice | tuple[int, ...] | int
-SlicingTupleType: TypeAlias = tuple[SlicingType, ...] | None
 
 
 def _int_boundary_check(value: int, shape: int) -> int:
@@ -57,28 +57,52 @@ def _slicing_tuple_boundary_check(
     return tuple(out_slicing_tuple)
 
 
-def get_slice_as_numpy(
-    zarr_array: zarr.Array, slice_tuple: tuple[SlicingType, ...] | None
-) -> np.ndarray:
-    if slice_tuple is None:
+class SlicingOps(BaseModel):
+    """Class to hold slicing operations."""
+
+    on_disk_axes: tuple[str, ...]
+    slicing_tuple: tuple[SlicingType, ...] | None = None
+    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
+
+    def normalize_slicing_tuple(
+        self, array_shape: tuple[int, ...]
+    ) -> None | tuple[SlicingType, ...]:
+        """Normalize the slicing tuple to be within the array shape boundaries."""
+        if self.slicing_tuple is not None:
+            return _slicing_tuple_boundary_check(
+                slicing_tuple=self.slicing_tuple,
+                array_shape=array_shape,
+            )
+        return None
+
+    def get(self, ax_name: str) -> SlicingType:
+        """Get the slicing tuple."""
+        if self.slicing_tuple is None:
+            return slice(None)
+        ax_index = self.on_disk_axes.index(ax_name)
+        return self.slicing_tuple[ax_index]
+
+
+def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
+    slicing_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
+    if slicing_tuple is None:
         return zarr_array[...]
 
-    slice_tuple = _slicing_tuple_boundary_check(slice_tuple, zarr_array.shape)
-    if all(not isinstance(s, tuple) for s in slice_tuple):
-        return zarr_array[slice_tuple]
+    if all(not isinstance(s, tuple) for s in slicing_tuple):
+        return zarr_array[slicing_tuple]
 
     # If there are tuple with int we need to handle them separately
     # this is a workaround for the fact that zarr does not support
     # non-contiguous slicing with tuples/lists.
     # TODO to be redone properly
     first_slice_tuple = []
-    for s in slice_tuple:
+    for s in slicing_tuple:
         if isinstance(s, tuple):
             first_slice_tuple.append(slice(None))
         else:
             first_slice_tuple.append(s)
     second_slice_tuple = []
-    for s in slice_tuple:
+    for s in slicing_tuple:
         if isinstance(s, tuple):
             second_slice_tuple.append(s)
         else:
@@ -87,10 +111,9 @@ def get_slice_as_numpy(
     return zarr_array[tuple(first_slice_tuple)][tuple(second_slice_tuple)]
 
 
-def get_slice_as_dask(
-    zarr_array: zarr.Array, slice_tuple: tuple[SlicingType, ...] | None
-) -> da.Array:
+def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     da_array = da.from_zarr(zarr_array)
+    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
     if slice_tuple is None:
         return da_array
 
@@ -108,8 +131,9 @@ def get_slice_as_dask(
 def set_slice_as_numpy(
     zarr_array: zarr.Array,
     patch: np.ndarray,
-    slice_tuple: tuple[SlicingType, ...] | None,
+    slicing_ops: SlicingOps,
 ) -> None:
+    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
     if slice_tuple is None:
         zarr_array[...] = patch
         return
@@ -119,8 +143,9 @@ def set_slice_as_numpy(
 
 
 def set_slice_as_dask(
-    zarr_array: zarr.Array, patch: da.Array, slice_tuple: tuple[SlicingType, ...] | None
+    zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
+    slice_tuple = slicing_ops.normalize_slicing_tuple(array_shape=zarr_array.shape)
     if slice_tuple is not None:
         slice_tuple = _slicing_tuple_boundary_check(slice_tuple, zarr_array.shape)
     da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)

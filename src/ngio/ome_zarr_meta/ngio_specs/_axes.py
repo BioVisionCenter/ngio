@@ -276,12 +276,13 @@ class AxesOps(BaseModel):
     squeeze_op: tuple[int, ...] | None = None
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
-    def isnoop(self) -> bool:
-        """Check if the axes operations are no-op."""
+    @property
+    def is_no_op(self) -> bool:
+        """Check if all operations are no ops."""
         if (
-            self.expand_op is None
+            self.transpose_op is None
+            and self.expand_op is None
             and self.squeeze_op is None
-            and self.transpose_op is None
         ):
             return True
         return False

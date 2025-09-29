@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import TypeAlias
 
 from ngio.common._dimensions import Dimensions
-from ngio.io_pipes._ops_slices import SlicingTupleType, SlicingType
+from ngio.io_pipes._ops_slices import SlicingOps, SlicingType
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesOps
 from ngio.utils import NgioValueError
@@ -152,7 +152,7 @@ def _normalize_axes_order(
 def _normalize_slicing_tuple(
     axis: Axis,
     slicing_dict: dict[str, SlicingInputType],
-    requires_axes_ops: bool,
+    no_axes_ops: bool,
     axes_order: list[str],
 ) -> SlicingType:
     """Normalize the slicing dict to tuple.
@@ -176,7 +176,11 @@ def _normalize_slicing_tuple(
     if isinstance(value, slice):
         return value
     elif isinstance(value, int):
-        if requires_axes_ops or axis_name in axes_order:
+        # If axes ops are requested, we need to preserve the dimension
+        # When we slice because the axes ops will be applied later
+        # If no axes ops are requested, we can safely keep the integer
+        # which will remove the dimension
+        if (not no_axes_ops) or (axis_name in axes_order):
             # Axes ops require all dimensions to be preserved
             value = slice(value, value + 1)
         return value
@@ -197,7 +201,7 @@ def _build_slicing_tuple(
     dimensions: Dimensions,
     slicing_dict: dict[str, SlicingInputType],
     axes_order: list[str] | None = None,
-    requires_axes_ops: bool = False,
+    no_axes_ops: bool = False,
     remove_channel_selection: bool = False,
 ) -> tuple[SlicingType, ...] | None:
     """Assemble slices to be used to query the array."""
@@ -219,7 +223,7 @@ def _build_slicing_tuple(
         _normalize_slicing_tuple(
             axis=axis,
             slicing_dict=_slicing_dict,
-            requires_axes_ops=requires_axes_ops,
+            no_axes_ops=no_axes_ops,
             axes_order=_axes_order,
         )
         for axis in dimensions.axes_handler.axes
@@ -258,7 +262,7 @@ def setup_io_pipe(
     slicing_dict: dict[str, SlicingInputType] | None = None,
     axes_order: Sequence[str] | None = None,
     remove_channel_selection: bool = False,
-) -> tuple[SlicingTupleType, AxesOps]:
+) -> tuple[SlicingOps, AxesOps]:
     """Setup the slicing tuple and axes ops for an IO pipe."""
     slicing_dict = slicing_dict or {}
     axes_order, axes_ops = _build_axes_ops(
@@ -270,7 +274,10 @@ def setup_io_pipe(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
         axes_order=axes_order,
-        requires_axes_ops=axes_ops.isnoop(),
+        no_axes_ops=axes_ops.is_no_op,
         remove_channel_selection=remove_channel_selection,
     )
-    return slicing_tuple, axes_ops
+    slicing_ops = SlicingOps(
+        on_disk_axes=axes_ops.on_disk_axes, slicing_tuple=slicing_tuple
+    )
+    return slicing_ops, axes_ops

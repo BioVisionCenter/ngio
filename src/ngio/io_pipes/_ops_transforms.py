@@ -4,7 +4,7 @@ from typing import Protocol
 import dask.array as da
 import numpy as np
 
-from ngio.io_pipes._ops_slices import SlicingTupleType
+from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesOps
 
 
@@ -12,25 +12,25 @@ class TransformProtocol(Protocol):
     """Protocol for a generic transform."""
 
     def get_as_numpy_transform(
-        self, array: np.ndarray, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """A transformation to be applied after loading a numpy array."""
         ...
 
     def get_as_dask_transform(
-        self, array: da.Array, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """A transformation to be applied after loading a dask array."""
         ...
 
     def set_as_numpy_transform(
-        self, array: np.ndarray, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """A transformation to be applied before writing a numpy array."""
         ...
 
     def set_as_dask_transform(
-        self, array: da.Array, slicing_tuple: SlicingTupleType, axes_ops: AxesOps
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """A transformation to be applied before writing a dask array."""
         ...
@@ -38,7 +38,7 @@ class TransformProtocol(Protocol):
 
 def get_as_numpy_transform(
     array: np.ndarray,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> np.ndarray:
@@ -48,14 +48,14 @@ def get_as_numpy_transform(
 
     for transform in transforms:
         array = transform.get_as_numpy_transform(
-            array, slicing_tuple=slicing_tuple, axes_ops=axes_ops
+            array, slicing_ops=slicing_ops, axes_ops=axes_ops
         )
     return array
 
 
 def get_as_dask_transform(
     array: da.Array,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> da.Array:
@@ -65,14 +65,14 @@ def get_as_dask_transform(
 
     for transform in transforms:
         array = transform.get_as_dask_transform(
-            array, slicing_tuple=slicing_tuple, axes_ops=axes_ops
+            array, slicing_ops=slicing_ops, axes_ops=axes_ops
         )
     return array
 
 
 def set_as_numpy_transform(
     array: np.ndarray,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> np.ndarray:
@@ -82,14 +82,14 @@ def set_as_numpy_transform(
 
     for transform in transforms:
         array = transform.set_as_numpy_transform(
-            array, slicing_tuple=slicing_tuple, axes_ops=axes_ops
+            array, slicing_ops=slicing_ops, axes_ops=axes_ops
         )
     return array
 
 
 def set_as_dask_transform(
     array: da.Array,
-    slicing_tuple: SlicingTupleType,
+    slicing_ops: SlicingOps,
     axes_ops: AxesOps,
     transforms: Sequence[TransformProtocol] | None = None,
 ) -> da.Array:
@@ -99,6 +99,6 @@ def set_as_dask_transform(
 
     for transform in transforms:
         array = transform.set_as_dask_transform(
-            array, slicing_tuple=slicing_tuple, axes_ops=axes_ops
+            array, slicing_ops=slicing_ops, axes_ops=axes_ops
         )
     return array
