@@ -1,14 +1,23 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Literal, assert_never, overload
 
-import dask.array as da
-import numpy as np
 import zarr
 
 from ngio.common._dimensions import Dimensions
 from ngio.common._roi import Roi, RoiPixels
-from ngio.io_pipes._io_pipes import build_getter_pipe, build_setter_pipe
+from ngio.io_pipes._io_pipes import (
+    DaskGetter,
+    DaskSetter,
+    NumpyGetter,
+    NumpySetter,
+    build_getter_pipe,
+    build_setter_pipe,
+)
 from ngio.io_pipes._io_pipes_masked import (
+    DaskMaskedGetter,
+    DaskMaskedSetter,
+    NumpyMaskedGetter,
+    NumpyMaskedSetter,
     build_masked_getter_pipe,
     build_masked_setter_pipe,
 )
@@ -54,7 +63,7 @@ def build_roi_getter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray]: ...
+) -> NumpyGetter: ...
 
 
 @overload
@@ -69,7 +78,7 @@ def build_roi_getter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[], da.Array]: ...
+) -> DaskGetter: ...
 
 
 def build_roi_getter_pipe(
@@ -83,7 +92,7 @@ def build_roi_getter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray] | Callable[[], da.Array]:
+) -> NumpyGetter | DaskGetter:
     """Prepare slice kwargs for getting an array."""
     input_slice_kwargs = roi_to_slicing_dict(
         roi=roi,
@@ -126,7 +135,7 @@ def build_roi_setter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None]: ...
+) -> NumpySetter: ...
 
 
 @overload
@@ -141,7 +150,7 @@ def build_roi_setter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[da.Array], None]: ...
+) -> DaskSetter: ...
 
 
 def build_roi_setter_pipe(
@@ -155,7 +164,7 @@ def build_roi_setter_pipe(
     transforms: Sequence[TransformProtocol] | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None] | Callable[[da.Array], None]:
+) -> NumpySetter | DaskSetter:
     """Prepare slice kwargs for setting an array."""
     input_slice_kwargs = roi_to_slicing_dict(
         roi=roi,
@@ -212,7 +221,7 @@ def build_roi_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray]: ...
+) -> NumpyMaskedGetter: ...
 
 
 @overload
@@ -234,7 +243,7 @@ def build_roi_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], da.Array]: ...
+) -> DaskMaskedGetter: ...
 
 
 def build_roi_masked_getter_pipe(
@@ -255,7 +264,7 @@ def build_roi_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray] | Callable[[], da.Array]:
+) -> NumpyMaskedGetter | DaskMaskedGetter:
     """Prepare slice kwargs for getting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
         roi=roi,
@@ -324,7 +333,7 @@ def build_roi_masked_setter_pipe(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None]: ...
+) -> NumpyMaskedSetter: ...
 
 
 @overload
@@ -345,7 +354,7 @@ def build_roi_masked_setter_pipe(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[da.Array], None]: ...
+) -> DaskMaskedSetter: ...
 
 
 def build_roi_masked_setter_pipe(
@@ -365,7 +374,7 @@ def build_roi_masked_setter_pipe(
     label_slicing_dict: dict[str, SlicingInputType] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[da.Array], None] | Callable[[np.ndarray], None]:
+) -> NumpyMaskedSetter | DaskMaskedSetter:
     """Prepare slice kwargs for setting a masked array."""
     input_slice_kwargs = roi_to_slicing_dict(
         roi=roi,

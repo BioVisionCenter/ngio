@@ -9,6 +9,8 @@ from dask.array import Array as DaskArray
 from ngio.common._dimensions import Dimensions
 from ngio.common._zoom import dask_zoom, numpy_zoom
 from ngio.io_pipes._io_pipes import (
+    DataGetter,
+    DataSetter,
     build_getter_pipe,
     build_setter_pipe,
 )
@@ -102,111 +104,138 @@ def _label_to_bool_mask_dask(
     return bool_mask
 
 
-def _build_numpy_getter_pipe(
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_id: int | None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    fill_value: int | float = 0,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray]:
-    """Get a dask array from the zarr array with the given slice kwargs."""
-    slicing_dict = slicing_dict or {}
-    label_slicing_dict = label_slicing_dict or slicing_dict
-    data_getter = build_getter_pipe(
-        mode="numpy",
-        zarr_array=zarr_array,
-        dimensions=dimensions,
-        axes_order=axes_order,
-        transforms=transforms,
-        slicing_dict=slicing_dict,
-        remove_channel_selection=remove_channel_selection,
-    )
+class NumpyMaskedGetter(DataGetter[np.ndarray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        label_id: int | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        fill_value: int | float = 0,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Initialize the NumpyMaskedGetter."""
+        slicing_dict = slicing_dict or {}
+        label_slicing_dict = label_slicing_dict or slicing_dict
+        self._data_getter = build_getter_pipe(
+            mode="numpy",
+            zarr_array=zarr_array,
+            dimensions=dimensions,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slicing_dict,
+            remove_channel_selection=remove_channel_selection,
+        )
 
-    label_data_getter = build_getter_pipe(
-        mode="numpy",
-        zarr_array=label_zarr_array,
-        dimensions=label_dimensions,
-        axes_order=axes_order,
-        transforms=label_transforms,
-        slicing_dict=label_slicing_dict,
-        remove_channel_selection=True,
-    )
+        self._label_data_getter = build_getter_pipe(
+            mode="numpy",
+            zarr_array=label_zarr_array,
+            dimensions=label_dimensions,
+            axes_order=axes_order,
+            transforms=label_transforms,
+            slicing_dict=label_slicing_dict,
+            remove_channel_selection=True,
+        )
+        self._label_id = label_id
+        self._fill_value = fill_value
+        self._allow_scaling = allow_scaling
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=self._data_getter.slicing_ops,
+            axes_ops=self._data_getter.axes_ops,
+            transforms=self._data_getter.transforms,
+        )
 
-    def get_masked_data_as_numpy() -> np.ndarray:
-        data = data_getter()
-        label_data = label_data_getter()
+    @property
+    def label_id(self) -> int | None:
+        return self._label_id
+
+    def get(self) -> np.ndarray:
+        """Get the masked data as a numpy array."""
+        data = self._data_getter()
+        label_data = self._label_data_getter()
         bool_mask = _label_to_bool_mask_numpy(
             label_data=label_data,
-            label=label_id,
+            label=self.label_id,
             data_shape=data.shape,
-            allow_scaling=allow_scaling,
+            allow_scaling=self._allow_scaling,
         )
-        masked_data = np.where(bool_mask, data, fill_value)
+        masked_data = np.where(bool_mask, data, self._fill_value)
         return masked_data
 
-    return get_masked_data_as_numpy
 
+class DaskMaskedGetter(DataGetter[DaskArray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        label_id: int | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        fill_value: int | float = 0,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Initialize the DaskMaskedGetter."""
+        slicing_dict = slicing_dict or {}
+        label_slicing_dict = label_slicing_dict or slicing_dict
+        self._data_getter = build_getter_pipe(
+            mode="dask",
+            zarr_array=zarr_array,
+            dimensions=dimensions,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slicing_dict,
+            remove_channel_selection=remove_channel_selection,
+        )
 
-def _build_dask_getter_pipe(
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_id: int | None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    fill_value: int | float = 0,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> Callable[[], DaskArray]:
-    """Get a dask array from the zarr array with the given slice kwargs."""
-    slicing_dict = slicing_dict or {}
-    label_slicing_dict = label_slicing_dict or slicing_dict
-    data_getter = build_getter_pipe(
-        mode="dask",
-        zarr_array=zarr_array,
-        dimensions=dimensions,
-        axes_order=axes_order,
-        transforms=transforms,
-        slicing_dict=slicing_dict,
-        remove_channel_selection=remove_channel_selection,
-    )
+        self._label_data_getter = build_getter_pipe(
+            mode="dask",
+            zarr_array=label_zarr_array,
+            dimensions=label_dimensions,
+            axes_order=axes_order,
+            transforms=label_transforms,
+            slicing_dict=label_slicing_dict,
+            remove_channel_selection=True,
+        )
+        self._label_id = label_id
+        self._fill_value = fill_value
+        self._allow_scaling = allow_scaling
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=self._data_getter.slicing_ops,
+            axes_ops=self._data_getter.axes_ops,
+            transforms=self._data_getter.transforms,
+        )
 
-    label_data_getter = build_getter_pipe(
-        mode="dask",
-        zarr_array=label_zarr_array,
-        dimensions=label_dimensions,
-        axes_order=axes_order,
-        transforms=label_transforms,
-        slicing_dict=label_slicing_dict,
-        remove_channel_selection=True,
-    )
+    @property
+    def label_id(self) -> int | None:
+        return self._label_id
 
-    def get_masked_data_as_dask() -> DaskArray:
-        data = data_getter()
-        label_data = label_data_getter()
+    def get(self) -> DaskArray:
+        data = self._data_getter()
+        label_data = self._label_data_getter()
         data_shape = tuple(int(dim) for dim in data.shape)
         bool_mask = _label_to_bool_mask_dask(
             label_data=label_data,
-            label=label_id,
+            label=self.label_id,
             data_shape=data_shape,
-            allow_scaling=allow_scaling,
+            allow_scaling=self._allow_scaling,
         )
-        masked_data = da.where(bool_mask, data, fill_value)
+        masked_data = da.where(bool_mask, data, self._fill_value)
         return masked_data
-
-    return get_masked_data_as_dask
 
 
 @overload
@@ -226,7 +255,7 @@ def build_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray]: ...
+) -> NumpyMaskedGetter: ...
 
 
 @overload
@@ -246,7 +275,7 @@ def build_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], DaskArray]: ...
+) -> DaskMaskedGetter: ...
 
 
 def build_masked_getter_pipe(
@@ -265,12 +294,12 @@ def build_masked_getter_pipe(
     fill_value: int | float = 0,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[], np.ndarray] | Callable[[], DaskArray]:
+) -> NumpyMaskedGetter | DaskMaskedGetter:
     """Get a dask array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
     label_slicing_dict = label_slicing_dict or slicing_dict
     if mode == "numpy":
-        return _build_numpy_getter_pipe(
+        return NumpyMaskedGetter(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -286,7 +315,7 @@ def build_masked_getter_pipe(
             remove_channel_selection=remove_channel_selection,
         )
     elif mode == "dask":
-        return _build_dask_getter_pipe(
+        return DaskMaskedGetter(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -305,29 +334,55 @@ def build_masked_getter_pipe(
     assert_never(mode)
 
 
-def _build_numpy_setter_pipe(
-    *,
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_id: int | None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
-    label_data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None]:
-    """Set a numpy array to the zarr array with the given slice kwargs."""
-    slicing_dict = slicing_dict or {}
-    label_slicing_dict = label_slicing_dict or slicing_dict
+class NumpyMaskedSetter(DataSetter[np.ndarray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        label_id: int | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        data_getter=None,
+        label_data_getter=None,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Initialize the NumpyMaskedSetter."""
+        slicing_dict = slicing_dict or {}
+        label_slicing_dict = label_slicing_dict or slicing_dict
 
-    if data_getter is None:
-        data_getter = build_getter_pipe(
+        if data_getter is None:
+            self._data_getter = build_getter_pipe(
+                mode="numpy",
+                zarr_array=zarr_array,
+                dimensions=dimensions,
+                axes_order=axes_order,
+                transforms=transforms,
+                slicing_dict=slicing_dict,
+                remove_channel_selection=remove_channel_selection,
+            )
+        else:
+            self._data_getter = data_getter
+
+        if label_data_getter is None:
+            self._label_data_getter = build_getter_pipe(
+                mode="numpy",
+                zarr_array=label_zarr_array,
+                dimensions=label_dimensions,
+                axes_order=axes_order,
+                transforms=label_transforms,
+                slicing_dict=label_slicing_dict,
+                remove_channel_selection=True,
+            )
+        else:
+            self._label_data_getter = label_data_getter
+
+        self._data_setter = build_setter_pipe(
             mode="numpy",
             zarr_array=zarr_array,
             dimensions=dimensions,
@@ -337,76 +392,84 @@ def _build_numpy_setter_pipe(
             remove_channel_selection=remove_channel_selection,
         )
 
-    if label_data_getter is None:
-        label_data_getter = build_getter_pipe(
-            mode="numpy",
-            zarr_array=label_zarr_array,
-            dimensions=label_dimensions,
-            axes_order=axes_order,
-            transforms=label_transforms,
-            slicing_dict=label_slicing_dict,
-            remove_channel_selection=True,
+        self._label_id = label_id
+        self._allow_scaling = allow_scaling
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=self._data_setter.slicing_ops,
+            axes_ops=self._data_setter.axes_ops,
+            transforms=self._data_setter.transforms,
         )
 
-    masked_data_setter = build_setter_pipe(
-        mode="numpy",
-        zarr_array=zarr_array,
-        dimensions=dimensions,
-        axes_order=axes_order,
-        transforms=transforms,
-        slicing_dict=slicing_dict,
-        remove_channel_selection=remove_channel_selection,
-    )
+    @property
+    def label_id(self) -> int | None:
+        return self._label_id
 
-    def set_patch_masked_as_numpy(patch: np.ndarray) -> None:
-        """Set a numpy patch to the array, masked by the label array."""
-        data = data_getter()
-        label_data = label_data_getter()
-        if not isinstance(label_data, np.ndarray):
-            raise ValueError(
-                "Something went wrong in setting up the label data getter. "
-                f"Expected a numpy array, got type {type(label_data)}."
-            )
-        if not isinstance(data, np.ndarray):
-            raise ValueError(
-                "Something went wrong in setting up the data getter. "
-                f"Expected a numpy array, got type {type(data)}."
-            )
+    def set(self, patch: np.ndarray) -> None:
+        data = self._data_getter()
+        label_data = self._label_data_getter()
+
         bool_mask = _label_to_bool_mask_numpy(
             label_data=label_data,
-            label=label_id,
+            label=self.label_id,
             data_shape=data.shape,
-            allow_scaling=allow_scaling,
+            allow_scaling=self._allow_scaling,
         )
         mask_data = np.where(bool_mask, patch, data)
-        masked_data_setter(mask_data)
-
-    return set_patch_masked_as_numpy
+        self._data_setter(mask_data)
 
 
-def _build_dask_setter_pipe(
-    *,
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_id: int | None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
-    label_data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> Callable[[DaskArray], None]:
-    """Set a dask array to the zarr array with the given slice kwargs."""
-    slicing_dict = slicing_dict or {}
-    label_slicing_dict = label_slicing_dict or slicing_dict
+class DaskMaskedSetter(DataSetter[DaskArray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        label_id: int | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        data_getter=None,
+        label_data_getter=None,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Initialize the DaskMaskedSetter."""
+        slicing_dict = slicing_dict or {}
+        label_slicing_dict = label_slicing_dict or slicing_dict
 
-    if data_getter is None:
-        data_getter = build_getter_pipe(
+        if data_getter is None:
+            self._data_getter = build_getter_pipe(
+                mode="dask",
+                zarr_array=zarr_array,
+                dimensions=dimensions,
+                axes_order=axes_order,
+                transforms=transforms,
+                slicing_dict=slicing_dict,
+                remove_channel_selection=remove_channel_selection,
+            )
+        else:
+            self._data_getter = data_getter
+
+        if label_data_getter is None:
+            self._label_data_getter = build_getter_pipe(
+                mode="dask",
+                zarr_array=label_zarr_array,
+                dimensions=label_dimensions,
+                axes_order=axes_order,
+                transforms=label_transforms,
+                slicing_dict=label_slicing_dict,
+                remove_channel_selection=True,
+            )
+        else:
+            self._label_data_getter = label_data_getter
+        self._label_id = label_id
+        self._allow_scaling = allow_scaling
+
+        self._data_setter = build_setter_pipe(
             mode="dask",
             zarr_array=zarr_array,
             dimensions=dimensions,
@@ -416,52 +479,30 @@ def _build_dask_setter_pipe(
             remove_channel_selection=remove_channel_selection,
         )
 
-    if label_data_getter is None:
-        label_data_getter = build_getter_pipe(
-            mode="dask",
-            zarr_array=label_zarr_array,
-            dimensions=label_dimensions,
-            axes_order=axes_order,
-            transforms=label_transforms,
-            slicing_dict=label_slicing_dict,
-            remove_channel_selection=True,
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=self._data_setter.slicing_ops,
+            axes_ops=self._data_setter.axes_ops,
+            transforms=self._data_setter.transforms,
         )
 
-    data_setter = build_setter_pipe(
-        mode="dask",
-        zarr_array=zarr_array,
-        dimensions=dimensions,
-        axes_order=axes_order,
-        transforms=transforms,
-        slicing_dict=slicing_dict,
-        remove_channel_selection=remove_channel_selection,
-    )
+    @property
+    def label_id(self) -> int | None:
+        return self._label_id
 
-    def set_patch_masked_as_dask(patch: DaskArray) -> None:
-        """Set a dask patch to the array, masked by the label array."""
-        data = data_getter()
-        label_data = label_data_getter()
-        if not isinstance(label_data, da.Array):
-            raise ValueError(
-                "Something went wrong in setting up the label data getter. "
-                f"Expected a Dask array, got type {type(label_data)}."
-            )
-        if not isinstance(data, da.Array):
-            raise ValueError(
-                "Something went wrong in setting up the data getter. "
-                f"Expected a Dask array, got type {type(data)}."
-            )
+    def set(self, patch: DaskArray) -> None:
+        data = self._data_getter()
+        label_data = self._label_data_getter()
         data_shape = tuple(int(dim) for dim in data.shape)
+
         bool_mask = _label_to_bool_mask_dask(
             label_data=label_data,
-            label=label_id,
+            label=self.label_id,
             data_shape=data_shape,
-            allow_scaling=allow_scaling,
+            allow_scaling=self._allow_scaling,
         )
         mask_data = da.where(bool_mask, patch, data)
-        data_setter(mask_data)
-
-    return set_patch_masked_as_dask
+        self._data_setter(mask_data)
 
 
 @overload
@@ -482,7 +523,7 @@ def build_masked_setter_pipe(
     label_data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None]: ...
+) -> NumpyMaskedSetter: ...
 
 
 @overload
@@ -503,7 +544,7 @@ def build_masked_setter_pipe(
     label_data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None]: ...
+) -> DaskMaskedSetter: ...
 
 
 def build_masked_setter_pipe(
@@ -523,12 +564,12 @@ def build_masked_setter_pipe(
     label_data_getter: Callable[[], np.ndarray | DaskArray] | None = None,
     allow_scaling: bool = True,
     remove_channel_selection: bool = False,
-) -> Callable[[np.ndarray], None] | Callable[[DaskArray], None]:
+) -> NumpyMaskedSetter | DaskMaskedSetter:
     """Get a dask array from the zarr array with the given slice kwargs."""
     slicing_dict = slicing_dict or {}
     label_slicing_dict = label_slicing_dict or slicing_dict
     if mode == "numpy":
-        return _build_numpy_setter_pipe(
+        return NumpyMaskedSetter(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -545,7 +586,7 @@ def build_masked_setter_pipe(
             remove_channel_selection=remove_channel_selection,
         )
     elif mode == "dask":
-        return _build_dask_setter_pipe(
+        return DaskMaskedSetter(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,

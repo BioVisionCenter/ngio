@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ngio.io_pipes._io_pipes import NumpyGetter
+from ngio.io_pipes._io_pipes import DataGetter
 
 
 class NumpyJoinedGetters:
@@ -31,14 +31,14 @@ class NumpyJoinedGetters:
             pixel_tolerance (int): The maximum number of pixels by which dimensions
                 can differ when `match_dimensions` is True.
         """
-        self._getter_pipes: list[NumpyGetter] = []
+        self._getter_pipes: list[DataGetter] = []
         self._match_dimensions = match_dimensions
         self._broadcast = broadcast
         self._pixel_tolerance = pixel_tolerance
 
     def add_getter_pipe(
         self,
-        getter_pipe: NumpyGetter,
+        getter_pipe: DataGetter[np.ndarray],
     ) -> None:
         """Add a getter pipe to the joined pipes."""
         self._getter_pipes.append(getter_pipe)
