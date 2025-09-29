@@ -86,27 +86,17 @@ class ZoomTransform:
                 continue
             in_dim = self._input_dimensions.get(ax_name, default=1)
             slice_ = slicing_ops.get(ax_name=ax_name, normalize=True)
-            print("slice_", slice_, "shape", shape, "in_dim", in_dim)
             out_shape.append(
                 self._normalize_shape(
                     slice_=slice_, shape=shape, scale=1, out_dim=in_dim
                 )
             )
-            print("out_shape", out_shape[-1])
 
         # Since we are basing the rescaling on the slice, we need to ensure
         # that the input image we got is roughly the right size.
         # This is a safeguard against user errors.
         expected_shape = self._compute_zoom_shape(
             array_shape=out_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
-        )
-        print(
-            "expected_shape",
-            expected_shape,
-            "array_shape",
-            array_shape,
-            "out_shape",
-            out_shape,
         )
         if any(
             abs(es - s) > 1 for es, s in zip(expected_shape, array_shape, strict=True)
