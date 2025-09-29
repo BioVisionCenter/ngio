@@ -2147,8 +2147,8 @@ blurred_image = blurred_omezarr.get_image()</div>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2201,6 +2201,23 @@ blurred_image.set_array(patch=blurred_image_data, axes_order=["c", "z", "y", "x"
 # To propagate the changes to all resolution levels,
 # we can use the `consolidate` method.
 blurred_image.consolidate()</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>patch.shape (1, 2, 2160, 5120)
+slicing_ops.slicing_tuple None
+slicing_ops.normalized_slicing_tuple None
+patch.shape (1, 2, 2160, 5120)
+slicing_ops.slicing_tuple None
+</pre>
 </div>
 </div>
 </div>
