@@ -1,5 +1,6 @@
 import math
 from typing import TypeAlias, assert_never
+from warnings import warn
 
 import dask.array as da
 import numpy as np
@@ -88,48 +89,86 @@ class SlicingOps(BaseModel):
         return slicing_tuple[ax_index]
 
 
+def _check_tuple_in_slicing_tuple(
+    slicing_tuple: tuple[SlicingType, ...],
+) -> tuple[None, None] | tuple[int, tuple[int, ...]]:
+    """Check if there are any tuple in the slicing tuple.
+
+    The zarr python api only supports int or slices, not tuples.
+    Ngio support a single tuple in the slicing tuple to allow non-contiguous
+    selection (main use case: selecting multiple channels).
+    """
+    # Find if the is any tuple in the slicing tuple
+    # If there is one we need to handle it differently
+    tuple_in_slice = [
+        (i, s) for i, s in enumerate(slicing_tuple) if isinstance(s, tuple)
+    ]
+    if not tuple_in_slice:
+        # No tuple in the slicing tuple
+        return None, None
+
+    if len(tuple_in_slice) > 1:
+        raise NotImplementedError(
+            "Slicing with multiple non-contiguous tuples/lists "
+            "is not supported yet in Ngio. Use directly the "
+            "zarr.Array api to get the correct array slice."
+        )
+    # Complex case, we have exactly one tuple in the slicing tuple
+    ax, first_tuple = tuple_in_slice[0]
+    if len(first_tuple) > 100:
+        warn(
+            "Performance warning: "
+            "Non-contiguous slicing with a tuple/list with more than 100 elements is "
+            "not natively supported by zarr. This is implemented by Ngio by performing "
+            "multiple reads and stacking the result.",
+            stacklevel=2,
+        )
+    return ax, first_tuple
+
+
 def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
     slicing_tuple = slicing_ops.normalized_slicing_tuple
     if slicing_tuple is None:
+        # Base case, no slicing, return the full array
         return zarr_array[...]
 
-    if all(not isinstance(s, tuple) for s in slicing_tuple):
+    # Find if the is any tuple in the slicing tuple
+    # If there is one we need to handle it differently
+    ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
+    if ax is None:
+        # Simple case, no tuple in the slicing tuple
         return zarr_array[slicing_tuple]
 
-    # If there are tuple with int we need to handle them separately
-    # this is a workaround for the fact that zarr does not support
-    # non-contiguous slicing with tuples/lists.
-    # TODO to be redone properly
-    first_slice_tuple = []
-    for s in slicing_tuple:
-        if isinstance(s, tuple):
-            first_slice_tuple.append(slice(None))
-        else:
-            first_slice_tuple.append(s)
-    second_slice_tuple = []
-    for s in slicing_tuple:
-        if isinstance(s, tuple):
-            second_slice_tuple.append(s)
-        else:
-            second_slice_tuple.append(slice(None))
-
-    return zarr_array[tuple(first_slice_tuple)][tuple(second_slice_tuple)]
+    assert first_tuple is not None
+    slices = [
+        zarr_array[(*slicing_tuple[:ax], idx, *slicing_tuple[ax + 1 :])]
+        for idx in first_tuple
+    ]
+    out_array = np.stack(slices, axis=ax)
+    return out_array
 
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     da_array = da.from_zarr(zarr_array)
-    slice_tuple = slicing_ops.normalized_slicing_tuple
-    if slice_tuple is None:
-        return da_array
+    slicing_tuple = slicing_ops.normalized_slicing_tuple
+    if slicing_tuple is None:
+        # Base case, no slicing, return the full array
+        return da_array[...]
 
-    # TODO add support for non-contiguous slicing with tuples/lists
-    if any(isinstance(s, tuple) for s in slice_tuple):
-        raise NotImplementedError(
-            "Slicing with non-contiguous tuples/lists "
-            "is not supported yet for Dask arrays. Use the "
-            "numpy api to get the correct array slice."
-        )
-    return da_array[slice_tuple]
+    # Find if the is any tuple in the slicing tuple
+    # If there is one we need to handle it differently
+    ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
+    if ax is None:
+        # Base case, no tuple in the slicing tuple
+        return da_array[slicing_tuple]
+
+    assert first_tuple is not None
+    slices = [
+        da_array[(*slicing_tuple[:ax], idx, *slicing_tuple[ax + 1 :])]
+        for idx in first_tuple
+    ]
+    out_array = da.stack(slices, axis=ax)
+    return out_array
 
 
 def set_slice_as_numpy(
@@ -139,14 +178,41 @@ def set_slice_as_numpy(
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
     if slice_tuple is None:
+        # Base case, no slicing, write the full array
         zarr_array[...] = patch
         return
 
-    zarr_array[slice_tuple] = patch
+    ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
+    if ax is None:
+        # Base case, no tuple in the slicing tuple
+        zarr_array[slice_tuple] = patch
+        return
+
+    # Complex case, we have exactly one tuple in the slicing tuple
+    assert first_tuple is not None
+    for i, idx in enumerate(first_tuple):
+        _sub_slice = (*slice_tuple[:ax], idx, *slice_tuple[ax + 1 :])
+        zarr_array[_sub_slice] = np.take(patch, indices=i, axis=ax)
 
 
 def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
-    da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
+    if slice_tuple is None:
+        # Base case, no slicing, write the full array
+        da.to_zarr(arr=patch, url=zarr_array)
+        return
+    ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
+    if ax is None:
+        # Base case, no tuple in the slicing tuple
+        da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
+        return
+
+    # Complex case, we have exactly one tuple in the slicing tuple
+    assert first_tuple is not None
+    for i, idx in enumerate(first_tuple):
+        _sub_slice = (*slice_tuple[:ax], slice(idx, idx + 1), *slice_tuple[ax + 1 :])
+        sub_patch = da.take(patch, indices=i, axis=ax)
+        sub_patch = da.expand_dims(sub_patch, axis=ax)
+        da.to_zarr(arr=sub_patch, url=zarr_array, region=_sub_slice)
