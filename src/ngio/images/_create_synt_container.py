@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 import numpy as np
 import PIL.Image
+from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common._synt_images_utils import fit_to_shape
 from ngio.images._ome_zarr_container import OmeZarrContainer, create_ome_zarr_from_array
@@ -35,6 +36,8 @@ def create_synthetic_ome_zarr(
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     table_backend: TableBackend = DefaultTableBackend,
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
@@ -63,6 +66,9 @@ def create_synthetic_ome_zarr(
         channel_active (Sequence[bool] | None, optional): Whether the channels are
             active. Defaults to None.
         table_backend (TableBackend): Table backend to be used to store tables
+        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+            dimensions. Defaults to "/".
+        compressor: The compressor to use. Defaults to "default".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
         version (NgffVersion, optional): The version of the OME-Zarr specification.
@@ -96,6 +102,8 @@ def create_synthetic_ome_zarr(
         name=sample_info.name,
         chunks=chunks,
         overwrite=overwrite,
+        dimension_separator=dimension_separator,
+        compressor=compressor,
         version=version,
     )
 

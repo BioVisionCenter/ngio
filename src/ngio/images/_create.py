@@ -3,6 +3,8 @@
 from collections.abc import Sequence
 from typing import TypeVar
 
+from zarr.types import DIMENSION_SEPARATOR
+
 from ngio.common._pyramid import init_empty_pyramid
 from ngio.ome_zarr_meta import (
     NgioImageMeta,
@@ -93,6 +95,8 @@ def create_empty_label_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str = "uint32",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -120,6 +124,9 @@ def create_empty_label_container(
         name (str | None, optional): The name of the image. Defaults to None.
         chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
+        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+            dimensions. Defaults to "/".
+        compressor: The compressor to use. Defaults to "default".
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
@@ -164,6 +171,8 @@ def create_empty_label_container(
         chunks=chunks,
         dtype=dtype,
         mode="a",
+        dimension_separator=dimension_separator,
+        compressor=compressor,
     )
     group_handler._mode = "r+"
     return group_handler
@@ -184,6 +193,8 @@ def create_empty_image_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -212,6 +223,9 @@ def create_empty_image_container(
         chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
+        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+            dimensions. Defaults to "/".
+        compressor: The compressor to use. Defaults to "default".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
         version (str, optional): The version of the OME-Zarr specification.
@@ -254,6 +268,8 @@ def create_empty_image_container(
         chunks=chunks,
         dtype=dtype,
         mode="a",
+        dimension_separator=dimension_separator,
+        compressor=compressor,
     )
 
     group_handler._mode = "r+"

@@ -3,6 +3,8 @@
 from collections.abc import Sequence
 from typing import Literal
 
+from zarr.types import DIMENSION_SEPARATOR
+
 from ngio.common import compute_masking_roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_label_container
@@ -167,6 +169,8 @@ class LabelsContainer:
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str = "uint32",
+        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        compressor=None,
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -184,6 +188,10 @@ class LabelsContainer:
                 For labels, the channel axis is not allowed.
             chunks (Sequence[int] | None): The chunk shape of the new image.
             dtype (str): The data type of the new label.
+            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+                dimensions. If None it will use the same as the reference image.
+            compressor: The compressor to use. If None it will use
+                the same as the reference image.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -226,6 +234,8 @@ def derive_label(
     pixel_size: PixelSize | None = None,
     axes_names: Sequence[str] | None = None,
     chunks: Sequence[int] | None = None,
+    dimension_separator: DIMENSION_SEPARATOR | None = None,
+    compressor=None,
     dtype: str = "uint32",
     overwrite: bool = False,
 ) -> None:
@@ -242,6 +252,10 @@ def derive_label(
             For labels, the channel axis is not allowed.
         chunks (Sequence[int] | None): The chunk shape of the new image.
         dtype (str): The data type of the new label.
+        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            dimensions. If None it will use the same as the reference image.
+        compressor: The compressor to use. If None it will use
+            the same as the reference image.
         overwrite (bool): Whether to overwrite an existing image.
 
     Returns:
@@ -291,6 +305,11 @@ def derive_label(
         axes_names = list(axes_names)
         axes_names = axes_names[:c_axis] + axes_names[c_axis + 1 :]
 
+    if dimension_separator is None:
+        dimension_separator = ref_image.zarr_array._dimension_separator  # type: ignore
+    if compressor is None:
+        compressor = ref_image.zarr_array.compressor  # type: ignore
+
     _ = create_empty_label_container(
         store=store,
         shape=shape,
@@ -305,6 +324,8 @@ def derive_label(
         axes_names=axes_names,
         chunks=chunks,
         dtype=dtype,
+        dimension_separator=dimension_separator,  # type: ignore
+        compressor=compressor,  # type: ignore
         overwrite=overwrite,
         version=ref_meta.version,
         name=name,

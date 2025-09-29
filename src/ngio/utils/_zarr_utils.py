@@ -8,6 +8,7 @@ import zarr
 from filelock import BaseFileLock, FileLock
 from zarr.errors import ContainsGroupError, GroupNotFoundError
 from zarr.storage import DirectoryStore, FSStore, MemoryStore, Store, StoreLike
+from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.utils import NgioFileExistsError, NgioFileNotFoundError, NgioValueError
 from ngio.utils._errors import NgioError
@@ -342,6 +343,8 @@ class ZarrGroupHandler:
         shape: tuple[int, ...],
         dtype: str,
         chunks: tuple[int, ...] | None = None,
+        dimension_separator: DIMENSION_SEPARATOR = "/",
+        compressor: str = "default",
         overwrite: bool = False,
     ) -> zarr.Array:
         if self.mode == "r":
@@ -353,7 +356,8 @@ class ZarrGroupHandler:
                 shape=shape,
                 dtype=dtype,
                 chunks=chunks,
-                dimension_separator="/",
+                dimension_separator=dimension_separator,
+                compressor=compressor,
                 overwrite=overwrite,
             )
         except ContainsGroupError as e:

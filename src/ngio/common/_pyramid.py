@@ -5,6 +5,7 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 import zarr
+from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common._zoom import (
     InterpolationOrder,
@@ -201,6 +202,8 @@ def init_empty_pyramid(
     chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
 ) -> None:
     # Return the an Image object
     if chunks is not None and len(chunks) != len(ref_shape):
@@ -233,8 +236,9 @@ def init_empty_pyramid(
             shape=ref_shape,
             dtype=dtype,
             chunks=chunks,
-            dimension_separator="/",
+            dimension_separator=dimension_separator,
             overwrite=True,
+            compressor=compressor,
         )
 
         _shape = [
