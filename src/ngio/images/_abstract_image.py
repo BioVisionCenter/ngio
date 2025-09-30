@@ -16,12 +16,16 @@ from ngio.common import (
     consolidate_pyramid,
 )
 from ngio.io_pipes import (
+    DaskGetter,
+    DaskRoiGetter,
+    DaskRoiSetter,
+    DaskSetter,
+    NumpyGetter,
+    NumpyRoiGetter,
+    NumpyRoiSetter,
+    NumpySetter,
     SlicingInputType,
     TransformProtocol,
-    build_getter_pipe,
-    build_roi_getter_pipe,
-    build_roi_setter_pipe,
-    build_setter_pipe,
 )
 from ngio.ome_zarr_meta import (
     AxesHandler,
@@ -189,8 +193,7 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        numpy_getter = build_getter_pipe(
-            mode="numpy",
+        numpy_getter = NumpyGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             axes_order=axes_order,
@@ -217,8 +220,7 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        numpy_roi_getter = build_roi_getter_pipe(
-            mode="numpy",
+        numpy_roi_getter = NumpyRoiGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -242,8 +244,7 @@ class AbstractImage(Generic[_image_handler]):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        dask_getter = build_getter_pipe(
-            mode="dask",
+        dask_getter = DaskGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             axes_order=axes_order,
@@ -267,8 +268,7 @@ class AbstractImage(Generic[_image_handler]):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        roi_dask_getter = build_roi_getter_pipe(
-            mode="dask",
+        roi_dask_getter = DaskRoiGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -298,15 +298,18 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        pipe = build_getter_pipe(
-            mode=mode,
-            zarr_array=self.zarr_array,
-            dimensions=self.dimensions,
-            axes_order=axes_order,
-            transforms=transforms,
-            slicing_dict=slicing_kwargs,
-        )
-        return pipe()
+        if mode == "numpy":
+            return self._get_as_numpy(
+                axes_order=axes_order, transforms=transforms, **slicing_kwargs
+            )
+        elif mode == "dask":
+            return self._get_as_dask(
+                axes_order=axes_order, transforms=transforms, **slicing_kwargs
+            )
+        else:
+            raise ValueError(
+                f"Unsupported mode: {mode}. Supported modes are: numpy, dask."
+            )
 
     def _get_roi(
         self,
@@ -329,17 +332,18 @@ class AbstractImage(Generic[_image_handler]):
         Returns:
             The array of the region of interest.
         """
-        pipe = build_roi_getter_pipe(
-            mode=mode,
-            zarr_array=self.zarr_array,
-            dimensions=self.dimensions,
-            roi=roi,
-            pixel_size=self.pixel_size,
-            axes_order=axes_order,
-            transforms=transforms,
-            slicing_dict=slice_kwargs,
-        )
-        return pipe()
+        if mode == "numpy":
+            return self._get_roi_as_numpy(
+                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+            )
+        elif mode == "dask":
+            return self._get_roi_as_dask(
+                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+            )
+        else:
+            raise ValueError(
+                f"Unsupported mode: {mode}. Supported modes are: numpy, dask."
+            )
 
     def _set_array(
         self,
@@ -358,8 +362,7 @@ class AbstractImage(Generic[_image_handler]):
 
         """
         if isinstance(patch, np.ndarray):
-            numpy_setter = build_setter_pipe(
-                mode="numpy",
+            numpy_setter = NumpySetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
@@ -369,8 +372,7 @@ class AbstractImage(Generic[_image_handler]):
             numpy_setter(patch)
 
         elif isinstance(patch, da.Array):
-            dask_setter = build_setter_pipe(
-                mode="dask",
+            dask_setter = DaskSetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
@@ -404,8 +406,7 @@ class AbstractImage(Generic[_image_handler]):
 
         """
         if isinstance(patch, np.ndarray):
-            roi_numpy_setter = build_roi_setter_pipe(
-                mode="numpy",
+            roi_numpy_setter = NumpyRoiSetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
@@ -417,8 +418,7 @@ class AbstractImage(Generic[_image_handler]):
             roi_numpy_setter(patch)
 
         elif isinstance(patch, da.Array):
-            roi_dask_setter = build_roi_setter_pipe(
-                mode="dask",
+            roi_dask_setter = DaskRoiSetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,

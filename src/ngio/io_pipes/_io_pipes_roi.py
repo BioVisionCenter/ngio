@@ -1,6 +1,7 @@
 from collections.abc import Sequence
-from typing import Literal, assert_never, overload
 
+import dask.array as da
+import numpy as np
 import zarr
 
 from ngio.common._dimensions import Dimensions
@@ -8,18 +9,15 @@ from ngio.common._roi import Roi, RoiPixels
 from ngio.io_pipes._io_pipes import (
     DaskGetter,
     DaskSetter,
+    DataGetter,
     NumpyGetter,
     NumpySetter,
-    build_getter_pipe,
-    build_setter_pipe,
 )
 from ngio.io_pipes._io_pipes_masked import (
     DaskMaskedGetter,
     DaskMaskedSetter,
     NumpyMaskedGetter,
     NumpyMaskedSetter,
-    build_masked_getter_pipe,
-    build_masked_setter_pipe,
 )
 from ngio.io_pipes._io_pipes_utils import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
@@ -51,58 +49,25 @@ def roi_to_slicing_dict(
     return roi_slicing_dict
 
 
-@overload
-def build_roi_getter_pipe(
-    *,
-    mode: Literal["numpy"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpyGetter: ...
-
-
-@overload
-def build_roi_getter_pipe(
-    *,
-    mode: Literal["dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> DaskGetter: ...
-
-
-def build_roi_getter_pipe(
-    *,
-    mode: Literal["numpy", "dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpyGetter | DaskGetter:
-    """Prepare slice kwargs for getting an array."""
-    input_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=dimensions,
-        pixel_size=pixel_size,
-        slicing_dict=slicing_dict,
-    )
-    if mode == "numpy":
-        return build_getter_pipe(
-            mode="numpy",
+class NumpyRoiGetter(NumpyGetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             axes_order=axes_order,
@@ -110,9 +75,27 @@ def build_roi_getter_pipe(
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
         )
-    elif mode == "dask":
-        return build_getter_pipe(
-            mode="dask",
+
+
+class DaskRoiGetter(DaskGetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             axes_order=axes_order,
@@ -120,61 +103,27 @@ def build_roi_getter_pipe(
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
         )
-    assert_never(mode)
 
 
-@overload
-def build_roi_setter_pipe(
-    *,
-    mode: Literal["numpy"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpySetter: ...
-
-
-@overload
-def build_roi_setter_pipe(
-    *,
-    mode: Literal["dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> DaskSetter: ...
-
-
-def build_roi_setter_pipe(
-    *,
-    mode: Literal["numpy", "dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpySetter | DaskSetter:
-    """Prepare slice kwargs for setting an array."""
-    input_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=dimensions,
-        pixel_size=pixel_size,
-        slicing_dict=slicing_dict,
-    )
-    if mode == "numpy":
-        return build_setter_pipe(
-            mode="numpy",
+class NumpyRoiSetter(NumpySetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             axes_order=axes_order,
@@ -182,9 +131,27 @@ def build_roi_setter_pipe(
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
         )
-    elif mode == "dask":
-        return build_setter_pipe(
-            mode="dask",
+
+
+class DaskRoiSetter(DaskSetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             axes_order=axes_order,
@@ -192,7 +159,6 @@ def build_roi_setter_pipe(
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
         )
-    assert_never(mode)
 
 
 ################################################################
@@ -202,85 +168,39 @@ def build_roi_setter_pipe(
 ################################################################
 
 
-@overload
-def build_roi_masked_getter_pipe(
-    *,
-    mode: Literal["numpy"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    fill_value: int | float = 0,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> NumpyMaskedGetter: ...
-
-
-@overload
-def build_roi_masked_getter_pipe(
-    *,
-    mode: Literal["dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    fill_value: int | float = 0,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> DaskMaskedGetter: ...
-
-
-def build_roi_masked_getter_pipe(
-    *,
-    mode: Literal["numpy", "dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    fill_value: int | float = 0,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> NumpyMaskedGetter | DaskMaskedGetter:
-    """Prepare slice kwargs for getting a masked array."""
-    input_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=dimensions,
-        pixel_size=pixel_size,
-        slicing_dict=slicing_dict,
-    )
-    label_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=label_dimensions,
-        pixel_size=label_pixel_size,
-        slicing_dict=label_slicing_dict,
-    )
-    if mode == "numpy":
-        return build_masked_getter_pipe(
-            mode="numpy",
+class NumpyMaskedRoiGetter(NumpyMaskedGetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        label_pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        fill_value: int | float = 0,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ):
+        """Prepare slice kwargs for getting a masked array."""
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        label_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=label_dimensions,
+            pixel_size=label_pixel_size,
+            slicing_dict=label_slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -295,9 +215,41 @@ def build_roi_masked_getter_pipe(
             allow_scaling=allow_scaling,
             remove_channel_selection=remove_channel_selection,
         )
-    elif mode == "dask":
-        return build_masked_getter_pipe(
-            mode="dask",
+
+
+class DaskMaskedRoiGetter(DaskMaskedGetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        label_pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        fill_value: int | float = 0,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ):
+        """Prepare slice kwargs for getting a masked array."""
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        label_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=label_dimensions,
+            pixel_size=label_pixel_size,
+            slicing_dict=label_slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -312,85 +264,42 @@ def build_roi_masked_getter_pipe(
             allow_scaling=allow_scaling,
             remove_channel_selection=remove_channel_selection,
         )
-    assert_never(mode)
 
 
-@overload
-def build_roi_masked_setter_pipe(
-    *,
-    mode: Literal["numpy"],
-    roi: Roi | RoiPixels,
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    pixel_size: PixelSize | None = None,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> NumpyMaskedSetter: ...
-
-
-@overload
-def build_roi_masked_setter_pipe(
-    *,
-    mode: Literal["dask"],
-    roi: Roi | RoiPixels,
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    pixel_size: PixelSize | None = None,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> DaskMaskedSetter: ...
-
-
-def build_roi_masked_setter_pipe(
-    *,
-    mode: Literal["dask", "numpy"],
-    roi: Roi | RoiPixels,
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    pixel_size: PixelSize | None = None,
-    label_zarr_array: zarr.Array,
-    label_dimensions: Dimensions,
-    label_pixel_size: PixelSize | None = None,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    label_transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    label_slicing_dict: dict[str, SlicingInputType] | None = None,
-    allow_scaling: bool = True,
-    remove_channel_selection: bool = False,
-) -> NumpyMaskedSetter | DaskMaskedSetter:
-    """Prepare slice kwargs for setting a masked array."""
-    input_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=dimensions,
-        pixel_size=pixel_size,
-        slicing_dict=slicing_dict,
-    )
-    label_slice_kwargs = roi_to_slicing_dict(
-        roi=roi,
-        dimensions=label_dimensions,
-        pixel_size=label_pixel_size,
-        slicing_dict=label_slicing_dict,
-    )
-    if mode == "numpy":
-        return build_masked_setter_pipe(
-            mode="numpy",
+class NumpyMaskedRoiSetter(NumpyMaskedSetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        label_pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        data_getter: DataGetter[np.ndarray] | None = None,
+        label_data_getter: DataGetter[np.ndarray] | None = None,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ):
+        """Prepare slice kwargs for setting a masked array."""
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        label_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=label_dimensions,
+            pixel_size=label_pixel_size,
+            slicing_dict=label_slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -401,12 +310,47 @@ def build_roi_masked_setter_pipe(
             label_transforms=label_transforms,
             slicing_dict=input_slice_kwargs,
             label_slicing_dict=label_slice_kwargs,
+            data_getter=data_getter,
+            label_data_getter=label_data_getter,
             allow_scaling=allow_scaling,
             remove_channel_selection=remove_channel_selection,
         )
-    elif mode == "dask":
-        return build_masked_setter_pipe(
-            mode="dask",
+
+
+class DaskMaskedRoiSetter(DaskMaskedSetter):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        pixel_size: PixelSize | None = None,
+        label_pixel_size: PixelSize | None = None,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        data_getter: DataGetter[da.Array] | None = None,
+        label_data_getter: DataGetter[da.Array] | None = None,
+        allow_scaling: bool = True,
+        remove_channel_selection: bool = False,
+    ):
+        """Prepare slice kwargs for setting a masked array."""
+        input_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=dimensions,
+            pixel_size=pixel_size,
+            slicing_dict=slicing_dict,
+        )
+        label_slice_kwargs = roi_to_slicing_dict(
+            roi=roi,
+            dimensions=label_dimensions,
+            pixel_size=label_pixel_size,
+            slicing_dict=label_slicing_dict,
+        )
+        super().__init__(
             zarr_array=zarr_array,
             dimensions=dimensions,
             label_zarr_array=label_zarr_array,
@@ -417,7 +361,8 @@ def build_roi_masked_setter_pipe(
             label_transforms=label_transforms,
             slicing_dict=input_slice_kwargs,
             label_slicing_dict=label_slice_kwargs,
+            data_getter=data_getter,
+            label_data_getter=label_data_getter,
             allow_scaling=allow_scaling,
             remove_channel_selection=remove_channel_selection,
         )
-    assert_never(mode)

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Generic, Literal, TypeVar, assert_never, overload
+from typing import Generic, TypeVar
 
 import numpy as np
 import zarr
@@ -125,14 +125,25 @@ class NumpyGetter(DataGetter[np.ndarray]):
     def __init__(
         self,
         zarr_array: zarr.Array,
-        slicing_ops: SlicingOps,
-        axes_ops: AxesOps,
+        dimensions: Dimensions,
+        axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
     ) -> None:
-        self._zarr_array = zarr_array
-        self._slicing_ops = slicing_ops
-        self._axes_ops = axes_ops
-        self._transforms = transforms
+        """Build a pipe to get a numpy or dask array from a zarr array."""
+        slicing_ops, axes_ops = setup_io_pipe(
+            dimensions=dimensions,
+            slicing_dict=slicing_dict,
+            axes_order=axes_order,
+            remove_channel_selection=remove_channel_selection,
+        )
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=slicing_ops,
+            axes_ops=axes_ops,
+            transforms=transforms,
+        )
 
     def get(self) -> np.ndarray:
         array = get_slice_as_numpy(self._zarr_array, slicing_ops=self._slicing_ops)
@@ -147,6 +158,29 @@ class NumpyGetter(DataGetter[np.ndarray]):
 
 
 class DaskGetter(DataGetter[DaskArray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Build a pipe to get a numpy or dask array from a zarr array."""
+        slicing_ops, axes_ops = setup_io_pipe(
+            dimensions=dimensions,
+            slicing_dict=slicing_dict,
+            axes_order=axes_order,
+            remove_channel_selection=remove_channel_selection,
+        )
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=slicing_ops,
+            axes_ops=axes_ops,
+            transforms=transforms,
+        )
+
     def get(self) -> DaskArray:
         array = get_slice_as_dask(self._zarr_array, slicing_ops=self._slicing_ops)
         array = get_as_dask_axes_ops(array, axes_ops=self._axes_ops)
@@ -159,67 +193,6 @@ class DaskGetter(DataGetter[DaskArray]):
         return array
 
 
-@overload
-def build_getter_pipe(
-    *,
-    mode: Literal["numpy"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpyGetter: ...
-
-
-@overload
-def build_getter_pipe(
-    *,
-    mode: Literal["dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> DaskGetter: ...
-
-
-def build_getter_pipe(
-    *,
-    mode: Literal["numpy", "dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpyGetter | DaskGetter:
-    """Build a pipe to get a numpy or dask array from a zarr array."""
-    slicing_ops, axes_ops = setup_io_pipe(
-        dimensions=dimensions,
-        slicing_dict=slicing_dict,
-        axes_order=axes_order,
-        remove_channel_selection=remove_channel_selection,
-    )
-    if mode == "numpy":
-        return NumpyGetter(
-            zarr_array=zarr_array,
-            slicing_ops=slicing_ops,
-            axes_ops=axes_ops,
-            transforms=transforms,
-        )
-
-    elif mode == "dask":
-        return DaskGetter(
-            zarr_array=zarr_array,
-            slicing_ops=slicing_ops,
-            axes_ops=axes_ops,
-            transforms=transforms,
-        )
-    assert_never(mode)
-
-
 ##############################################################
 #
 # "To Disk" Pipes
@@ -228,6 +201,29 @@ def build_getter_pipe(
 
 
 class NumpySetter(DataSetter[np.ndarray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Build a pipe to get a numpy or dask array from a zarr array."""
+        slicing_ops, axes_ops = setup_io_pipe(
+            dimensions=dimensions,
+            slicing_dict=slicing_dict,
+            axes_order=axes_order,
+            remove_channel_selection=remove_channel_selection,
+        )
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=slicing_ops,
+            axes_ops=axes_ops,
+            transforms=transforms,
+        )
+
     def set(self, patch: np.ndarray) -> None:
         """Get a numpy array from the zarr array with ops."""
         patch = set_as_numpy_transform(
@@ -248,6 +244,29 @@ class NumpySetter(DataSetter[np.ndarray]):
 
 
 class DaskSetter(DataSetter[DaskArray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        remove_channel_selection: bool = False,
+    ) -> None:
+        """Build a pipe to get a numpy or dask array from a zarr array."""
+        slicing_ops, axes_ops = setup_io_pipe(
+            dimensions=dimensions,
+            slicing_dict=slicing_dict,
+            axes_order=axes_order,
+            remove_channel_selection=remove_channel_selection,
+        )
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=slicing_ops,
+            axes_ops=axes_ops,
+            transforms=transforms,
+        )
+
     def set(self, patch: DaskArray) -> None:
         """Get a dask array from the zarr array with ops."""
         patch = set_as_dask_transform(
@@ -265,63 +284,3 @@ class DaskSetter(DataSetter[DaskArray]):
             patch=patch,
             slicing_ops=self._slicing_ops,
         )
-
-
-@overload
-def build_setter_pipe(
-    *,
-    mode: Literal["numpy"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpySetter: ...
-
-
-@overload
-def build_setter_pipe(
-    *,
-    mode: Literal["dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> DaskSetter: ...
-
-
-def build_setter_pipe(
-    *,
-    mode: Literal["numpy", "dask"],
-    zarr_array: zarr.Array,
-    dimensions: Dimensions,
-    axes_order: Sequence[str] | None = None,
-    transforms: Sequence[TransformProtocol] | None = None,
-    slicing_dict: dict[str, SlicingInputType] | None = None,
-    remove_channel_selection: bool = False,
-) -> NumpySetter | DaskSetter:
-    """Build a pipe to get a numpy or dask array from a zarr array."""
-    slicing_ops, axes_ops = setup_io_pipe(
-        dimensions=dimensions,
-        slicing_dict=slicing_dict,
-        axes_order=axes_order,
-        remove_channel_selection=remove_channel_selection,
-    )
-    if mode == "numpy":
-        return NumpySetter(
-            zarr_array=zarr_array,
-            slicing_ops=slicing_ops,
-            axes_ops=axes_ops,
-            transforms=transforms,
-        )
-    elif mode == "dask":
-        return DaskSetter(
-            zarr_array=zarr_array,
-            slicing_ops=slicing_ops,
-            axes_ops=axes_ops,
-            transforms=transforms,
-        )
-    assert_never(mode)

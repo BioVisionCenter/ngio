@@ -11,9 +11,11 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.io_pipes import (
+    DaskRoiGetter,
+    DaskRoiSetter,
+    NumpyRoiGetter,
+    NumpyRoiSetter,
     TransformProtocol,
-    build_roi_getter_pipe,
-    build_roi_setter_pipe,
 )
 
 
@@ -84,50 +86,46 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        return build_roi_getter_pipe(
-            mode="numpy",
+        return NumpyRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             pixel_size=self._input.pixel_size,
-            roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return build_roi_setter_pipe(
-            mode="numpy",
+        return NumpyRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
-            roi=roi,
             slicing_dict=self._output_slicing_kwargs,
         )
 
     def build_dask_getter(self, roi: Roi):
-        return build_roi_getter_pipe(
-            mode="dask",
+        return DaskRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             pixel_size=self._input.pixel_size,
-            roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_dask_setter(self, roi: Roi):
-        return build_roi_setter_pipe(
-            mode="dask",
+        return DaskRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
-            roi=roi,
             slicing_dict=self._output_slicing_kwargs,
         )
 

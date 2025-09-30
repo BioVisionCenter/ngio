@@ -12,11 +12,17 @@ from ngio.images._image import (
 )
 from ngio.images._masked_image import MaskedImage
 from ngio.io_pipes import (
+    DaskMaskedRoiGetter,
+    DaskMaskedRoiSetter,
+    DaskRoiGetter,
+    DaskRoiSetter,
+    DataGetter,
+    DataSetter,
+    NumpyMaskedRoiGetter,
+    NumpyMaskedRoiSetter,
+    NumpyRoiGetter,
+    NumpyRoiSetter,
     TransformProtocol,
-    build_roi_getter_pipe,
-    build_roi_masked_getter_pipe,
-    build_roi_masked_setter_pipe,
-    build_roi_setter_pipe,
 )
 
 
@@ -74,51 +80,47 @@ class SegmentationIterator(AbstractIteratorBuilder):
             "output_transforms": self._output_transforms,
         }
 
-    def build_numpy_getter(self, roi: Roi):
-        return build_roi_getter_pipe(
-            mode="numpy",
+    def build_numpy_getter(self, roi: Roi) -> DataGetter[np.ndarray]:
+        return NumpyRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             pixel_size=self._input.pixel_size,
-            roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
 
-    def build_numpy_setter(self, roi: Roi):
-        return build_roi_setter_pipe(
-            mode="numpy",
+    def build_numpy_setter(self, roi: Roi) -> DataSetter[np.ndarray]:
+        return NumpyRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
-            roi=roi,
             remove_channel_selection=True,
         )
 
-    def build_dask_getter(self, roi: Roi):
-        return build_roi_getter_pipe(
-            mode="dask",
+    def build_dask_getter(self, roi: Roi) -> DataGetter[da.Array]:
+        return DaskRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             pixel_size=self._input.pixel_size,
-            roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
 
-    def build_dask_setter(self, roi: Roi):
-        return build_roi_setter_pipe(
-            mode="dask",
+    def build_dask_setter(self, roi: Roi) -> DataSetter[da.Array]:
+        return DaskRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
+            roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
             pixel_size=self._output.pixel_size,
-            roi=roi,
             remove_channel_selection=True,
         )
 
@@ -217,11 +219,10 @@ class MaskedSegmentationIterator(SegmentationIterator):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        return build_roi_masked_getter_pipe(
-            mode="numpy",
-            roi=roi,
+        return NumpyMaskedRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
+            roi=roi,
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
             label_pixel_size=self._input._label.pixel_size,
@@ -232,8 +233,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return build_roi_masked_setter_pipe(
-            mode="numpy",
+        return NumpyMaskedRoiSetter(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
@@ -247,8 +247,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_dask_getter(self, roi: Roi):
-        return build_roi_masked_getter_pipe(
-            mode="dask",
+        return DaskMaskedRoiGetter(
             roi=roi,
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -262,8 +261,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_dask_setter(self, roi: Roi):
-        return build_roi_masked_setter_pipe(
-            mode="dask",
+        return DaskMaskedRoiSetter(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,

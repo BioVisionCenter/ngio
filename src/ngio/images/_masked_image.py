@@ -14,9 +14,11 @@ from ngio.images._image import (
 )
 from ngio.images._label import Label
 from ngio.io_pipes import (
+    DaskMaskedRoiGetter,
+    DaskMaskedRoiSetter,
+    NumpyMaskedRoiGetter,
+    NumpyMaskedRoiSetter,
     TransformProtocol,
-    build_roi_masked_getter_pipe,
-    build_roi_masked_setter_pipe,
 )
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
@@ -160,8 +162,7 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_getter_pipe(
-            mode="numpy",
+        masked_getter = NumpyMaskedRoiGetter(
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -193,8 +194,7 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_getter_pipe(
-            mode="dask",
+        masked_getter = DaskMaskedRoiGetter(
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -227,8 +227,7 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_getter_pipe(
-            mode=mode,
+        masked_getter = NumpyMaskedRoiGetter(
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -262,8 +261,7 @@ class MaskedImage(Image):
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            path_setter = build_roi_masked_setter_pipe(
-                mode="dask",
+            path_setter = DaskMaskedRoiSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -278,8 +276,7 @@ class MaskedImage(Image):
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            path_setter = build_roi_masked_setter_pipe(
-                mode="numpy",
+            path_setter = NumpyMaskedRoiSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -422,8 +419,7 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a NumPy array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_getter_pipe(
-            mode="numpy",
+        masked_getter = NumpyMaskedRoiGetter(
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -450,8 +446,7 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a Dask array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = build_roi_masked_getter_pipe(
-            mode="dask",
+        masked_getter = DaskMaskedRoiGetter(
             roi=roi,
             zarr_array=self.zarr_array,
             label_zarr_array=self._label.zarr_array,
@@ -513,8 +508,7 @@ class MaskedLabel(Label):
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         if isinstance(patch, da.Array):
-            path_setter = build_roi_masked_setter_pipe(
-                mode="dask",
+            path_setter = DaskMaskedRoiSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,
@@ -529,8 +523,7 @@ class MaskedLabel(Label):
             )
             path_setter(patch)
         elif isinstance(patch, np.ndarray):
-            path_setter = build_roi_masked_setter_pipe(
-                mode="numpy",
+            path_setter = NumpyMaskedRoiSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 label_zarr_array=self._label.zarr_array,

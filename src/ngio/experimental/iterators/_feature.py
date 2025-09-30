@@ -10,7 +10,7 @@ from ngio.images._image import (
     ChannelSlicingInputType,
     add_channel_selection_to_slicing_dict,
 )
-from ngio.io_pipes import TransformProtocol, build_roi_getter_pipe
+from ngio.io_pipes import DaskRoiGetter, NumpyRoiGetter, TransformProtocol
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder):
@@ -70,8 +70,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        data_getter = build_roi_getter_pipe(
-            mode="numpy",
+        data_getter = NumpyRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -80,8 +79,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = build_roi_getter_pipe(
-            mode="numpy",
+        label_getter = NumpyRoiGetter(
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
@@ -96,8 +94,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         return None
 
     def build_dask_getter(self, roi: Roi):
-        data_getter = build_roi_getter_pipe(
-            mode="dask",
+        data_getter = DaskRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -106,8 +103,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = build_roi_getter_pipe(
-            mode="dask",
+        label_getter = DaskRoiGetter(
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
