@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from ngio import Image, create_empty_ome_zarr, open_image
+from ngio.transforms import ZoomTransform
 from ngio.utils import NgioValueError
 
 
@@ -125,22 +126,24 @@ def test_image_assert_can_be_rescaled(
     img1.assert_can_be_rescaled(img2)
 
     # Also test with transforms
-    # TODO fix this
-    # zoom = ZoomTransform.from_images(
-    #    origin_image=img2,
-    #    destination_image=img1,
-    #    order="nearest",
-    # )
-    # img1_data = img1.get_as_numpy()
-    # img2_data = img2.get_as_numpy(transforms=[zoom])
-    # assert img1_data.shape == img2_data.shape
+    zoom = ZoomTransform(
+        input_image=img2,
+        target_image=img1,
+        order="nearest",
+    )
+    img1_data = img1.get_as_numpy()
+    img2_data = img2.get_as_numpy(transforms=[zoom])
+    assert img1_data.shape == img2_data.shape
 
 
-"""
 @pytest.mark.parametrize(
     ("shape1", "shape2", "axes1", "axes2", "xy_pixelsize", "should_raise"),
     [
         ((111, 111), (112, 112), "yx", "yx", 0.99, False),
+        ((111, 111), (111, 111), "yx", "yx", 2.0, True),
+        ((111, 111), (55, 55), "yx", "yx", 2.0, False),
+        ((111, 111), (56, 56), "yx", "yx", 2.0, False),
+        ((111, 111), (54, 54), "yx", "yx", 2.0, True),
     ],
 )
 def test_image_assert_can_be_rescaled2(
@@ -164,23 +167,24 @@ def test_image_assert_can_be_rescaled2(
     img2 = open_image(path2)
 
     # Also test with transforms
-    zoom_px = ZoomTransform.from_pixel_sizes(
-        original_dimension=img2.dimensions,
-        original_pixel_size=img2.pixel_size,
-        target_pixel_size=img1.pixel_size,
-        order="nearest",
-    )
-    zoom_d = ZoomTransform.from_dimensions(
-        original_dimension=img2.dimensions,
-        target_dimension=img1.dimensions,
+    if should_raise:
+        with pytest.raises(NgioValueError):
+            img2.assert_can_be_rescaled(img1)
+        return None
+    zoom = ZoomTransform(
+        input_image=img2,
+        target_image=img1,
         order="nearest",
     )
 
     img1_data = img1.get_as_numpy()
-    img2_d_data = img2.get_as_numpy(transforms=[zoom_d])
-    img2_px_data = img2.get_as_numpy(transforms=[zoom_px])
-    assert img1_data.shape == img2_d_data.shape, "dimension-based zoom failed"
-    assert img1_data.shape == img2_px_data.shape, (
-        f"pixel-based zoom failed {zoom_px.scale}, {zoom_d.scale}"
+    img2_data = img2.get_as_numpy(transforms=[zoom])
+    # Shapes should close but they might differ by 1 (with zoom factor 2)
+    assert all(
+        abs(a - b) <= 1 for a, b in zip(img1_data.shape, img2_data.shape, strict=True)
     )
-"""
+
+    roi = img1.build_image_roi_table().rois()[0]
+    img2_roi_data = img2.get_roi_as_numpy(roi, transforms=[zoom])
+    # Roi data should match exactly
+    assert img1_data.shape == img2_roi_data.shape

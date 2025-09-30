@@ -111,7 +111,6 @@ class ZoomTransform:
     def _numpy_zoom(
         self, array: np.ndarray, target_shape: tuple[int, ...]
     ) -> np.ndarray:
-        print(array.shape, target_shape, array.shape == target_shape)
         if array.shape == target_shape:
             return array
         return numpy_zoom(
