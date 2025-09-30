@@ -156,7 +156,7 @@ class AbstractIteratorBuilder(ABC):
     def map_as_numpy(self, func: Callable) -> None:
         """Apply a transformation function to the ROI pixels."""
         for roi in self.rois:
-            data = self.build_numpy_getter(roi)
+            data = self.build_numpy_getter(roi)()
             data = func(data)
             self.build_numpy_setter(roi)
         self.post_consolidate()
@@ -164,7 +164,7 @@ class AbstractIteratorBuilder(ABC):
     def map_as_dask(self, func: Callable) -> None:
         """Apply a transformation function to the ROI pixels."""
         for roi in self.rois:
-            data = self.build_dask_getter(roi)
+            data = self.build_dask_getter(roi)()
             data = func(data)
             self.build_dask_setter(roi)
         self.post_consolidate()
