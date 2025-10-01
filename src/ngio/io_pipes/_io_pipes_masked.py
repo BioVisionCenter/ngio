@@ -170,6 +170,8 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
             data_axes=self._data_getter.axes_ops.in_memory_axes,
             allow_rescaling=self._allow_rescaling,
         )
+        if bool_mask.shape != data.shape:
+            bool_mask = np.broadcast_to(bool_mask, data.shape)
         masked_data = np.where(bool_mask, data, self._fill_value)
         return masked_data
 
@@ -242,9 +244,10 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
             data_axes=self._data_getter.axes_ops.in_memory_axes,
             allow_rescaling=self._allow_rescaling,
         )
-        print(bool_mask.shape, patch.shape, data.shape)
-        mask_data = np.where(bool_mask, patch, data)
-        self._data_setter(mask_data)
+        if bool_mask.shape != data.shape:
+            bool_mask = np.broadcast_to(bool_mask, data.shape)
+        masked_patch = np.where(bool_mask, patch, data)
+        self._data_setter(masked_patch)
 
 
 ##############################################################
@@ -395,6 +398,8 @@ class DaskGetterMasked(DataGetter[DaskArray]):
             data_axes=self._data_getter.axes_ops.in_memory_axes,
             allow_rescaling=self._allow_rescaling,
         )
+        if bool_mask.shape != data.shape:
+            bool_mask = da.broadcast_to(bool_mask, data.shape)
         masked_data = da.where(bool_mask, data, self._fill_value)
         return masked_data
 
@@ -469,5 +474,7 @@ class DaskSetterMasked(DataSetter[DaskArray]):
             data_axes=self._data_getter.axes_ops.in_memory_axes,
             allow_rescaling=self._allow_rescaling,
         )
-        mask_data = da.where(bool_mask, patch, data)
-        self._data_setter(mask_data)
+        if bool_mask.shape != data.shape:
+            bool_mask = da.broadcast_to(bool_mask, data.shape)
+        masked_patch = da.where(bool_mask, patch, data)
+        self._data_setter(masked_patch)

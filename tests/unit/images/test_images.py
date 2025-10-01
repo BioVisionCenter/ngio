@@ -36,7 +36,7 @@ def test_open_image(images_v04: dict[str, Path], zarr_name: str):
         ((1, 1, 10, 10), (1, 1, 10, 10), "tcyx", "czyx", True),
     ],
 )
-def test_image_asserts_axes_match(
+def test_image_require_axes_match(
     tmp_path: Path, shape1, shape2, axes1, axes2, should_raise: bool
 ):
     path1 = tmp_path / "image1.zarr"
@@ -68,7 +68,7 @@ def test_image_asserts_axes_match(
         ((1, 2, 10, 10), (1, 3, 10, 10), "czyx", "czyx", False, True),
     ],
 )
-def test_image_asserts_dimensions_match(
+def test_image_require_dimensions_match(
     tmp_path: Path, shape1, shape2, axes1, axes2, allow_singleton, should_raise: bool
 ):
     path1 = tmp_path / "image1.zarr"
@@ -97,7 +97,7 @@ def test_image_asserts_dimensions_match(
         ((1, 3, 10, 10), (1, 3, 20, 20), "czyx", "czyx", 2.0, True),
     ],
 )
-def test_image_assert_can_be_rescaled(
+def test_image_require_can_be_rescaled(
     tmp_path: Path,
     shape1,
     shape2,
@@ -146,7 +146,7 @@ def test_image_assert_can_be_rescaled(
         ((111, 111), (54, 54), "yx", "yx", 2.0, True),
     ],
 )
-def test_image_assert_can_be_rescaled2(
+def test_image_require_can_be_rescaled2(
     tmp_path: Path,
     shape1,
     shape2,

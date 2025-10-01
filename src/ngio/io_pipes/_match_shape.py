@@ -4,12 +4,14 @@ from enum import Enum
 import dask.array as da
 import numpy as np
 
+from ngio.utils import NgioValueError, ngio_logger
+
 
 class Action(str, Enum):
     NONE = "none"
     PAD = "pad"
     TRIM = "trim"
-    RESIZE = "resize"
+    RESCALING = "rescaling"
 
 
 def _compute_pad_widths(
@@ -26,6 +28,11 @@ def _compute_pad_widths(
             pad_def.append((before, after))
         else:
             pad_def.append((0, 0))
+    ngio_logger.warning(
+        f"Images have a different shape ({array_shape} vs {target_shape}). "
+        f"Resolving by padding: {pad_def}",
+        stacklevel=2,
+    )
     return tuple(pad_def)
 
 
@@ -67,6 +74,12 @@ def _compute_trim_slices(
             slices.append(slice(0, ts))
         else:
             slices.append(slice(0, s))
+
+    ngio_logger.warning(
+        f"Images have a different shape ({array_shape} vs {target_shape}). "
+        f"Resolving by trimming: {slices}",
+        stacklevel=2,
+    )
     return tuple(slices)
 
 
@@ -89,63 +102,60 @@ def _dask_trim(
     return array[tuple(slices)]
 
 
-def _compute_resize_shape(
+def _compute_rescaling_shape(
     array_shape: tuple[int, ...],
     actions: list[Action],
     target_shape: tuple[int, ...],
 ) -> tuple[int, ...]:
-    resize_shape = []
+    rescaling_shape = []
+    factor = []
     for act, s, ts in zip(actions, array_shape, target_shape, strict=True):
-        if act == Action.RESIZE:
-            resize_shape.append(ts)
+        if act == Action.RESCALING:
+            rescaling_shape.append(ts)
+            factor.append(ts / s)
         else:
-            resize_shape.append(s)
-    return tuple(resize_shape)
+            rescaling_shape.append(s)
+            factor.append(1.0)
+
+    ngio_logger.warning(
+        f"Images have a different shape ({array_shape} vs {target_shape}). "
+        f"Resolving by scaling with factors {factor}.",
+        stacklevel=2,
+    )
+    return tuple(rescaling_shape)
 
 
-def _numpy_resize(
+def _numpy_rescaling(
     array: np.ndarray, actions: list[Action], target_shape: tuple[int, ...]
 ) -> np.ndarray:
-    if all(act != Action.RESIZE for act in actions):
+    if all(act != Action.RESCALING for act in actions):
         return array
     from ngio.common._zoom import numpy_zoom
 
-    resize_shape = _compute_resize_shape(array.shape, actions, target_shape)
-    return numpy_zoom(source_array=array, target_shape=resize_shape, order="nearest")
+    rescaling_shape = _compute_rescaling_shape(array.shape, actions, target_shape)
+    return numpy_zoom(source_array=array, target_shape=rescaling_shape, order="nearest")
 
 
-def _dask_resize(
+def _dask_rescaling(
     array: da.Array, actions: list[Action], target_shape: tuple[int, ...]
 ) -> da.Array:
-    if all(act != Action.RESIZE for act in actions):
+    if all(act != Action.RESCALING for act in actions):
         return array
     from ngio.common._zoom import dask_zoom
 
     shape = tuple(int(s) for s in array.shape)
-    resize_shape = _compute_resize_shape(shape, actions, target_shape)
-    return dask_zoom(source_array=array, target_shape=resize_shape, order="nearest")
-
-
-def _numpy_broadcast(array, target_shape):
-    if array.shape == target_shape:
-        return array
-    return np.broadcast_to(array, target_shape)
-
-
-def _dask_broadcast(array, target_shape):
-    if array.shape == target_shape:
-        return array
-    return da.broadcast_to(array, target_shape)
+    rescaling_shape = _compute_rescaling_shape(shape, actions, target_shape)
+    return dask_zoom(source_array=array, target_shape=rescaling_shape, order="nearest")
 
 
 def _check_axes(array_shape, reference_shape, array_axes, reference_axes):
     if len(array_shape) != len(array_axes):
-        raise ValueError(
+        raise NgioValueError(
             f"Array shape {array_shape} and reference axes {array_axes} "
             "must have the same number of dimensions."
         )
     if len(reference_shape) != len(reference_axes):
-        raise ValueError(
+        raise NgioValueError(
             f"Reference shape {reference_shape} and reference axes {reference_axes} "
             "must have the same number of dimensions."
         )
@@ -153,9 +163,17 @@ def _check_axes(array_shape, reference_shape, array_axes, reference_axes):
     # Check if the array axes are a subset of the target axes
     diff = set(array_axes) - set(reference_axes)
     if diff:
-        raise ValueError(
+        raise NgioValueError(
             f"Array axes {array_axes} are not a subset "
             f"of reference axes {reference_axes}"
+        )
+
+    # Array must be smaller or equal in number of dimensions
+    if len(array_axes) > len(reference_axes):
+        raise NgioValueError(
+            f"Array has more dimensions ({len(array_axes)}) "
+            f"than reference ({len(reference_axes)}). "
+            "Cannot match shapes if the array has more dimensions."
         )
 
 
@@ -189,7 +207,7 @@ def _compute_reshape_and_actions(
                 if (ref_shape - s2) <= tolerance:
                     actions.append(Action.PAD)
                 elif allow_rescaling:
-                    actions.append(Action.RESIZE)
+                    actions.append(Action.RESCALING)
                 else:
                     errors.append(
                         f"Cannot pad axis={ref_ax}:{s2}->{ref_shape} "
@@ -200,7 +218,7 @@ def _compute_reshape_and_actions(
                 if (s2 - ref_shape) <= tolerance:
                     actions.append(Action.TRIM)
                 elif allow_rescaling:
-                    actions.append(Action.RESIZE)
+                    actions.append(Action.RESCALING)
                 else:
                     errors.append(
                         f"Cannot trim axis={ref_ax}:{s2}->{ref_shape} "
@@ -210,12 +228,12 @@ def _compute_reshape_and_actions(
             else:
                 raise RuntimeError("Unreachable code reached.")
         else:
-            raise ValueError(
+            raise NgioValueError(
                 f"Axes order mismatch {array_axes} -> {reference_axes}. "
                 "Cannot match shapes if the order is different."
             )
     if errors:
-        raise ValueError(
+        raise NgioValueError(
             "Array shape cannot be matched to reference shape:\n\n".join(errors)
         )
     return tuple(reshape_tuple), actions
@@ -227,7 +245,6 @@ def numpy_match_shape(
     array_axes: Sequence[str],
     reference_axes: Sequence[str],
     tolerance: int = 1,
-    allow_broadcast: bool = True,
     pad_mode: str = "constant",
     pad_values: int | float = 0,
     allow_rescaling: bool = True,
@@ -255,19 +272,19 @@ def numpy_match_shape(
         pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
         allow_rescaling (bool): If True, when the array differs more than the
-            tolerance, it will be resized to the reference shape. If False,
+            tolerance, it will be rescalingd to the reference shape. If False,
             an error will be raised.
     """
-    if array.shape == reference_shape:
-        # Shapes already match
-        return array
-
     _check_axes(
         array_shape=array.shape,
         reference_shape=reference_shape,
         array_axes=array_axes,
         reference_axes=reference_axes,
     )
+    if array.shape == reference_shape:
+        # Shapes already match
+        return array
+
     array_axes = list(array_axes)
     reference_axes = list(reference_axes)
 
@@ -280,7 +297,7 @@ def numpy_match_shape(
         allow_rescaling=allow_rescaling,
     )
     array = array.reshape(reshape_tuple)
-    array = _numpy_resize(array=array, actions=actions, target_shape=reference_shape)
+    array = _numpy_rescaling(array=array, actions=actions, target_shape=reference_shape)
     array = _numpy_pad(
         array=array,
         actions=actions,
@@ -289,8 +306,6 @@ def numpy_match_shape(
         constant_values=pad_values,
     )
     array = _numpy_trim(array=array, actions=actions, target_shape=reference_shape)
-    if allow_broadcast:
-        array = _numpy_broadcast(array=array, target_shape=reference_shape)
     return array
 
 
@@ -300,7 +315,6 @@ def dask_match_shape(
     array_axes: Sequence[str],
     reference_axes: Sequence[str],
     tolerance: int = 1,
-    allow_broadcast: bool = True,
     pad_mode: str = "constant",
     pad_values: int | float = 0,
     allow_rescaling: bool = True,
@@ -321,27 +335,23 @@ def dask_match_shape(
         reference_axes (Sequence[str]): The axes names of the reference shape.
         tolerance (int): The maximum number of pixels by which dimensions
             can differ when matching shapes.
-        allow_broadcast (bool): If True, allow broadcasting new dimensions to
-            match the reference shape. If False, single-dimension axes will
-            be left as is.
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
         pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
         allow_rescaling (bool): If True, when the array differs more than the
-            tolerance, it will be resized to the reference shape. If False,
+            tolerance, it will be rescalingd to the reference shape. If False,
             an error will be raised.
     """
     array_shape = tuple(int(s) for s in array.shape)
-    if array_shape == reference_shape:
-        # Shapes already match
-        return array
-
     _check_axes(
         array_shape=array_shape,
         reference_shape=reference_shape,
         array_axes=array_axes,
         reference_axes=reference_axes,
     )
+    if array_shape == reference_shape:
+        # Shapes already match
+        return array
     array_axes = list(array_axes)
     reference_axes = list(reference_axes)
 
@@ -354,7 +364,7 @@ def dask_match_shape(
         allow_rescaling=allow_rescaling,
     )
     array = da.reshape(array, reshape_tuple)
-    array = _dask_resize(array=array, actions=actions, target_shape=reference_shape)
+    array = _dask_rescaling(array=array, actions=actions, target_shape=reference_shape)
     array = _dask_pad(
         array=array,
         actions=actions,
@@ -363,6 +373,4 @@ def dask_match_shape(
         constant_values=pad_values,
     )
     array = _dask_trim(array=array, actions=actions, target_shape=reference_shape)
-    if allow_broadcast:
-        array = _dask_broadcast(array=array, target_shape=reference_shape)
     return array

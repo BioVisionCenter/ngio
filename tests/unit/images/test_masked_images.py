@@ -7,6 +7,7 @@ from scipy import ndimage
 from skimage.segmentation import watershed
 
 from ngio import create_ome_zarr_from_array
+from ngio.transforms import ZoomTransform
 
 
 def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
@@ -36,20 +37,28 @@ def test_get_masking(tmp_path: Path, shape: tuple[int, ...]):
         levels=2,
         overwrite=True,
     )
-    label = ome_zarr.derive_label("label")
-    label.set_array(label_image)
-    label.consolidate()
+    full_res_image = ome_zarr.get_image(path="0")
+    for level_path in ome_zarr.levels_paths:
+        label_name = f"label_{level_path}"
+        masking_table_name = f"label_ROI_table_{level_path}"
+        image = ome_zarr.get_image(path=level_path)
+        label = ome_zarr.derive_label(label_name, ref_image=image)
+        zoom = ZoomTransform(
+            input_image=label,
+            target_image=full_res_image,
+        )
+        label.set_array(label_image, transforms=[zoom])
+        label.consolidate()
 
-    masking_roi = label.build_masking_roi_table()
-    ome_zarr.add_table("label_ROI_table", masking_roi)
-    # Masking image test
-    _ = ome_zarr.get_masked_image(masking_label_name="label")
-    _ = ome_zarr.get_masked_image(masking_label_name="label")
-    _ = ome_zarr.get_masked_image(masking_table_name="label_ROI_table")
-    _ = ome_zarr.get_masked_image(
-        masking_table_name="label_ROI_table", masking_label_name="label"
-    )
-    _ = ome_zarr.get_masked_image(masking_label_name="label", path="1")
+        masking_roi = label.build_masking_roi_table()
+        ome_zarr.add_table(masking_table_name, masking_roi)
+        # Masking image test
+        _ = ome_zarr.get_masked_image(masking_label_name=label_name)
+        _ = ome_zarr.get_masked_image(masking_table_name=masking_table_name)
+        _ = ome_zarr.get_masked_image(
+            masking_table_name=masking_table_name, masking_label_name=label_name
+        )
+        _ = ome_zarr.get_masked_image(masking_label_name=label_name, path="1")
 
 
 @pytest.mark.parametrize(
