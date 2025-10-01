@@ -179,12 +179,11 @@ def test_image_assert_can_be_rescaled2(
 
     img1_data = img1.get_as_numpy()
     img2_data = img2.get_as_numpy(transforms=[zoom])
-    # Shapes should close but they might differ by 1 (with zoom factor 2)
-    assert all(
-        abs(a - b) <= 1 for a, b in zip(img1_data.shape, img2_data.shape, strict=True)
-    )
+    assert img1_data.shape == img2_data.shape, (shape1, shape2, xy_pixelsize)
+    img2.set_array(patch=img2_data, transforms=[zoom])
 
     roi = img1.build_image_roi_table().rois()[0]
     img2_roi_data = img2.get_roi_as_numpy(roi, transforms=[zoom])
     # Roi data should match exactly
     assert img1_data.shape == img2_roi_data.shape
+    img2.set_roi(roi=roi, patch=img2_roi_data, transforms=[zoom])

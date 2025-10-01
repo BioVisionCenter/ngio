@@ -21,6 +21,7 @@ class ZoomTransform:
         target_image: AbstractImage,
         order: InterpolationOrder = "nearest",
     ) -> None:
+        input_image.assert_can_be_rescaled(target_image)
         self._input_dimensions = input_image.dimensions
         self._target_dimensions = target_image.dimensions
         self._input_pixel_size = input_image.pixel_size
@@ -32,10 +33,14 @@ class ZoomTransform:
     ) -> int:
         if isinstance(slice_, slice):
             _start = slice_.start or 0
-            _stop = slice_.stop or shape
-            out_shape = (_stop - _start) * scale
             max_out_shape = out_dim - _start * scale
-            out_shape = min(out_shape, max_out_shape)
+            if slice_.stop is not None:
+                _stop = slice_.stop
+                out_shape = (_stop - _start) * scale
+                out_shape = min(out_shape, max_out_shape)
+            else:
+                out_shape = max_out_shape
+
         elif isinstance(slice_, int):
             out_shape = 1
         elif isinstance(slice_, tuple):
