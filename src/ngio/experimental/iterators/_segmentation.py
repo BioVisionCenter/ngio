@@ -12,16 +12,16 @@ from ngio.images._image import (
 )
 from ngio.images._masked_image import MaskedImage
 from ngio.io_pipes import (
-    DaskMaskedRoiGetter,
-    DaskMaskedRoiSetter,
+    DaskGetterMasked,
     DaskRoiGetter,
     DaskRoiSetter,
+    DaskSetterMasked,
     DataGetter,
     DataSetter,
-    NumpyMaskedRoiGetter,
-    NumpyMaskedRoiSetter,
+    NumpyGetterMasked,
     NumpyRoiGetter,
     NumpyRoiSetter,
+    NumpySetterMasked,
     TransformProtocol,
 )
 
@@ -215,7 +215,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         }
 
     def build_numpy_getter(self, roi: Roi):
-        return NumpyMaskedRoiGetter(
+        return NumpyGetterMasked(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             roi=roi,
@@ -227,21 +227,19 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return NumpyMaskedRoiSetter(
+        return NumpySetterMasked(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
-            label_pixel_size=self._input._label.pixel_size,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             remove_channel_selection=True,
         )
 
     def build_dask_getter(self, roi: Roi):
-        return DaskMaskedRoiGetter(
+        return DaskGetterMasked(
             roi=roi,
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -253,16 +251,14 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
 
     def build_dask_setter(self, roi: Roi):
-        return DaskMaskedRoiSetter(
+        return DaskSetterMasked(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
-            label_pixel_size=self._input._label.pixel_size,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             remove_channel_selection=True,
         )
 

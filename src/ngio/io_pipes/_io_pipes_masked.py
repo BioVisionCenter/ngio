@@ -17,9 +17,15 @@ from ngio.io_pipes._io_pipes import (
 )
 from ngio.io_pipes._io_pipes_roi import roi_to_slicing_dict
 from ngio.io_pipes._io_pipes_utils import SlicingInputType
+from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
 from ngio.io_pipes._ops_transforms import TransformProtocol
-from ngio.io_pipes._utils import dask_match_shape, numpy_match_shape
-from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
+from ngio.io_pipes._zoom_transform import BaseZoomTransform
+
+##############################################################
+#
+# Numpy Pipes
+#
+##############################################################
 
 
 def _numpy_label_to_bool_mask(
@@ -28,7 +34,7 @@ def _numpy_label_to_bool_mask(
     data_shape: tuple[int, ...],
     label_axes: tuple[str, ...],
     data_axes: tuple[str, ...],
-    allow_resize: bool = True,
+    allow_rescaling: bool = True,
 ) -> np.ndarray:
     """Convert label data to a boolean mask."""
     if label is not None:
@@ -41,36 +47,69 @@ def _numpy_label_to_bool_mask(
         reference_shape=data_shape,
         array_axes=label_axes,
         reference_axes=data_axes,
-        allow_resize=allow_resize,
+        allow_rescaling=allow_rescaling,
     )
     return bool_mask
 
 
-def _dask_label_to_bool_mask(
-    label_data: DaskArray,
-    label: int | None,
-    data_shape: tuple[int, ...],
-    label_axes: tuple[str, ...],
-    data_axes: tuple[str, ...],
-    allow_resize: bool = True,
-) -> DaskArray:
-    """Convert label data to a boolean mask."""
-    if label is not None:
-        bool_mask = label_data == label
-    else:
-        bool_mask = label_data != 0
-
-    bool_mask = dask_match_shape(
-        array=bool_mask,
-        reference_shape=data_shape,
-        array_axes=label_axes,
-        reference_axes=data_axes,
-        allow_resize=allow_resize,
+def _setup_numpy_getters(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    allow_rescaling: bool = True,
+    remove_channel_selection: bool = False,
+) -> tuple[NumpyGetter, NumpyGetter, dict[str, SlicingInputType]]:
+    """Prepare slice kwargs for getting a masked array."""
+    slicing_dict = roi_to_slicing_dict(
+        roi=roi,
+        pixel_size=dimensions.pixel_size,
+        slicing_dict=slicing_dict,
     )
-    return bool_mask
+
+    data_getter = NumpyGetter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+    if allow_rescaling:
+        _zoom_transform = BaseZoomTransform(
+            input_dimensions=dimensions,
+            target_dimensions=label_dimensions,
+            order="nearest",
+        )
+        if label_transforms is None or len(label_transforms) == 0:
+            label_transforms = [_zoom_transform]
+        else:
+            label_transforms = [_zoom_transform, *label_transforms]
+
+    label_slicing_dict = roi_to_slicing_dict(
+        roi=roi,
+        pixel_size=label_dimensions.pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    label_data_getter = NumpyGetter(
+        zarr_array=label_zarr_array,
+        dimensions=label_dimensions,
+        axes_order=axes_order,
+        transforms=label_transforms,
+        slicing_dict=label_slicing_dict,
+        remove_channel_selection=True,
+    )
+    return data_getter, label_data_getter, slicing_dict
 
 
-class NumpyMaskedRoiGetter(DataGetter[np.ndarray]):
+class NumpyGetterMasked(DataGetter[np.ndarray]):
     def __init__(
         self,
         zarr_array: zarr.Array,
@@ -84,41 +123,30 @@ class NumpyMaskedRoiGetter(DataGetter[np.ndarray]):
         slicing_dict: dict[str, SlicingInputType] | None = None,
         label_slicing_dict: dict[str, SlicingInputType] | None = None,
         fill_value: int | float = 0,
-        allow_scaling: bool = True,
+        allow_rescaling: bool = True,
         remove_channel_selection: bool = False,
     ):
         """Prepare slice kwargs for getting a masked array."""
-        slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=dimensions.pixel_size,
-            slicing_dict=slicing_dict,
-        )
-        label_slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=label_dimensions.pixel_size,
-            slicing_dict=label_slicing_dict,
-        )
-        self._data_getter = NumpyGetter(
+        data_getter, label_data_getter, slicing_dict = _setup_numpy_getters(
             zarr_array=zarr_array,
             dimensions=dimensions,
+            label_zarr_array=label_zarr_array,
+            label_dimensions=label_dimensions,
+            roi=roi,
             axes_order=axes_order,
             transforms=transforms,
+            label_transforms=label_transforms,
             slicing_dict=slicing_dict,
+            label_slicing_dict=label_slicing_dict,
+            allow_rescaling=allow_rescaling,
             remove_channel_selection=remove_channel_selection,
         )
-
-        self._label_data_getter = NumpyGetter(
-            zarr_array=label_zarr_array,
-            dimensions=label_dimensions,
-            axes_order=axes_order,
-            transforms=label_transforms,
-            slicing_dict=label_slicing_dict,
-            remove_channel_selection=True,
-        )
+        self._data_getter = data_getter
+        self._label_data_getter = label_data_getter
 
         self._label_id = roi.label
         self._fill_value = fill_value
-        self._allow_scaling = allow_scaling
+        self._allow_rescaling = allow_rescaling
         super().__init__(
             zarr_array=zarr_array,
             slicing_ops=self._data_getter.slicing_ops,
@@ -140,13 +168,174 @@ class NumpyMaskedRoiGetter(DataGetter[np.ndarray]):
             data_shape=data.shape,
             label_axes=self._label_data_getter.axes_ops.in_memory_axes,
             data_axes=self._data_getter.axes_ops.in_memory_axes,
-            allow_resize=self._allow_scaling,
+            allow_rescaling=self._allow_rescaling,
         )
         masked_data = np.where(bool_mask, data, self._fill_value)
         return masked_data
 
 
-class DaskMaskedRoiGetter(DataGetter[DaskArray]):
+class NumpySetterMasked(DataSetter[np.ndarray]):
+    def __init__(
+        self,
+        zarr_array: zarr.Array,
+        dimensions: Dimensions,
+        label_zarr_array: zarr.Array,
+        label_dimensions: Dimensions,
+        roi: Roi | RoiPixels,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        label_transforms: Sequence[TransformProtocol] | None = None,
+        slicing_dict: dict[str, SlicingInputType] | None = None,
+        label_slicing_dict: dict[str, SlicingInputType] | None = None,
+        allow_rescaling: bool = True,
+        remove_channel_selection: bool = False,
+    ):
+        """Prepare slice kwargs for setting a masked array."""
+        _data_getter, _label_data_getter, slicing_dict = _setup_numpy_getters(
+            zarr_array=zarr_array,
+            dimensions=dimensions,
+            label_zarr_array=label_zarr_array,
+            label_dimensions=label_dimensions,
+            roi=roi,
+            axes_order=axes_order,
+            transforms=transforms,
+            label_transforms=label_transforms,
+            slicing_dict=slicing_dict,
+            label_slicing_dict=label_slicing_dict,
+            allow_rescaling=allow_rescaling,
+            remove_channel_selection=remove_channel_selection,
+        )
+        self._data_getter = _data_getter
+        self._label_data_getter = _label_data_getter
+        self._label_id = roi.label
+        self._allow_rescaling = allow_rescaling
+
+        self._data_setter = NumpySetter(
+            zarr_array=zarr_array,
+            dimensions=dimensions,
+            axes_order=axes_order,
+            transforms=transforms,
+            slicing_dict=slicing_dict,
+            remove_channel_selection=remove_channel_selection,
+        )
+        super().__init__(
+            zarr_array=zarr_array,
+            slicing_ops=self._data_setter.slicing_ops,
+            axes_ops=self._data_setter.axes_ops,
+            transforms=self._data_setter.transforms,
+        )
+
+    @property
+    def label_id(self) -> int | None:
+        return self._label_id
+
+    def set(self, patch: np.ndarray) -> None:
+        data = self._data_getter()
+        label_data = self._label_data_getter()
+        print(data.shape, label_data.shape)
+
+        bool_mask = _numpy_label_to_bool_mask(
+            label_data=label_data,
+            label=self.label_id,
+            data_shape=data.shape,
+            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
+            data_axes=self._data_getter.axes_ops.in_memory_axes,
+            allow_rescaling=self._allow_rescaling,
+        )
+        print(bool_mask.shape, patch.shape, data.shape)
+        mask_data = np.where(bool_mask, patch, data)
+        self._data_setter(mask_data)
+
+
+##############################################################
+#
+# Dask Pipes
+#
+##############################################################
+
+
+def _dask_label_to_bool_mask(
+    label_data: DaskArray,
+    label: int | None,
+    data_shape: tuple[int, ...],
+    label_axes: tuple[str, ...],
+    data_axes: tuple[str, ...],
+    allow_rescaling: bool = True,
+) -> DaskArray:
+    """Convert label data to a boolean mask."""
+    if label is not None:
+        bool_mask = label_data == label
+    else:
+        bool_mask = label_data != 0
+
+    bool_mask = dask_match_shape(
+        array=bool_mask,
+        reference_shape=data_shape,
+        array_axes=label_axes,
+        reference_axes=data_axes,
+        allow_rescaling=allow_rescaling,
+    )
+    return bool_mask
+
+
+def _setup_dask_getters(
+    zarr_array: zarr.Array,
+    dimensions: Dimensions,
+    label_zarr_array: zarr.Array,
+    label_dimensions: Dimensions,
+    roi: Roi | RoiPixels,
+    axes_order: Sequence[str] | None = None,
+    transforms: Sequence[TransformProtocol] | None = None,
+    label_transforms: Sequence[TransformProtocol] | None = None,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    label_slicing_dict: dict[str, SlicingInputType] | None = None,
+    allow_rescaling: bool = True,
+    remove_channel_selection: bool = False,
+) -> tuple[DaskGetter, DaskGetter, dict[str, SlicingInputType]]:
+    """Prepare slice kwargs for getting a masked array."""
+    slicing_dict = roi_to_slicing_dict(
+        roi=roi,
+        pixel_size=dimensions.pixel_size,
+        slicing_dict=slicing_dict,
+    )
+
+    data_getter = DaskGetter(
+        zarr_array=zarr_array,
+        dimensions=dimensions,
+        axes_order=axes_order,
+        transforms=transforms,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+    if allow_rescaling:
+        _zoom_transform = BaseZoomTransform(
+            input_dimensions=dimensions,
+            target_dimensions=label_dimensions,
+            order="nearest",
+        )
+        if label_transforms is None or len(label_transforms) == 0:
+            label_transforms = [_zoom_transform]
+        else:
+            label_transforms = [_zoom_transform, *label_transforms]
+
+    label_slicing_dict = roi_to_slicing_dict(
+        roi=roi,
+        pixel_size=label_dimensions.pixel_size,
+        slicing_dict=label_slicing_dict,
+    )
+    label_data_getter = DaskGetter(
+        zarr_array=label_zarr_array,
+        dimensions=label_dimensions,
+        axes_order=axes_order,
+        transforms=label_transforms,
+        slicing_dict=label_slicing_dict,
+        remove_channel_selection=True,
+    )
+    return data_getter, label_data_getter, slicing_dict
+
+
+class DaskGetterMasked(DataGetter[DaskArray]):
     def __init__(
         self,
         zarr_array: zarr.Array,
@@ -160,40 +349,29 @@ class DaskMaskedRoiGetter(DataGetter[DaskArray]):
         slicing_dict: dict[str, SlicingInputType] | None = None,
         label_slicing_dict: dict[str, SlicingInputType] | None = None,
         fill_value: int | float = 0,
-        allow_scaling: bool = True,
+        allow_rescaling: bool = True,
         remove_channel_selection: bool = False,
     ):
         """Prepare slice kwargs for getting a masked array."""
-        slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=dimensions.pixel_size,
-            slicing_dict=slicing_dict,
-        )
-        label_slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=label_dimensions.pixel_size,
-            slicing_dict=label_slicing_dict,
-        )
-        self._data_getter = DaskGetter(
+        _data_getter, _label_data_getter, slicing_dict = _setup_dask_getters(
             zarr_array=zarr_array,
             dimensions=dimensions,
+            label_zarr_array=label_zarr_array,
+            label_dimensions=label_dimensions,
+            roi=roi,
             axes_order=axes_order,
             transforms=transforms,
+            label_transforms=label_transforms,
             slicing_dict=slicing_dict,
+            label_slicing_dict=label_slicing_dict,
+            allow_rescaling=allow_rescaling,
             remove_channel_selection=remove_channel_selection,
         )
-
-        self._label_data_getter = DaskGetter(
-            zarr_array=label_zarr_array,
-            dimensions=label_dimensions,
-            axes_order=axes_order,
-            transforms=label_transforms,
-            slicing_dict=label_slicing_dict,
-            remove_channel_selection=True,
-        )
+        self._data_getter = _data_getter
+        self._label_data_getter = _label_data_getter
         self._label_id = roi.label
         self._fill_value = fill_value
-        self._allow_scaling = allow_scaling
+        self._allow_rescaling = allow_rescaling
         super().__init__(
             zarr_array=zarr_array,
             slicing_ops=self._data_getter.slicing_ops,
@@ -215,13 +393,13 @@ class DaskMaskedRoiGetter(DataGetter[DaskArray]):
             data_shape=data_shape,
             label_axes=self._label_data_getter.axes_ops.in_memory_axes,
             data_axes=self._data_getter.axes_ops.in_memory_axes,
-            allow_resize=self._allow_scaling,
+            allow_rescaling=self._allow_rescaling,
         )
         masked_data = da.where(bool_mask, data, self._fill_value)
         return masked_data
 
 
-class NumpyMaskedRoiSetter(DataSetter[np.ndarray]):
+class DaskSetterMasked(DataSetter[DaskArray]):
     def __init__(
         self,
         zarr_array: zarr.Array,
@@ -229,149 +407,34 @@ class NumpyMaskedRoiSetter(DataSetter[np.ndarray]):
         label_zarr_array: zarr.Array,
         label_dimensions: Dimensions,
         roi: Roi | RoiPixels,
-        pixel_size: PixelSize | None = None,
-        label_pixel_size: PixelSize | None = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
         label_slicing_dict: dict[str, SlicingInputType] | None = None,
-        data_getter: DataGetter[np.ndarray] | None = None,
-        label_data_getter: DataGetter[np.ndarray] | None = None,
-        allow_scaling: bool = True,
+        allow_rescaling: bool = True,
         remove_channel_selection: bool = False,
     ):
         """Prepare slice kwargs for setting a masked array."""
-        slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=dimensions.pixel_size,
-            slicing_dict=slicing_dict,
-        )
-        label_slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=label_dimensions.pixel_size,
-            slicing_dict=label_slicing_dict,
-        )
-
-        if data_getter is None:
-            self._data_getter = NumpyGetter(
-                zarr_array=zarr_array,
-                dimensions=dimensions,
-                axes_order=axes_order,
-                transforms=transforms,
-                slicing_dict=slicing_dict,
-                remove_channel_selection=remove_channel_selection,
-            )
-        else:
-            self._data_getter = data_getter
-
-        if label_data_getter is None:
-            self._label_data_getter = NumpyGetter(
-                zarr_array=label_zarr_array,
-                dimensions=label_dimensions,
-                axes_order=axes_order,
-                transforms=label_transforms,
-                slicing_dict=label_slicing_dict,
-                remove_channel_selection=True,
-            )
-        else:
-            self._label_data_getter = label_data_getter
-
-        self._data_setter = NumpySetter(
+        _data_getter, _label_data_getter, slicing_dict = _setup_dask_getters(
             zarr_array=zarr_array,
             dimensions=dimensions,
+            label_zarr_array=label_zarr_array,
+            label_dimensions=label_dimensions,
+            roi=roi,
             axes_order=axes_order,
             transforms=transforms,
+            label_transforms=label_transforms,
             slicing_dict=slicing_dict,
+            label_slicing_dict=label_slicing_dict,
+            allow_rescaling=allow_rescaling,
             remove_channel_selection=remove_channel_selection,
         )
+        self._data_getter = _data_getter
+        self._label_data_getter = _label_data_getter
 
         self._label_id = roi.label
-        self._allow_scaling = allow_scaling
-        super().__init__(
-            zarr_array=zarr_array,
-            slicing_ops=self._data_setter.slicing_ops,
-            axes_ops=self._data_setter.axes_ops,
-            transforms=self._data_setter.transforms,
-        )
-
-    @property
-    def label_id(self) -> int | None:
-        return self._label_id
-
-    def set(self, patch: np.ndarray) -> None:
-        data = self._data_getter()
-        label_data = self._label_data_getter()
-
-        bool_mask = _numpy_label_to_bool_mask(
-            label_data=label_data,
-            label=self.label_id,
-            data_shape=data.shape,
-            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
-            data_axes=self._data_getter.axes_ops.in_memory_axes,
-            allow_resize=self._allow_scaling,
-        )
-        mask_data = np.where(bool_mask, patch, data)
-        self._data_setter(mask_data)
-
-
-class DaskMaskedRoiSetter(DataSetter[DaskArray]):
-    def __init__(
-        self,
-        zarr_array: zarr.Array,
-        dimensions: Dimensions,
-        label_zarr_array: zarr.Array,
-        label_dimensions: Dimensions,
-        roi: Roi | RoiPixels,
-        pixel_size: PixelSize | None = None,
-        label_pixel_size: PixelSize | None = None,
-        axes_order: Sequence[str] | None = None,
-        transforms: Sequence[TransformProtocol] | None = None,
-        label_transforms: Sequence[TransformProtocol] | None = None,
-        slicing_dict: dict[str, SlicingInputType] | None = None,
-        label_slicing_dict: dict[str, SlicingInputType] | None = None,
-        data_getter: DataGetter[da.Array] | None = None,
-        label_data_getter: DataGetter[da.Array] | None = None,
-        allow_scaling: bool = True,
-        remove_channel_selection: bool = False,
-    ):
-        """Prepare slice kwargs for setting a masked array."""
-        slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=dimensions.pixel_size,
-            slicing_dict=slicing_dict,
-        )
-        label_slicing_dict = roi_to_slicing_dict(
-            roi=roi,
-            pixel_size=label_dimensions.pixel_size,
-            slicing_dict=label_slicing_dict,
-        )
-
-        if data_getter is None:
-            self._data_getter = DaskGetter(
-                zarr_array=zarr_array,
-                dimensions=dimensions,
-                axes_order=axes_order,
-                transforms=transforms,
-                slicing_dict=slicing_dict,
-                remove_channel_selection=remove_channel_selection,
-            )
-        else:
-            self._data_getter = data_getter
-
-        if label_data_getter is None:
-            self._label_data_getter = DaskGetter(
-                zarr_array=label_zarr_array,
-                dimensions=label_dimensions,
-                axes_order=axes_order,
-                transforms=label_transforms,
-                slicing_dict=label_slicing_dict,
-                remove_channel_selection=True,
-            )
-        else:
-            self._label_data_getter = label_data_getter
-        self._label_id = roi.label
-        self._allow_scaling = allow_scaling
+        self._allow_rescaling = allow_rescaling
 
         self._data_setter = DaskSetter(
             zarr_array=zarr_array,
@@ -404,7 +467,7 @@ class DaskMaskedRoiSetter(DataSetter[DaskArray]):
             data_shape=data_shape,
             label_axes=self._label_data_getter.axes_ops.in_memory_axes,
             data_axes=self._data_getter.axes_ops.in_memory_axes,
-            allow_resize=self._allow_scaling,
+            allow_rescaling=self._allow_rescaling,
         )
         mask_data = da.where(bool_mask, patch, data)
         self._data_setter(mask_data)

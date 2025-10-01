@@ -9,10 +9,10 @@ from ngio.io_pipes._io_pipes import (
     NumpySetter,
 )
 from ngio.io_pipes._io_pipes_masked import (
-    DaskMaskedRoiGetter,
-    DaskMaskedRoiSetter,
-    NumpyMaskedRoiGetter,
-    NumpyMaskedRoiSetter,
+    DaskGetterMasked,
+    DaskSetterMasked,
+    NumpyGetterMasked,
+    NumpySetterMasked,
 )
 from ngio.io_pipes._io_pipes_roi import (
     DaskRoiGetter,
@@ -21,26 +21,29 @@ from ngio.io_pipes._io_pipes_roi import (
     NumpyRoiSetter,
 )
 from ngio.io_pipes._io_pipes_utils import SlicingInputType
+from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
 from ngio.io_pipes._ops_slices import SlicingOps, SlicingType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 
 __all__ = [
     "DaskGetter",
-    "DaskMaskedRoiGetter",
-    "DaskMaskedRoiSetter",
+    "DaskGetterMasked",
     "DaskRoiGetter",
     "DaskRoiSetter",
     "DaskSetter",
+    "DaskSetterMasked",
     "DataGetter",
     "DataSetter",
     "NumpyGetter",
-    "NumpyMaskedRoiGetter",
-    "NumpyMaskedRoiSetter",
+    "NumpyGetterMasked",
     "NumpyRoiGetter",
     "NumpyRoiSetter",
     "NumpySetter",
+    "NumpySetterMasked",
     "SlicingInputType",
     "SlicingOps",
     "SlicingType",
     "TransformProtocol",
+    "dask_match_shape",
+    "numpy_match_shape",
 ]

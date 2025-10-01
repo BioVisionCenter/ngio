@@ -165,7 +165,7 @@ def _compute_reshape_and_actions(
     array_axes: list[str],
     reference_axes: list[str],
     tolerance: int = 1,
-    allow_resize: bool = True,
+    allow_rescaling: bool = True,
 ) -> tuple[tuple[int, ...], list[Action]]:
     # Reshape array to match reference shape
     # And determine actions to be taken
@@ -188,7 +188,7 @@ def _compute_reshape_and_actions(
             elif s2 < ref_shape:
                 if (ref_shape - s2) <= tolerance:
                     actions.append(Action.PAD)
-                elif allow_resize:
+                elif allow_rescaling:
                     actions.append(Action.RESIZE)
                 else:
                     errors.append(
@@ -199,7 +199,7 @@ def _compute_reshape_and_actions(
             elif s2 > ref_shape:
                 if (s2 - ref_shape) <= tolerance:
                     actions.append(Action.TRIM)
-                elif allow_resize:
+                elif allow_rescaling:
                     actions.append(Action.RESIZE)
                 else:
                     errors.append(
@@ -230,7 +230,7 @@ def numpy_match_shape(
     allow_broadcast: bool = True,
     pad_mode: str = "constant",
     pad_values: int | float = 0,
-    allow_resize: bool = True,
+    allow_rescaling: bool = True,
 ):
     """Match the shape of a numpy array to a reference shape.
 
@@ -254,7 +254,7 @@ def numpy_match_shape(
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
         pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
-        allow_resize (bool): If True, when the array differs more than the
+        allow_rescaling (bool): If True, when the array differs more than the
             tolerance, it will be resized to the reference shape. If False,
             an error will be raised.
     """
@@ -277,7 +277,7 @@ def numpy_match_shape(
         array_axes=array_axes,
         reference_axes=reference_axes,
         tolerance=tolerance,
-        allow_resize=allow_resize,
+        allow_rescaling=allow_rescaling,
     )
     array = array.reshape(reshape_tuple)
     array = _numpy_resize(array=array, actions=actions, target_shape=reference_shape)
@@ -303,7 +303,7 @@ def dask_match_shape(
     allow_broadcast: bool = True,
     pad_mode: str = "constant",
     pad_values: int | float = 0,
-    allow_resize: bool = True,
+    allow_rescaling: bool = True,
 ) -> da.Array:
     """Match the shape of a dask array to a reference shape.
 
@@ -327,7 +327,7 @@ def dask_match_shape(
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
         pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
-        allow_resize (bool): If True, when the array differs more than the
+        allow_rescaling (bool): If True, when the array differs more than the
             tolerance, it will be resized to the reference shape. If False,
             an error will be raised.
     """
@@ -351,7 +351,7 @@ def dask_match_shape(
         array_axes=array_axes,
         reference_axes=reference_axes,
         tolerance=tolerance,
-        allow_resize=allow_resize,
+        allow_rescaling=allow_rescaling,
     )
     array = da.reshape(array, reshape_tuple)
     array = _dask_resize(array=array, actions=actions, target_shape=reference_shape)

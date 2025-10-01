@@ -10,7 +10,7 @@ from ngio.common._zoom import (
     dask_zoom,
     numpy_zoom,
 )
-from ngio.io_pipes import SlicingOps
+from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.ome_zarr_meta import AxesOps
 
 
