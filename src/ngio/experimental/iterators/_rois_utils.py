@@ -100,10 +100,10 @@ def by_chunks(
 ) -> list[Roi]:
     """This method is a placeholder for chunked processing."""
     chunk_size = ref_image.chunks
-    t_axis = ref_image.axes_mapper.get_index("t")
-    z_axis = ref_image.axes_mapper.get_index("z")
-    y_axis = ref_image.axes_mapper.get_index("y")
-    x_axis = ref_image.axes_mapper.get_index("x")
+    t_axis = ref_image.axes_handler.get_index("t")
+    z_axis = ref_image.axes_handler.get_index("z")
+    y_axis = ref_image.axes_handler.get_index("y")
+    x_axis = ref_image.axes_handler.get_index("x")
 
     size_x = chunk_size[x_axis] if x_axis is not None else None
     size_y = chunk_size[y_axis] if y_axis is not None else None

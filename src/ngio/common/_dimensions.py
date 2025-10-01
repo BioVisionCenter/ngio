@@ -148,7 +148,7 @@ class Dimensions:
             return False
         return True
 
-    def assert_axes_match(self, other: "Dimensions") -> None:
+    def require_axes_match(self, other: "Dimensions") -> None:
         """Check if two Dimensions objects have the same axes.
 
         Besides the channel axis (which is a special case), all axes must be
@@ -160,27 +160,9 @@ class Dimensions:
         Raises:
             NgioValueError: If the axes do not match.
         """
-        for s_axis in self.axes_handler.axes:
-            if s_axis.axis_type == "channel":
-                continue
-            o_axis = other.axes_handler.get_axis(s_axis.name)
-            if o_axis is None:
-                raise NgioValueError(
-                    f"Axes do not match. The axis {s_axis.name} "
-                    f"is not present in either dimensions."
-                )
-        # Check for axes present in the other dimensions but not in this one
-        for o_axis in other.axes_handler.axes:
-            if o_axis.axis_type == "channel":
-                continue
-            s_axis = self.axes_handler.get_axis(o_axis.name)
-            if s_axis is None:
-                raise NgioValueError(
-                    f"Axes do not match. The axis {o_axis.name} "
-                    f"is not present in either dimensions."
-                )
+        require_axes_match(self, other)
 
-    def assert_dimensions_match(
+    def require_dimensions_match(
         self, other: "Dimensions", allow_singleton: bool = False
     ) -> None:
         """Check if two Dimensions objects have the same axes and dimensions.
@@ -197,25 +179,9 @@ class Dimensions:
         Raises:
             NgioValueError: If the dimensions do not match.
         """
-        self.assert_axes_match(other)
-        for s_axis in self.axes_handler.axes:
-            if s_axis.axis_type == "channel":
-                continue
-            o_axis = other.axes_handler.get_axis(s_axis.name)
-            assert o_axis is not None  # already checked in assert_axes_match
+        require_dimensions_match(self, other, allow_singleton)
 
-            i_dim = self.get(s_axis.name, default=1)
-            o_dim = other.get(o_axis.name, default=1)
-
-            if i_dim != o_dim:
-                if allow_singleton and (i_dim == 1 or o_dim == 1):
-                    continue
-                raise NgioValueError(
-                    f"Dimensions do not match for axis "
-                    f"{s_axis.name}. Got {i_dim} and {o_dim}."
-                )
-
-    def assert_can_be_rescaled(self, other: "Dimensions") -> None:
+    def require_can_be_rescaled(self, other: "Dimensions") -> None:
         """Assert that two images can be rescaled.
 
         For this to be true, the images must have the same axes, and
@@ -225,29 +191,7 @@ class Dimensions:
             other (Dimensions): The other dimensions object to compare against.
 
         """
-        self.assert_axes_match(other)
-        for ax1 in self.axes_handler.axes:
-            if ax1.axis_type == "channel":
-                continue
-            ax2 = other.axes_handler.get_axis(ax1.name)
-            assert ax2 is not None, "Axes do not match."
-            px1 = self.pixel_size.get(ax1.name, default=1.0)
-            px2 = other.pixel_size.get(ax2.name, default=1.0)
-            shape1 = self.get(ax1.name, default=1)
-            shape2 = other.get(ax2.name, default=1)
-            scale = px1 / px2
-            if not _are_compatible(
-                shape1=shape1,
-                shape2=shape2,
-                scaling=scale,
-            ):
-                raise NgioValueError(
-                    f"Image1 with shape {self.shape}, "
-                    f"and pixel size {self.pixel_size}, "
-                    f"cannot be rescaled to "
-                    f"Image2 with shape {other.shape}, "
-                    f"and pixel size {other.pixel_size}. "
-                )
+        require_rescalable(self, other)
 
 
 def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
@@ -262,3 +206,110 @@ def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
     expected_shape2_floor = math.floor(expected_shape2)
     expected_shape2_ceil = math.ceil(expected_shape2)
     return shape2 in {expected_shape2_floor, expected_shape2_ceil}
+
+
+def require_axes_match(dimensions1: Dimensions, dimensions2: Dimensions) -> None:
+    """Check if two Dimensions objects have the same axes.
+
+    Besides the channel axis (which is a special case), all axes must be
+    present in both Dimensions objects.
+
+    Args:
+        dimensions1 (Dimensions): The first dimensions object to compare against.
+        dimensions2 (Dimensions): The second dimensions object to compare against.
+
+    Raises:
+        NgioValueError: If the axes do not match.
+    """
+    for s_axis in dimensions1.axes_handler.axes:
+        if s_axis.axis_type == "channel":
+            continue
+        o_axis = dimensions2.axes_handler.get_axis(s_axis.name)
+        if o_axis is None:
+            raise NgioValueError(
+                f"Axes do not match. The axis {s_axis.name} "
+                f"is not present in either dimensions."
+            )
+    # Check for axes present in the other dimensions but not in this one
+    for o_axis in dimensions2.axes_handler.axes:
+        if o_axis.axis_type == "channel":
+            continue
+        s_axis = dimensions1.axes_handler.get_axis(o_axis.name)
+        if s_axis is None:
+            raise NgioValueError(
+                f"Axes do not match. The axis {o_axis.name} "
+                f"is not present in either dimensions."
+            )
+
+
+def require_dimensions_match(
+    dimensions1: Dimensions, dimensions2: Dimensions, allow_singleton: bool = False
+) -> None:
+    """Check if two Dimensions objects have the same axes and dimensions.
+
+    Besides the channel axis, all axes must have the same dimension in
+    both images.
+
+    Args:
+        dimensions1 (Dimensions): The first dimensions object to compare against.
+        dimensions2 (Dimensions): The second dimensions object to compare against.
+        allow_singleton (bool): Whether to allow singleton dimensions to be
+            different. For example, if the input image has shape
+            (5, 100, 100) and the label has shape (1, 100, 100).
+
+    Raises:
+        NgioValueError: If the dimensions do not match.
+    """
+    require_axes_match(dimensions1, dimensions2)
+    for s_axis in dimensions1.axes_handler.axes:
+        if s_axis.axis_type == "channel":
+            continue
+        o_axis = dimensions2.axes_handler.get_axis(s_axis.name)
+        assert o_axis is not None  # already checked in assert_axes_match
+
+        i_dim = dimensions1.get(s_axis.name, default=1)
+        o_dim = dimensions2.get(o_axis.name, default=1)
+
+        if i_dim != o_dim:
+            if allow_singleton and (i_dim == 1 or o_dim == 1):
+                continue
+            raise NgioValueError(
+                f"Dimensions do not match for axis "
+                f"{s_axis.name}. Got {i_dim} and {o_dim}."
+            )
+
+
+def require_rescalable(dimensions1: Dimensions, dimensions2: Dimensions) -> None:
+    """Assert that two images can be rescaled.
+
+    For this to be true, the images must have the same axes, and
+    the pixel sizes must be compatible (i.e. one can be scaled to the other).
+
+    Args:
+        dimensions1 (Dimensions): The first dimensions object to compare against.
+        dimensions2 (Dimensions): The second dimensions object to compare against.
+
+    """
+    require_axes_match(dimensions1, dimensions2)
+    for ax1 in dimensions1.axes_handler.axes:
+        if ax1.axis_type == "channel":
+            continue
+        ax2 = dimensions2.axes_handler.get_axis(ax1.name)
+        assert ax2 is not None, "Axes do not match."
+        px1 = dimensions1.pixel_size.get(ax1.name, default=1.0)
+        px2 = dimensions2.pixel_size.get(ax2.name, default=1.0)
+        shape1 = dimensions1.get(ax1.name, default=1)
+        shape2 = dimensions2.get(ax2.name, default=1)
+        scale = px1 / px2
+        if not _are_compatible(
+            shape1=shape1,
+            shape2=shape2,
+            scaling=scale,
+        ):
+            raise NgioValueError(
+                f"Image1 with shape {dimensions1.shape}, "
+                f"and pixel size {dimensions1.pixel_size}, "
+                f"cannot be rescaled to "
+                f"Image2 with shape {dimensions2.shape}, "
+                f"and pixel size {dimensions2.pixel_size}. "
+            )

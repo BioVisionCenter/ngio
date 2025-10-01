@@ -71,7 +71,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 
-        self._input.assert_dimensions_match(self._output, allow_singleton=True)
+        self._input.require_dimensions_match(self._output, allow_singleton=True)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""

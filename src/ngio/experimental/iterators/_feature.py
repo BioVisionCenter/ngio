@@ -54,8 +54,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
         self._input_transforms = input_transforms
         self._label_transforms = label_transforms
 
-        self._input.assert_axes_match(self._input_label)
-        self._input.assert_can_be_rescaled(self._input_label)
+        self._input.require_axes_match(self._input_label)
+        self._input.require_can_be_rescaled(self._input_label)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""

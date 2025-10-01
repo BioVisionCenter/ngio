@@ -52,9 +52,9 @@ def test_image_asserts_axes_match(
 
     if should_raise:
         with pytest.raises(NgioValueError):
-            img1.assert_axes_match(img2)
+            img1.require_axes_match(img2)
     else:
-        img1.assert_axes_match(img2)
+        img1.require_axes_match(img2)
 
 
 @pytest.mark.parametrize(
@@ -84,9 +84,9 @@ def test_image_asserts_dimensions_match(
 
     if should_raise:
         with pytest.raises(NgioValueError):
-            img1.assert_dimensions_match(img2, allow_singleton=allow_singleton)
+            img1.require_dimensions_match(img2, allow_singleton=allow_singleton)
     else:
-        img1.assert_dimensions_match(img2, allow_singleton=allow_singleton)
+        img1.require_dimensions_match(img2, allow_singleton=allow_singleton)
 
 
 @pytest.mark.parametrize(
@@ -120,10 +120,10 @@ def test_image_assert_can_be_rescaled(
     # Also test with transforms
     if should_raise:
         with pytest.raises(NgioValueError):
-            img1.assert_can_be_rescaled(img2)
+            img1.require_can_be_rescaled(img2)
         return None
 
-    img1.assert_can_be_rescaled(img2)
+    img1.require_can_be_rescaled(img2)
 
     # Also test with transforms
     zoom = ZoomTransform(
@@ -169,7 +169,7 @@ def test_image_assert_can_be_rescaled2(
     # Also test with transforms
     if should_raise:
         with pytest.raises(NgioValueError):
-            img2.assert_can_be_rescaled(img1)
+            img2.require_can_be_rescaled(img1)
         return None
     zoom = ZoomTransform(
         input_image=img2,

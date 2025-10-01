@@ -5,46 +5,9 @@ import dask.array as da
 import numpy as np
 from scipy.ndimage import zoom as scipy_zoom
 
-from ngio.common._dimensions import Dimensions
-from ngio.ome_zarr_meta import PixelSize
 from ngio.utils import NgioValueError
 
 InterpolationOrder = Literal["nearest", "linear", "cubic"]
-
-
-def scale_factor_from_dimensions(
-    original_dimension: Dimensions,
-    target_dimension: Dimensions,
-) -> tuple[float, ...]:
-    """Compute the scale factor from original and target Dimensions."""
-    scale = []
-    for o_ax_name in original_dimension.axes_handler.axes_names:
-        t_ax = target_dimension.axes_handler.get_axis(name=o_ax_name)
-        if t_ax is None:
-            _scale = 1
-        else:
-            t_shape = target_dimension.get(o_ax_name)
-            o_shape = original_dimension.get(o_ax_name)
-            assert t_shape is not None and o_shape is not None
-            _scale = t_shape / o_shape
-        scale.append(_scale)
-    return tuple(scale)
-
-
-def scale_factor_from_pixel_size(
-    original_dimension: Dimensions,
-    original_pixel_size: PixelSize,
-    target_pixel_size: PixelSize,
-) -> tuple[float, ...]:
-    """Compute the scale factor from original and target PixelSize."""
-    scale = []
-    for o_ax_name in original_dimension.axes_handler.axes_names:
-        t_px = target_pixel_size.get(o_ax_name, default=1.0)
-        o_px = original_pixel_size.get(o_ax_name, default=1.0)
-        assert t_px is not None and o_px is not None
-        _scale = o_px / t_px
-        scale.append(_scale)
-    return tuple(scale)
 
 
 def order_to_int(order: InterpolationOrder | Literal[0, 1, 2]) -> Literal[0, 1, 2]:

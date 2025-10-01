@@ -1,6 +1,5 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
-import math
 from collections.abc import Sequence
 from typing import Generic, Literal, TypeVar
 
@@ -36,7 +35,6 @@ from ngio.ome_zarr_meta import (
 )
 from ngio.tables import RoiTable
 from ngio.utils import NgioFileExistsError, ZarrGroupHandler
-from ngio.utils._errors import NgioValueError
 
 _image_handler = TypeVar("_image_handler", ImageMetaHandler, LabelMetaHandler)
 
@@ -100,8 +98,8 @@ class AbstractImage(Generic[_image_handler]):
         return self.dataset.pixel_size
 
     @property
-    def axes_mapper(self) -> AxesHandler:
-        """Return the axes mapper of the image."""
+    def axes_handler(self) -> AxesHandler:
+        """Return the axes handler of the image."""
         return self.dataset.axes_handler
 
     @property
@@ -162,16 +160,15 @@ class AbstractImage(Generic[_image_handler]):
     @property
     def space_unit(self) -> str | None:
         """Return the space unit of the image."""
-        return self.meta_handler.meta.space_unit
+        return self.axes_handler.space_unit
 
     @property
     def time_unit(self) -> str | None:
         """Return the time unit of the image."""
-        return self.meta_handler.meta.time_unit
+        return self.axes_handler.time_unit
 
     def has_axis(self, axis: str) -> bool:
         """Return True if the image has the given axis."""
-        self.axes_mapper.get_index("x")
         return self.dimensions.has_axis(axis)
 
     def _get_as_numpy(
@@ -441,11 +438,33 @@ class AbstractImage(Generic[_image_handler]):
         """
         consolidate_image(image=self, order=order, mode=mode)
 
+    def roi(self, name: str | None = "image") -> Roi:
+        """Return the ROI covering the entire image."""
+        dim_x = self.dimensions.get("x")
+        dim_y = self.dimensions.get("y")
+        assert dim_x is not None and dim_y is not None
+        dim_z = self.dimensions.get("z")
+        z = None if dim_z is None else 0
+        dim_t = self.dimensions.get("t")
+        t = None if dim_t is None else 0
+        roi_px = RoiPixels(
+            name=name,
+            x=0,
+            y=0,
+            z=z,
+            t=t,
+            x_length=dim_x,
+            y_length=dim_y,
+            z_length=dim_z,
+            t_length=dim_t,
+        )
+        return roi_px.to_roi(pixel_size=self.pixel_size)
+
     def build_image_roi_table(self, name: str | None = "image") -> RoiTable:
         """Build the ROI table for an image."""
-        return build_image_roi_table(image=self, name=name)
+        return RoiTable(rois=[self.roi(name=name)])
 
-    def assert_dimensions_match(
+    def require_dimensions_match(
         self,
         other: "AbstractImage",
         allow_singleton: bool = False,
@@ -460,11 +479,11 @@ class AbstractImage(Generic[_image_handler]):
         Raises:
             NgioValueError: If the images do not have compatible dimensions.
         """
-        assert_dimensions_match(
-            image1=self, image2=other, allow_singleton=allow_singleton
+        self.dimensions.require_dimensions_match(
+            other.dimensions, allow_singleton=allow_singleton
         )
 
-    def assert_axes_match(
+    def require_axes_match(
         self,
         other: "AbstractImage",
     ) -> None:
@@ -476,9 +495,9 @@ class AbstractImage(Generic[_image_handler]):
         Raises:
             NgioValueError: If the images do not have compatible axes.
         """
-        assert_axes_match(image1=self, image2=other)
+        self.dimensions.require_axes_match(other.dimensions)
 
-    def assert_can_be_rescaled(
+    def require_can_be_rescaled(
         self,
         other: "AbstractImage",
     ) -> None:
@@ -493,7 +512,7 @@ class AbstractImage(Generic[_image_handler]):
         Raises:
             NgioValueError: If the images cannot be scaled to each other.
         """
-        assert_can_be_rescaled(image1=self, image2=other)
+        self.dimensions.require_can_be_rescaled(other.dimensions)
 
 
 def consolidate_image(
@@ -511,118 +530,3 @@ def consolidate_image(
     consolidate_pyramid(
         source=image.zarr_array, targets=targets, order=order, mode=mode
     )
-
-
-def build_image_roi_table(image: AbstractImage, name: str | None = "image") -> RoiTable:
-    """Build the ROI table for an image."""
-    dim_x = image.dimensions.get("x")
-    dim_y = image.dimensions.get("y")
-    assert dim_x is not None and dim_y is not None
-    dim_z = image.dimensions.get("z")
-    z = None if dim_z is None else 0
-    dim_t = image.dimensions.get("t")
-    t = None if dim_t is None else 0
-    image_roi = RoiPixels(
-        name=name,
-        x=0,
-        y=0,
-        z=z,
-        t=t,
-        x_length=dim_x,
-        y_length=dim_y,
-        z_length=dim_z,
-        t_length=dim_t,
-    )
-    return RoiTable(rois=[image_roi.to_roi(pixel_size=image.pixel_size)])
-
-
-def assert_dimensions_match(
-    image1: AbstractImage,
-    image2: AbstractImage,
-    allow_singleton: bool = False,
-) -> None:
-    """Assert that two images have matching spatial dimensions.
-
-    Args:
-        image1: The first image.
-        image2: The second image.
-        allow_singleton: If True, allow singleton dimensions to be
-            compatible with non-singleton dimensions.
-
-    Raises:
-        NgioValueError: If the images do not have compatible dimensions.
-    """
-    image1.dimensions.assert_dimensions_match(
-        other=image2.dimensions, allow_singleton=allow_singleton
-    )
-
-
-def assert_axes_match(
-    image1: AbstractImage,
-    image2: AbstractImage,
-) -> None:
-    """Assert that two images have compatible axes.
-
-    Args:
-        image1: The first image.
-        image2: The second image.
-
-    Raises:
-        NgioValueError: If the images do not have compatible axes.
-    """
-    image1.dimensions.assert_axes_match(other=image2.dimensions)
-
-
-def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
-    """Check if shape2 is consistent with shape1 given pixel sizes.
-
-    Since we only deal with shape discrepancies due to rounding, we
-    shape1, needs to be larger than shape2.
-    """
-    if shape1 < shape2:
-        return _are_compatible(shape2, shape1, 1 / scaling)
-    expected_shape2 = shape1 * scaling
-    expected_shape2_floor = math.floor(expected_shape2)
-    expected_shape2_ceil = math.ceil(expected_shape2)
-    return shape2 in {expected_shape2_floor, expected_shape2_ceil}
-
-
-def assert_can_be_rescaled(
-    image1: AbstractImage,
-    image2: AbstractImage,
-) -> None:
-    """Assert that two images can be rescaled to each other.
-
-    For this to be true, the images must have the same axes, and
-    the pixel sizes must be compatible (i.e. one can be scaled to the other).
-
-    Args:
-        image1: The first image.
-        image2: The second image.
-
-    Raises:
-        NgioValueError: If the images cannot be scaled to each other.
-    """
-    assert_axes_match(image1=image1, image2=image2)
-    for ax1 in image1.dimensions.axes_handler.axes:
-        if ax1.axis_type == "channel":
-            continue
-        ax2 = image2.dimensions.axes_handler.get_axis(ax1.name)
-        assert ax2 is not None, "Axes do not match."
-        px1 = image1.pixel_size.get(ax1.name, default=1.0)
-        px2 = image2.pixel_size.get(ax2.name, default=1.0)
-        shape1 = image1.dimensions.get(ax1.name, default=1)
-        shape2 = image2.dimensions.get(ax2.name, default=1)
-        scale = px1 / px2
-        if not _are_compatible(
-            shape1=shape1,
-            shape2=shape2,
-            scaling=scale,
-        ):
-            raise NgioValueError(
-                f"Image1 with shape {image1.shape}, "
-                f"and pixel size {image1.pixel_size}, "
-                f"cannot be rescaled to "
-                f"Image2 with shape {image2.shape}, "
-                f"and pixel size {image2.pixel_size}. "
-            )
