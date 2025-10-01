@@ -4,20 +4,14 @@ This is not related to the NGFF metadata,
 but it is based on the actual metadata of the image data.
 """
 
-from collections.abc import Sequence
+import math
 from typing import overload
 
 from ngio.ome_zarr_meta import (
     AxesHandler,
-    build_canonical_axes_handler,
 )
-from ngio.ome_zarr_meta.ngio_specs import (
-    AxesSetup,
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
-    SpaceUnits,
-    TimeUnits,
-)
+from ngio.ome_zarr_meta.ngio_specs._dataset import Dataset
+from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValueError
 
 
@@ -32,16 +26,17 @@ class Dimensions:
     def __init__(
         self,
         shape: tuple[int, ...],
-        axes_handler: AxesHandler,
+        dataset: Dataset,
     ) -> None:
         """Create a Dimension object from a Zarr array.
 
         Args:
             shape: The shape of the Zarr array.
-            axes_handler: The axes handler object.
+            dataset: The dataset object.
         """
         self._shape = shape
-        self._axes_handler = axes_handler
+        self._axes_handler = dataset.axes_handler
+        self._pixel_size = dataset.pixel_size
 
         if len(self._shape) != len(self._axes_handler.axes):
             raise NgioValueError(
@@ -49,29 +44,6 @@ class Dimensions:
                 f"Expected Axis {self._axes_handler.axes_names} but got shape "
                 f"{self._shape}."
             )
-
-    @classmethod
-    def default_init(
-        cls,
-        shape: tuple[int, ...],
-        axes_names: Sequence[str],
-        space_units: SpaceUnits | str | None = DefaultSpaceUnit,
-        time_units: TimeUnits | str | None = DefaultTimeUnit,
-        # user defined args
-        axes_setup: AxesSetup | None = None,
-        allow_non_canonical_axes: bool = False,
-        strict_canonical_order: bool = False,
-    ) -> "Dimensions":
-        """Create a Dimension object from a shape and axes names."""
-        axes_handler = build_canonical_axes_handler(
-            axes_names=axes_names,
-            space_units=space_units,
-            time_units=time_units,
-            axes_setup=axes_setup,
-            allow_non_canonical_axes=allow_non_canonical_axes,
-            strict_canonical_order=strict_canonical_order,
-        )
-        return cls(shape=shape, axes_handler=axes_handler)
 
     def __str__(self) -> str:
         """Return the string representation of the object."""
@@ -89,6 +61,11 @@ class Dimensions:
     def axes_handler(self) -> AxesHandler:
         """Return the axes handler object."""
         return self._axes_handler
+
+    @property
+    def pixel_size(self) -> PixelSize:
+        """Return the pixel size object."""
+        return self._pixel_size
 
     @property
     def shape(self) -> tuple[int, ...]:
@@ -164,14 +141,6 @@ class Dimensions:
         """
         return self.axes_handler.get_index(axis_name)
 
-    def get_pixel_size(self, axis_name: str) -> float | None:
-        """Return the pixel size of the given axis name.
-
-        Args:
-            axis_name: The name of the axis (either canonical or non-canonical).
-        """
-        pass
-
     def has_axis(self, axis_name: str) -> bool:
         """Return whether the axis exists."""
         index = self.axes_handler.get_index(axis_name)
@@ -245,3 +214,51 @@ class Dimensions:
                     f"Dimensions do not match for axis "
                     f"{s_axis.name}. Got {i_dim} and {o_dim}."
                 )
+
+    def assert_can_be_rescaled(self, other: "Dimensions") -> None:
+        """Assert that two images can be rescaled.
+
+        For this to be true, the images must have the same axes, and
+        the pixel sizes must be compatible (i.e. one can be scaled to the other).
+
+        Args:
+            other (Dimensions): The other dimensions object to compare against.
+
+        """
+        self.assert_axes_match(other)
+        for ax1 in self.axes_handler.axes:
+            if ax1.axis_type == "channel":
+                continue
+            ax2 = other.axes_handler.get_axis(ax1.name)
+            assert ax2 is not None, "Axes do not match."
+            px1 = self.pixel_size.get(ax1.name, default=1.0)
+            px2 = other.pixel_size.get(ax2.name, default=1.0)
+            shape1 = self.get(ax1.name, default=1)
+            shape2 = other.get(ax2.name, default=1)
+            scale = px1 / px2
+            if not _are_compatible(
+                shape1=shape1,
+                shape2=shape2,
+                scaling=scale,
+            ):
+                raise NgioValueError(
+                    f"Image1 with shape {self.shape}, "
+                    f"and pixel size {self.pixel_size}, "
+                    f"cannot be rescaled to "
+                    f"Image2 with shape {other.shape}, "
+                    f"and pixel size {other.pixel_size}. "
+                )
+
+
+def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
+    """Check if shape2 is consistent with shape1 given pixel sizes.
+
+    Since we only deal with shape discrepancies due to rounding, we
+    shape1, needs to be larger than shape2.
+    """
+    if shape1 < shape2:
+        return _are_compatible(shape2, shape1, 1 / scaling)
+    expected_shape2 = shape1 * scaling
+    expected_shape2_floor = math.floor(expected_shape2)
+    expected_shape2_ceil = math.ceil(expected_shape2)
+    return shape2 in {expected_shape2_floor, expected_shape2_ceil}

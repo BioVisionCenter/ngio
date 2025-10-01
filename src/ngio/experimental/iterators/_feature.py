@@ -74,7 +74,6 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
@@ -83,7 +82,6 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
             transforms=self._label_transforms,
-            pixel_size=self._input_label.pixel_size,
             roi=roi,
             remove_channel_selection=True,
         )
@@ -98,7 +96,6 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
@@ -107,7 +104,6 @@ class FeatureExtractorIterator(AbstractIteratorBuilder):
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
             transforms=self._label_transforms,
-            pixel_size=self._input_label.pixel_size,
             roi=roi,
             remove_channel_selection=True,
         )

@@ -7,7 +7,7 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
 from typing import TypeVar
 from warnings import warn
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from ngio.common._dimensions import Dimensions
 from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnits
@@ -35,13 +35,6 @@ def _to_world(value: int | float, pixel_size: float) -> float:
 
 
 T = TypeVar("T", int, float)
-
-
-class BaseDimensions(BaseModel):
-    dim_x: int | None = None
-    dim_y: int | None = None
-    dim_z: int | None = None
-    dim_t: int | None = None
 
 
 class GenericRoi(BaseModel):
@@ -201,20 +194,8 @@ class Roi(GenericRoi):
     y: float = 0.0
     unit: SpaceUnits | str | None = DefaultSpaceUnit
 
-    def to_roi_pixels(
-        self, pixel_size: PixelSize, dimensions: Dimensions | None = None
-    ) -> "RoiPixels":
+    def to_roi_pixels(self, pixel_size: PixelSize) -> "RoiPixels":
         """Convert to raster coordinates."""
-        if dimensions is None:
-            _dimensions = BaseDimensions()
-        else:
-            _dimensions = BaseDimensions(
-                dim_x=dimensions.get("x"),
-                dim_y=dimensions.get("y"),
-                dim_z=dimensions.get("z"),
-                dim_t=dimensions.get("t"),
-            )
-
         x, x_length = _to_raster(self.x, self.x_length, pixel_size.x)
         y, y_length = _to_raster(self.y, self.y_length, pixel_size.y)
 
@@ -243,7 +224,6 @@ class Roi(GenericRoi):
             t_length=t_length,
             label=self.label,
             unit=self.unit,
-            dimensions=_dimensions,
             **extra_dict,
         )
 
@@ -258,7 +238,7 @@ class Roi(GenericRoi):
             stacklevel=2,
         )
 
-        return self.to_roi_pixels(pixel_size=pixel_size, dimensions=dimensions)
+        return self.to_roi_pixels(pixel_size=pixel_size)
 
     def zoom(self, zoom_factor: float = 1) -> "Roi":
         """Zoom the ROI by a factor.
@@ -278,7 +258,6 @@ class RoiPixels(GenericRoi):
     x: float = 0
     y: float = 0
     unit: SpaceUnits | str | None = None
-    dimensions: BaseDimensions = Field(default_factory=BaseDimensions)
 
     def to_roi(self, pixel_size: PixelSize) -> "Roi":
         """Convert to raster coordinates."""

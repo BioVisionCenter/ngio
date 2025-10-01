@@ -87,7 +87,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 
@@ -98,7 +97,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             remove_channel_selection=True,
         )
 
@@ -109,7 +107,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 
@@ -120,7 +117,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             remove_channel_selection=True,
         )
 
@@ -225,10 +221,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
             roi=roi,
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
-            label_pixel_size=self._input._label.pixel_size,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 
@@ -253,10 +247,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
             dimensions=self._input.dimensions,
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
-            label_pixel_size=self._input._label.pixel_size,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 

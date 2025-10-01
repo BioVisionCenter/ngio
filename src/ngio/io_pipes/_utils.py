@@ -1,17 +1,25 @@
 from collections.abc import Sequence
+from enum import Enum
 
 import dask.array as da
 import numpy as np
 
 
+class Action(str, Enum):
+    NONE = "none"
+    PAD = "pad"
+    TRIM = "trim"
+    RESIZE = "resize"
+
+
 def _compute_pad_widths(
     array_shape: tuple[int, ...],
-    actions: list[str | None],
+    actions: list[Action],
     target_shape: tuple[int, ...],
 ) -> tuple[tuple[int, int], ...]:
     pad_def = []
     for act, s, ts in zip(actions, array_shape, target_shape, strict=True):
-        if act == "pad":
+        if act == Action.PAD:
             total_pad = ts - s
             before = total_pad // 2
             after = total_pad - before
@@ -23,12 +31,12 @@ def _compute_pad_widths(
 
 def _numpy_pad(
     array: np.ndarray,
-    actions: list[str | None],
+    actions: list[Action],
     target_shape: tuple[int, ...],
     pad_mode: str = "constant",
-    constant_values: int = 0,
+    constant_values: int | float = 0,
 ) -> np.ndarray:
-    if all(act != "pad" for act in actions):
+    if all(act != Action.PAD for act in actions):
         return array
     pad_widths = _compute_pad_widths(array.shape, actions, target_shape)
     return np.pad(array, pad_widths, mode=pad_mode, constant_values=constant_values)  # type: ignore
@@ -36,12 +44,12 @@ def _numpy_pad(
 
 def _dask_pad(
     array: da.Array,
-    actions: list[str | None],
+    actions: list[Action],
     target_shape: tuple[int, ...],
     pad_mode: str = "constant",
-    constant_values: int = 0,
+    constant_values: int | float = 0,
 ) -> da.Array:
-    if all(act != "pad" for act in actions):
+    if all(act != Action.PAD for act in actions):
         return array
     shape = tuple(int(s) for s in array.shape)
     pad_widths = _compute_pad_widths(shape, actions, target_shape)
@@ -50,12 +58,12 @@ def _dask_pad(
 
 def _compute_trim_slices(
     array_shape: tuple[int, ...],
-    actions: list[str | None],
+    actions: list[Action],
     target_shape: tuple[int, ...],
 ) -> tuple[slice, ...]:
     slices = []
     for act, s, ts in zip(actions, array_shape, target_shape, strict=True):
-        if act == "trim":
+        if act == Action.TRIM:
             slices.append(slice(0, ts))
         else:
             slices.append(slice(0, s))
@@ -63,22 +71,59 @@ def _compute_trim_slices(
 
 
 def _numpy_trim(
-    array: np.ndarray, actions: list[str | None], target_shape: tuple[int, ...]
+    array: np.ndarray, actions: list[Action], target_shape: tuple[int, ...]
 ) -> np.ndarray:
-    if all(act != "trim" for act in actions):
+    if all(act != Action.TRIM for act in actions):
         return array
     slices = _compute_trim_slices(array.shape, actions, target_shape)
     return array[tuple(slices)]
 
 
 def _dask_trim(
-    array: da.Array, actions: list[str | None], target_shape: tuple[int, ...]
+    array: da.Array, actions: list[Action], target_shape: tuple[int, ...]
 ) -> da.Array:
-    if all(act != "trim" for act in actions):
+    if all(act != Action.TRIM for act in actions):
         return array
     shape = tuple(int(s) for s in array.shape)
     slices = _compute_trim_slices(shape, actions, target_shape)
     return array[tuple(slices)]
+
+
+def _compute_resize_shape(
+    array_shape: tuple[int, ...],
+    actions: list[Action],
+    target_shape: tuple[int, ...],
+) -> tuple[int, ...]:
+    resize_shape = []
+    for act, s, ts in zip(actions, array_shape, target_shape, strict=True):
+        if act == Action.RESIZE:
+            resize_shape.append(ts)
+        else:
+            resize_shape.append(s)
+    return tuple(resize_shape)
+
+
+def _numpy_resize(
+    array: np.ndarray, actions: list[Action], target_shape: tuple[int, ...]
+) -> np.ndarray:
+    if all(act != Action.RESIZE for act in actions):
+        return array
+    from ngio.common._zoom import numpy_zoom
+
+    resize_shape = _compute_resize_shape(array.shape, actions, target_shape)
+    return numpy_zoom(source_array=array, target_shape=resize_shape, order="nearest")
+
+
+def _dask_resize(
+    array: da.Array, actions: list[Action], target_shape: tuple[int, ...]
+) -> da.Array:
+    if all(act != Action.RESIZE for act in actions):
+        return array
+    from ngio.common._zoom import dask_zoom
+
+    shape = tuple(int(s) for s in array.shape)
+    resize_shape = _compute_resize_shape(shape, actions, target_shape)
+    return dask_zoom(source_array=array, target_shape=resize_shape, order="nearest")
 
 
 def _numpy_broadcast(array, target_shape):
@@ -120,7 +165,8 @@ def _compute_reshape_and_actions(
     array_axes: list[str],
     reference_axes: list[str],
     tolerance: int = 1,
-) -> tuple[tuple[int, ...], list[str | None]]:
+    allow_resize: bool = True,
+) -> tuple[tuple[int, ...], list[Action]]:
     # Reshape array to match reference shape
     # And determine actions to be taken
     # to match the shapes
@@ -131,30 +177,36 @@ def _compute_reshape_and_actions(
     for ref_ax, ref_shape in zip(reference_axes, reference_shape, strict=True):
         if ref_ax not in array_axes:
             reshape_tuple.append(1)
-            actions.append(None)
+            actions.append(Action.NONE)
         elif ref_ax == array_axes[left_pointer]:
             s2 = array_shape[left_pointer]
             reshape_tuple.append(s2)
             left_pointer += 1
 
             if s2 == ref_shape or s2 == 1:
-                actions.append(None)
+                actions.append(Action.NONE)
             elif s2 < ref_shape:
-                if (ref_shape - s2) > tolerance:
+                if (ref_shape - s2) <= tolerance:
+                    actions.append(Action.PAD)
+                elif allow_resize:
+                    actions.append(Action.RESIZE)
+                else:
                     errors.append(
                         f"Cannot pad axis={ref_ax}:{s2}->{ref_shape} "
                         "because shape difference is outside tolerance "
                         f"{tolerance}."
                     )
-                actions.append("pad")
             elif s2 > ref_shape:
-                if (s2 - ref_shape) > tolerance:
+                if (s2 - ref_shape) <= tolerance:
+                    actions.append(Action.TRIM)
+                elif allow_resize:
+                    actions.append(Action.RESIZE)
+                else:
                     errors.append(
                         f"Cannot trim axis={ref_ax}:{s2}->{ref_shape} "
                         "because shape difference is outside tolerance "
                         f"{tolerance}."
                     )
-                actions.append("trim")
             else:
                 raise RuntimeError("Unreachable code reached.")
         else:
@@ -177,7 +229,8 @@ def numpy_match_shape(
     tolerance: int = 1,
     allow_broadcast: bool = True,
     pad_mode: str = "constant",
-    pad_values: int = 0,
+    pad_values: int | float = 0,
+    allow_resize: bool = True,
 ):
     """Match the shape of a numpy array to a reference shape.
 
@@ -199,8 +252,11 @@ def numpy_match_shape(
             match the reference shape. If False, single-dimension axes will
             be left as is.
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
-        pad_values (int): The constant value to use for padding if
+        pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
+        allow_resize (bool): If True, when the array differs more than the
+            tolerance, it will be resized to the reference shape. If False,
+            an error will be raised.
     """
     if array.shape == reference_shape:
         # Shapes already match
@@ -221,8 +277,10 @@ def numpy_match_shape(
         array_axes=array_axes,
         reference_axes=reference_axes,
         tolerance=tolerance,
+        allow_resize=allow_resize,
     )
     array = array.reshape(reshape_tuple)
+    array = _numpy_resize(array=array, actions=actions, target_shape=reference_shape)
     array = _numpy_pad(
         array=array,
         actions=actions,
@@ -244,7 +302,8 @@ def dask_match_shape(
     tolerance: int = 1,
     allow_broadcast: bool = True,
     pad_mode: str = "constant",
-    pad_values: int = 0,
+    pad_values: int | float = 0,
+    allow_resize: bool = True,
 ) -> da.Array:
     """Match the shape of a dask array to a reference shape.
 
@@ -266,8 +325,11 @@ def dask_match_shape(
             match the reference shape. If False, single-dimension axes will
             be left as is.
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
-        pad_values (int): The constant value to use for padding if
+        pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
+        allow_resize (bool): If True, when the array differs more than the
+            tolerance, it will be resized to the reference shape. If False,
+            an error will be raised.
     """
     array_shape = tuple(int(s) for s in array.shape)
     if array_shape == reference_shape:
@@ -289,8 +351,10 @@ def dask_match_shape(
         array_axes=array_axes,
         reference_axes=reference_axes,
         tolerance=tolerance,
+        allow_resize=allow_resize,
     )
     array = da.reshape(array, reshape_tuple)
+    array = _dask_resize(array=array, actions=actions, target_shape=reference_shape)
     array = _dask_pad(
         array=array,
         actions=actions,

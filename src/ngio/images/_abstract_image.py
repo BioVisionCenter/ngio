@@ -65,27 +65,49 @@ class AbstractImage(Generic[_image_handler]):
         self._group_handler = group_handler
         self._meta_handler = meta_handler
 
-        self._dataset = self._meta_handler.meta.get_dataset(path=path)
-        self._pixel_size = self._dataset.pixel_size
-
         try:
-            self._zarr_array = self._group_handler.get_array(self._dataset.path)
+            self._zarr_array = self._group_handler.get_array(self._path)
         except NgioFileExistsError as e:
             raise NgioFileExistsError(f"Could not find the dataset at {path}.") from e
-
-        self._dimensions = Dimensions(
-            shape=self._zarr_array.shape, axes_handler=self._dataset.axes_handler
-        )
-        self._axes_mapper = self._dataset.axes_handler
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
         return f"Image(path={self.path}, {self.dimensions})"
 
     @property
+    def path(self) -> str:
+        """Return the path of the image."""
+        return self._path
+
+    @property
     def meta_handler(self) -> _image_handler:
         """Return the metadata."""
         return self._meta_handler
+
+    @property
+    def dataset(self) -> Dataset:
+        """Return the dataset of the image."""
+        return self.meta_handler.meta.get_dataset(path=self.path)
+
+    @property
+    def dimensions(self) -> Dimensions:
+        """Return the dimensions of the image."""
+        return Dimensions(shape=self.zarr_array.shape, dataset=self.dataset)
+
+    @property
+    def pixel_size(self) -> PixelSize:
+        """Return the pixel size of the image."""
+        return self.dataset.pixel_size
+
+    @property
+    def axes_mapper(self) -> AxesHandler:
+        """Return the axes mapper of the image."""
+        return self.dataset.axes_handler
+
+    @property
+    def axes(self) -> tuple[str, ...]:
+        """Return the axes of the image."""
+        return self.dimensions.axes
 
     @property
     def zarr_array(self) -> zarr.Array:
@@ -106,16 +128,6 @@ class AbstractImage(Generic[_image_handler]):
     def chunks(self) -> tuple[int, ...]:
         """Return the chunks of the image."""
         return self.zarr_array.chunks
-
-    @property
-    def dimensions(self) -> Dimensions:
-        """Return the dimensions of the image."""
-        return self._dimensions
-
-    @property
-    def axes_mapper(self) -> AxesHandler:
-        """Return the axes mapper of the image."""
-        return self._axes_mapper
 
     @property
     def is_3d(self) -> bool:
@@ -156,21 +168,6 @@ class AbstractImage(Generic[_image_handler]):
     def time_unit(self) -> str | None:
         """Return the time unit of the image."""
         return self.meta_handler.meta.time_unit
-
-    @property
-    def pixel_size(self) -> PixelSize:
-        """Return the pixel size of the image."""
-        return self._pixel_size
-
-    @property
-    def dataset(self) -> Dataset:
-        """Return the dataset of the image."""
-        return self._dataset
-
-    @property
-    def path(self) -> str:
-        """Return the path of the image."""
-        return self._dataset.path
 
     def has_axis(self, axis: str) -> bool:
         """Return True if the image has the given axis."""
@@ -224,7 +221,6 @@ class AbstractImage(Generic[_image_handler]):
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
-            pixel_size=self.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
@@ -272,7 +268,6 @@ class AbstractImage(Generic[_image_handler]):
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
-            pixel_size=self.pixel_size,
             axes_order=axes_order,
             transforms=transforms,
             slicing_dict=slicing_kwargs,
@@ -410,7 +405,6 @@ class AbstractImage(Generic[_image_handler]):
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
-                pixel_size=self.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,
@@ -422,7 +416,6 @@ class AbstractImage(Generic[_image_handler]):
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
-                pixel_size=self.pixel_size,
                 axes_order=axes_order,
                 transforms=transforms,
                 slicing_dict=slicing_kwargs,

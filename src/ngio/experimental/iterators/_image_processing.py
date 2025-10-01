@@ -92,7 +92,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 
@@ -103,7 +102,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             slicing_dict=self._output_slicing_kwargs,
         )
 
@@ -114,7 +112,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            pixel_size=self._input.pixel_size,
             slicing_dict=self._input_slicing_kwargs,
         )
 
@@ -125,7 +122,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder):
             roi=roi,
             axes_order=self._axes_order,
             transforms=self._output_transforms,
-            pixel_size=self._output.pixel_size,
             slicing_dict=self._output_slicing_kwargs,
         )
 
