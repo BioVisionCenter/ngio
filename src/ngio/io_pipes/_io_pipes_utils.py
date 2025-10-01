@@ -154,7 +154,7 @@ def _normalize_slicing_tuple(
     slicing_dict: dict[str, SlicingInputType],
     no_axes_ops: bool,
     axes_order: list[str],
-) -> SlicingType:
+) -> tuple[SlicingType, str | None]:
     """Normalize the slicing dict to tuple.
 
     Since the slicing dict can contain different types of values
@@ -167,14 +167,14 @@ def _normalize_slicing_tuple(
     axis_name = axis.name
     if axis_name not in slicing_dict:
         # If no slice is provided for the axis, use a full slice
-        return slice(None)
+        return slice(None), None
 
     value = slicing_dict[axis_name]
     if value is None:
-        return slice(None)
+        return slice(None), None
 
     if isinstance(value, slice):
-        return value
+        return value, None
     elif isinstance(value, int):
         # If axes ops are requested, we need to preserve the dimension
         # When we slice because the axes ops will be applied later
@@ -183,12 +183,13 @@ def _normalize_slicing_tuple(
         if (not no_axes_ops) or (axis_name in axes_order):
             # Axes ops require all dimensions to be preserved
             value = slice(value, value + 1)
-        return value
+            return value, None
+        return value, axis_name
     elif isinstance(value, Sequence):
         # If a contiguous sequence of integers is provided,
         # convert it to a slice for efficiency
         # Alternatively, it will be converted to a tuple of ints
-        return _try_to_slice(value)
+        return _try_to_slice(value), None
 
     raise NgioValueError(
         f"Invalid slice definition {value} of type {type(value)}. "
@@ -203,11 +204,11 @@ def _build_slicing_tuple(
     axes_order: list[str] | None = None,
     no_axes_ops: bool = False,
     remove_channel_selection: bool = False,
-) -> tuple[SlicingType, ...] | None:
+) -> tuple[tuple[SlicingType, ...] | None, list[str]]:
     """Assemble slices to be used to query the array."""
     if len(slicing_dict) == 0:
         # Skip unnecessary computation if no slicing is requested
-        return None
+        return None, []
     _axes_order = (
         _normalize_axes_order(dimensions=dimensions, axes_order=axes_order)
         if axes_order is not None
@@ -219,15 +220,19 @@ def _build_slicing_tuple(
         remove_channel_selection=remove_channel_selection,
     )
 
-    slicing_tuple = tuple(
-        _normalize_slicing_tuple(
+    slicing_tuple = []
+    axes_to_remove = []
+    for axis in dimensions.axes_handler.axes:
+        sl, ax_to_remove = _normalize_slicing_tuple(
             axis=axis,
             slicing_dict=_slicing_dict,
             no_axes_ops=no_axes_ops,
             axes_order=_axes_order,
         )
-        for axis in dimensions.axes_handler.axes
-    )
+        slicing_tuple.append(sl)
+        if ax_to_remove is not None:
+            axes_to_remove.append(ax_to_remove)
+    slicing_tuple = tuple(slicing_tuple)
     # Slicing tuple can have only one element of type tuple
     # If multiple tuple are present it will lead to errors
     # when querying the array
@@ -237,7 +242,7 @@ def _build_slicing_tuple(
             "multiple non-contiguous selections (tuples) in the slicing tuple. "
             "Please use slices or single integer selections instead."
         )
-    return slicing_tuple
+    return slicing_tuple, axes_to_remove
 
 
 def _build_axes_ops(
@@ -270,16 +275,25 @@ def setup_io_pipe(
         dimensions=dimensions,
     )
 
-    slicing_tuple = _build_slicing_tuple(
+    slicing_tuple, axes_to_remove = _build_slicing_tuple(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
         axes_order=axes_order,
         no_axes_ops=axes_ops.is_no_op,
         remove_channel_selection=remove_channel_selection,
     )
+
+    if axes_to_remove:
+        in_memory_axes = tuple(
+            ax for ax in axes_ops.in_memory_axes if ax not in axes_to_remove
+        )
+        axes_ops = AxesOps(
+            on_disk_axes=axes_ops.on_disk_axes,
+            in_memory_axes=in_memory_axes,
+        )
     slicing_ops = SlicingOps(
-        on_disk_axes=axes_ops.on_disk_axes,
-        on_disk_shape=dimensions.shape,
+        on_disk_axes=dimensions.axes_handler.axes_names,
         slicing_tuple=slicing_tuple,
+        on_disk_shape=dimensions.shape,
     )
     return slicing_ops, axes_ops

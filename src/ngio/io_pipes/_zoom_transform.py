@@ -28,25 +28,26 @@ class BaseZoomTransform:
         self._order: InterpolationOrder = order
 
     def _normalize_shape(
-        self, slice_: slice | int | tuple, shape: int, scale: float, out_dim: int
+        self, slice_: slice | int | tuple, scale: float, max_dim: int
     ) -> int:
         if isinstance(slice_, slice):
             _start = slice_.start or 0
-            max_out_shape = out_dim - _start * scale
+            _start_int = math.floor(_start * scale)
             if slice_.stop is not None:
-                _stop = slice_.stop
-                out_shape = (_stop - _start) * scale
-                out_shape = min(out_shape, max_out_shape)
+                _stop = slice_.stop * scale
+                _stop = min(_stop, max_dim)
             else:
-                out_shape = max_out_shape
+                _stop = max_dim
+            _stop_int = math.ceil(_stop)
+            target_shape = _stop_int - _start_int
 
         elif isinstance(slice_, int):
-            out_shape = 1
+            target_shape = 1
         elif isinstance(slice_, tuple):
-            out_shape = len(slice_) * scale
+            target_shape = len(slice_) * scale
         else:
             raise ValueError(f"Unsupported slice type: {type(slice_)}")
-        return math.ceil(out_shape)
+        return math.ceil(target_shape)
 
     def _compute_zoom_shape(
         self,
@@ -56,23 +57,23 @@ class BaseZoomTransform:
     ) -> tuple[int, ...]:
         assert len(array_shape) == len(axes_ops.in_memory_axes)
 
-        out_shape = []
+        target_shape = []
         for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is not None and ax_type.axis_type == "channel":
                 # Do not scale channel axis
-                out_shape.append(shape)
+                target_shape.append(shape)
                 continue
-            out_dim = self._target_dimensions.get(ax_name, default=1)
+            t_dim = self._target_dimensions.get(ax_name, default=1)
             in_pix = self._input_pixel_size.get(ax_name, default=1.0)
-            out_pix = self._target_pixel_size.get(ax_name, default=1.0)
+            t_pix = self._target_pixel_size.get(ax_name, default=1.0)
             slice_ = slicing_ops.get(ax_name, normalize=False)
-            scale = in_pix / out_pix
-            _out_shape = self._normalize_shape(
-                slice_=slice_, shape=shape, scale=scale, out_dim=out_dim
+            scale = in_pix / t_pix
+            _target_shape = self._normalize_shape(
+                slice_=slice_, scale=scale, max_dim=t_dim
             )
-            out_shape.append(_out_shape)
-        return tuple(out_shape)
+            target_shape.append(_target_shape)
+        return tuple(target_shape)
 
     def _compute_inverse_zoom_shape(
         self,
@@ -82,26 +83,24 @@ class BaseZoomTransform:
     ) -> tuple[int, ...]:
         assert len(array_shape) == len(axes_ops.in_memory_axes)
 
-        out_shape = []
+        target_shape = []
         for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is not None and ax_type.axis_type == "channel":
                 # Do not scale channel axis
-                out_shape.append(shape)
+                target_shape.append(shape)
                 continue
             in_dim = self._input_dimensions.get(ax_name, default=1)
             slice_ = slicing_ops.get(ax_name=ax_name, normalize=True)
-            out_shape.append(
-                self._normalize_shape(
-                    slice_=slice_, shape=shape, scale=1, out_dim=in_dim
-                )
+            target_shape.append(
+                self._normalize_shape(slice_=slice_, scale=1, max_dim=in_dim)
             )
 
         # Since we are basing the rescaling on the slice, we need to ensure
         # that the input image we got is roughly the right size.
         # This is a safeguard against user errors.
         expected_shape = self._compute_zoom_shape(
-            array_shape=out_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
+            array_shape=target_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
         if any(
             abs(es - s) > 1 for es, s in zip(expected_shape, array_shape, strict=True)
@@ -110,7 +109,7 @@ class BaseZoomTransform:
                 f"Input array shape {array_shape} is not compatible with the expected "
                 f"shape {expected_shape} based on the zoom transform.\n"
             )
-        return tuple(out_shape)
+        return tuple(target_shape)
 
     def _numpy_zoom(
         self, array: np.ndarray, target_shape: tuple[int, ...]
@@ -137,40 +136,40 @@ class BaseZoomTransform:
         self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the scaling transformation to a numpy array."""
-        out_shape = self._compute_zoom_shape(
+        target_shape = self._compute_zoom_shape(
             array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return self._numpy_zoom(array=array, target_shape=out_shape)
+        return self._numpy_zoom(array=array, target_shape=target_shape)
 
     def get_as_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the scaling transformation to a dask array."""
         array_shape = tuple(int(s) for s in array.shape)
-        out_shape = self._compute_zoom_shape(
+        target_shape = self._compute_zoom_shape(
             array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
         return self._dask_zoom(
-            array=array, array_shape=array_shape, target_shape=out_shape
+            array=array, array_shape=array_shape, target_shape=target_shape
         )
 
     def set_as_numpy_transform(
         self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> np.ndarray:
         """Apply the inverse scaling transformation to a numpy array."""
-        out_shape = self._compute_inverse_zoom_shape(
+        target_shape = self._compute_inverse_zoom_shape(
             array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
-        return self._numpy_zoom(array=array, target_shape=out_shape)
+        return self._numpy_zoom(array=array, target_shape=target_shape)
 
     def set_as_dask_transform(
         self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
     ) -> da.Array:
         """Apply the inverse scaling transformation to a dask array."""
         array_shape = tuple(int(s) for s in array.shape)
-        out_shape = self._compute_inverse_zoom_shape(
+        target_shape = self._compute_inverse_zoom_shape(
             array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
         )
         return self._dask_zoom(
-            array=array, array_shape=array_shape, target_shape=out_shape
+            array=array, array_shape=array_shape, target_shape=target_shape
         )

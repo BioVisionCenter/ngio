@@ -6,7 +6,7 @@ import pytest
 from scipy import ndimage
 from skimage.segmentation import watershed
 
-from ngio import create_ome_zarr_from_array
+from ngio import create_ome_zarr_from_array, open_ome_zarr_container
 from ngio.transforms import ZoomTransform
 
 
@@ -125,3 +125,33 @@ def test_masking(
     for label_id in labels_stats.keys():
         x = masked_new_label.get_roi_masked(label_id, mode=array_mode, zoom_factor=1.1)
         masked_new_label.set_roi(label_id, x, zoom_factor=1.1)
+
+
+@pytest.mark.filterwarnings("ignore::anndata._warnings.ImplicitModificationWarning")
+@pytest.mark.parametrize(
+    ("label", "c", "zoom_factor", "expected_shape"),
+    [
+        (1009, (0,), 2, (1, 1, 154, 167)),
+        (1009, 0, 2, (1, 154, 167)),
+        (1009, 0, 1.123, (1, 86, 95)),
+    ],
+)
+def test_real_mask(
+    cardiomyocyte_small_mip_path: Path, label, c, zoom_factor, expected_shape
+):
+    # Test on a real example
+    path = cardiomyocyte_small_mip_path / "B" / "03" / "0"
+    ome_zarr = open_ome_zarr_container(path)
+    masked_image = ome_zarr.get_masked_image("nuclei")
+    image_data = masked_image.get_roi_masked_as_numpy(
+        label=label, c=c, zoom_factor=zoom_factor
+    )
+    assert image_data.shape == expected_shape
+    masked_image.set_roi_masked(
+        label=label, patch=image_data, c=c, zoom_factor=zoom_factor
+    )
+
+    data_no_mask = masked_image.get_roi_as_numpy(
+        label=label, c=c, zoom_factor=zoom_factor
+    )
+    assert data_no_mask.shape == image_data.shape
