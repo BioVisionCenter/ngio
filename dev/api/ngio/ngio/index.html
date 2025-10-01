@@ -2154,12 +2154,12 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Dimensions.assert_axes_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_axes_match</span>
+<h5 id="ngio.Dimensions.require_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_axes_match</span>
 
 
-<a href="#ngio.Dimensions.assert_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Dimensions.require_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2208,25 +2208,7 @@ present in both Dimensions objects.</p>
 <span class="normal">160</span>
 <span class="normal">161</span>
 <span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span>
-<span class="normal">169</span>
-<span class="normal">170</span>
-<span class="normal">171</span>
-<span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span>
-<span class="normal">176</span>
-<span class="normal">177</span>
-<span class="normal">178</span>
-<span class="normal">179</span>
-<span class="normal">180</span>
-<span class="normal">181</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_axes_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="normal">163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two Dimensions objects have the same axes.</span>
 
 <span class="sd">    Besides the channel axis (which is a special case), all axes must be</span>
@@ -2238,25 +2220,7 @@ present in both Dimensions objects.</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the axes do not match.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">s_axis</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">s_axis</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="n">o_axis</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">o_axis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Axes do not match. The axis </span><span class="si">{</span><span class="n">s_axis</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;is not present in either dimensions.&quot;</span>
-            <span class="p">)</span>
-    <span class="c1"># Check for axes present in the other dimensions but not in this one</span>
-    <span class="k">for</span> <span class="n">o_axis</span> <span class="ow">in</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">o_axis</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="n">s_axis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">o_axis</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">s_axis</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Axes do not match. The axis </span><span class="si">{</span><span class="n">o_axis</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;is not present in either dimensions.&quot;</span>
-            <span class="p">)</span>
+    <span class="n">require_axes_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2266,12 +2230,12 @@ present in both Dimensions objects.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Dimensions.assert_dimensions_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_dimensions_match</span>
+<h5 id="ngio.Dimensions.require_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_dimensions_match</span>
 
 
-<a href="#ngio.Dimensions.assert_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+<a href="#ngio.Dimensions.require_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.Dimensions">Dimensions</a></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
@@ -2322,40 +2286,24 @@ different. For example, if the input image has shape
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span>
-<span class="normal">198</span>
-<span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span>
-<span class="normal">204</span>
-<span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span>
-<span class="normal">211</span>
-<span class="normal">212</span>
-<span class="normal">213</span>
-<span class="normal">214</span>
-<span class="normal">215</span>
-<span class="normal">216</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">165</span>
+<span class="normal">166</span>
+<span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two Dimensions objects have the same axes and dimensions.</span>
@@ -2372,23 +2320,7 @@ different. For example, if the input image has shape
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the dimensions do not match.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">s_axis</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">s_axis</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="n">o_axis</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">assert</span> <span class="n">o_axis</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># already checked in assert_axes_match</span>
-
-        <span class="n">i_dim</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">s_axis</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">o_dim</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">o_axis</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-
-        <span class="k">if</span> <span class="n">i_dim</span> <span class="o">!=</span> <span class="n">o_dim</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">allow_singleton</span> <span class="ow">and</span> <span class="p">(</span><span class="n">i_dim</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">or</span> <span class="n">o_dim</span> <span class="o">==</span> <span class="mi">1</span><span class="p">):</span>
-                <span class="k">continue</span>
-            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Dimensions do not match for axis &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">s_axis</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">. Got </span><span class="si">{</span><span class="n">i_dim</span><span class="si">}</span><span class="s2"> and </span><span class="si">{</span><span class="n">o_dim</span><span class="si">}</span><span class="s2">.&quot;</span>
-            <span class="p">)</span>
+    <span class="n">require_dimensions_match</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2398,12 +2330,12 @@ different. For example, if the input image has shape
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Dimensions.assert_can_be_rescaled" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_can_be_rescaled</span>
+<h5 id="ngio.Dimensions.require_can_be_rescaled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_can_be_rescaled</span>
 
 
-<a href="#ngio.Dimensions.assert_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Dimensions.require_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Dimensions&lt;/span&gt; (&lt;code&gt;ngio.common._dimensions.Dimensions&lt;/code&gt;)" href="#ngio.Dimensions">Dimensions</a></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2428,39 +2360,17 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/common/_dimensions.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">218</span>
-<span class="normal">219</span>
-<span class="normal">220</span>
-<span class="normal">221</span>
-<span class="normal">222</span>
-<span class="normal">223</span>
-<span class="normal">224</span>
-<span class="normal">225</span>
-<span class="normal">226</span>
-<span class="normal">227</span>
-<span class="normal">228</span>
-<span class="normal">229</span>
-<span class="normal">230</span>
-<span class="normal">231</span>
-<span class="normal">232</span>
-<span class="normal">233</span>
-<span class="normal">234</span>
-<span class="normal">235</span>
-<span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_can_be_rescaled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span>
+<span class="normal">190</span>
+<span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;Dimensions&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assert that two images can be rescaled.</span>
 
 <span class="sd">    For this to be true, the images must have the same axes, and</span>
@@ -2470,29 +2380,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <span class="sd">        other (Dimensions): The other dimensions object to compare against.</span>
 
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">ax1</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">axes</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">ax1</span><span class="o">.</span><span class="n">axis_type</span> <span class="o">==</span> <span class="s2">&quot;channel&quot;</span><span class="p">:</span>
-            <span class="k">continue</span>
-        <span class="n">ax2</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">get_axis</span><span class="p">(</span><span class="n">ax1</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
-        <span class="k">assert</span> <span class="n">ax2</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;Axes do not match.&quot;</span>
-        <span class="n">px1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">pixel_size</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-        <span class="n">px2</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">pixel_size</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
-        <span class="n">shape1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax1</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">shape2</span> <span class="o">=</span> <span class="n">other</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">ax2</span><span class="o">.</span><span class="n">name</span><span class="p">,</span> <span class="n">default</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">scale</span> <span class="o">=</span> <span class="n">px1</span> <span class="o">/</span> <span class="n">px2</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">_are_compatible</span><span class="p">(</span>
-            <span class="n">shape1</span><span class="o">=</span><span class="n">shape1</span><span class="p">,</span>
-            <span class="n">shape2</span><span class="o">=</span><span class="n">shape2</span><span class="p">,</span>
-            <span class="n">scaling</span><span class="o">=</span><span class="n">scale</span><span class="p">,</span>
-        <span class="p">):</span>
-            <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
-                <span class="sa">f</span><span class="s2">&quot;Image1 with shape </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;and pixel size </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">pixel_size</span><span class="si">}</span><span class="s2">, &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;cannot be rescaled to &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;Image2 with shape </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, &quot;</span>
-                <span class="sa">f</span><span class="s2">&quot;and pixel size </span><span class="si">{</span><span class="n">other</span><span class="o">.</span><span class="n">pixel_size</span><span class="si">}</span><span class="s2">. &quot;</span>
-            <span class="p">)</span>
+    <span class="n">require_rescalable</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8250,21 +8138,21 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
 
 
-<h5 id="ngio.Image.axes_mapper" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">axes_mapper</span>
+<h5 id="ngio.Image.axes_handler" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">axes_handler</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#ngio.Image.axes_mapper" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">axes_mapper</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.AxesHandler">AxesHandler</span></span>
+<a href="#ngio.Image.axes_handler" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">axes_handler</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.AxesHandler">AxesHandler</span></span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Return the axes mapper of the image.</p>
+        <p>Return the axes handler of the image.</p>
 
     </div>
 
@@ -8723,13 +8611,76 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the image has the given axis.&quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">get_index</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.Image.roi" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">roi</span>
+
+
+<a href="#ngio.Image.roi" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">roi</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s1">&#39;image&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Roi&lt;/span&gt; (&lt;code&gt;ngio.common.Roi&lt;/code&gt;)" href="../common/#ngio.common.Roi">Roi</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the ROI covering the entire image.</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">roi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Roi</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the ROI covering the entire image.&quot;&quot;&quot;</span>
+    <span class="n">dim_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
+    <span class="n">dim_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">dim_x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dim_y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="n">dim_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;z&quot;</span><span class="p">)</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">dim_z</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">dim_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">dim_t</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">roi_px</span> <span class="o">=</span> <span class="n">RoiPixels</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">z</span><span class="o">=</span><span class="n">z</span><span class="p">,</span>
+        <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+        <span class="n">x_length</span><span class="o">=</span><span class="n">dim_x</span><span class="p">,</span>
+        <span class="n">y_length</span><span class="o">=</span><span class="n">dim_y</span><span class="p">,</span>
+        <span class="n">z_length</span><span class="o">=</span><span class="n">dim_z</span><span class="p">,</span>
+        <span class="n">t_length</span><span class="o">=</span><span class="n">dim_t</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">roi_px</span><span class="o">.</span><span class="n">to_roi</span><span class="p">(</span><span class="n">pixel_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pixel_size</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8761,11 +8712,11 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table for an image.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">build_image_roi_table</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">RoiTable</span><span class="p">(</span><span class="n">rois</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">roi</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8775,12 +8726,12 @@ interpret the identifier. Can be "label", "wavelength_id", or
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Image.assert_dimensions_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_dimensions_match</span>
+<h5 id="ngio.Image.require_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_dimensions_match</span>
 
 
-<a href="#ngio.Image.assert_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+<a href="#ngio.Image.require_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
@@ -8817,7 +8768,7 @@ compatible with non-singleton dimensions.</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images do not have compatible dimensions.</p>
@@ -8828,24 +8779,24 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
     <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -8860,8 +8811,8 @@ compatible with non-singleton dimensions.</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images do not have compatible dimensions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_dimensions_match</span><span class="p">(</span>
-        <span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_dimensions_match</span><span class="p">(</span>
+        <span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -8872,12 +8823,12 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Image.assert_axes_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_axes_match</span>
+<h5 id="ngio.Image.require_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_axes_match</span>
 
 
-<a href="#ngio.Image.assert_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Image.require_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -8901,7 +8852,7 @@ compatible with non-singleton dimensions.</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images do not have compatible axes.</p>
@@ -8912,19 +8863,19 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
-<span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
-<span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_axes_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -8936,7 +8887,7 @@ compatible with non-singleton dimensions.</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images do not have compatible axes.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_axes_match</span><span class="p">(</span><span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_axes_match</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8946,12 +8897,12 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Image.assert_can_be_rescaled" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_can_be_rescaled</span>
+<h5 id="ngio.Image.require_can_be_rescaled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_can_be_rescaled</span>
 
 
-<a href="#ngio.Image.assert_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Image.require_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -8977,7 +8928,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images cannot be scaled to each other.</p>
@@ -8988,22 +8939,22 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_can_be_rescaled</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_can_be_rescaled</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -9018,7 +8969,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images cannot be scaled to each other.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_can_be_rescaled</span><span class="p">(</span><span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -10540,21 +10491,21 @@ If None, all channels are set.</p>
 
 
 
-<h5 id="ngio.Label.axes_mapper" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">axes_mapper</span>
+<h5 id="ngio.Label.axes_handler" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">axes_handler</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-property"><code>property</code></small>
   </span>
 
-<a href="#ngio.Label.axes_mapper" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="n">axes_mapper</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.AxesHandler">AxesHandler</span></span>
+<a href="#ngio.Label.axes_handler" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="n">axes_handler</span><span class="p">:</span> <span class="n"><span title="ngio.ome_zarr_meta.AxesHandler">AxesHandler</span></span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
-        <p>Return the axes mapper of the image.</p>
+        <p>Return the axes handler of the image.</p>
 
     </div>
 
@@ -11101,13 +11052,76 @@ If None, all channels are set.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">172</span>
-<span class="normal">173</span>
-<span class="normal">174</span>
-<span class="normal">175</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the image has the given axis.&quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">axes_mapper</span><span class="o">.</span><span class="n">get_index</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.Label.roi" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">roi</span>
+
+
+<a href="#ngio.Label.roi" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">roi</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/stdtypes.html#str">str</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s1">&#39;image&#39;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Roi&lt;/span&gt; (&lt;code&gt;ngio.common.Roi&lt;/code&gt;)" href="../common/#ngio.common.Roi">Roi</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Return the ROI covering the entire image.</p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span>
+<span class="normal">457</span>
+<span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">roi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Roi</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the ROI covering the entire image.&quot;&quot;&quot;</span>
+    <span class="n">dim_x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">)</span>
+    <span class="n">dim_y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;y&quot;</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">dim_x</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">dim_y</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+    <span class="n">dim_z</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;z&quot;</span><span class="p">)</span>
+    <span class="n">z</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">dim_z</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">dim_t</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
+    <span class="n">t</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">dim_t</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span>
+    <span class="n">roi_px</span> <span class="o">=</span> <span class="n">RoiPixels</span><span class="p">(</span>
+        <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">x</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">y</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+        <span class="n">z</span><span class="o">=</span><span class="n">z</span><span class="p">,</span>
+        <span class="n">t</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
+        <span class="n">x_length</span><span class="o">=</span><span class="n">dim_x</span><span class="p">,</span>
+        <span class="n">y_length</span><span class="o">=</span><span class="n">dim_y</span><span class="p">,</span>
+        <span class="n">z_length</span><span class="o">=</span><span class="n">dim_z</span><span class="p">,</span>
+        <span class="n">t_length</span><span class="o">=</span><span class="n">dim_t</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">roi_px</span><span class="o">.</span><span class="n">to_roi</span><span class="p">(</span><span class="n">pixel_size</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">pixel_size</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -11139,11 +11153,11 @@ If None, all channels are set.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">444</span>
-<span class="normal">445</span>
-<span class="normal">446</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table for an image.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="n">build_image_roi_table</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">RoiTable</span><span class="p">(</span><span class="n">rois</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">roi</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -11153,12 +11167,12 @@ If None, all channels are set.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Label.assert_dimensions_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_dimensions_match</span>
+<h5 id="ngio.Label.require_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_dimensions_match</span>
 
 
-<a href="#ngio.Label.assert_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+<a href="#ngio.Label.require_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
@@ -11195,7 +11209,7 @@ compatible with non-singleton dimensions.</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images do not have compatible dimensions.</p>
@@ -11206,24 +11220,24 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">448</span>
-<span class="normal">449</span>
-<span class="normal">450</span>
-<span class="normal">451</span>
-<span class="normal">452</span>
-<span class="normal">453</span>
-<span class="normal">454</span>
-<span class="normal">455</span>
-<span class="normal">456</span>
-<span class="normal">457</span>
-<span class="normal">458</span>
-<span class="normal">459</span>
-<span class="normal">460</span>
-<span class="normal">461</span>
-<span class="normal">462</span>
-<span class="normal">463</span>
-<span class="normal">464</span>
-<span class="normal">465</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_dimensions_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span>
+<span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_dimensions_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
     <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
@@ -11238,8 +11252,8 @@ compatible with non-singleton dimensions.</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images do not have compatible dimensions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_dimensions_match</span><span class="p">(</span>
-        <span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_dimensions_match</span><span class="p">(</span>
+        <span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -11250,12 +11264,12 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Label.assert_axes_match" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_axes_match</span>
+<h5 id="ngio.Label.require_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_axes_match</span>
 
 
-<a href="#ngio.Label.assert_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Label.require_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -11279,7 +11293,7 @@ compatible with non-singleton dimensions.</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images do not have compatible axes.</p>
@@ -11290,19 +11304,19 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
-<span class="normal">468</span>
-<span class="normal">469</span>
-<span class="normal">470</span>
-<span class="normal">471</span>
-<span class="normal">472</span>
-<span class="normal">473</span>
-<span class="normal">474</span>
-<span class="normal">475</span>
-<span class="normal">476</span>
-<span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_axes_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -11314,7 +11328,7 @@ compatible with non-singleton dimensions.</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images do not have compatible axes.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_axes_match</span><span class="p">(</span><span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_axes_match</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -11324,12 +11338,12 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.Label.assert_can_be_rescaled" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">assert_can_be_rescaled</span>
+<h5 id="ngio.Label.require_can_be_rescaled" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_can_be_rescaled</span>
 
 
-<a href="#ngio.Label.assert_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">assert_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.Label.require_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -11355,7 +11369,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <p><span class="doc-section-title">Raises:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils._errors.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+              <code><span title="NgioValueError">NgioValueError</span></code>
             –
           <div class="doc-md-description">
             <p>If the images cannot be scaled to each other.</p>
@@ -11366,22 +11380,22 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">481</span>
-<span class="normal">482</span>
-<span class="normal">483</span>
-<span class="normal">484</span>
-<span class="normal">485</span>
-<span class="normal">486</span>
-<span class="normal">487</span>
-<span class="normal">488</span>
-<span class="normal">489</span>
-<span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assert_can_be_rescaled</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_can_be_rescaled</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -11396,7 +11410,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images cannot be scaled to each other.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">assert_can_be_rescaled</span><span class="p">(</span><span class="n">image1</span><span class="o">=</span><span class="bp">self</span><span class="p">,</span> <span class="n">image2</span><span class="o">=</span><span class="n">other</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
