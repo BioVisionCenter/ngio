@@ -162,7 +162,6 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
         """Get the masked data as a numpy array."""
         data = self._data_getter()
         label_data = self._label_data_getter()
-        print(self._label_data_getter.axes_ops.in_memory_axes)
 
         bool_mask = _numpy_label_to_bool_mask(
             label_data=label_data,
