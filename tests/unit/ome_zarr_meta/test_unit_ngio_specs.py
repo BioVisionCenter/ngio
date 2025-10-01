@@ -244,8 +244,6 @@ def test_dataset():
     assert ds.get_scale("x") == 0.5
     assert ds.axes_handler.get_index("x") == 4
     assert ds.get_translation("x") == 0.0
-    assert ds.space_unit == DefaultSpaceUnit
-    assert ds.time_unit == DefaultTimeUnit, ds.time_unit
 
     ps = ds.pixel_size
     assert ps.x == 0.5
@@ -272,10 +270,10 @@ def test_dataset_fail():
         translation=[0.0, 0.0],
     )
 
-    assert ds.time_unit is None
+    assert ds.axes_handler.time_unit is None
 
     with pytest.raises(ValueError):
-        assert ds.space_unit == "micrometer"
+        assert ds.axes_handler.space_unit == "micrometer"
 
 
 def test_channels():

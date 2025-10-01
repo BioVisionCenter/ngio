@@ -121,9 +121,18 @@ class AbstractNgioImageMeta:
             space_unit(str): The space unit to convert to.
             time_unit(str): The time unit to convert to.
         """
+        new_axes_handler = self.axes_handler.to_units(
+            space_unit=space_unit,
+            time_unit=time_unit,
+        )
         new_datasets = []
         for dataset in self.datasets:
-            new_dataset = dataset.to_units(space_unit=space_unit, time_unit=time_unit)
+            new_dataset = Dataset(
+                path=dataset.path,
+                axes_handler=new_axes_handler,
+                scale=dataset.scale,
+                translation=dataset.translation,
+            )
             new_datasets.append(new_dataset)
 
         return type(self)(

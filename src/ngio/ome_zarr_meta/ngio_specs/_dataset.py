@@ -4,10 +4,6 @@ from collections.abc import Sequence
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesHandler,
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
-    SpaceUnits,
-    TimeUnits,
 )
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError
@@ -33,6 +29,7 @@ class Dataset:
             scale (list[float]): The list of scale transformation.
                 The scale transformation must have the same length as the axes.
             translation (list[float] | None): The list of translation.
+                The translation must have the same length as the axes.
         """
         self._path = path
         self._axes_handler = axes_handler
@@ -73,14 +70,14 @@ class Dataset:
         )
 
     @property
-    def space_unit(self) -> str | None:
-        """Return the space unit of the dataset."""
-        return self.axes_handler.space_unit
+    def scale(self) -> tuple[float, ...]:
+        """Return the scale transformation as a tuple."""
+        return tuple(self._scale)
 
     @property
-    def time_unit(self) -> str | None:
-        """Return the time unit of the dataset."""
-        return self.axes_handler.time_unit
+    def translation(self) -> tuple[float, ...]:
+        """Return the translation as a tuple."""
+        return tuple(self._translation)
 
     def get_scale(self, axis_name: str, default: float | None = None) -> float:
         """Return the scale for a given axis."""
@@ -99,26 +96,3 @@ class Dataset:
                 return default
             raise ValueError(f"Axis {axis_name} not found in axes {self.axes_handler}.")
         return self._translation[idx]
-
-    def to_units(
-        self,
-        *,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> "Dataset":
-        """Convert the pixel size to the given units.
-
-        Args:
-            space_unit(str): The space unit to convert to.
-            time_unit(str): The time unit to convert to.
-        """
-        new_axes_handler = self.axes_handler.to_units(
-            space_unit=space_unit,
-            time_unit=time_unit,
-        )
-        return Dataset(
-            path=self.path,
-            axes_handler=new_axes_handler,
-            scale=self._scale,
-            translation=self._translation,
-        )

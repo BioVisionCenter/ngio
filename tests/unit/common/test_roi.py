@@ -1,6 +1,5 @@
 from ngio import PixelSize
-from ngio.common import Dimensions, Roi
-from ngio.ome_zarr_meta.ngio_specs import AxesHandler, Axis
+from ngio.common import Roi
 
 
 def test_rois():
@@ -18,12 +17,8 @@ def test_rois():
 
     assert roi.x == 0.0
 
-    axes = [Axis(name="x"), Axis(name="y")]
-    ax_mapper = AxesHandler(axes=axes)
-    dims = Dimensions(shape=(30, 30), axes_handler=ax_mapper)
-
     pixel_size = PixelSize(x=1.0, y=1.0, z=1.0)
-    raster_roi = roi.to_roi_pixels(pixel_size, dims)
+    raster_roi = roi.to_roi_pixels(pixel_size)
 
     assert raster_roi.to_slicing_dict() == {
         "x": slice(0, 1),

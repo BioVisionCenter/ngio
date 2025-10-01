@@ -1,7 +1,7 @@
 import pytest
 
 from ngio.common import Dimensions
-from ngio.ome_zarr_meta import AxesHandler
+from ngio.ome_zarr_meta import AxesHandler, Dataset
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
 
@@ -25,7 +25,15 @@ def test_dimensions(axes_names):
     shape = tuple(s for s in shape if s is not None)
 
     ax_mapper = AxesHandler(axes=axes)
-    dims = Dimensions(shape=shape, axes_handler=ax_mapper)
+
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_mapper,
+        scale=[1.0] * len(axes_names),
+        translation=[0.0] * len(axes_names),
+    )
+
+    dims = Dimensions(shape=shape, dataset=ds)
 
     assert isinstance(dims.__repr__(), str)
 
@@ -59,12 +67,19 @@ def test_dimensions(axes_names):
 def test_dimensions_error():
     axes = [Axis(name="x"), Axis(name="y")]
     shape = (1, 2, 3)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0] * len(axes),
+        translation=[0.0] * len(axes),
+    )
 
     with pytest.raises(NgioValueError):
-        Dimensions(shape=shape, axes_handler=AxesHandler(axes=axes))
+        Dimensions(shape=shape, dataset=ds)
 
     shape = (3, 4)
-    dims = Dimensions(shape=shape, axes_handler=AxesHandler(axes=axes))
+    dims = Dimensions(shape=shape, dataset=ds)
 
     assert dims.get("c", default=None) is None
     assert not dims.is_3d
