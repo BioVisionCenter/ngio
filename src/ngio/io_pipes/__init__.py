@@ -11,6 +11,20 @@ There are 3 main types of I/O pipes:
     from a region of interest (ROI). However they also load a boolean mask
     from a label zarr array to mask the data being read or written.
 
+All the io pipes are structured in the same way.
+
+When reading data the order of operations is:
+- Step 1: Slice the zarr array to load only the data needed into memory.
+- Step 2: Apply axes operations to reorder, squeeze or expand the axes.
+    To match the user desired axes order.
+- Step 3: Apply any additional transforms to the data.
+
+When writing data the order of operations is the reverse.
+
+The Transforms must implement the TransformProtocol.
+They should be stateless and only depend on the input array and the slicing
+and axes ops. This allows them to be easily reused between different I/O pipes.
+
 """
 
 from ngio.io_pipes._io_pipes import (

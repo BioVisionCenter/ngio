@@ -112,6 +112,7 @@ def _setup_numpy_getters(
 class NumpyGetterMasked(DataGetter[np.ndarray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
@@ -180,6 +181,7 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
 class NumpySetterMasked(DataSetter[np.ndarray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
@@ -342,6 +344,7 @@ def _setup_dask_getters(
 class DaskGetterMasked(DataGetter[DaskArray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
@@ -408,6 +411,7 @@ class DaskGetterMasked(DataGetter[DaskArray]):
 class DaskSetterMasked(DataSetter[DaskArray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,

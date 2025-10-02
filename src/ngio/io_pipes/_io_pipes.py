@@ -40,15 +40,7 @@ def setup_io_pipe(
     axes_order: Sequence[str] | None = None,
     remove_channel_selection: bool = False,
 ) -> tuple[SlicingOps, AxesOps]:
-    """Setup the slicing tuple and axes ops for an IO pipe.
-
-    * fist step is building the axes ops that contains the relant information about
-        the all the squeeze, expand and reorder operations
-    * second step is building the slicing tuple that will be used to slice the array
-        when reading or writing data.
-    * last step is cleaning the axes ops and slicing ops to be consistent.
-
-    """
+    """Setup the slicing tuple and axes ops for an IO pipe."""
     slicing_ops = build_slicing_ops(
         dimensions=dimensions,
         slicing_dict=slicing_dict,
@@ -157,6 +149,7 @@ class DataSetter(ABC, Generic[ArrayType]):
 class NumpyGetter(DataGetter[np.ndarray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         axes_order: Sequence[str] | None = None,
@@ -179,6 +172,7 @@ class NumpyGetter(DataGetter[np.ndarray]):
         )
 
     def get(self) -> np.ndarray:
+        """Get a numpy array from the zarr array with ops."""
         array = get_slice_as_numpy(self._zarr_array, slicing_ops=self._slicing_ops)
         array = get_as_numpy_axes_ops(array, axes_ops=self._axes_ops)
         array = get_as_numpy_transform(
@@ -193,6 +187,7 @@ class NumpyGetter(DataGetter[np.ndarray]):
 class DaskGetter(DataGetter[DaskArray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         axes_order: Sequence[str] | None = None,
@@ -215,6 +210,14 @@ class DaskGetter(DataGetter[DaskArray]):
         )
 
     def get(self) -> DaskArray:
+        """Get a dask array from the zarr array with ops.
+
+        The order of operations is:
+        * get slice will load the data from the zarr array
+        * get axes ops will reorder, squeeze or expand the axes
+        * get transform will apply any additional transforms
+
+        """
         array = get_slice_as_dask(self._zarr_array, slicing_ops=self._slicing_ops)
         array = get_as_dask_axes_ops(array, axes_ops=self._axes_ops)
         array = get_as_dask_transform(
@@ -236,6 +239,7 @@ class DaskGetter(DataGetter[DaskArray]):
 class NumpySetter(DataSetter[np.ndarray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         axes_order: Sequence[str] | None = None,
@@ -279,6 +283,7 @@ class NumpySetter(DataSetter[np.ndarray]):
 class DaskSetter(DataSetter[DaskArray]):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         axes_order: Sequence[str] | None = None,

@@ -17,6 +17,7 @@ from ngio.utils import NgioValueError
 
 
 def roi_to_slicing_dict(
+    *,
     roi: Roi | RoiPixels,
     pixel_size: PixelSize | None = None,
     slicing_dict: dict[str, SlicingInputType] | None = None,
@@ -42,6 +43,7 @@ def roi_to_slicing_dict(
 class NumpyRoiGetter(NumpyGetter):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         roi: Roi | RoiPixels,
@@ -68,6 +70,7 @@ class NumpyRoiGetter(NumpyGetter):
 class DaskRoiGetter(DaskGetter):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         roi: Roi | RoiPixels,
@@ -94,6 +97,7 @@ class DaskRoiGetter(DaskGetter):
 class NumpyRoiSetter(NumpySetter):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         roi: Roi | RoiPixels,
@@ -120,6 +124,7 @@ class NumpyRoiSetter(NumpySetter):
 class DaskRoiSetter(DaskSetter):
     def __init__(
         self,
+        *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
         roi: Roi | RoiPixels,
