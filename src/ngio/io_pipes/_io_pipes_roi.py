@@ -10,7 +10,7 @@ from ngio.io_pipes._io_pipes import (
     NumpyGetter,
     NumpySetter,
 )
-from ngio.io_pipes._io_pipes_utils import SlicingInputType
+from ngio.io_pipes._ops_slices import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValueError

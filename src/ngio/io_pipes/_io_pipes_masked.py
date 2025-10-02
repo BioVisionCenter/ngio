@@ -16,8 +16,8 @@ from ngio.io_pipes._io_pipes import (
     NumpySetter,
 )
 from ngio.io_pipes._io_pipes_roi import roi_to_slicing_dict
-from ngio.io_pipes._io_pipes_utils import SlicingInputType
 from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
+from ngio.io_pipes._ops_slices import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
 
@@ -167,8 +167,8 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
             label_data=label_data,
             label=self.label_id,
             data_shape=data.shape,
-            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
-            data_axes=self._data_getter.axes_ops.in_memory_axes,
+            label_axes=self._label_data_getter.axes_ops.output_axes,
+            data_axes=self._data_getter.axes_ops.output_axes,
             allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
@@ -241,8 +241,8 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
             label_data=label_data,
             label=self.label_id,
             data_shape=data.shape,
-            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
-            data_axes=self._data_getter.axes_ops.in_memory_axes,
+            label_axes=self._label_data_getter.axes_ops.output_axes,
+            data_axes=self._data_getter.axes_ops.output_axes,
             allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
@@ -395,8 +395,8 @@ class DaskGetterMasked(DataGetter[DaskArray]):
             label_data=label_data,
             label=self.label_id,
             data_shape=data_shape,
-            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
-            data_axes=self._data_getter.axes_ops.in_memory_axes,
+            label_axes=self._label_data_getter.axes_ops.output_axes,
+            data_axes=self._data_getter.axes_ops.output_axes,
             allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
@@ -471,8 +471,8 @@ class DaskSetterMasked(DataSetter[DaskArray]):
             label_data=label_data,
             label=self.label_id,
             data_shape=data_shape,
-            label_axes=self._label_data_getter.axes_ops.in_memory_axes,
-            data_axes=self._data_getter.axes_ops.in_memory_axes,
+            label_axes=self._label_data_getter.axes_ops.output_axes,
+            data_axes=self._data_getter.axes_ops.output_axes,
             allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:

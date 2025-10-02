@@ -8,7 +8,6 @@ This models can be tr
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesHandler,
-    AxesOps,
     AxesSetup,
     Axis,
     AxisType,
@@ -46,7 +45,6 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 
 __all__ = [
     "AxesHandler",
-    "AxesOps",
     "AxesSetup",
     "Axis",
     "AxisType",

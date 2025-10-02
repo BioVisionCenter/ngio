@@ -1,7 +1,6 @@
 import numpy as np
 import pytest
 
-from ngio.io_pipes._ops_axes import _apply_numpy_axes_ops
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
     AxesSetup,
@@ -68,44 +67,6 @@ def test_axes_base(axes, axes_setup, allow_non_canonical_axes, strict_canonical_
         assert mapper.get_index(ax) == i
 
     assert len(mapper.axes) == len(axes)
-    # Test the transformation
-    shape = list(range(2, len(axes) + 2))
-    np.random.seed(0)
-    x_in = np.random.rand(*shape)
-    axes_ops = mapper.get_canonical_axes_ops()
-    x_inner = _apply_numpy_axes_ops(
-        x_in,
-        squeeze_axes=axes_ops.get_squeeze_op,
-        transpose_axes=axes_ops.get_transpose_op,
-        expand_axes=axes_ops.get_expand_op,
-    )
-    assert len(x_inner.shape) == 5 + len(mapper._axes_setup.others)
-    axes_ops = mapper.get_canonical_axes_ops()
-    x_out = _apply_numpy_axes_ops(
-        x_inner,
-        squeeze_axes=axes_ops.set_squeeze_op,
-        transpose_axes=axes_ops.set_transpose_op,
-        expand_axes=axes_ops.set_expand_op,
-    )
-
-    np.testing.assert_allclose(x_in, x_out)
-    # Test transformation with shuffle
-    shuffled_axes = np.random.permutation(axes).tolist()
-    axes_ops = mapper.get_axes_ops(shuffled_axes)
-    x_inner = _apply_numpy_axes_ops(
-        x_in,
-        squeeze_axes=axes_ops.get_squeeze_op,
-        transpose_axes=axes_ops.get_transpose_op,
-        expand_axes=axes_ops.get_expand_op,
-    )
-    assert len(x_inner.shape) == len(axes)
-    x_out = _apply_numpy_axes_ops(
-        x_inner,
-        squeeze_axes=axes_ops.set_squeeze_op,
-        transpose_axes=axes_ops.set_transpose_op,
-        expand_axes=axes_ops.set_expand_op,
-    )
-    np.testing.assert_allclose(x_in, x_out)
 
 
 @pytest.mark.parametrize(
@@ -178,16 +139,6 @@ def test_axes_fail():
             allow_non_canonical_axes=False,
             strict_canonical_order=False,
         )
-
-    mapper = AxesHandler(
-        axes=[
-            Axis(name="y"),
-            Axis(name="x"),
-        ],
-        axes_setup=None,
-    )
-    with pytest.raises(ValueError):
-        mapper.get_axes_ops(["x", "y", "y"])
 
 
 def test_pixel_size():

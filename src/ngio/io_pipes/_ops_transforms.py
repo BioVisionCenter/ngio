@@ -4,8 +4,8 @@ from typing import Protocol
 import dask.array as da
 import numpy as np
 
+from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
-from ngio.ome_zarr_meta.ngio_specs._axes import AxesOps
 
 
 class TransformProtocol(Protocol):

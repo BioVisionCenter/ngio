@@ -4,7 +4,6 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import Literal, TypeAlias, TypeVar
 
-import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 from ngio.utils import NgioValidationError, NgioValueError
@@ -263,63 +262,6 @@ def validate_axes(
     )
 
 
-class AxesOps(BaseModel):
-    """Model to represent axes operations.
-
-    This model will be used to transform objects from on disk axes to in memory axes.
-    """
-
-    on_disk_axes: tuple[str, ...]
-    in_memory_axes: tuple[str, ...]
-    transpose_op: tuple[int, ...] | None = None
-    expand_op: tuple[int, ...] | None = None
-    squeeze_op: tuple[int, ...] | None = None
-    model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
-
-    @property
-    def is_no_op(self) -> bool:
-        """Check if all operations are no ops."""
-        if (
-            self.transpose_op is None
-            and self.expand_op is None
-            and self.squeeze_op is None
-        ):
-            return True
-        return False
-
-    @property
-    def get_transpose_op(self) -> tuple[int, ...] | None:
-        """Get the transpose axes."""
-        return self.transpose_op
-
-    @property
-    def get_expand_op(self) -> tuple[int, ...] | None:
-        """Get the expand axes."""
-        return self.expand_op
-
-    @property
-    def get_squeeze_op(self) -> tuple[int, ...] | None:
-        """Get the squeeze axes."""
-        return self.squeeze_op
-
-    @property
-    def set_transpose_op(self) -> tuple[int, ...] | None:
-        """Set the transpose axes."""
-        if self.transpose_op is None:
-            return None
-        return tuple(np.argsort(self.transpose_op))
-
-    @property
-    def set_expand_op(self) -> tuple[int, ...] | None:
-        """Set the expand axes."""
-        return self.squeeze_op
-
-    @property
-    def set_squeeze_op(self) -> tuple[int, ...] | None:
-        """Set the squeeze axes."""
-        return self.expand_op
-
-
 class AxesHandler:
     """This class is used to handle and operate on OME-Zarr axes.
 
@@ -513,79 +455,6 @@ class AxesHandler:
             else:
                 new_axes.append(axes)
         self._axes = new_axes
-
-    def _reorder_axes(
-        self, names: Sequence[str]
-    ) -> tuple[tuple[int, ...] | None, tuple[int, ...] | None, tuple[int, ...] | None]:
-        """Change the order of the axes."""
-        # Validate the names
-        unique_names = set(names)
-        if len(unique_names) != len(names):
-            raise NgioValueError(
-                "Duplicate axis names found. Please provide unique names for each axis."
-            )
-        for name in names:
-            if not isinstance(name, str):
-                raise NgioValueError(
-                    f"Invalid axis name '{name}'. Axis names must be strings."
-                )
-        inv_canonical_map = self.axes_setup.inverse_canonical_map()
-
-        # Step 1: Check find squeeze axes
-        _axes_to_squeeze: list[int] = []
-        axes_names_after_squeeze = []
-        for i, ax in enumerate(self.axes_names):
-            # If the axis is not in the names, it means we need to squeeze it
-            ax_canonical = inv_canonical_map.get(ax, None)
-            if ax not in names and ax_canonical not in names:
-                _axes_to_squeeze.append(i)
-            elif ax in names:
-                axes_names_after_squeeze.append(ax)
-            elif ax_canonical in names:
-                # If the axis is in the canonical map, we add it to the names
-                axes_names_after_squeeze.append(ax_canonical)
-
-        axes_to_squeeze = tuple(_axes_to_squeeze) if len(_axes_to_squeeze) > 0 else None
-
-        # Step 2: Find the transposition order
-        _transposition_order: list[int] = []
-        axes_names_after_transpose = []
-        for ax in names:
-            if ax in axes_names_after_squeeze:
-                _transposition_order.append(axes_names_after_squeeze.index(ax))
-                axes_names_after_transpose.append(ax)
-
-        if np.allclose(_transposition_order, range(len(_transposition_order))):
-            # If the transposition order is the identity, we don't need to transpose
-            transposition_order = None
-        else:
-            transposition_order = tuple(_transposition_order)
-
-        # Step 3: Find axes to expand
-        _axes_to_expand: list[int] = []
-        for i, name in enumerate(names):
-            if name not in axes_names_after_transpose:
-                # If the axis is not in the mapping, it means we need to expand it
-                _axes_to_expand.append(i)
-
-        axes_to_expand = tuple(_axes_to_expand) if len(_axes_to_expand) > 0 else None
-        return axes_to_squeeze, transposition_order, axes_to_expand
-
-    def get_axes_ops(self, names: Sequence[str]) -> AxesOps:
-        """Get the axes operations to go from on-disk to in-memory axes."""
-        axes_to_squeeze, transposition_order, axes_to_expand = self._reorder_axes(names)
-        return AxesOps(
-            on_disk_axes=self.axes_names,
-            in_memory_axes=tuple(names),
-            transpose_op=transposition_order,
-            expand_op=axes_to_expand,
-            squeeze_op=axes_to_squeeze,
-        )
-
-    def get_canonical_axes_ops(self) -> AxesOps:
-        """Get the axes operations to go from on-disk to canonical in-memory axes."""
-        other = self._axes_setup.others
-        return self.get_axes_ops(list(self._canonical_order) + other)
 
 
 def build_canonical_axes_handler(

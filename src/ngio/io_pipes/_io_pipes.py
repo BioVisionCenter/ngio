@@ -6,16 +6,19 @@ import numpy as np
 import zarr
 from dask.array import Array as DaskArray
 
-from ngio.common import Dimensions
-from ngio.io_pipes._io_pipes_utils import SlicingInputType, setup_io_pipe
+from ngio.common._dimensions import Dimensions
 from ngio.io_pipes._ops_axes import (
+    AxesOps,
+    build_axes_ops,
     get_as_dask_axes_ops,
     get_as_numpy_axes_ops,
     set_as_dask_axes_ops,
     set_as_numpy_axes_ops,
 )
 from ngio.io_pipes._ops_slices import (
+    SlicingInputType,
     SlicingOps,
+    build_slicing_ops,
     get_slice_as_dask,
     get_slice_as_numpy,
     set_slice_as_dask,
@@ -28,7 +31,37 @@ from ngio.io_pipes._ops_transforms import (
     set_as_dask_transform,
     set_as_numpy_transform,
 )
-from ngio.ome_zarr_meta.ngio_specs._axes import AxesOps
+
+
+def setup_io_pipe(
+    *,
+    dimensions: Dimensions,
+    slicing_dict: dict[str, SlicingInputType] | None = None,
+    axes_order: Sequence[str] | None = None,
+    remove_channel_selection: bool = False,
+) -> tuple[SlicingOps, AxesOps]:
+    """Setup the slicing tuple and axes ops for an IO pipe.
+
+    * fist step is building the axes ops that contains the relant information about
+        the all the squeeze, expand and reorder operations
+    * second step is building the slicing tuple that will be used to slice the array
+        when reading or writing data.
+    * last step is cleaning the axes ops and slicing ops to be consistent.
+
+    """
+    slicing_ops = build_slicing_ops(
+        dimensions=dimensions,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+    axes_ops = build_axes_ops(
+        dimensions=dimensions,
+        input_axes=slicing_ops.slice_axes,
+        axes_order=axes_order,
+    )
+    return slicing_ops, axes_ops
+
 
 ##############################################################
 #
@@ -66,7 +99,7 @@ class DataGetter(ABC, Generic[ArrayType]):
 
     @property
     def in_memory_axes(self) -> tuple[str, ...]:
-        return self._axes_ops.in_memory_axes
+        return self._axes_ops.output_axes
 
     @property
     def transforms(self) -> Sequence[TransformProtocol] | None:
@@ -107,7 +140,7 @@ class DataSetter(ABC, Generic[ArrayType]):
 
     @property
     def in_memory_axes(self) -> tuple[str, ...]:
-        return self._axes_ops.in_memory_axes
+        return self._axes_ops.output_axes
 
     @property
     def transforms(self) -> Sequence[TransformProtocol] | None:

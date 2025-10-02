@@ -1,4 +1,5 @@
 import math
+from collections.abc import Mapping, Sequence
 from typing import TypeAlias, assert_never
 from warnings import warn
 
@@ -7,9 +8,18 @@ import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict
 
+from ngio.common._dimensions import Dimensions
+from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
 
+SlicingInputType: TypeAlias = slice | Sequence[int] | int | None
 SlicingType: TypeAlias = slice | tuple[int, ...] | int
+
+##############################################################
+#
+# "SlicingOps" model
+#
+##############################################################
 
 
 def _int_boundary_check(value: int, shape: int) -> int:
@@ -63,26 +73,32 @@ class SlicingOps(BaseModel):
 
     on_disk_axes: tuple[str, ...]
     on_disk_shape: tuple[int, ...]
-    slicing_tuple: tuple[SlicingType, ...] | None = None
+    slicing_tuple: tuple[SlicingType, ...]
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
     @property
-    def normalized_slicing_tuple(self) -> None | tuple[SlicingType, ...]:
+    def normalized_slicing_tuple(self) -> tuple[SlicingType, ...]:
         """Normalize the slicing tuple to be within the array shape boundaries."""
-        if self.slicing_tuple is not None:
-            return _slicing_tuple_boundary_check(
-                slicing_tuple=self.slicing_tuple,
-                array_shape=self.on_disk_shape,
-            )
-        return None
+        return _slicing_tuple_boundary_check(
+            slicing_tuple=self.slicing_tuple,
+            array_shape=self.on_disk_shape,
+        )
+
+    @property
+    def slice_axes(self) -> tuple[str, ...]:
+        """The axes after slicing."""
+        in_memory_axes = []
+        for ax, sl in zip(self.on_disk_axes, self.slicing_tuple, strict=True):
+            if isinstance(sl, int):
+                continue
+            in_memory_axes.append(ax)
+        return tuple(in_memory_axes)
 
     def get(self, ax_name: str, normalize: bool = False) -> SlicingType:
         """Get the slicing tuple."""
         slicing_tuple = (
             self.slicing_tuple if not normalize else self.normalized_slicing_tuple
         )
-        if slicing_tuple is None:
-            return slice(None)
         if ax_name not in self.on_disk_axes:
             return slice(None)
         ax_index = self.on_disk_axes.index(ax_name)
@@ -126,12 +142,16 @@ def _check_tuple_in_slicing_tuple(
     return ax, first_tuple
 
 
-def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
-    slicing_tuple = slicing_ops.normalized_slicing_tuple
-    if slicing_tuple is None:
-        # Base case, no slicing, return the full array
-        return zarr_array[...]
+##############################################################
+#
+# Slicing implementations
+#
+##############################################################
 
+
+def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
+    """Get a slice of a zarr array as a numpy array."""
+    slicing_tuple = slicing_ops.normalized_slicing_tuple
     # Find if the is any tuple in the slicing tuple
     # If there is one we need to handle it differently
     ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
@@ -149,12 +169,9 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
 
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
+    """Get a slice of a zarr array as a dask array."""
     da_array = da.from_zarr(zarr_array)
     slicing_tuple = slicing_ops.normalized_slicing_tuple
-    if slicing_tuple is None:
-        # Base case, no slicing, return the full array
-        return da_array[...]
-
     # Find if the is any tuple in the slicing tuple
     # If there is one we need to handle it differently
     ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
@@ -177,11 +194,6 @@ def set_slice_as_numpy(
     slicing_ops: SlicingOps,
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
-    if slice_tuple is None:
-        # Base case, no slicing, write the full array
-        zarr_array[...] = patch
-        return
-
     ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
     if ax is None:
         # Base case, no tuple in the slicing tuple
@@ -199,10 +211,6 @@ def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
-    if slice_tuple is None:
-        # Base case, no slicing, write the full array
-        da.to_zarr(arr=patch, url=zarr_array)
-        return
     ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
     if ax is None:
         # Base case, no tuple in the slicing tuple
@@ -216,3 +224,194 @@ def set_slice_as_dask(
         sub_patch = da.take(patch, indices=i, axis=ax)
         sub_patch = da.expand_dims(sub_patch, axis=ax)
         da.to_zarr(arr=sub_patch, url=zarr_array, region=_sub_slice)
+
+
+##############################################################
+#
+# Builder functions
+#
+##############################################################
+
+
+def _try_to_slice(value: Sequence[int]) -> slice | tuple[int, ...]:
+    """Try to convert a list of integers into a slice if they are contiguous.
+
+    - If the input is empty, return an empty tuple.
+    - If the input is sorted, and contains contiguous integers,
+      return a slice from the minimum to the maximum integer.
+    - Otherwise, return the input as a tuple.
+
+    This is useful for optimizing array slicing operations
+    by allowing the use of slices when possible, which can be more efficient.
+    """
+    if not value:
+        raise NgioValueError("Ngio does not support empty sequences as slice input.")
+
+    if not all(isinstance(i, int) for i in value):
+        _value = []
+        for i in value:
+            try:
+                _value.append(int(i))
+            except Exception as e:
+                raise NgioValueError(
+                    f"Invalid value {i} of type {type(i)} in sequence {value}"
+                ) from e
+        value = _value
+    # If the input is not sorted, return it as a tuple
+    max_input = max(value)
+    min_input = min(value)
+    assert min_input >= 0, "Input must contain non-negative integers"
+
+    if sorted(value) == list(range(min_input, max_input + 1)):
+        return slice(min_input, max_input + 1)
+
+    return tuple(value)
+
+
+def _remove_channel_slicing(
+    slicing_dict: dict[str, SlicingInputType],
+    dimensions: Dimensions,
+) -> dict[str, SlicingInputType]:
+    """This utility function removes the channel selection from the slice kwargs.
+
+    if ignore_channel_selection is True, it will remove the channel selection
+    regardless of the dimensions. If the ignore_channel_selection is False
+    it will fail.
+    """
+    if dimensions.is_multi_channels:
+        return slicing_dict
+
+    if "c" in slicing_dict:
+        slicing_dict.pop("c", None)
+    return slicing_dict
+
+
+def _check_slicing_virtual_axes(slice_: SlicingInputType) -> bool:
+    """Check if the slice_ is compatible with virtual axes.
+
+    Virtual axes are axes that are not present in the actual data,
+    such as time or channel axes in some datasets.
+    So the only valid slices for virtual axes are:
+    - None: means all data along the axis
+    - 0: means the first element along the axis
+    - slice([0, None], [1, None])
+    """
+    if slice_ is None or slice_ == 0:
+        return True
+    if isinstance(slice_, slice):
+        if slice_.start is None and slice_.stop is None:
+            return True
+        if slice_.start == 0 and slice_.stop is None:
+            return True
+        if slice_.start is None and slice_.stop == 0:
+            return True
+        if slice_.start == 0 and slice_.stop == 1:
+            return True
+    if isinstance(slice_, Sequence):
+        if len(slice_) == 1 and slice_[0] == 0:
+            return True
+    return False
+
+
+def _clean_slicing_dict(
+    dimensions: Dimensions,
+    slicing_dict: Mapping[str, SlicingInputType],
+    remove_channel_selection: bool = False,
+) -> dict[str, SlicingInputType]:
+    """Clean the slicing dict.
+
+    This function will:
+        - Validate that the axes in the slicing_dict are present in the dimensions.
+        - Make sure that the slicing_dict uses the on-disk axis names.
+        - Check for duplicate axis names in the slicing_dict.
+        - Clean up channel selection if the dimensions
+    """
+    clean_slicing_dict: dict[str, SlicingInputType] = {}
+    for axis_name, slice_ in slicing_dict.items():
+        axis = dimensions.axes_handler.get_axis(axis_name)
+        if axis is None:
+            # Virtual axes should be allowed to be selected
+            # Common use case is still allowing channel_selection
+            # When the zarr has not channel axis.
+            if not _check_slicing_virtual_axes(slice_):
+                raise NgioValueError(
+                    f"Invalid axis selection:{axis_name}={slice_}. "
+                    f"Not found on the on-disk axes {dimensions.axes}."
+                )
+            # Virtual axes can be safely ignored
+            continue
+        if axis.name in clean_slicing_dict:
+            raise NgioValueError(
+                f"Duplicate axis {axis.name} in slice kwargs. "
+                "Please provide unique axis names."
+            )
+        clean_slicing_dict[axis.name] = slice_
+
+    if remove_channel_selection:
+        clean_slicing_dict = _remove_channel_slicing(
+            slicing_dict=clean_slicing_dict, dimensions=dimensions
+        )
+    return clean_slicing_dict
+
+
+def _normalize_slicing_tuple(
+    axis: Axis,
+    slicing_dict: dict[str, SlicingInputType],
+) -> SlicingType:
+    """Normalize the slicing dict to tuple.
+
+    Since the slicing dict can contain different types of values
+    We need to normalize them to more predictable types.
+    The output types are:
+    - slice
+    - int
+    - tuple of int (for non-contiguous selection)
+    """
+    axis_name = axis.name
+    if axis_name not in slicing_dict:
+        # If no slice is provided for the axis, use a full slice
+        return slice(None)
+
+    value = slicing_dict[axis_name]
+    if value is None:
+        return slice(None)
+    if isinstance(value, slice) or isinstance(value, int):
+        return value
+    elif isinstance(value, Sequence):
+        # If a contiguous sequence of integers is provided,
+        # convert it to a slice for simplicity.
+        # Alternatively, it will be converted to a tuple of ints
+        return _try_to_slice(value)
+
+    raise NgioValueError(
+        f"Invalid slice definition {value} of type {type(value)}. "
+        "Allowed types are: int, slice, sequence of int or None."
+    )
+
+
+def build_slicing_ops(
+    *,
+    dimensions: Dimensions,
+    slicing_dict: dict[str, SlicingInputType] | None,
+    remove_channel_selection: bool = False,
+) -> SlicingOps:
+    """Assemble slices to be used to query the array."""
+    slicing_dict = slicing_dict or {}
+    _slicing_dict = _clean_slicing_dict(
+        dimensions=dimensions,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=remove_channel_selection,
+    )
+
+    slicing_tuple = tuple(
+        _normalize_slicing_tuple(
+            axis=axis,
+            slicing_dict=_slicing_dict,
+        )
+        for axis in dimensions.axes_handler.axes
+    )
+    return SlicingOps(
+        on_disk_axes=dimensions.axes_handler.axes_names,
+        on_disk_shape=dimensions.shape,
+        slicing_tuple=slicing_tuple,
+    )

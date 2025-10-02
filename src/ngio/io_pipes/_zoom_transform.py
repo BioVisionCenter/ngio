@@ -10,8 +10,8 @@ from ngio.common._zoom import (
     dask_zoom,
     numpy_zoom,
 )
+from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
-from ngio.ome_zarr_meta import AxesOps
 
 
 class BaseZoomTransform:
@@ -55,10 +55,10 @@ class BaseZoomTransform:
         axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(axes_ops.in_memory_axes)
+        assert len(array_shape) == len(axes_ops.output_axes)
 
         target_shape = []
-        for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
+        for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is not None and ax_type.axis_type == "channel":
                 # Do not scale channel axis
@@ -81,10 +81,10 @@ class BaseZoomTransform:
         axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(axes_ops.in_memory_axes)
+        assert len(array_shape) == len(axes_ops.output_axes)
 
         target_shape = []
-        for shape, ax_name in zip(array_shape, axes_ops.in_memory_axes, strict=True):
+        for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is not None and ax_type.axis_type == "channel":
                 # Do not scale channel axis

@@ -14,7 +14,6 @@ from ngio.ome_zarr_meta._meta_handlers import (
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
-    AxesOps,
     Dataset,
     ImageInWellPath,
     NgffVersions,
@@ -29,7 +28,6 @@ from ngio.ome_zarr_meta.ngio_specs import (
 
 __all__ = [
     "AxesHandler",
-    "AxesOps",
     "Dataset",
     "ImageInWellPath",
     "ImageMetaHandler",
