@@ -7,8 +7,6 @@ from ngio.experimental.iterators._segmentation import (
     SegmentationIterator,
 )
 
-# from ngio.experimental.iterators._builder import IteratorBuilder
-
 __all__ = [
     "FeatureExtractorIterator",
     "ImageProcessingIterator",

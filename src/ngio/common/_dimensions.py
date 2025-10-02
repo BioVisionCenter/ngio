@@ -26,15 +26,18 @@ class Dimensions:
     def __init__(
         self,
         shape: tuple[int, ...],
+        chunks: tuple[int, ...],
         dataset: Dataset,
     ) -> None:
         """Create a Dimension object from a Zarr array.
 
         Args:
             shape: The shape of the Zarr array.
+            chunks: The chunks of the Zarr array.
             dataset: The dataset object.
         """
         self._shape = shape
+        self._chunks = chunks
         self._axes_handler = dataset.axes_handler
         self._pixel_size = dataset.pixel_size
 
@@ -70,7 +73,12 @@ class Dimensions:
     @property
     def shape(self) -> tuple[int, ...]:
         """Return the shape as a tuple."""
-        return tuple(self._shape)
+        return self._shape
+
+    @property
+    def chunks(self) -> tuple[int, ...]:
+        """Return the chunks as a tuple."""
+        return self._chunks
 
     @property
     def axes(self) -> tuple[str, ...]:

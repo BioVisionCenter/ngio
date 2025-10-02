@@ -90,7 +90,11 @@ class AbstractImage(Generic[_image_handler]):
     @property
     def dimensions(self) -> Dimensions:
         """Return the dimensions of the image."""
-        return Dimensions(shape=self.zarr_array.shape, dataset=self.dataset)
+        return Dimensions(
+            shape=self.zarr_array.shape,
+            chunks=self.zarr_array.chunks,
+            dataset=self.dataset,
+        )
 
     @property
     def pixel_size(self) -> PixelSize:

@@ -33,7 +33,7 @@ def test_dimensions(axes_names):
         translation=[0.0] * len(axes_names),
     )
 
-    dims = Dimensions(shape=shape, dataset=ds)
+    dims = Dimensions(shape=shape, chunks=shape, dataset=ds)
 
     assert isinstance(dims.__repr__(), str)
 
@@ -76,10 +76,10 @@ def test_dimensions_error():
     )
 
     with pytest.raises(NgioValueError):
-        Dimensions(shape=shape, dataset=ds)
+        Dimensions(shape=shape, chunks=shape, dataset=ds)
 
     shape = (3, 4)
-    dims = Dimensions(shape=shape, dataset=ds)
+    dims = Dimensions(shape=shape, chunks=shape, dataset=ds)
 
     assert dims.get("c", default=None) is None
     assert not dims.is_3d

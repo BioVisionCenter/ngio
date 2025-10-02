@@ -140,6 +140,22 @@ class AbstractIteratorBuilder(ABC):
         """Post-process the consolidated data."""
         raise NotImplementedError
 
+    def numpy_getters(self) -> list[Callable]:
+        """Return a list of numpy getter functions for all ROIs."""
+        return [self.build_numpy_getter(roi) for roi in self.rois]
+
+    def dask_getters(self) -> list[Callable]:
+        """Return a list of dask getter functions for all ROIs."""
+        return [self.build_dask_getter(roi) for roi in self.rois]
+
+    def numpy_setters(self) -> list[Callable]:
+        """Return a list of numpy setter functions for all ROIs."""
+        return [self.build_numpy_setter(roi) for roi in self.rois]
+
+    def dask_setters(self) -> list[Callable]:
+        """Return a list of dask setter functions for all ROIs."""
+        return [self.build_dask_setter(roi) for roi in self.rois]
+
     def iter_as_numpy(self):
         """Create an iterator over the pixels of the ROIs."""
         for roi in self.rois:

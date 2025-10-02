@@ -9,6 +9,7 @@ import zarr
 from pydantic import BaseModel, ConfigDict
 
 from ngio.common._dimensions import Dimensions
+from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
 
@@ -73,6 +74,7 @@ class SlicingOps(BaseModel):
 
     on_disk_axes: tuple[str, ...]
     on_disk_shape: tuple[int, ...]
+    on_disk_chunks: tuple[int, ...]
     slicing_tuple: tuple[SlicingType, ...]
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -93,6 +95,14 @@ class SlicingOps(BaseModel):
                 continue
             in_memory_axes.append(ax)
         return tuple(in_memory_axes)
+
+    def slice_chunks(self) -> set[tuple[int, ...]]:
+        """The required to read or write the slice."""
+        return compute_slice_chunks(
+            shape=self.on_disk_shape,
+            chunks=self.on_disk_chunks,
+            slicing_tuple=self.normalized_slicing_tuple,
+        )
 
     def get(self, ax_name: str, normalize: bool = False) -> SlicingType:
         """Get the slicing tuple."""
@@ -413,5 +423,6 @@ def build_slicing_ops(
     return SlicingOps(
         on_disk_axes=dimensions.axes_handler.axes_names,
         on_disk_shape=dimensions.shape,
+        on_disk_chunks=dimensions.chunks,
         slicing_tuple=slicing_tuple,
     )
