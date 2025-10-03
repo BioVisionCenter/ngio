@@ -62,10 +62,10 @@ def setup_io_pipe(
 #
 ##############################################################
 
-ArrayType = TypeVar("ArrayType", np.ndarray, DaskArray)
+T = TypeVar("T")
 
 
-class DataGetter(ABC, Generic[ArrayType]):
+class DataGetter(ABC, Generic[T]):
     def __init__(
         self,
         zarr_array: zarr.Array,
@@ -103,15 +103,15 @@ class DataGetter(ABC, Generic[ArrayType]):
             raise ValueError(f"No ROI defined for {name}.")
         return self._roi
 
-    def __call__(self) -> ArrayType:
+    def __call__(self) -> T:
         return self.get()
 
     @abstractmethod
-    def get(self) -> ArrayType:
+    def get(self) -> T:
         pass
 
 
-class DataSetter(ABC, Generic[ArrayType]):
+class DataSetter(ABC, Generic[T]):
     def __init__(
         self,
         zarr_array: zarr.Array,
@@ -149,11 +149,11 @@ class DataSetter(ABC, Generic[ArrayType]):
             raise ValueError(f"No ROI defined for {name}.")
         return self._roi
 
-    def __call__(self, patch: ArrayType) -> None:
+    def __call__(self, patch: T) -> None:
         return self.set(patch)
 
     @abstractmethod
-    def set(self, patch: ArrayType) -> None:
+    def set(self, patch: T) -> None:
         pass
 
 

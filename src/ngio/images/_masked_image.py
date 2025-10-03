@@ -217,24 +217,29 @@ class MaskedImage(Image):
         **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray | da.Array:
         """Return the masked array for a given label."""
-        slicing_kwargs = add_channel_selection_to_slicing_dict(
-            image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
-        )
+        if mode == "numpy":
+            return self.get_roi_masked_as_numpy(
+                label=label,
+                channel_selection=channel_selection,
+                zoom_factor=zoom_factor,
+                axes_order=axes_order,
+                transforms=transforms,
+                allow_rescaling=allow_rescaling,
+                **slicing_kwargs,
+            )
 
-        roi = self._masking_roi_table.get_label(label)
-        roi = roi.zoom(zoom_factor)
-        masked_getter = NumpyGetterMasked(
-            roi=roi,
-            zarr_array=self.zarr_array,
-            label_zarr_array=self._label.zarr_array,
-            dimensions=self.dimensions,
-            label_dimensions=self._label.dimensions,
-            axes_order=axes_order,
-            transforms=transforms,
-            slicing_dict=slicing_kwargs,
-            allow_rescaling=allow_rescaling,
-        )
-        return masked_getter()
+        elif mode == "dask":
+            return self.get_roi_masked_as_dask(
+                label=label,
+                channel_selection=channel_selection,
+                zoom_factor=zoom_factor,
+                axes_order=axes_order,
+                transforms=transforms,
+                allow_rescaling=allow_rescaling,
+                **slicing_kwargs,
+            )
+        else:
+            raise ValueError(f"Unknown mode: {mode}")
 
     def set_roi_masked(
         self,

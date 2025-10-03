@@ -1,4 +1,4 @@
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Sequence
 
 import dask.array as da
 import numpy as np
@@ -16,17 +16,16 @@ from ngio.io_pipes import (
     DaskRoiGetter,
     DaskRoiSetter,
     DaskSetterMasked,
-    DataGetter,
-    DataSetter,
     NumpyGetterMasked,
     NumpyRoiGetter,
     NumpyRoiSetter,
     NumpySetterMasked,
     TransformProtocol,
 )
+from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 
 
-class SegmentationIterator(AbstractIteratorBuilder):
+class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
     """Base class for iterators over ROIs."""
 
     def __init__(
@@ -80,7 +79,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             "output_transforms": self._output_transforms,
         }
 
-    def build_numpy_getter(self, roi: Roi) -> DataGetter[np.ndarray]:
+    def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
         return NumpyRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -90,7 +89,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             slicing_dict=self._input_slicing_kwargs,
         )
 
-    def build_numpy_setter(self, roi: Roi) -> DataSetter[np.ndarray]:
+    def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
         return NumpyRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
@@ -100,7 +99,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             remove_channel_selection=True,
         )
 
-    def build_dask_getter(self, roi: Roi) -> DataGetter[da.Array]:
+    def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[da.Array]:
         return DaskRoiGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
@@ -110,7 +109,7 @@ class SegmentationIterator(AbstractIteratorBuilder):
             slicing_dict=self._input_slicing_kwargs,
         )
 
-    def build_dask_setter(self, roi: Roi) -> DataSetter[da.Array]:
+    def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
         return DaskRoiSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
@@ -122,36 +121,6 @@ class SegmentationIterator(AbstractIteratorBuilder):
 
     def post_consolidate(self):
         self._output.consolidate()
-
-    def iter_as_numpy(
-        self,
-    ) -> Generator[tuple[np.ndarray, Callable[[np.ndarray], None]]]:
-        """Create an iterator over the pixels of the ROIs as Dask arrays.
-
-        Returns:
-            Generator[tuple[da.Array, DaskWriter]]: An iterator the input
-                image as Dask arrays and a writer to write the output
-                to the label image.
-        """
-        return super().iter_as_numpy()
-
-    def map_as_numpy(self, func: Callable[[np.ndarray], np.ndarray]) -> None:
-        """Apply a transformation function to the ROI pixels."""
-        return super().map_as_numpy(func)
-
-    def iter_as_dask(self) -> Generator[tuple[da.Array, Callable[[da.Array], None]]]:
-        """Create an iterator over the pixels of the ROIs as Dask arrays.
-
-        Returns:
-            Generator[tuple[da.Array, DaskWriter]]: An iterator the input
-                image as Dask arrays and a writer to write the output
-                to the label image.
-        """
-        return super().iter_as_dask()
-
-    def map_as_dask(self, func: Callable[[da.Array], da.Array]) -> None:
-        """Apply a transformation function to the ROI pixels."""
-        return super().map_as_dask(func)
 
 
 class MaskedSegmentationIterator(SegmentationIterator):

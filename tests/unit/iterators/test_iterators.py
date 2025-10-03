@@ -12,6 +12,7 @@ from ngio.experimental.iterators import (
     MaskedSegmentationIterator,
     SegmentationIterator,
 )
+from ngio.utils import NgioValueError
 
 
 @pytest.mark.parametrize(
@@ -37,6 +38,16 @@ def test_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
     iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
     iterator = iterator.by_chunks()
     iterator = iterator.by_yx()
+
+    iterator.require_no_regions_overlap()
+    if image.is_3d or image.is_time_series:
+        # 3D images should overlap in chunks
+        with pytest.raises(NgioValueError):
+            iterator.require_no_chunks_overlap()
+    else:
+        # 2D or 2D+channels does not overlap in chunks
+        iterator.require_no_chunks_overlap()
+
     for i, (img_chunk, writer) in enumerate(iterator.iter_as_numpy()):
         label_patch = np.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
         writer(label_patch)

@@ -1,13 +1,26 @@
+from collections.abc import Iterable, Iterator
 from itertools import product
-from typing import TypeAlias
+from typing import TypeAlias, TypeVar
 
-from ngio.utils import ngio_logger
+from ngio.utils import NgioValueError, ngio_logger
+
+T = TypeVar("T")
 
 ##############################################################
 #
 # Check slice overlaps
 #
 ##############################################################
+
+
+def _pairs_stream(iterable: Iterable[T]) -> Iterator[tuple[T, T]]:
+    # Same as combinations but yields pairs as soon as they are generated
+    seen: list[T] = []
+    for a in iterable:
+        for b in seen:
+            yield b, a
+        seen.append(a)
+
 
 SlicingType: TypeAlias = slice | tuple[int, ...] | int
 
@@ -20,7 +33,7 @@ def check_elem_intersection(s1: SlicingType, s2: SlicingType) -> bool:
     If they are tuples, check if they have any common elements.
     """
     if not isinstance(s1, type(s2)):
-        raise ValueError(
+        raise NgioValueError(
             f"Slices must be of the same type. Got {type(s1)} and {type(s2)}"
         )
 
@@ -56,26 +69,26 @@ def check_slicing_tuple_intersection(
 ) -> bool:
     """For a tuple of SlicingType, check if all elements intersect."""
     if len(s1) != len(s2):
-        raise ValueError("Slices must have the same length")
+        raise NgioValueError("Slices must have the same length")
     return all(check_elem_intersection(a, b) for a, b in zip(s1, s2, strict=True))
 
 
-def check_for_logical_overlaps(slices: list[tuple[SlicingType, ...]]) -> bool:
+def check_if_regions_overlap(slices: Iterable[tuple[SlicingType, ...]]) -> bool:
     """Check for overlaps in a list of slicing tuples using brute-force method.
 
     This is O(n^2) and not efficient for large lists.
     Returns True if any overlaps are found.
     """
-    if len(slices) > 10_000:
-        ngio_logger.warning(
-            "Performance Warning check_for_overlaps is O(n^2) and may be slow for "
-            f"large numbers of regions. Current number of regions: {len(slices)}."
-        )
-    for i, si in enumerate(slices):
-        for sj in slices[i + 1 :]:
-            overalap = check_slicing_tuple_intersection(si, sj)
-            if overalap:
-                return True
+    for it, (si, sj) in enumerate(_pairs_stream(slices)):
+        overalap = check_slicing_tuple_intersection(si, sj)
+        if overalap:
+            return True
+
+        if it == 10_000:
+            ngio_logger.warning(
+                "Performance Warning check_for_overlaps is O(n^2) and may be slow for "
+                "large numbers of regions."
+            )
     return False
 
 
@@ -88,11 +101,11 @@ def check_for_logical_overlaps(slices: list[tuple[SlicingType, ...]]) -> bool:
 
 def _normalize_slice(slc: slice, size: int) -> tuple[int, int]:
     if slc.step not in (None, 1):
-        raise ValueError(f"Only step=1 slices supported, got step={slc.step}")
+        raise NgioValueError(f"Only step=1 slices supported, got step={slc.step}")
     start = 0 if slc.start is None else slc.start
     stop = size if slc.stop is None else slc.stop
     if start < 0 or stop < 0:
-        raise ValueError("Negative slice bounds are not supported")
+        raise NgioValueError("Negative slice bounds are not supported")
     # clamp to [0, size]
     start = min(start, size)
     stop = min(stop, size)
@@ -145,7 +158,9 @@ def compute_slice_chunks(
         slicing_tuple: tuple of slices, ints, or tuples of ints
     """
     if len(slicing_tuple) != len(shape):
-        raise ValueError(f"key must have {len(shape)} items, got {len(slicing_tuple)}")
+        raise NgioValueError(
+            f"key must have {len(shape)} items, got {len(slicing_tuple)}"
+        )
 
     per_axis_chunks: list[list[int]] = [
         _chunk_indices_for_axis(sel, size, csize)
@@ -159,8 +174,8 @@ def compute_slice_chunks(
     return {tuple(idx) for idx in product(*per_axis_chunks)}
 
 
-def check_for_chunks_overlap(
-    slices: list[tuple[SlicingType, ...]],
+def check_if_chunks_overlap(
+    slices: Iterable[tuple[SlicingType, ...]],
     shape: tuple[int, ...],
     chunks: tuple[int, ...],
 ) -> bool:
@@ -169,15 +184,13 @@ def check_for_chunks_overlap(
     This is O(n^2) and not efficient for large lists.
     Returns True if any overlaps are found.
     """
-    if len(slices) > 10_000:
-        ngio_logger.warning(
-            "Performance Warning check_for_chunks_overlaps is O(n^2) and may be "
-            "slow for large numbers of regions. Current number of "
-            f"regions: {len(slices)}."
-        )
-    slices_chunks = [compute_slice_chunks(shape, chunks, si) for si in slices]
-    for i, si in enumerate(slices_chunks):
-        for sj in slices_chunks[i + 1 :]:
-            if si & sj:
-                return True
+    slices_chunks = (compute_slice_chunks(shape, chunks, si) for si in slices)
+    for it, (si, sj) in enumerate(_pairs_stream(slices_chunks)):
+        if si & sj:
+            return True
+        if it == 10_000:
+            ngio_logger.warning(
+                "Performance Warning check_for_chunks_overlaps is O(n^2) and may be "
+                "slow for large numbers of regions."
+            )
     return False

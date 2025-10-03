@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable
-from typing import Self
+from collections.abc import Callable, Generator
+from typing import Generic, Literal, Self, TypeVar, overload
 
 from ngio import Roi
 from ngio.experimental.iterators._rois_utils import (
@@ -11,10 +11,16 @@ from ngio.experimental.iterators._rois_utils import (
     rois_product,
 )
 from ngio.images._abstract_image import AbstractImage
+from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
 from ngio.tables import GenericRoiTable
+from ngio.utils import NgioValueError
+
+NumpyPipeType = TypeVar("NumpyPipeType")
+DaskPipeType = TypeVar("DaskPipeType")
 
 
-class AbstractIteratorBuilder(ABC):
+class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     """Base class for building iterators over ROIs."""
 
     _rois: list[Roi]
@@ -116,22 +122,22 @@ class AbstractIteratorBuilder(ABC):
         return self._new_from_rois(rois)
 
     @abstractmethod
-    def build_numpy_getter(self, roi: Roi):
+    def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[NumpyPipeType]:
         """Build a getter function for the given ROI."""
         raise NotImplementedError
 
     @abstractmethod
-    def build_numpy_setter(self, roi: Roi):
+    def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[NumpyPipeType] | None:
         """Build a setter function for the given ROI."""
         raise NotImplementedError
 
     @abstractmethod
-    def build_dask_getter(self, roi: Roi):
+    def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[DaskPipeType]:
         """Build a Dask reader function for the given ROI."""
         raise NotImplementedError
 
     @abstractmethod
-    def build_dask_setter(self, roi: Roi):
+    def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[DaskPipeType] | None:
         """Build a Dask setter function for the given ROI."""
         raise NotImplementedError
 
@@ -140,63 +146,218 @@ class AbstractIteratorBuilder(ABC):
         """Post-process the consolidated data."""
         raise NotImplementedError
 
-    def numpy_getters(self) -> list[Callable]:
+    def _numpy_getters_generator(self) -> Generator[DataGetterProtocol[NumpyPipeType]]:
         """Return a list of numpy getter functions for all ROIs."""
-        return [self.build_numpy_getter(roi) for roi in self.rois]
+        yield from (self.build_numpy_getter(roi) for roi in self.rois)
 
-    def dask_getters(self) -> list[Callable]:
+    def _dask_getters_generator(self) -> Generator[DataGetterProtocol[DaskPipeType]]:
         """Return a list of dask getter functions for all ROIs."""
-        return [self.build_dask_getter(roi) for roi in self.rois]
+        yield from (self.build_dask_getter(roi) for roi in self.rois)
 
-    def numpy_setters(self) -> list[Callable]:
+    def _numpy_setters_generator(
+        self,
+    ) -> Generator[DataSetterProtocol[NumpyPipeType] | None]:
         """Return a list of numpy setter functions for all ROIs."""
-        return [self.build_numpy_setter(roi) for roi in self.rois]
+        yield from (self.build_numpy_setter(roi) for roi in self.rois)
 
-    def dask_setters(self) -> list[Callable]:
+    def _dask_setters_generator(
+        self,
+    ) -> Generator[DataSetterProtocol[DaskPipeType] | None]:
         """Return a list of dask setter functions for all ROIs."""
-        return [self.build_dask_setter(roi) for roi in self.rois]
+        yield from (self.build_dask_setter(roi) for roi in self.rois)
 
-    def iter_as_numpy(self):
+    def _read_and_write_generator(
+        self,
+        getters: Generator[
+            DataGetterProtocol[NumpyPipeType] | DataGetterProtocol[DaskPipeType]
+        ],
+        setters: Generator[
+            DataSetterProtocol[NumpyPipeType] | DataSetterProtocol[DaskPipeType] | None
+        ],
+    ) -> Generator[
+        tuple[
+            DataGetterProtocol[NumpyPipeType] | DataGetterProtocol[DaskPipeType],
+            DataSetterProtocol[NumpyPipeType] | DataSetterProtocol[DaskPipeType],
+        ]
+    ]:
         """Create an iterator over the pixels of the ROIs."""
-        for roi in self.rois:
-            data = self.build_numpy_getter(roi)()
-            yield data, self.build_numpy_setter(roi)
+        for getter, setter in zip(getters, setters, strict=True):
+            if setter is None:
+                name = self.__class__.__name__
+                raise NgioValueError(f"Iterator is read-only: {name}")
+            yield getter, setter
         self.post_consolidate()
 
-    def iter_as_dask(self):
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readwrite"],
+    ) -> Generator[
+        tuple[DataGetterProtocol[NumpyPipeType], DataSetterProtocol[NumpyPipeType]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readonly"] = ...,
+    ) -> Generator[DataGetterProtocol[NumpyPipeType]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readwrite"],
+    ) -> Generator[
+        tuple[DataGetterProtocol[DaskPipeType], DataSetterProtocol[DaskPipeType]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readonly"] = ...,
+    ) -> Generator[DataGetterProtocol[DaskPipeType]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readwrite"],
+    ) -> Generator[tuple[NumpyPipeType, DataSetterProtocol[NumpyPipeType]]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readonly"] = ...,
+    ) -> Generator[NumpyPipeType]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readwrite"],
+    ) -> Generator[tuple[DaskPipeType, DataSetterProtocol[DaskPipeType]]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readonly"] = ...,
+    ) -> Generator[DaskPipeType]: ...
+
+    def iter(
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] = "dask",
+        iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
+    ) -> Generator:
         """Create an iterator over the pixels of the ROIs."""
-        for roi in self.rois:
-            data = self.build_dask_getter(roi)()
-            yield data, self.build_dask_setter(roi)
+        if data_mode == "numpy":
+            getters = self._numpy_getters_generator()
+            setters = self._numpy_setters_generator()
+        elif data_mode == "dask":
+            getters = self._dask_getters_generator()
+            setters = self._dask_setters_generator()
+        else:
+            raise NgioValueError(f"Invalid mode: {data_mode}")
 
-    def map_as_numpy(self, func: Callable) -> None:
+        if iterator_mode == "readonly":
+            if lazy:
+                return getters
+            else:
+                return (getter() for getter in getters)
+        if lazy:
+            return self._read_and_write_generator(getters, setters)
+        else:
+            gen = self._read_and_write_generator(getters, setters)
+            return ((getter(), setter) for getter, setter in gen)
+
+    def iter_as_numpy(
+        self,
+    ):
+        """Create an iterator over the pixels of the ROIs."""
+        return self.iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
+
+    def iter_as_dask(
+        self,
+    ):
+        """Create an iterator over the pixels of the ROIs."""
+        return self.iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
+
+    def map_as_numpy(self, func: Callable[[NumpyPipeType], NumpyPipeType]) -> None:
         """Apply a transformation function to the ROI pixels."""
-        for roi in self.rois:
-            data = self.build_numpy_getter(roi)()
+        for data, setter in self.iter_as_numpy():
             data = func(data)
-            self.build_numpy_setter(roi)
+            setter(data)
         self.post_consolidate()
 
-    def map_as_dask(self, func: Callable) -> None:
+    def map_as_dask(self, func: Callable[[DaskPipeType], DaskPipeType]) -> None:
         """Apply a transformation function to the ROI pixels."""
-        for roi in self.rois:
-            data = self.build_dask_getter(roi)()
+        for data, setter in self.iter_as_dask():
             data = func(data)
-            self.build_dask_setter(roi)
+            setter(data)
         self.post_consolidate()
 
-    def check_for_logical_overlaps(self) -> bool:
-        """Check if any of the ROIs logically overlap."""
-        raise NotImplementedError("Overlap checking is not implemented yet.")
+    def check_if_regions_overlap(self) -> bool:
+        """Check if any of the ROIs overlap logically.
 
-    def require_no_logical_overlaps(self) -> None:
+        If two ROIs cover the same pixel, they are considered to overlap.
+        This does not consider chunking or other storage details.
+
+        Returns:
+            bool: True if any ROIs overlap. False otherwise.
+        """
+        if len(self.rois) < 2:
+            # Less than 2 ROIs cannot overlap
+            return False
+
+        slicing_tuples = (
+            g.slicing_ops.normalized_slicing_tuple
+            for g in self._numpy_getters_generator()
+        )
+        x = check_if_regions_overlap(slicing_tuples)
+        return x
+
+    def require_no_regions_overlap(self) -> None:
         """Ensure that the Iterator's ROIs do not overlap."""
-        raise NotImplementedError("Overlap checking is not implemented yet.")
+        if self.check_if_regions_overlap():
+            raise NgioValueError("Some rois overlap.")
 
-    def check_for_chunks_overlap(self) -> bool:
-        """Check if any of the ROIs overlap in terms of chunks."""
-        raise NotImplementedError("Chunk overlap checking is not implemented yet.")
+    def check_if_chunks_overlap(self) -> bool:
+        """Check if any of the ROIs overlap in terms of chunks.
+
+        If two ROIs cover the same chunk, they are considered to overlap in chunks.
+        This does not consider pixel-level overlaps.
+
+        Returns:
+            bool: True if any ROIs overlap in chunks, False otherwise.
+        """
+        from ngio.io_pipes._ops_slices_utils import check_if_chunks_overlap
+
+        if len(self.rois) < 2:
+            # Less than 2 ROIs cannot overlap
+            return False
+
+        slicing_tuples = (
+            g.slicing_ops.normalized_slicing_tuple
+            for g in self._numpy_getters_generator()
+        )
+        shape = self.ref_image.shape
+        chunks = self.ref_image.chunks
+        return check_if_chunks_overlap(slicing_tuples, shape, chunks)
 
     def require_no_chunks_overlap(self) -> None:
         """Ensure that the ROIs do not overlap in terms of chunks."""
-        raise NotImplementedError("Chunk overlap checking is not implemented yet.")
+        if self.check_if_chunks_overlap():
+            raise NgioValueError("Some rois overlap in chunks.")

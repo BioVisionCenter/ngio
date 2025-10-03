@@ -216,6 +216,8 @@ class LabelsContainer:
             axes_names=axes_names,
             chunks=chunks,
             dtype=dtype,
+            dimension_separator=dimension_separator,
+            compressor=compressor,
             overwrite=overwrite,
         )
 

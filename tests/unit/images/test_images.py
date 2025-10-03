@@ -120,10 +120,10 @@ def test_image_require_can_be_rescaled(
     # Also test with transforms
     if should_raise:
         with pytest.raises(NgioValueError):
-            img1.require_can_be_rescaled(img2)
+            img1.require_rescalable(img2)
         return None
 
-    img1.require_can_be_rescaled(img2)
+    img1.require_rescalable(img2)
 
     # Also test with transforms
     zoom = ZoomTransform(
@@ -169,7 +169,7 @@ def test_image_require_can_be_rescaled2(
     # Also test with transforms
     if should_raise:
         with pytest.raises(NgioValueError):
-            img2.require_can_be_rescaled(img1)
+            img2.require_rescalable(img1)
         return None
     zoom = ZoomTransform(
         input_image=img2,

@@ -173,7 +173,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def has_axis(self, axis: str) -> bool:
         """Return True if the image has the given axis."""
-        return self.dimensions.has_axis(axis)
+        return self.axes_handler.has_axis(axis)
 
     def _get_as_numpy(
         self,
@@ -465,7 +465,7 @@ class AbstractImage(Generic[_image_handler]):
         return roi_px.to_roi(pixel_size=self.pixel_size)
 
     def build_image_roi_table(self, name: str | None = "image") -> RoiTable:
-        """Build the ROI table for an image."""
+        """Build the ROI table containing the ROI covering the entire image."""
         return RoiTable(rois=[self.roi(name=name)])
 
     def require_dimensions_match(
@@ -487,6 +487,25 @@ class AbstractImage(Generic[_image_handler]):
             other.dimensions, allow_singleton=allow_singleton
         )
 
+    def check_if_dimensions_match(
+        self,
+        other: "AbstractImage",
+        allow_singleton: bool = False,
+    ) -> bool:
+        """Check if two images have matching spatial dimensions.
+
+        Args:
+            other: The other image to compare to.
+            allow_singleton: If True, allow singleton dimensions to be
+                compatible with non-singleton dimensions.
+
+        Returns:
+            bool: True if the images have matching dimensions, False otherwise.
+        """
+        return self.dimensions.check_if_dimensions_match(
+            other.dimensions, allow_singleton=allow_singleton
+        )
+
     def require_axes_match(
         self,
         other: "AbstractImage",
@@ -501,7 +520,22 @@ class AbstractImage(Generic[_image_handler]):
         """
         self.dimensions.require_axes_match(other.dimensions)
 
-    def require_can_be_rescaled(
+    def check_if_axes_match(
+        self,
+        other: "AbstractImage",
+    ) -> bool:
+        """Check if two images have compatible axes.
+
+        Args:
+            other: The other image to compare to.
+
+        Returns:
+            bool: True if the images have compatible axes, False otherwise.
+
+        """
+        return self.dimensions.check_if_axes_match(other.dimensions)
+
+    def require_rescalable(
         self,
         other: "AbstractImage",
     ) -> None:
@@ -516,7 +550,24 @@ class AbstractImage(Generic[_image_handler]):
         Raises:
             NgioValueError: If the images cannot be scaled to each other.
         """
-        self.dimensions.require_can_be_rescaled(other.dimensions)
+        self.dimensions.require_rescalable(other.dimensions)
+
+    def check_if_rescalable(
+        self,
+        other: "AbstractImage",
+    ) -> bool:
+        """Check if two images can be rescaled to each other.
+
+        For this to be true, the images must have the same axes, and
+        the pixel sizes must be compatible (i.e. one can be scaled to the other).
+
+        Args:
+            other: The other image to compare to.
+
+        Returns:
+            bool: True if the images can be rescaled to each other, False otherwise.
+        """
+        return self.dimensions.check_if_rescalable(other.dimensions)
 
 
 def consolidate_image(

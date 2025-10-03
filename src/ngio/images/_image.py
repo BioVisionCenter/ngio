@@ -641,6 +641,8 @@ class ImagesContainer:
             name=name,
             chunks=chunks,
             dtype=dtype,
+            dimension_separator=dimension_separator,
+            compressor=compressor,
             overwrite=overwrite,
         )
 

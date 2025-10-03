@@ -429,6 +429,13 @@ class AxesHandler:
         """Get the index of the axis by name."""
         return self._index_mapping.get(name, None)
 
+    def has_axis(self, axis_name: str) -> bool:
+        """Return whether the axis exists."""
+        index = self.get_index(axis_name)
+        if index is None:
+            return False
+        return True
+
     def get_canonical_name(self, name: str) -> str | None:
         """Get the canonical name of the axis by name."""
         return self._axes_setup.get_canonical_name(name)
