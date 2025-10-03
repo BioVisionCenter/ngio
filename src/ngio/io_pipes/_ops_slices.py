@@ -217,13 +217,31 @@ def set_slice_as_numpy(
         zarr_array[_sub_slice] = np.take(patch, indices=i, axis=ax)
 
 
+def handle_int_set_as_dask(
+    patch: da.Array,
+    slicing_tuple: tuple[SlicingType, ...],
+) -> tuple[da.Array, tuple[SlicingType, ...]]:
+    """Handle the case where the slicing tuple contains integers.
+
+    In this case we need to expand the patch array to match the slicing tuple.
+    """
+    new_slicing_tuple = list(slicing_tuple)
+    for i, sl in enumerate(slicing_tuple):
+        if isinstance(sl, int):
+            patch = da.expand_dims(patch, axis=i)
+            new_slicing_tuple[i] = slice(sl, sl + 1)
+    return patch, tuple(new_slicing_tuple)
+
+
 def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
     ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
+    patch, slice_tuple = handle_int_set_as_dask(patch, slice_tuple)
     if ax is None:
         # Base case, no tuple in the slicing tuple
+        # assert False
         da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
         return
 
