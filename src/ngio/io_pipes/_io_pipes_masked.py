@@ -153,6 +153,7 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
             slicing_ops=self._data_getter.slicing_ops,
             axes_ops=self._data_getter.axes_ops,
             transforms=self._data_getter.transforms,
+            roi=roi,
         )
 
     @property
@@ -228,6 +229,7 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
             slicing_ops=self._data_setter.slicing_ops,
             axes_ops=self._data_setter.axes_ops,
             transforms=self._data_setter.transforms,
+            roi=roi,
         )
 
     @property
@@ -384,6 +386,7 @@ class DaskGetterMasked(DataGetter[DaskArray]):
             slicing_ops=self._data_getter.slicing_ops,
             axes_ops=self._data_getter.axes_ops,
             transforms=self._data_getter.transforms,
+            roi=roi,
         )
 
     @property
@@ -460,6 +463,7 @@ class DaskSetterMasked(DataSetter[DaskArray]):
             slicing_ops=self._data_setter.slicing_ops,
             axes_ops=self._data_setter.axes_ops,
             transforms=self._data_setter.transforms,
+            roi=roi,
         )
 
     @property

@@ -7,6 +7,7 @@ import zarr
 from dask.array import Array as DaskArray
 
 from ngio.common._dimensions import Dimensions
+from ngio.common._roi import Roi, RoiPixels
 from ngio.io_pipes._ops_axes import (
     AxesOps,
     build_axes_ops,
@@ -71,11 +72,13 @@ class DataGetter(ABC, Generic[ArrayType]):
         slicing_ops: SlicingOps,
         axes_ops: AxesOps,
         transforms: Sequence[TransformProtocol] | None = None,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         self._zarr_array = zarr_array
         self._slicing_ops = slicing_ops
         self._axes_ops = axes_ops
         self._transforms = transforms
+        self._roi = roi
 
     @property
     def zarr_array(self) -> zarr.Array:
@@ -90,12 +93,15 @@ class DataGetter(ABC, Generic[ArrayType]):
         return self._axes_ops
 
     @property
-    def in_memory_axes(self) -> tuple[str, ...]:
-        return self._axes_ops.output_axes
-
-    @property
     def transforms(self) -> Sequence[TransformProtocol] | None:
         return self._transforms
+
+    @property
+    def roi(self) -> Roi | RoiPixels:
+        if self._roi is None:
+            name = self.__class__.__name__
+            raise ValueError(f"No ROI defined for {name}.")
+        return self._roi
 
     def __call__(self) -> ArrayType:
         return self.get()
@@ -112,11 +118,13 @@ class DataSetter(ABC, Generic[ArrayType]):
         slicing_ops: SlicingOps,
         axes_ops: AxesOps,
         transforms: Sequence[TransformProtocol] | None = None,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         self._zarr_array = zarr_array
         self._slicing_ops = slicing_ops
         self._axes_ops = axes_ops
         self._transforms = transforms
+        self._roi = roi
 
     @property
     def zarr_array(self) -> zarr.Array:
@@ -131,12 +139,15 @@ class DataSetter(ABC, Generic[ArrayType]):
         return self._axes_ops
 
     @property
-    def in_memory_axes(self) -> tuple[str, ...]:
-        return self._axes_ops.output_axes
-
-    @property
     def transforms(self) -> Sequence[TransformProtocol] | None:
         return self._transforms
+
+    @property
+    def roi(self) -> Roi | RoiPixels:
+        if self._roi is None:
+            name = self.__class__.__name__
+            raise ValueError(f"No ROI defined for {name}.")
+        return self._roi
 
     def __call__(self, patch: ArrayType) -> None:
         return self.set(patch)
@@ -156,6 +167,7 @@ class NumpyGetter(DataGetter[np.ndarray]):
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
         remove_channel_selection: bool = False,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
         slicing_ops, axes_ops = setup_io_pipe(
@@ -169,6 +181,7 @@ class NumpyGetter(DataGetter[np.ndarray]):
             slicing_ops=slicing_ops,
             axes_ops=axes_ops,
             transforms=transforms,
+            roi=roi,
         )
 
     def get(self) -> np.ndarray:
@@ -194,6 +207,7 @@ class DaskGetter(DataGetter[DaskArray]):
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
         remove_channel_selection: bool = False,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
         slicing_ops, axes_ops = setup_io_pipe(
@@ -207,6 +221,7 @@ class DaskGetter(DataGetter[DaskArray]):
             slicing_ops=slicing_ops,
             axes_ops=axes_ops,
             transforms=transforms,
+            roi=roi,
         )
 
     def get(self) -> DaskArray:
@@ -246,6 +261,7 @@ class NumpySetter(DataSetter[np.ndarray]):
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
         remove_channel_selection: bool = False,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
         slicing_ops, axes_ops = setup_io_pipe(
@@ -259,6 +275,7 @@ class NumpySetter(DataSetter[np.ndarray]):
             slicing_ops=slicing_ops,
             axes_ops=axes_ops,
             transforms=transforms,
+            roi=roi,
         )
 
     def set(self, patch: np.ndarray) -> None:
@@ -290,6 +307,7 @@ class DaskSetter(DataSetter[DaskArray]):
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
         remove_channel_selection: bool = False,
+        roi: Roi | RoiPixels | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
         slicing_ops, axes_ops = setup_io_pipe(
@@ -303,6 +321,7 @@ class DaskSetter(DataSetter[DaskArray]):
             slicing_ops=slicing_ops,
             axes_ops=axes_ops,
             transforms=transforms,
+            roi=roi,
         )
 
     def set(self, patch: DaskArray) -> None:

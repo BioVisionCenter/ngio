@@ -184,3 +184,19 @@ class AbstractIteratorBuilder(ABC):
             data = func(data)
             self.build_dask_setter(roi)
         self.post_consolidate()
+
+    def check_for_logical_overlaps(self) -> bool:
+        """Check if any of the ROIs logically overlap."""
+        raise NotImplementedError("Overlap checking is not implemented yet.")
+
+    def require_no_logical_overlaps(self) -> None:
+        """Ensure that the Iterator's ROIs do not overlap."""
+        raise NotImplementedError("Overlap checking is not implemented yet.")
+
+    def check_for_chunks_overlap(self) -> bool:
+        """Check if any of the ROIs overlap in terms of chunks."""
+        raise NotImplementedError("Chunk overlap checking is not implemented yet.")
+
+    def require_no_chunks_overlap(self) -> None:
+        """Ensure that the ROIs do not overlap in terms of chunks."""
+        raise NotImplementedError("Chunk overlap checking is not implemented yet.")

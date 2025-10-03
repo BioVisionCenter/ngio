@@ -64,6 +64,7 @@ class NumpyRoiGetter(NumpyGetter):
             transforms=transforms,
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
+            roi=roi,
         )
 
 
@@ -91,6 +92,7 @@ class DaskRoiGetter(DaskGetter):
             transforms=transforms,
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
+            roi=roi,
         )
 
 
@@ -118,6 +120,7 @@ class NumpyRoiSetter(NumpySetter):
             transforms=transforms,
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
+            roi=roi,
         )
 
 
@@ -145,4 +148,5 @@ class DaskRoiSetter(DaskSetter):
             transforms=transforms,
             slicing_dict=input_slice_kwargs,
             remove_channel_selection=remove_channel_selection,
+            roi=roi,
         )

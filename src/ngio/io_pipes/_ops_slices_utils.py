@@ -60,7 +60,7 @@ def check_slicing_tuple_intersection(
     return all(check_elem_intersection(a, b) for a, b in zip(s1, s2, strict=True))
 
 
-def check_for_overlaps(slices: list[tuple[SlicingType, ...]]) -> bool:
+def check_for_logical_overlaps(slices: list[tuple[SlicingType, ...]]) -> bool:
     """Check for overlaps in a list of slicing tuples using brute-force method.
 
     This is O(n^2) and not efficient for large lists.
@@ -159,7 +159,7 @@ def compute_slice_chunks(
     return {tuple(idx) for idx in product(*per_axis_chunks)}
 
 
-def check_for_chunks_overlaps(
+def check_for_chunks_overlap(
     slices: list[tuple[SlicingType, ...]],
     shape: tuple[int, ...],
     chunks: tuple[int, ...],
