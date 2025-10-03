@@ -2472,7 +2472,7 @@ interpret the identifier. Can be "label", "wavelength_id", or
 <span class="normal">175</span>
 <span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the image has the given axis.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -2564,7 +2564,7 @@ interpret the identifier. Can be "label", "wavelength_id", or
 
     <div class="doc doc-contents ">
 
-        <p>Build the ROI table for an image.</p>
+        <p>Build the ROI table containing the ROI covering the entire image.</p>
 
 
             <details class="quote">
@@ -2572,7 +2572,7 @@ interpret the identifier. Can be "label", "wavelength_id", or
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table for an image.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table containing the ROI covering the entire image.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">RoiTable</span><span class="p">(</span><span class="n">rois</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">roi</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)])</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -2680,6 +2680,103 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
+<h5 id="ngio.images.Image.check_if_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_dimensions_match</span>
+
+
+<a href="#ngio.images.Image.check_if_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_dimensions_match</span><span class="p">(</span>
+    <span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images have matching spatial dimensions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>allow_singleton</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>If True, allow singleton dimensions to be
+compatible with non-singleton dimensions.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images have matching dimensions, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_dimensions_match</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+    <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images have matching spatial dimensions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+<span class="sd">        allow_singleton: If True, allow singleton dimensions to be</span>
+<span class="sd">            compatible with non-singleton dimensions.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images have matching dimensions, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_dimensions_match</span><span class="p">(</span>
+        <span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h5 id="ngio.images.Image.require_axes_match" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_axes_match</span>
 
@@ -2720,19 +2817,19 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -2754,12 +2851,88 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.images.Image.require_can_be_rescaled" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_can_be_rescaled</span>
+<h5 id="ngio.images.Image.check_if_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_axes_match</span>
 
 
-<a href="#ngio.images.Image.require_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.images.Image.check_if_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images have compatible axes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images have compatible axes, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_axes_match</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images have compatible axes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images have compatible axes, False otherwise.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_axes_match</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.images.Image.require_rescalable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_rescalable</span>
+
+
+<a href="#ngio.images.Image.require_rescalable" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_rescalable</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -2796,22 +2969,22 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_can_be_rescaled</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_rescalable</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -2826,7 +2999,89 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images cannot be scaled to each other.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_rescalable</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.images.Image.check_if_rescalable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_rescalable</span>
+
+
+<a href="#ngio.images.Image.check_if_rescalable" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_rescalable</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images can be rescaled to each other.</p>
+<p>For this to be true, the images must have the same axes, and
+the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images can be rescaled to each other, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_rescalable</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images can be rescaled to each other.</span>
+
+<span class="sd">    For this to be true, the images must have the same axes, and</span>
+<span class="sd">    the pixel sizes must be compatible (i.e. one can be scaled to the other).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images can be rescaled to each other, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_rescalable</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5112,7 +5367,9 @@ the same as the reference image.</p>
 <span class="normal">642</span>
 <span class="normal">643</span>
 <span class="normal">644</span>
-<span class="normal">645</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
+<span class="normal">645</span>
+<span class="normal">646</span>
+<span class="normal">647</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">ref_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -5160,6 +5417,8 @@ the same as the reference image.</p>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
         <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
         <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="n">dimension_separator</span><span class="o">=</span><span class="n">dimension_separator</span><span class="p">,</span>
+        <span class="n">compressor</span><span class="o">=</span><span class="n">compressor</span><span class="p">,</span>
         <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span>
     <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -5227,9 +5486,7 @@ closest pixel size level will be returned.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">647</span>
-<span class="normal">648</span>
-<span class="normal">649</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">649</span>
 <span class="normal">650</span>
 <span class="normal">651</span>
 <span class="normal">652</span>
@@ -5250,7 +5507,9 @@ closest pixel size level will be returned.</p>
 <span class="normal">667</span>
 <span class="normal">668</span>
 <span class="normal">669</span>
-<span class="normal">670</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
+<span class="normal">670</span>
+<span class="normal">671</span>
+<span class="normal">672</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6090,7 +6349,7 @@ closest pixel size level will be returned.</p>
 <span class="normal">175</span>
 <span class="normal">176</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">has_axis</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return True if the image has the given axis.&quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">axes_handler</span><span class="o">.</span><span class="n">has_axis</span><span class="p">(</span><span class="n">axis</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6182,7 +6441,7 @@ closest pixel size level will be returned.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Build the ROI table for an image.</p>
+        <p>Build the ROI table containing the ROI covering the entire image.</p>
 
 
             <details class="quote">
@@ -6190,7 +6449,7 @@ closest pixel size level will be returned.</p>
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">467</span>
 <span class="normal">468</span>
 <span class="normal">469</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">build_image_roi_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiTable</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table for an image.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build the ROI table containing the ROI covering the entire image.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="n">RoiTable</span><span class="p">(</span><span class="n">rois</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">roi</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">)])</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -6298,6 +6557,103 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
+<h5 id="ngio.images.Label.check_if_dimensions_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_dimensions_match</span>
+
+
+<a href="#ngio.images.Label.check_if_dimensions_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_dimensions_match</span><span class="p">(</span>
+    <span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">,</span> <span class="n">allow_singleton</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span> <span class="o">=</span> <span class="kc">False</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images have matching spatial dimensions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>allow_singleton</code></b>
+              (<code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>, default:
+                  <code>False</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>If True, allow singleton dimensions to be
+compatible with non-singleton dimensions.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images have matching dimensions, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span>
+<span class="normal">506</span>
+<span class="normal">507</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_dimensions_match</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+    <span class="n">allow_singleton</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images have matching spatial dimensions.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+<span class="sd">        allow_singleton: If True, allow singleton dimensions to be</span>
+<span class="sd">            compatible with non-singleton dimensions.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images have matching dimensions, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_dimensions_match</span><span class="p">(</span>
+        <span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">allow_singleton</span><span class="o">=</span><span class="n">allow_singleton</span>
+    <span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
 <h5 id="ngio.images.Label.require_axes_match" class="doc doc-heading">
 <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_axes_match</span>
 
@@ -6338,19 +6694,19 @@ compatible with non-singleton dimensions.</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">490</span>
-<span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
-<span class="normal">501</span>
-<span class="normal">502</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_axes_match</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -6372,12 +6728,88 @@ compatible with non-singleton dimensions.</p>
 <div class="doc doc-object doc-function">
 
 
-<h5 id="ngio.images.Label.require_can_be_rescaled" class="doc doc-heading">
-<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_can_be_rescaled</span>
+<h5 id="ngio.images.Label.check_if_axes_match" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_axes_match</span>
 
 
-<a href="#ngio.images.Label.require_can_be_rescaled" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
+<a href="#ngio.images.Label.check_if_axes_match" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_axes_match</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images have compatible axes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images have compatible axes, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span>
+<span class="normal">536</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_axes_match</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images have compatible axes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images have compatible axes, False otherwise.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_axes_match</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.images.Label.require_rescalable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">require_rescalable</span>
+
+
+<a href="#ngio.images.Label.require_rescalable" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">require_rescalable</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
@@ -6414,22 +6846,22 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
             <details class="quote">
               <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">504</span>
-<span class="normal">505</span>
-<span class="normal">506</span>
-<span class="normal">507</span>
-<span class="normal">508</span>
-<span class="normal">509</span>
-<span class="normal">510</span>
-<span class="normal">511</span>
-<span class="normal">512</span>
-<span class="normal">513</span>
-<span class="normal">514</span>
-<span class="normal">515</span>
-<span class="normal">516</span>
-<span class="normal">517</span>
-<span class="normal">518</span>
-<span class="normal">519</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_can_be_rescaled</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span>
+<span class="normal">551</span>
+<span class="normal">552</span>
+<span class="normal">553</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">require_rescalable</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -6444,7 +6876,89 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 <span class="sd">    Raises:</span>
 <span class="sd">        NgioValueError: If the images cannot be scaled to each other.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_can_be_rescaled</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+    <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">require_rescalable</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.images.Label.check_if_rescalable" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">check_if_rescalable</span>
+
+
+<a href="#ngio.images.Label.check_if_rescalable" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">check_if_rescalable</span><span class="p">(</span><span class="n">other</span><span class="p">:</span> <span class="n"><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Check if two images can be rescaled to each other.</p>
+<p>For this to be true, the images must have the same axes, and
+the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="ngio.images._abstract_image.AbstractImage">AbstractImage</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The other image to compare to.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+<b><code>bool</code></b> (              <code><a class="autorefs autorefs-external" href="https://docs.python.org/3/library/functions.html#bool">bool</a></code>
+)          –
+          <div class="doc-md-description">
+            <p>True if the images can be rescaled to each other, False otherwise.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="quote">
+              <summary>Source code in <code>ngio/images/_abstract_image.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">check_if_rescalable</span><span class="p">(</span>
+    <span class="bp">self</span><span class="p">,</span>
+    <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;AbstractImage&quot;</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if two images can be rescaled to each other.</span>
+
+<span class="sd">    For this to be true, the images must have the same axes, and</span>
+<span class="sd">    the pixel sizes must be compatible (i.e. one can be scaled to the other).</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: The other image to compare to.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        bool: True if the images can be rescaled to each other, False otherwise.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">check_if_rescalable</span><span class="p">(</span><span class="n">other</span><span class="o">.</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -7080,7 +7594,9 @@ the same as the reference image.</p>
 <span class="normal">223</span>
 <span class="normal">224</span>
 <span class="normal">225</span>
-<span class="normal">226</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">ref_image</span><span class="p">:</span> <span class="n">Image</span> <span class="o">|</span> <span class="n">Label</span><span class="p">,</span>
@@ -7136,6 +7652,8 @@ the same as the reference image.</p>
         <span class="n">axes_names</span><span class="o">=</span><span class="n">axes_names</span><span class="p">,</span>
         <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
         <span class="n">dtype</span><span class="o">=</span><span class="n">dtype</span><span class="p">,</span>
+        <span class="n">dimension_separator</span><span class="o">=</span><span class="n">dimension_separator</span><span class="p">,</span>
+        <span class="n">compressor</span><span class="o">=</span><span class="n">compressor</span><span class="p">,</span>
         <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span>
     <span class="p">)</span>
 
