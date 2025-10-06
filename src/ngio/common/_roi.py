@@ -327,7 +327,7 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
             If the zoom factor is 1 the ROI will not be changed.
     """
     if zoom_factor <= 0:
-        raise ValueError("Zoom factor must be greater than 0.")
+        raise NgioValueError("Zoom factor must be greater than 0.")
 
     # the zoom factor needs to be rescaled
     # from the range [-1, inf) to [0, inf)
