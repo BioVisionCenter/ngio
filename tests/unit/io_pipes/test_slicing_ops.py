@@ -9,6 +9,7 @@ from ngio.io_pipes._ops_slices import (
     set_slice_as_dask,
     set_slice_as_numpy,
 )
+from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
 from ngio.ome_zarr_meta import AxesHandler, Dataset
 from ngio.ome_zarr_meta.ngio_specs import Axis
 
@@ -77,17 +78,22 @@ def test_chunk_slice():
     dims = Dimensions(shape=input_shape, chunks=chunk_shape, dataset=ds)
 
     slicing_dict = {"t": 0, "c": (0, 2)}
-    slicing_ops = build_slicing_ops(
+    slicing_ops1 = build_slicing_ops(
         dimensions=dims,
         slicing_dict=slicing_dict,  # type: ignore[arg-type]
         remove_channel_selection=False,
     )
-    assert slicing_ops.slice_chunks() == {(0, 0, 0, 0, 0), (0, 2, 0, 0, 0)}
+    assert slicing_ops1.slice_chunks() == {(0, 0, 0, 0, 0), (0, 2, 0, 0, 0)}
 
     slicing_dict = {"t": 1, "c": (0, 2)}
-    slicing_ops = build_slicing_ops(
+    slicing_ops2 = build_slicing_ops(
         dimensions=dims,
         slicing_dict=slicing_dict,  # type: ignore[arg-type]
         remove_channel_selection=False,
     )
-    assert slicing_ops.slice_chunks() == {(1, 0, 0, 0, 0), (1, 2, 0, 0, 0)}
+    assert slicing_ops2.slice_chunks() == {(1, 0, 0, 0, 0), (1, 2, 0, 0, 0)}
+
+    # Check for overlapping regions
+    assert not check_if_regions_overlap(
+        [slicing_ops1.normalized_slicing_tuple, slicing_ops2.normalized_slicing_tuple]
+    )
