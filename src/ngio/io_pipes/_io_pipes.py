@@ -80,6 +80,15 @@ class DataGetter(ABC, Generic[T]):
         self._transforms = transforms
         self._roi = roi
 
+    def __repr__(self) -> str:
+        name = self.__class__.__name__
+        return (
+            f"{name}(zarr_array={self._zarr_array}, "
+            f"slicing_ops={self._slicing_ops}, "
+            f"axes_ops={self._axes_ops}, "
+            f"transforms={self._transforms})"
+        )
+
     @property
     def zarr_array(self) -> zarr.Array:
         return self._zarr_array
@@ -125,6 +134,15 @@ class DataSetter(ABC, Generic[T]):
         self._axes_ops = axes_ops
         self._transforms = transforms
         self._roi = roi
+
+    def __repr__(self) -> str:
+        name = self.__class__.__name__
+        return (
+            f"{name}(zarr_array={self._zarr_array}, "
+            f"slicing_ops={self._slicing_ops}, "
+            f"axes_ops={self._axes_ops}, "
+            f"transforms={self._transforms})"
+        )
 
     @property
     def zarr_array(self) -> zarr.Array:
