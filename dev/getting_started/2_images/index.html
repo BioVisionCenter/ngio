@@ -313,6 +313,8 @@
       
         
       
+        
+      
     
     
     
@@ -479,6 +481,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#world-coordinates-slicing" class="md-nav__link">
+    <span class="md-ellipsis">
+      World coordinates slicing
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -594,6 +605,29 @@
   
   <span class="md-ellipsis">
     5. HCS Plates
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../6_iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    6. Iterators
     
   </span>
   
@@ -1113,6 +1147,8 @@
       
         
       
+        
+      
     
     
     
@@ -1247,8 +1283,37 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../api/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Iterators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -1272,10 +1337,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
   
   
@@ -1288,8 +1353,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
             <span class="md-nav__icon md-icon"></span>
             ngio
           </label>
@@ -1308,6 +1373,75 @@
   
   <span class="md-ellipsis">
     ngio
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/common/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.common
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/io_pipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.io_pipes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.iterators
     
   </span>
   
@@ -1394,12 +1528,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ngio/utils/" class="md-nav__link">
+      <a href="../../api/ngio/transforms/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    ngio.utils
+    ngio.transforms
     
   </span>
   
@@ -1417,12 +1551,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ngio/common/" class="md-nav__link">
+      <a href="../../api/ngio/utils/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    ngio.common
+    ngio.utils
     
   </span>
   
@@ -1627,6 +1761,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#world-coordinates-slicing" class="md-nav__link">
+    <span class="md-ellipsis">
+      World coordinates slicing
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1781,7 +1924,7 @@ The <code>axes</code> attribute returns the order of the axes in the image.</p>
 </div>
 </div>
 <p>The <code>get_as_*</code> can also be used to slice the image data, and query specific axes in specific orders:</p>
-<div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">image_slice</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">(</span><span class="n">c</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span> <span class="c1"># Get a specific channel and axes order</span>
+<div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">image_slice</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">(</span><span class="n">channel_selection</span><span class="o">=</span><span class="s2">&quot;DAPI&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;t&quot;</span><span class="p">,</span> <span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span> <span class="c1"># Get a specific channel and axes order</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">image_slice</span><span class="o">.</span><span class="n">shape</span>
 <span class="go">(1, 1, 1080, 128, 1)</span>
 </code></pre></div>
@@ -1791,13 +1934,13 @@ The <code>axes</code> attribute returns the order of the axes in the image.</p>
 <p>The <code>set_array</code> method can be used to set the image data from a numpy array, dask array, or dask delayed object.</p>
 <p>A minimal example of how to use the <code>get_array</code> and <code>set_array</code> methods:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Get the image data as a numpy array</span>
-<span class="n">data</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">(</span><span class="n">c</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">image</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">(</span><span class="n">channel_selection</span><span class="o">=</span><span class="s2">&quot;DAPI&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span>
 
 <span class="c1"># Modify the image data</span>
 <span class="n">data</span> <span class="o">=</span> <span class="n">some_function</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
 
 <span class="c1"># Set the modified image data</span>
-<span class="n">image</span><span class="o">.</span><span class="n">set_array</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">c</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span>
+<span class="n">image</span><span class="o">.</span><span class="n">set_array</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">channel_selection</span><span class="o">=</span><span class="s2">&quot;DAPI&quot;</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">y</span><span class="o">=</span><span class="nb">slice</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">128</span><span class="p">),</span> <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;z&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">,</span> <span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;c&quot;</span><span class="p">])</span>
 <span class="n">image</span><span class="o">.</span><span class="n">consolidate</span><span class="p">()</span> <span class="c1"># Consolidate the changes to all resolution levels, see below for more details</span>
 </code></pre></div>
 <div class="result"></div>
@@ -1808,6 +1951,13 @@ The <code>axes</code> attribute returns the order of the axes in the image.</p>
 </code></pre></div>
 This will write the changes to the OME-Zarr file at all resolution levels.</p>
 </div>
+<h3 id="world-coordinates-slicing">World coordinates slicing<a class="headerlink" href="#world-coordinates-slicing" title="Permanent link">&para;</a></h3>
+<p>To read or write a specific region of the image defined in world coordinates, you can use the <code>Roi</code> object.</p>
+<div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">Roi</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">roi</span> <span class="o">=</span> <span class="n">Roi</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">34.1</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">x_length</span><span class="o">=</span><span class="mf">321.6</span><span class="p">,</span> <span class="n">y_length</span><span class="o">=</span><span class="mi">330</span><span class="p">)</span> <span class="c1"># Define a ROI in world coordinates</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image</span><span class="o">.</span><span class="n">get_roi_as_numpy</span><span class="p">(</span><span class="n">roi</span><span class="p">)</span> <span class="c1"># Get the image data in the ROI as a numpy array</span>
+<span class="go">(3, 1, 509, 496)</span>
+</code></pre></div>
 <h2 id="labels">Labels<a class="headerlink" href="#labels" title="Permanent link">&para;</a></h2>
 <p><code>Labels</code> represent segmentation masks that identify objects in the image. In ngio <code>Labels</code> are similar to <code>Images</code> and can
 be accessed and manipulated in the same way.</p>
@@ -1882,7 +2032,7 @@ If you want to create a new label with slightly different metadata see <a href="
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="September 2, 2025 16:12:09 UTC">September 2, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 12:38:22 UTC">October 6, 2025</span>
   </span>
 
     

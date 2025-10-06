@@ -25,6 +25,10 @@
          <lastmod>2025-10-06</lastmod>
     </url>
     <url>
+         <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/iterators/</loc>
+         <lastmod>2025-10-06</lastmod>
+    </url>
+    <url>
          <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ome_zarr_container/</loc>
          <lastmod>2025-10-06</lastmod>
     </url>
@@ -45,11 +49,23 @@
          <lastmod>2025-10-06</lastmod>
     </url>
     <url>
+         <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ngio/io_pipes/</loc>
+         <lastmod>2025-10-06</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ngio/iterators/</loc>
+         <lastmod>2025-10-06</lastmod>
+    </url>
+    <url>
          <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ngio/ngio/</loc>
          <lastmod>2025-10-06</lastmod>
     </url>
     <url>
          <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ngio/tables/</loc>
+         <lastmod>2025-10-06</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/BioVisionCenter/ngio.git/dev/api/ngio/transforms/</loc>
          <lastmod>2025-10-06</lastmod>
     </url>
     <url>
@@ -78,6 +94,10 @@
     </url>
     <url>
          <loc>https://github.com/BioVisionCenter/ngio.git/dev/getting_started/5_hcs/</loc>
+         <lastmod>2025-10-06</lastmod>
+    </url>
+    <url>
+         <loc>https://github.com/BioVisionCenter/ngio.git/dev/getting_started/6_iterators/</loc>
          <lastmod>2025-10-06</lastmod>
     </url>
     <url>

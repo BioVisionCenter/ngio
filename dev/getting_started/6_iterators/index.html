@@ -10,22 +10,28 @@
       
       
       
+        <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/getting_started/6_iterators/">
       
       
+        <link rel="prev" href="../5_hcs/">
       
-      <link rel="icon" href="/BioVisionCenter/ngio.git/dev/images/favicon.ico">
+      
+        <link rel="next" href="../../tutorials/create_ome_zarr/">
+      
+      
+      <link rel="icon" href="../../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.6.21">
     
     
       
-        <title>NGIO: Next Generation File Format I/O</title>
+        <title>6. Iterators - NGIO: Next Generation File Format I/O</title>
       
     
     
-      <link rel="stylesheet" href="/BioVisionCenter/ngio.git/dev/assets/stylesheets/main.2a3383ac.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.2a3383ac.min.css">
       
         
-        <link rel="stylesheet" href="/BioVisionCenter/ngio.git/dev/assets/stylesheets/palette.06af60db.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.06af60db.min.css">
       
       
 
@@ -44,13 +50,13 @@
       
     
     
-      <link rel="stylesheet" href="/BioVisionCenter/ngio.git/dev/assets/_markdown_exec_pyodide.css">
+      <link rel="stylesheet" href="../../assets/_markdown_exec_pyodide.css">
     
-      <link rel="stylesheet" href="/BioVisionCenter/ngio.git/dev/assets/_markdown_exec_ansi.css">
+      <link rel="stylesheet" href="../../assets/_markdown_exec_ansi.css">
     
-      <link rel="stylesheet" href="/BioVisionCenter/ngio.git/dev/assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL("/BioVisionCenter/ngio.git/dev",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -75,6 +81,11 @@
     <label class="md-overlay" for="__drawer"></label>
     <div data-md-component="skip">
       
+        
+        <a href="#6-iterators" class="md-skip">
+          Skip to content
+        </a>
+      
     </div>
     <div data-md-component="announce">
       
@@ -91,7 +102,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="/BioVisionCenter/ngio.git/dev/." title="NGIO: Next Generation File Format I/O" class="md-header__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
+    <a href="../.." title="NGIO: Next Generation File Format I/O" class="md-header__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -111,7 +122,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              
+              6. Iterators
             
           </span>
         </div>
@@ -234,7 +245,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="/BioVisionCenter/ngio.git/dev/." title="NGIO: Next Generation File Format I/O" class="md-nav__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
+    <a href="../.." title="NGIO: Next Generation File Format I/O" class="md-nav__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -264,7 +275,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/." class="md-nav__link">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -283,8 +294,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -311,11 +324,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
@@ -331,7 +344,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             Getting Started
@@ -345,7 +358,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/0_quickstart/" class="md-nav__link">
+      <a href="../0_quickstart/" class="md-nav__link">
         
   
   
@@ -368,7 +381,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/1_ome_zarr_containers/" class="md-nav__link">
+      <a href="../1_ome_zarr_containers/" class="md-nav__link">
         
   
   
@@ -391,7 +404,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/2_images/" class="md-nav__link">
+      <a href="../2_images/" class="md-nav__link">
         
   
   
@@ -414,7 +427,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/3_tables/" class="md-nav__link">
+      <a href="../3_tables/" class="md-nav__link">
         
   
   
@@ -437,7 +450,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/4_masked_images/" class="md-nav__link">
+      <a href="../4_masked_images/" class="md-nav__link">
         
   
   
@@ -460,7 +473,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/5_hcs/" class="md-nav__link">
+      <a href="../5_hcs/" class="md-nav__link">
         
   
   
@@ -480,10 +493,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/getting_started/6_iterators/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -494,6 +516,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -568,7 +591,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/tutorials/create_ome_zarr/" class="md-nav__link">
+      <a href="../../tutorials/create_ome_zarr/" class="md-nav__link">
         
   
   
@@ -591,7 +614,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/tutorials/image_processing/" class="md-nav__link">
+      <a href="../../tutorials/image_processing/" class="md-nav__link">
         
   
   
@@ -614,7 +637,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/tutorials/image_segmentation/" class="md-nav__link">
+      <a href="../../tutorials/image_segmentation/" class="md-nav__link">
         
   
   
@@ -637,7 +660,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/tutorials/feature_extraction/" class="md-nav__link">
+      <a href="../../tutorials/feature_extraction/" class="md-nav__link">
         
   
   
@@ -660,7 +683,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/tutorials/hcs_exploration/" class="md-nav__link">
+      <a href="../../tutorials/hcs_exploration/" class="md-nav__link">
         
   
   
@@ -741,7 +764,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/overview/" class="md-nav__link">
+      <a href="../../table_specs/overview/" class="md-nav__link">
         
   
   
@@ -764,7 +787,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/backend/" class="md-nav__link">
+      <a href="../../table_specs/backend/" class="md-nav__link">
         
   
   
@@ -841,7 +864,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/generic_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/generic_table/" class="md-nav__link">
         
   
   
@@ -864,7 +887,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/roi_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/roi_table/" class="md-nav__link">
         
   
   
@@ -887,7 +910,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/masking_roi_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/masking_roi_table/" class="md-nav__link">
         
   
   
@@ -910,7 +933,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/feature_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/feature_table/" class="md-nav__link">
         
   
   
@@ -933,7 +956,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/condition_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/condition_table/" class="md-nav__link">
         
   
   
@@ -956,7 +979,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/table_specs/table_types/custom_table/" class="md-nav__link">
+      <a href="../../table_specs/table_types/custom_table/" class="md-nav__link">
         
   
   
@@ -1053,7 +1076,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ome_zarr_container/" class="md-nav__link">
+      <a href="../../api/ome_zarr_container/" class="md-nav__link">
         
   
   
@@ -1076,7 +1099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/images/" class="md-nav__link">
+      <a href="../../api/images/" class="md-nav__link">
         
   
   
@@ -1099,7 +1122,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/hcs/" class="md-nav__link">
+      <a href="../../api/hcs/" class="md-nav__link">
         
   
   
@@ -1122,7 +1145,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/tables/" class="md-nav__link">
+      <a href="../../api/tables/" class="md-nav__link">
         
   
   
@@ -1145,7 +1168,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/iterators/" class="md-nav__link">
+      <a href="../../api/iterators/" class="md-nav__link">
         
   
   
@@ -1228,7 +1251,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/ngio/" class="md-nav__link">
+      <a href="../../api/ngio/ngio/" class="md-nav__link">
         
   
   
@@ -1251,7 +1274,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/common/" class="md-nav__link">
+      <a href="../../api/ngio/common/" class="md-nav__link">
         
   
   
@@ -1274,7 +1297,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/io_pipes/" class="md-nav__link">
+      <a href="../../api/ngio/io_pipes/" class="md-nav__link">
         
   
   
@@ -1297,7 +1320,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/iterators/" class="md-nav__link">
+      <a href="../../api/ngio/iterators/" class="md-nav__link">
         
   
   
@@ -1320,7 +1343,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/images/" class="md-nav__link">
+      <a href="../../api/ngio/images/" class="md-nav__link">
         
   
   
@@ -1343,7 +1366,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/tables/" class="md-nav__link">
+      <a href="../../api/ngio/tables/" class="md-nav__link">
         
   
   
@@ -1366,7 +1389,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/hcs/" class="md-nav__link">
+      <a href="../../api/ngio/hcs/" class="md-nav__link">
         
   
   
@@ -1389,7 +1412,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/transforms/" class="md-nav__link">
+      <a href="../../api/ngio/transforms/" class="md-nav__link">
         
   
   
@@ -1412,7 +1435,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/api/ngio/utils/" class="md-nav__link">
+      <a href="../../api/ngio/utils/" class="md-nav__link">
         
   
   
@@ -1443,7 +1466,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/changelog/" class="md-nav__link">
+      <a href="../../changelog/" class="md-nav__link">
         
   
   
@@ -1522,7 +1545,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/contributing/" class="md-nav__link">
+      <a href="../../contributing/" class="md-nav__link">
         
   
   
@@ -1545,7 +1568,7 @@
   
   
     <li class="md-nav__item">
-      <a href="/BioVisionCenter/ngio.git/dev/code_of_conduct/" class="md-nav__link">
+      <a href="../../code_of_conduct/" class="md-nav__link">
         
   
   
@@ -1585,6 +1608,8 @@
   
   
   
+    
+  
   
 </nav>
                   </div>
@@ -1596,8 +1621,69 @@
             <div class="md-content" data-md-component="content">
               <article class="md-content__inner md-typeset">
                 
-  <h1>404 - Not found</h1>
+                  
 
+
+  
+  
+
+
+<h1 id="6-iterators">6. Iterators<a class="headerlink" href="#6-iterators" title="Permanent link">&para;</a></h1>
+<p>When building image processing pipelines it is often useful to iterate over specific regions of the image, for example to process the image in smaller tiles or to process only specific regions of interest (ROIs).</p>
+<p>Moreover, when working with OME-Zarr Images it is often useful to set specific broadcasting rules for the iteration, for example to iterate over all z-planes or iterate over all timepoints.</p>
+<p>Ngio provides a set of <code>Iterator</code> classes that can be used for this purpose. We provide iterators four basic iterators: </p>
+<ul>
+<li>The <code>SegmentationIterator</code> is designed to build segmentation pipelines, where an input image is processed to produce a segmentation mask. An example use case on how to use the <code>SegmentationIterator</code> can be found in the <a href="../../tutorials/image_segmentation/">Image Segmentation Tutorial</a>.</li>
+<li>The <code>MaskedSegmentationIterator</code> is similar to the <code>SegmentationIterator</code>, but it uses a masking roi table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. An example use case on how to use the <code>MaskedSegmentationIterator</code> can be found in the <a href="../../tutorials/image_segmentation/">Image Segmentation Tutorial</a>.</li>
+<li>The <code>ImageProcessingIterator</code> is designed to build image processing pipelines, where an input image is processed to produce a new image. An example use case on how to use the <code>ImageProcessingIterator</code> can be found in the <a href="../../tutorials/image_processing/">Image Processing Tutorial</a>.</li>
+<li>The <code>FeatureExtractionIterator</code> is read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. An example use case on how to use the <code>FeatureExtractionIterator</code> can be found in the <a href="../../tutorials/feature_extraction/">Feature Extraction Tutorial</a>.</li>
+</ul>
+<p>A set of more complete example can be found in the <a href="https://github.com/fractal-analytics-platform/fractal-tasks-template">Fractal Tasks Template</a>.</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 12:38:22 UTC">October 6, 2025</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 12:38:22 UTC">October 6, 2025</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
               </article>
             </div>
           
@@ -1611,6 +1697,44 @@
       
         <footer class="md-footer">
   
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../5_hcs/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 5. HCS Plates">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                5. HCS Plates
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../../tutorials/create_ome_zarr/" class="md-footer__link md-footer__link--next" aria-label="Next: OME-Zarr Creation">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                OME-Zarr Creation
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
     
   
   <div class="md-footer-meta md-typeset">
@@ -1656,12 +1780,12 @@
     
     
       
-      <script id="__config" type="application/json">{"base": "/BioVisionCenter/ngio.git/dev", "features": ["content.tooltips", "content.tabs.link", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.footer", "toc.follow", "search.suggest", "search.share"], "search": "/BioVisionCenter/ngio.git/dev/assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"base": "../..", "features": ["content.tooltips", "content.tabs.link", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.footer", "toc.follow", "search.suggest", "search.share"], "search": "../../assets/javascripts/workers/search.973d3a69.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="/BioVisionCenter/ngio.git/dev/assets/javascripts/bundle.f55a23d4.min.js"></script>
+      <script src="../../assets/javascripts/bundle.f55a23d4.min.js"></script>
       
-        <script src="/BioVisionCenter/ngio.git/dev/assets/_markdown_exec_pyodide.js"></script>
+        <script src="../../assets/_markdown_exec_pyodide.js"></script>
       
     
   </body>

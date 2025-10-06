@@ -13,7 +13,7 @@
         <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/tutorials/create_ome_zarr/">
       
       
-        <link rel="prev" href="../../getting_started/5_hcs/">
+        <link rel="prev" href="../../getting_started/6_iterators/">
       
       
         <link rel="next" href="../image_processing/">
@@ -311,6 +311,8 @@
       
         
       
+        
+      
     
     
     
@@ -485,6 +487,29 @@
 
               
             
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting_started/6_iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    6. Iterators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -606,9 +631,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#adding-rois-to-ome-zarr" class="md-nav__link">
+  <a href="#adding-a-roi-table-to-an-ome-zarr-image" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding Rois to OME-Zarr
+      Adding a ROI table to an OME-Zarr image
     </span>
   </a>
   
@@ -1047,6 +1072,8 @@
       
         
       
+        
+      
     
     
     
@@ -1181,8 +1208,37 @@
   
   
   
+    <li class="md-nav__item">
+      <a href="../../api/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Iterators
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
     
     
+      
+        
+      
+        
+      
+        
       
         
       
@@ -1206,10 +1262,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_5" id="__nav_5_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
   
   
@@ -1222,8 +1278,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_5">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
             <span class="md-nav__icon md-icon"></span>
             ngio
           </label>
@@ -1242,6 +1298,75 @@
   
   <span class="md-ellipsis">
     ngio
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/common/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.common
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/io_pipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.io_pipes
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    ngio.iterators
     
   </span>
   
@@ -1328,12 +1453,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ngio/utils/" class="md-nav__link">
+      <a href="../../api/ngio/transforms/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    ngio.utils
+    ngio.transforms
     
   </span>
   
@@ -1351,12 +1476,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../api/ngio/common/" class="md-nav__link">
+      <a href="../../api/ngio/utils/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    ngio.common
+    ngio.utils
     
   </span>
   
@@ -1534,9 +1659,9 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#adding-rois-to-ome-zarr" class="md-nav__link">
+  <a href="#adding-a-roi-table-to-an-ome-zarr-image" class="md-nav__link">
     <span class="md-ellipsis">
-      Adding Rois to OME-Zarr
+      Adding a ROI table to an OME-Zarr image
     </span>
   </a>
   
@@ -2126,7 +2251,7 @@ ome_zarr</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="adding-rois-to-ome-zarr">Adding Rois to OME-Zarr<a class="anchor-link" href="#adding-rois-to-ome-zarr">¶</a></h2><p>Often, is useful to add ROIs to OME-Zarr images to be able to retrieve them later.<br/>
+<h2 id="adding-a-roi-table-to-an-ome-zarr-image">Adding a ROI table to an OME-Zarr image<a class="anchor-link" href="#adding-a-roi-table-to-an-ome-zarr-image">¶</a></h2><p>Often, is useful to add ROIs to OME-Zarr images to be able to retrieve them later.<br/>
 This can be done using the <code>ngio</code> library as follows.</p>
 </div>
 </div>
@@ -2202,7 +2327,7 @@ ome_zarr.add_table("image_roi_table", roi_table)</div>
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 10, 2025 16:00:26 UTC">July 10, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 12:38:22 UTC">October 6, 2025</span>
   </span>
 
     
@@ -2243,7 +2368,7 @@ ome_zarr.add_table("image_roi_table", roi_table)</div>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../../getting_started/5_hcs/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 5. HCS Plates">
+          <a href="../../getting_started/6_iterators/" class="md-footer__link md-footer__link--prev" aria-label="Previous: 6. Iterators">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2253,7 +2378,7 @@ ome_zarr.add_table("image_roi_table", roi_table)</div>
                 Previous
               </span>
               <div class="md-ellipsis">
-                5. HCS Plates
+                6. Iterators
               </div>
             </div>
           </a>
