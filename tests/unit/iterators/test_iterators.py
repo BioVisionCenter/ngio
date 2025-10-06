@@ -36,8 +36,13 @@ def test_segmentation_iterator(images_v04: dict[str, Path], zarr_name: str):
     image = ome_zarr.get_image()
     label = ome_zarr.get_label("label")
     iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
-    iterator = iterator.by_chunks()
+    assert iterator.__repr__().startswith("SegmentationIterator")
+
     iterator = iterator.by_yx()
+    assert len(iterator.rois) == image.dimensions.get("t", 1) * image.dimensions.get(
+        "z", 1
+    )
+    iterator = iterator.by_chunks()
 
     iterator.require_no_regions_overlap()
     if image.is_3d or image.is_time_series:
@@ -132,7 +137,16 @@ def test_img_processing_iterator(images_v04: dict[str, Path], zarr_name: str):
     t_image = t_ome_zarr.get_image()
 
     iterator = ImageProcessingIterator(input_image=image, output_image=t_image)
+
+    assert len(iterator.rois) == 1
+    roi_table = image.build_image_roi_table()
+    iterator = iterator.product(roi_table)
+    assert len(iterator.rois) == 1
+
     iterator = iterator.by_zyx(strict=False)
+    assert len(iterator.rois) == image.dimensions.get("t", 1)
+
+    iterator = iterator.grid(size_x=64, size_y=64)
     for img_chunk, writer in iterator.iter_as_numpy():
         label_patch = np.zeros_like(img_chunk, dtype=np.uint8)
         writer(label_patch)
