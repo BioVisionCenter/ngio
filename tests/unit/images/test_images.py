@@ -187,3 +187,36 @@ def test_image_require_can_be_rescaled2(
     # Roi data should match exactly
     assert img1_data.shape == img2_roi_data.shape
     img2.set_roi(roi=roi, patch=img2_roi_data, transforms=[zoom])
+
+
+def test_zoom_virtual_axes(
+    tmp_path: Path,
+):
+    path1 = tmp_path / "image1.zarr"
+    path2 = tmp_path / "image2.zarr"
+    create_empty_ome_zarr(
+        store=path1, shape=(3, 16, 16, 16), axes_names="czyx", xy_pixelsize=1.0
+    )
+    create_empty_ome_zarr(
+        store=path2, shape=(16, 32, 32), axes_names="zyx", xy_pixelsize=0.5
+    )
+    img1 = open_image(path1)
+    img2 = open_image(path2)
+
+    # Also test with transforms
+    zoom = ZoomTransform(
+        input_image=img2,
+        target_image=img1,
+        order="nearest",
+    )
+
+    img1_data = img1.get_as_numpy()
+    img2_data = img2.get_as_numpy(transforms=[zoom], axes_order="czyx")
+    img2.set_array(patch=img2_data, transforms=[zoom], axes_order="czyx")
+    assert img2_data.shape[0] == 1  # Virtual channel axis
+
+    roi = img1.build_image_roi_table().rois()[0]
+    img2_roi_data = img2.get_roi_as_numpy(roi, transforms=[zoom], axes_order="czyx")
+    # Roi data should match exactly except for virtual axis
+    assert img1_data.shape[1:] == img2_roi_data.shape[1:]
+    img2.set_roi(roi=roi, patch=img2_roi_data, transforms=[zoom], axes_order="czyx")

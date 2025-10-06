@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.1]
+
+### Bug Fixes
+- Fix bug in zoom transform when input axes contain unknown axes (e.g. virtual axes). Now unknown axes are treated as virtual axes and set to 1 in the target shape.
+
 ## [v0.4.0]
 
 ### Features

@@ -60,7 +60,12 @@ class BaseZoomTransform:
         target_shape = []
         for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
-            if ax_type is not None and ax_type.axis_type == "channel":
+            if ax_type is None:
+                # Unknown axis can only be a virtual axis
+                # So we set it to 1
+                target_shape.append(1)
+                continue
+            elif ax_type.axis_type == "channel":
                 # Do not scale channel axis
                 target_shape.append(shape)
                 continue
