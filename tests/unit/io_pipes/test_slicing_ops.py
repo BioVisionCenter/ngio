@@ -97,3 +97,16 @@ def test_chunk_slice():
     assert not check_if_regions_overlap(
         [slicing_ops1.normalized_slicing_tuple, slicing_ops2.normalized_slicing_tuple]
     )
+
+    # Repeat with bigger tuples as different element
+    slicing_dict = {"t": 0, "c": (0, 2)}
+    slicing_ops2 = build_slicing_ops(
+        dimensions=dims,
+        slicing_dict=slicing_dict,  # type: ignore[arg-type]
+        remove_channel_selection=False,
+    )
+
+    # Check for overlapping regions
+    assert check_if_regions_overlap(
+        [slicing_ops1.normalized_slicing_tuple, slicing_ops2.normalized_slicing_tuple]
+    )
