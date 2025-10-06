@@ -3,6 +3,7 @@ from collections.abc import Callable, Generator
 from typing import Generic, Literal, Self, TypeVar, overload
 
 from ngio import Roi
+from ngio.experimental.iterators._mappers import BasicMapper, MapperProtocol
 from ngio.experimental.iterators._rois_utils import (
     by_chunks,
     by_yx,
@@ -31,7 +32,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
     @abstractmethod
     def get_init_kwargs(self) -> dict:
-        """Return the initialization arguments for the iterator."""
+        """Return the initialization arguments for the iterator.
+
+        This is used to clone the iterator with the same parameters
+        after every "product" operation.
+        """
         pass
 
     @property
@@ -295,18 +300,40 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Create an iterator over the pixels of the ROIs."""
         return self.iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
 
-    def map_as_numpy(self, func: Callable[[NumpyPipeType], NumpyPipeType]) -> None:
+    def map_as_numpy(
+        self,
+        func: Callable[[NumpyPipeType], NumpyPipeType],
+        mapper: MapperProtocol[NumpyPipeType] | None = None,
+    ) -> None:
         """Apply a transformation function to the ROI pixels."""
-        for data, setter in self.iter_as_numpy():
-            data = func(data)
-            setter(data)
+        if mapper is None:
+            _mapper = BasicMapper[NumpyPipeType]()
+        else:
+            _mapper = mapper
+
+        _mapper(
+            func=func,
+            getters=self._numpy_getters_generator(),
+            setters=self._numpy_setters_generator(),
+        )
         self.post_consolidate()
 
-    def map_as_dask(self, func: Callable[[DaskPipeType], DaskPipeType]) -> None:
+    def map_as_dask(
+        self,
+        func: Callable[[DaskPipeType], DaskPipeType],
+        mapper: MapperProtocol[DaskPipeType] | None = None,
+    ) -> None:
         """Apply a transformation function to the ROI pixels."""
-        for data, setter in self.iter_as_dask():
-            data = func(data)
-            setter(data)
+        if mapper is None:
+            _mapper = BasicMapper[DaskPipeType]()
+        else:
+            _mapper = mapper
+
+        _mapper(
+            func=func,
+            getters=self._dask_getters_generator(),
+            setters=self._dask_setters_generator(),
+        )
         self.post_consolidate()
 
     def check_if_regions_overlap(self) -> bool:

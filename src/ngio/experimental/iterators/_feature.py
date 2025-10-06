@@ -1,4 +1,4 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import TypeAlias
 
 import dask.array as da
@@ -187,11 +187,3 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def iter_as_dask(self):  # type: ignore[override]
         """Create an iterator over the pixels of the ROIs."""
         return self.iter(lazy=False, data_mode="dask", iterator_mode="readonly")
-
-    def map_as_numpy(self, func: Callable[[NumpyPipeType], NumpyPipeType]) -> None:
-        """Apply a transformation function to the ROI pixels."""
-        raise NotImplementedError("Numpy mapping not implemented for this iterator.")
-
-    def map_as_dask(self, func: Callable[[DaskPipeType], DaskPipeType]) -> None:
-        """Apply a transformation function to the ROI pixels."""
-        raise NotImplementedError("Dask mapping not implemented for this iterator.")
