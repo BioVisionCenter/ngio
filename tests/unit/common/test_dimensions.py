@@ -87,3 +87,75 @@ def test_dimensions_error():
     assert not dims.is_time_series
     assert not dims.is_3d_time_series
     assert not dims.is_2d_time_series
+
+
+def test_dimensions_checks():
+    axes = [Axis(name="c"), Axis(name="z"), Axis(name="x"), Axis(name="y")]
+    shape = (3, 4, 8, 8)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0] * len(axes),
+        translation=[0.0] * len(axes),
+    )
+    dims_ref = Dimensions(shape=shape, chunks=shape, dataset=ds)
+
+    # Test with rescalable dimensions
+    # Axes matches, dimensions do not match, but are rescalable
+    axes = [Axis(name="c"), Axis(name="z"), Axis(name="x"), Axis(name="y")]
+    shape = (3, 4, 16, 16)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0, 1.0, 0.5, 0.5],
+        translation=[0.0] * len(axes),
+    )
+    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+
+    dims_ref.require_axes_match(dims_other)
+    assert dims_ref.check_if_axes_match(dims_other)
+
+    with pytest.raises(NgioValueError):
+        dims_ref.require_dimensions_match(dims_other, allow_singleton=False)
+    assert not dims_ref.check_if_dimensions_match(dims_other, allow_singleton=False)
+
+    dims_ref.require_rescalable(dims_other)
+    assert dims_ref.check_if_rescalable(dims_other)
+
+    # Test with non-matching axes
+    # Axes do not match
+
+    axes = [Axis(name="x"), Axis(name="y")]
+    shape = (8, 8)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0] * len(axes),
+        translation=[0.0] * len(axes),
+    )
+    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+
+    with pytest.raises(NgioValueError):
+        dims_ref.require_axes_match(dims_other)
+    assert not dims_ref.check_if_axes_match(dims_other)
+
+    # Axes match, dimensions do (with singleton allowed)
+    axes = [Axis(name="z"), Axis(name="x"), Axis(name="y")]
+    shape = (1, 8, 8)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0] * len(axes),
+        translation=[0.0] * len(axes),
+    )
+    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims_ref.require_axes_match(dims_other)
+    assert dims_ref.check_if_axes_match(dims_other)
+
+    assert not dims_ref.check_if_dimensions_match(dims_other, allow_singleton=False)
+    dims_ref.require_dimensions_match(dims_other, allow_singleton=True)
+    assert dims_ref.check_if_dimensions_match(dims_other, allow_singleton=True)
