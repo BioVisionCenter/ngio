@@ -239,7 +239,6 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
     def set(self, patch: np.ndarray) -> None:
         data = self._data_getter()
         label_data = self._label_data_getter()
-        print(data.shape, label_data.shape)
 
         bool_mask = _numpy_label_to_bool_mask(
             label_data=label_data,

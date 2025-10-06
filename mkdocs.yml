@@ -112,6 +112,7 @@ nav:
     - getting_started/3_tables.md
     - getting_started/4_masked_images.md
     - getting_started/5_hcs.md
+    - getting_started/6_iterators.md
 
   - Tutorials:
     - tutorials/create_ome_zarr.ipynb
@@ -136,13 +137,17 @@ nav:
     - "Images": api/images.md
     - "HCS": api/hcs.md
     - "Tables": api/tables.md
+    - "Iterators": api/iterators.md
     - "ngio":
       - "ngio": api/ngio/ngio.md
+      - "ngio.common": api/ngio/common.md
+      - "ngio.io_pipes": api/ngio/io_pipes.md
+      - "ngio.iterators": api/ngio/iterators.md
       - "ngio.images": api/ngio/images.md
       - "ngio.tables": api/ngio/tables.md
       - "ngio.hcs": api/ngio/hcs.md
+      - "ngio.transforms": api/ngio/transforms.md
       - "ngio.utils": api/ngio/utils.md
-      - "ngio.common": api/ngio/common.md
     - changelog.md
 
   - Contributing:

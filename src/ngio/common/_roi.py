@@ -40,7 +40,7 @@ T = TypeVar("T", int, float)
 class GenericRoi(BaseModel):
     """A generic Region of Interest (ROI) model."""
 
-    name: str | None
+    name: str | None = None
     x: float
     y: float
     z: float | None = None

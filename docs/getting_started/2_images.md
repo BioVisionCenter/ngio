@@ -96,7 +96,7 @@ Once you have the `Image` object, you can access the image data as a:
 The `get_as_*` can also be used to slice the image data, and query specific axes in specific orders:
 
 ```pycon exec="true" source="console" session="get_started"
->>> image_slice = image.get_as_numpy(c=0, x=slice(0, 128), axes_order=["t", "z", "y", "x", "c"]) # Get a specific channel and axes order
+>>> image_slice = image.get_as_numpy(channel_selection="DAPI", x=slice(0, 128), axes_order=["t", "z", "y", "x", "c"]) # Get a specific channel and axes order
 >>> image_slice.shape
 >>> print(image_slice.shape) # markdown-exec: hide
 ```
@@ -113,14 +113,14 @@ A minimal example of how to use the `get_array` and `set_array` methods:
 
 ```python exec="true" source="material-block" session="get_started"
 # Get the image data as a numpy array
-data = image.get_as_numpy(c=0, x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
+data = image.get_as_numpy(channel_selection="DAPI", x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
 
 # Modify the image data
 some_function = lambda x: x # markdown-exec: hide
 data = some_function(data)
 
 # Set the modified image data
-image.set_array(data, c=0, x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
+image.set_array(data, channel_selection="DAPI", x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
 image.consolidate() # Consolidate the changes to all resolution levels, see below for more details
 ```
 
@@ -130,6 +130,17 @@ image.consolidate() # Consolidate the changes to all resolution levels, see belo
     >>> image.consolidate() # Consolidate the changes
     ```
     This will write the changes to the OME-Zarr file at all resolution levels.
+
+### World coordinates slicing
+
+To read or write a specific region of the image defined in world coordinates, you can use the `Roi` object.
+
+```pycon exec="true" source="console" session="get_started"
+>>> from ngio import Roi
+>>> roi = Roi(x=34.1, y=10, x_length=321.6, y_length=330) # Define a ROI in world coordinates
+>>> image.get_roi_as_numpy(roi) # Get the image data in the ROI as a numpy array
+>>> print(image.get_roi_as_numpy(roi).shape) # markdown-exec: hide
+```
 
 ## Labels
 
