@@ -26,6 +26,7 @@ theme:
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
+
   features:
     - content.tooltips
     - content.tabs.link
@@ -36,6 +37,7 @@ theme:
     - navigation.path
     - navigation.indexes
     - navigation.footer
+    #- toc.integrate
     - toc.follow
     - search.suggest
     - search.share
@@ -68,6 +70,19 @@ plugins:
             show_root_full_path: true
             show_bases: true
             docstring_section_style: list
+            extensions:
+              - griffe_typingdoc
+            show_if_no_docstring: true
+            inherited_members: true
+            members_order: source
+            separate_signature: true
+            unwrap_annotated: false
+            filters:
+            - '!^_'
+            merge_init_into_class: true
+            signature_crossrefs: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
   - git-revision-date-localized:
       enable_creation_date: true
   - git-committers:
@@ -83,6 +98,10 @@ markdown_extensions:
   - md_in_html
   - pymdownx.tabbed:
       alternate_style: true
+  - toc:
+      permalink: true
+      toc_depth: 3
+      
 
 nav:
   - "NGIO: Streamlined OME-Zarr Image Analysis": index.md
@@ -93,12 +112,14 @@ nav:
     - getting_started/3_tables.md
     - getting_started/4_masked_images.md
     - getting_started/5_hcs.md
+    - getting_started/6_iterators.md
 
   - Tutorials:
+    - tutorials/create_ome_zarr.ipynb
     - tutorials/image_processing.ipynb
     - tutorials/image_segmentation.ipynb
     - tutorials/feature_extraction.ipynb
-    - tutorials/hcs_processing.ipynb
+    - tutorials/hcs_exploration.ipynb
 
   - Table Specifications:
     - "Overview": table_specs/overview.md
@@ -112,12 +133,21 @@ nav:
       - "Add Custom Table": table_specs/table_types/custom_table.md
   
   - API Reference:
-    - "ngio": api/ngio.md
-    - "ngio.images": api/images.md
-    - "ngio.tables": api/tables.md
-    - "ngio.hcs": api/hcs.md
-    - "ngio.utils": api/utils.md
-    - "ngio.common": api/common.md
+    - "OmeZarrContainer": api/ome_zarr_container.md
+    - "Images": api/images.md
+    - "HCS": api/hcs.md
+    - "Tables": api/tables.md
+    - "Iterators": api/iterators.md
+    - "ngio":
+      - "ngio": api/ngio/ngio.md
+      - "ngio.common": api/ngio/common.md
+      - "ngio.io_pipes": api/ngio/io_pipes.md
+      - "ngio.iterators": api/ngio/iterators.md
+      - "ngio.images": api/ngio/images.md
+      - "ngio.tables": api/ngio/tables.md
+      - "ngio.hcs": api/ngio/hcs.md
+      - "ngio.transforms": api/ngio/transforms.md
+      - "ngio.utils": api/ngio/utils.md
     - changelog.md
 
   - Contributing:

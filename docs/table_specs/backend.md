@@ -66,7 +66,7 @@ table.zarr          # Zarr group for the table
 
 The CSV backend is a plain text format that is widely used for tabular data. It is easy to read and write, and can be used across many different tools.
 
-The CSV backen in ngio follows closely the same specifications as the Parquet backend, with the following metadata:
+The CSV backend in ngio follows closely the same specifications as the Parquet backend, with the following metadata:
 
 ```json
 {

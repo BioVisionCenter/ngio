@@ -81,8 +81,8 @@ Examples of the OME-Zarr metadata access:
     ```
     The metadata object contains all the information about the image, for example, the channel labels:
     ```pycon exec="true" source="console" session="get_started"
-    >>> metadata.channel_labels
-    >>> print(metadata.channel_labels) # markdown-exec: hide
+    >>> metadata.channels_meta.channel_labels
+    >>> print(metadata.channels_meta.channel_labels) # markdown-exec: hide
     ```
 
 ## Accessing images / labels / tables

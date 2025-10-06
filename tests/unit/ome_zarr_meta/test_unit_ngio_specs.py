@@ -1,9 +1,8 @@
 import numpy as np
 import pytest
 
-from ngio.common._axes_transforms import transform_list, transform_numpy_array
 from ngio.ome_zarr_meta.ngio_specs import (
-    AxesMapper,
+    AxesHandler,
     AxesSetup,
     Axis,
     AxisType,
@@ -22,7 +21,7 @@ from ngio.ome_zarr_meta.ngio_specs._channels import valid_hex_color
 
 
 @pytest.mark.parametrize(
-    "on_disk_axes, axes_setup, allow_non_canonical_axes, strict_canonical_order",
+    "axes, axes_setup, allow_non_canonical_axes, strict_canonical_order",
     [
         (
             ["t", "c", "z", "y", "x"],
@@ -56,52 +55,18 @@ from ngio.ome_zarr_meta.ngio_specs._channels import valid_hex_color
         ),
     ],
 )
-def test_axes_base(
-    on_disk_axes, axes_setup, allow_non_canonical_axes, strict_canonical_order
-):
-    _axes = [Axis(on_disk_name=on_disk_name) for on_disk_name in on_disk_axes]
-    mapper = AxesMapper(
-        on_disk_axes=_axes,
+def test_axes_base(axes, axes_setup, allow_non_canonical_axes, strict_canonical_order):
+    _axes = [Axis(name=name) for name in axes]
+    mapper = AxesHandler(
+        axes=_axes,
         axes_setup=axes_setup,
         allow_non_canonical_axes=allow_non_canonical_axes,
         strict_canonical_order=strict_canonical_order,
     )
-    for i, ax in enumerate(on_disk_axes):
+    for i, ax in enumerate(axes):
         assert mapper.get_index(ax) == i
 
-    assert len(mapper.on_disk_axes) == len(on_disk_axes)
-    # Test the transformation
-    shape = list(range(2, len(on_disk_axes) + 2))
-    np.random.seed(0)
-    x_in = np.random.rand(*shape)
-    x_inner = transform_numpy_array(x_in, mapper.to_canonical())
-    x_inner_shape = transform_list(
-        list(x_in.shape), default=1, operations=mapper.to_canonical()
-    )
-    assert len(x_inner.shape) == 5 + len(mapper._axes_setup.others)
-    assert tuple(x_inner_shape) == tuple(x_inner.shape)
-
-    x_out = transform_numpy_array(x_inner, mapper.from_canonical())
-    x_out_shape = transform_list(
-        list(x_inner.shape), default=1, operations=mapper.from_canonical()
-    )
-    assert tuple(x_out_shape) == tuple(x_in.shape)
-
-    np.testing.assert_allclose(x_in, x_out)
-    # Test transformation with shuffle
-    shuffled_axes = np.random.permutation(on_disk_axes)
-    x_inner = transform_numpy_array(x_in, mapper.to_order(shuffled_axes))
-    x_inner_shape = transform_list(
-        list(x_in.shape), default=1, operations=mapper.to_order(shuffled_axes)
-    )
-    assert len(x_inner.shape) == len(on_disk_axes)
-    assert tuple(x_inner_shape) == tuple(x_inner.shape)
-    x_out = transform_numpy_array(x_inner, mapper.from_order(shuffled_axes))
-    x_out_shape = transform_list(
-        list(x_inner.shape), default=1, operations=mapper.from_order(shuffled_axes)
-    )
-    assert tuple(x_out_shape) == tuple(x_out.shape)
-    np.testing.assert_allclose(x_in, x_out)
+    assert len(mapper.axes) == len(axes)
 
 
 @pytest.mark.parametrize(
@@ -115,7 +80,7 @@ def test_axes_base(
 )
 def test_axis_cast(canonical_name, axis_type, unit, expected_type, expected_unit):
     ax = Axis(
-        on_disk_name="temp",
+        name="temp",
         unit=unit,
         axis_type=axis_type,
     )
@@ -126,26 +91,26 @@ def test_axis_cast(canonical_name, axis_type, unit, expected_type, expected_unit
 
 def test_axes_fail():
     with pytest.raises(ValueError):
-        AxesMapper(
-            on_disk_axes=[Axis(on_disk_name="x")],
+        AxesHandler(
+            axes=[Axis(name="x")],
             axes_setup=AxesSetup(x="X"),
             allow_non_canonical_axes=False,
             strict_canonical_order=False,
         )
 
     with pytest.raises(ValueError):
-        AxesMapper(
-            on_disk_axes=[Axis(on_disk_name="x")],
+        AxesHandler(
+            axes=[Axis(name="x")],
             axes_setup=AxesSetup(x="x"),
             allow_non_canonical_axes=True,
             strict_canonical_order=True,
         )
 
     with pytest.raises(ValueError):
-        AxesMapper(
-            on_disk_axes=[
-                Axis(on_disk_name="x"),
-                Axis(on_disk_name="x"),
+        AxesHandler(
+            axes=[
+                Axis(name="x"),
+                Axis(name="x"),
             ],
             axes_setup=None,
             allow_non_canonical_axes=False,
@@ -153,10 +118,10 @@ def test_axes_fail():
         )
 
     with pytest.raises(ValueError):
-        AxesMapper(
-            on_disk_axes=[
-                Axis(on_disk_name="x"),
-                Axis(on_disk_name="z"),
+        AxesHandler(
+            axes=[
+                Axis(name="x"),
+                Axis(name="z"),
             ],
             axes_setup=None,
             allow_non_canonical_axes=False,
@@ -164,35 +129,16 @@ def test_axes_fail():
         )
 
     with pytest.raises(ValueError):
-        AxesMapper(
-            on_disk_axes=[
-                Axis(on_disk_name="weird"),
-                Axis(on_disk_name="y"),
-                Axis(on_disk_name="x"),
+        AxesHandler(
+            axes=[
+                Axis(name="weird"),
+                Axis(name="y"),
+                Axis(name="x"),
             ],
             axes_setup=AxesSetup(others=["weird"]),
             allow_non_canonical_axes=False,
             strict_canonical_order=False,
         )
-
-    mapper = AxesMapper(
-        on_disk_axes=[
-            Axis(on_disk_name="y"),
-            Axis(on_disk_name="x"),
-        ],
-        axes_setup=None,
-    )
-    with pytest.raises(ValueError):
-        mapper.to_order(["x", "y", "y"])
-
-    with pytest.raises(ValueError):
-        mapper.from_order(["x"])
-
-    with pytest.raises(ValueError):
-        mapper.from_order(["XX"])
-
-    with pytest.raises(ValueError):
-        mapper.get_index("XX")
 
 
 def test_pixel_size():
@@ -221,32 +167,34 @@ def test_pixel_size():
 
 
 def test_dataset():
-    on_disk_axes = [
-        Axis(on_disk_name="t", axis_type=AxisType.time, unit=DefaultTimeUnit),
-        Axis(on_disk_name="c", axis_type=AxisType.channel),
-        Axis(on_disk_name="z"),
-        Axis(on_disk_name="y"),
-        Axis(on_disk_name="x"),
+    axes = [
+        Axis(name="t", axis_type=AxisType.time, unit=DefaultTimeUnit),
+        Axis(name="c", axis_type=AxisType.channel),
+        Axis(name="z"),
+        Axis(name="y"),
+        Axis(name="x"),
     ]
 
-    on_disk_scale = [1.0, 1.0, 1.0, 0.5, 0.5]
-    on_disk_translation = [0.0, 0.0, 0.0, 0.0, 0.0]
-    ds = Dataset(
-        path="0",
-        on_disk_axes=on_disk_axes,
-        on_disk_scale=on_disk_scale,
-        on_disk_translation=on_disk_translation,
+    axes_handler = AxesHandler(
+        axes=axes,
         axes_setup=AxesSetup(),
         allow_non_canonical_axes=False,
         strict_canonical_order=True,
     )
 
+    scale = [1.0, 1.0, 1.0, 0.5, 0.5]
+    translation = [0.0, 0.0, 0.0, 0.0, 0.0]
+    ds = Dataset(
+        path="0",
+        axes_handler=axes_handler,
+        scale=scale,
+        translation=translation,
+    )
+
     assert ds.path == "0"
     assert ds.get_scale("x") == 0.5
-    assert ds.axes_mapper.get_index("x") == 4
+    assert ds.axes_handler.get_index("x") == 4
     assert ds.get_translation("x") == 0.0
-    assert ds.space_unit == DefaultSpaceUnit
-    assert ds.time_unit == DefaultTimeUnit, ds.time_unit
 
     ps = ds.pixel_size
     assert ps.x == 0.5
@@ -256,23 +204,27 @@ def test_dataset():
 
 
 def test_dataset_fail():
-    on_disk_axes = [
-        Axis(on_disk_name="y", unit="centimeter"),
-        Axis(on_disk_name="x", unit="micrometer"),
+    axes = [
+        Axis(name="y", unit="centimeter"),
+        Axis(name="x", unit="micrometer"),
     ]
-    ds = Dataset(
-        path="0",
-        on_disk_axes=on_disk_axes,
-        on_disk_scale=[0.5, 0.5],
-        on_disk_translation=[0.0, 0.0],
+    axes_handler = AxesHandler(
+        axes=axes,
+        axes_setup=AxesSetup(),
         allow_non_canonical_axes=False,
         strict_canonical_order=True,
     )
+    ds = Dataset(
+        path="0",
+        axes_handler=axes_handler,
+        scale=[0.5, 0.5],
+        translation=[0.0, 0.0],
+    )
 
-    assert ds.time_unit is None
+    assert ds.axes_handler.time_unit is None
 
     with pytest.raises(ValueError):
-        assert ds.space_unit == "micrometer"
+        assert ds.axes_handler.space_unit == "micrometer"
 
 
 def test_channels():
@@ -351,31 +303,33 @@ def test_ngio_colors():
 
 
 def test_image_meta():
-    on_disk_axes = [
-        Axis(on_disk_name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
-        Axis(on_disk_name="c", axis_type=AxisType.channel),
-        Axis(on_disk_name="z"),
-        Axis(on_disk_name="y"),
-        Axis(on_disk_name="x"),
+    axes = [
+        Axis(name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
+        Axis(name="c", axis_type=AxisType.channel),
+        Axis(name="z"),
+        Axis(name="y"),
+        Axis(name="x"),
     ]
-    on_disk_translation = [0.0, 0.0, 0.0, 0.0, 0.0]
-    on_disk_scale = [1.0, 1.0, 1.0, 0.5, 0.5]
+
+    axes_handler = AxesHandler(
+        axes=axes,
+        axes_setup=AxesSetup(),
+        allow_non_canonical_axes=False,
+        strict_canonical_order=True,
+    )
+    translation = [0.0, 0.0, 0.0, 0.0, 0.0]
+    scale = [1.0, 1.0, 1.0, 0.5, 0.5]
 
     datasets = []
     for path in range(4):
         ds = Dataset(
             path=str(path),
-            on_disk_axes=on_disk_axes,
-            on_disk_scale=on_disk_scale,
-            on_disk_translation=on_disk_translation,
-            axes_setup=AxesSetup(),
-            allow_non_canonical_axes=False,
-            strict_canonical_order=True,
+            axes_handler=axes_handler,
+            scale=scale,
+            translation=translation,
         )
         datasets.append(ds)
-        on_disk_scale = [
-            s * f for s, f in zip(on_disk_scale, [1, 1, 1, 2, 2], strict=True)
-        ]
+        scale = [s * f for s, f in zip(scale, [1, 1, 1, 2, 2], strict=True)]
 
     image_meta = NgioImageMeta(version="0.4", name="test", datasets=datasets)
 
@@ -390,36 +344,39 @@ def test_image_meta():
     assert image_meta.get_dataset(path="1").path == "1"
     assert image_meta.get_dataset().path == "0"
     assert image_meta.get_dataset(pixel_size=datasets[-1].pixel_size).path == "3"
-    assert image_meta.get_channel_idx(label="DAPI") == 0
-    assert image_meta.get_channel_idx(wavelength_id="DAPI") == 0
-    assert image_meta.channel_labels == ["DAPI", "GFP", "RFP"]
+    channels_meta = image_meta.channels_meta
+    assert channels_meta is not None
+    assert channels_meta.get_channel_idx(channel_label="DAPI") == 0
+    assert channels_meta.get_channel_idx(wavelength_id="DAPI") == 0
+    assert channels_meta.channel_labels == ["DAPI", "GFP", "RFP"]
 
 
 def test_label_meta():
-    on_disk_axes = [
-        Axis(on_disk_name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
-        Axis(on_disk_name="z"),
-        Axis(on_disk_name="y"),
-        Axis(on_disk_name="x"),
+    axes = [
+        Axis(name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
+        Axis(name="z"),
+        Axis(name="y"),
+        Axis(name="x"),
     ]
-    on_disk_translation = [0.0, 0.0, 0.0, 0.0]
-    on_disk_scale = [1.0, 1.0, 0.5, 0.5]
+    axes_handler = AxesHandler(
+        axes=axes,
+        axes_setup=AxesSetup(),
+        allow_non_canonical_axes=False,
+        strict_canonical_order=True,
+    )
+    translation = [0.0, 0.0, 0.0, 0.0]
+    scale = [1.0, 1.0, 0.5, 0.5]
 
     datasets = []
     for path in range(4):
         ds = Dataset(
             path=str(path),
-            on_disk_axes=on_disk_axes,
-            on_disk_scale=on_disk_scale,
-            on_disk_translation=on_disk_translation,
-            axes_setup=AxesSetup(),
-            allow_non_canonical_axes=False,
-            strict_canonical_order=True,
+            axes_handler=axes_handler,
+            scale=scale,
+            translation=translation,
         )
         datasets.append(ds)
-        on_disk_scale = [
-            s * f for s, f in zip(on_disk_scale, [1, 1, 2, 2], strict=True)
-        ]
+        scale = [s * f for s, f in zip(scale, [1, 1, 2, 2], strict=True)]
 
     label_meta = NgioLabelMeta(
         version="0.4",
@@ -438,30 +395,31 @@ def test_label_meta():
 
 
 def test_channels_label_meta():
-    on_disk_axes = [
-        Axis(on_disk_name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
-        Axis(on_disk_name="c"),
-        Axis(on_disk_name="z"),
-        Axis(on_disk_name="y"),
-        Axis(on_disk_name="x"),
+    axes = [
+        Axis(name="t", axis_type=AxisType.time, unit=DefaultSpaceUnit),
+        Axis(name="c"),
+        Axis(name="z"),
+        Axis(name="y"),
+        Axis(name="x"),
     ]
-    on_disk_translation = [0.0, 0.0, 0.0, 0.0, 0.0]
-    on_disk_scale = [1.0, 1.0, 1.0, 0.5, 0.5]
+    axes_handler = AxesHandler(
+        axes=axes,
+        axes_setup=AxesSetup(),
+        allow_non_canonical_axes=False,
+        strict_canonical_order=True,
+    )
+    translation = [0.0, 0.0, 0.0, 0.0, 0.0]
+    scale = [1.0, 1.0, 1.0, 0.5, 0.5]
 
     datasets = []
     for path in range(4):
         ds = Dataset(
             path=str(path),
-            on_disk_axes=on_disk_axes,
-            on_disk_scale=on_disk_scale,
-            on_disk_translation=on_disk_translation,
-            axes_setup=AxesSetup(),
-            allow_non_canonical_axes=False,
-            strict_canonical_order=True,
+            axes_handler=axes_handler,
+            scale=scale,
+            translation=translation,
         )
         datasets.append(ds)
-        on_disk_scale = [
-            s * f for s, f in zip(on_disk_scale, [1, 1, 1, 2, 2], strict=True)
-        ]
+        scale = [s * f for s, f in zip(scale, [1, 1, 1, 2, 2], strict=True)]
 
     _ = NgioLabelMeta(version="0.4", name="test", datasets=datasets)

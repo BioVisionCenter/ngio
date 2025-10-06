@@ -8,20 +8,22 @@ Ngio's mission is to streamline working with OME-Zarr files by providing a simpl
 
 ## Key Features
 
-### 📊 Simple Object-Based API
+### 🔍 Simple Object-Based API
 
 - Easily open, explore, and manipulate OME-Zarr images and HCS plates
 - Create and derive new images and labels with minimal boilerplate code
 
-### 🔍 Rich Tables and Regions of Interest (ROI) Support
+### 📊 Rich Tables and Regions of Interest (ROI) Support
 
+- Tight integration with [tabular data](https://biovisioncenter.github.io/ngio/stable/table_specs/overview/)
 - Extract and analyze specific regions of interest
-- Tight integration with [Fractal's table framework](https://BioVisionCenter.github.io/fractal-tasks-core/tables/)
+- Store measurements and other metadata in the OME-Zarr container
+- Extensible & modular allowing users to define custom table schemas and on disk serialization
 
-### 🔄 Scalable Data Processing (Coming Soon)
+### 🔄 Scalable Data Processing
 
-- Powerful iterators for processing data at scale
-- Efficient memory management for large datasets
+- Powerful iterators for building scalable and generalizable image processing pipelines
+- Extensible mapping mechanism for custom parallelization strategies
 
 ## Getting Started
 
@@ -43,14 +45,14 @@ Currently, ngio only supports OME-Zarr v0.4. Support for version 0.5 and higher 
 - ✅ OME-Zarr metadata handling and validation
 - ✅ Image and label access across pyramid levels
 - ✅ ROI and table support
+- ✅ Image processing iterators
 - ✅ Streaming from remote sources
 - ✅ Documentation and examples
 
 ### Upcoming Features
 
-- Advanced image processing iterators
-- Parallel processing capabilities
-- Support for OME-Zarr v0.5 and Zarr v3
+- Support for OME-Zarr v0.5 and Zarr v3 (via `zarr-python` v3)
+- Enhanced performance optimizations (parallel iterators, optimized io strategies)
 
 ## Contributors
 

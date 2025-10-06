@@ -1,12 +1,12 @@
 """A module for handling label images in OME-NGFF files."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Literal
 
-import dask.array as da
+from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common import compute_masking_roi
-from ngio.images._abstract_image import AbstractImage, consolidate_image
+from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_label_container
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
@@ -32,6 +32,15 @@ from ngio.utils import (
 
 class Label(AbstractImage[LabelMetaHandler]):
     """Placeholder class for a label."""
+
+    get_as_numpy = AbstractImage._get_as_numpy
+    get_as_dask = AbstractImage._get_as_dask
+    get_array = AbstractImage._get_array
+    get_roi_as_numpy = AbstractImage._get_roi_as_numpy
+    get_roi_as_dask = AbstractImage._get_roi_as_dask
+    get_roi = AbstractImage._get_roi
+    set_array = AbstractImage._set_array
+    set_roi = AbstractImage._set_roi
 
     def __init__(
         self,
@@ -86,7 +95,10 @@ class Label(AbstractImage[LabelMetaHandler]):
         mode: Literal["dask", "numpy", "coarsen"] = "dask",
     ) -> None:
         """Consolidate the label on disk."""
-        consolidate_image(self, mode=mode, order=0)
+        self._consolidate(
+            order="nearest",
+            mode=mode,
+        )
 
 
 class LabelsContainer:
@@ -152,11 +164,13 @@ class LabelsContainer:
         self,
         name: str,
         ref_image: Image | Label,
-        shape: Collection[int] | None = None,
+        shape: Sequence[int] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Collection[str] | None = None,
-        chunks: Collection[int] | None = None,
-        dtype: str | None = None,
+        axes_names: Sequence[str] | None = None,
+        chunks: Sequence[int] | None = None,
+        dtype: str = "uint32",
+        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        compressor=None,
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -168,12 +182,16 @@ class LabelsContainer:
             ref_image (Image | Label): A reference image that will be used to create
                 the new image.
             name (str): The name of the new image.
-            shape (Collection[int] | None): The shape of the new image.
+            shape (Sequence[int] | None): The shape of the new image.
             pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Collection[str] | None): The axes names of the new image.
+            axes_names (Sequence[str] | None): The axes names of the new image.
                 For labels, the channel axis is not allowed.
-            chunks (Collection[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
+            dtype (str): The data type of the new label.
+            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+                dimensions. If None it will use the same as the reference image.
+            compressor: The compressor to use. If None it will use
+                the same as the reference image.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -198,6 +216,8 @@ class LabelsContainer:
             axes_names=axes_names,
             chunks=chunks,
             dtype=dtype,
+            dimension_separator=dimension_separator,
+            compressor=compressor,
             overwrite=overwrite,
         )
 
@@ -212,11 +232,13 @@ def derive_label(
     store: StoreOrGroup,
     ref_image: Image | Label,
     name: str,
-    shape: Collection[int] | None = None,
+    shape: Sequence[int] | None = None,
     pixel_size: PixelSize | None = None,
-    axes_names: Collection[str] | None = None,
-    chunks: Collection[int] | None = None,
-    dtype: str | None = None,
+    axes_names: Sequence[str] | None = None,
+    chunks: Sequence[int] | None = None,
+    dimension_separator: DIMENSION_SEPARATOR | None = None,
+    compressor=None,
+    dtype: str = "uint32",
     overwrite: bool = False,
 ) -> None:
     """Create an empty OME-Zarr label from a reference image.
@@ -226,12 +248,16 @@ def derive_label(
         ref_image (Image | Label): A reference image that will be used to
             create the new image.
         name (str): The name of the new image.
-        shape (Collection[int] | None): The shape of the new image.
+        shape (Sequence[int] | None): The shape of the new image.
         pixel_size (PixelSize | None): The pixel size of the new image.
-        axes_names (Collection[str] | None): The axes names of the new image.
+        axes_names (Sequence[str] | None): The axes names of the new image.
             For labels, the channel axis is not allowed.
-        chunks (Collection[int] | None): The chunk shape of the new image.
-        dtype (str | None): The data type of the new image.
+        chunks (Sequence[int] | None): The chunk shape of the new image.
+        dtype (str): The data type of the new label.
+        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            dimensions. If None it will use the same as the reference image.
+        compressor: The compressor to use. If None it will use
+            the same as the reference image.
         overwrite (bool): Whether to overwrite an existing image.
 
     Returns:
@@ -247,8 +273,8 @@ def derive_label(
         pixel_size = ref_image.pixel_size
 
     if axes_names is None:
-        axes_names = ref_meta.axes_mapper.on_disk_axes_names
-        c_axis = ref_meta.axes_mapper.get_index("c")
+        axes_names = ref_meta.axes_handler.axes_names
+        c_axis = ref_meta.axes_handler.get_index("c")
     else:
         if "c" in axes_names:
             raise NgioValidationError(
@@ -272,9 +298,6 @@ def derive_label(
             f"Got {chunks} for shape {shape}."
         )
 
-    if dtype is None:
-        dtype = ref_image.dtype
-
     if c_axis is not None:
         # remove channel if present
         shape = list(shape)
@@ -283,6 +306,11 @@ def derive_label(
         chunks = chunks[:c_axis] + chunks[c_axis + 1 :]
         axes_names = list(axes_names)
         axes_names = axes_names[:c_axis] + axes_names[c_axis + 1 :]
+
+    if dimension_separator is None:
+        dimension_separator = ref_image.zarr_array._dimension_separator  # type: ignore
+    if compressor is None:
+        compressor = ref_image.zarr_array.compressor  # type: ignore
 
     _ = create_empty_label_container(
         store=store,
@@ -298,6 +326,8 @@ def derive_label(
         axes_names=axes_names,
         chunks=chunks,
         dtype=dtype,
+        dimension_separator=dimension_separator,  # type: ignore
+        compressor=compressor,  # type: ignore
         overwrite=overwrite,
         version=ref_meta.version,
         name=name,
@@ -307,10 +337,6 @@ def derive_label(
 
 def build_masking_roi_table(label: Label) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
-    if label.dimensions.is_time_series:
-        raise NgioValueError("Time series labels are not supported.")
-
-    array = label.get_array(axes_order=["z", "y", "x"], mode="dask")
-    assert isinstance(array, da.Array), "Array must be a Dask array."
+    array = label.get_as_dask(axes_order=["t", "z", "y", "x"])
     rois = compute_masking_roi(array, label.pixel_size)
     return MaskingRoiTable(rois, reference_label=label.meta.name)

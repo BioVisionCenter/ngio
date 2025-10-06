@@ -1,0 +1,3 @@
+# ngio API documentation
+
+::: ngio

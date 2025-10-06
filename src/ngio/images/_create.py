@@ -1,7 +1,9 @@
 """Utility functions for working with OME-Zarr images."""
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import TypeVar
+
+from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common._pyramid import init_empty_pyramid
 from ngio.ome_zarr_meta import (
@@ -29,7 +31,7 @@ _image_or_label_meta = TypeVar("_image_or_label_meta", NgioImageMeta, NgioLabelM
 def _init_generic_meta(
     meta_type: type[_image_or_label_meta],
     pixelsize: float,
-    axes_names: Collection[str],
+    axes_names: Sequence[str],
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     levels: int | list[str] = 5,
@@ -80,7 +82,7 @@ def _init_generic_meta(
 
 def create_empty_label_container(
     store: StoreOrGroup,
-    shape: Collection[int],
+    shape: Sequence[int],
     pixelsize: float,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
@@ -89,10 +91,12 @@ def create_empty_label_container(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
-    dtype: str = "uint16",
+    chunks: Sequence[int] | None = None,
+    dtype: str = "uint32",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -100,7 +104,7 @@ def create_empty_label_container(
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
-        shape (Collection[int]): The shape of the image.
+        shape (Sequence[int]): The shape of the image.
         pixelsize (float): The pixel size in x and y dimensions.
         z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
         time_spacing (float, optional): The spacing between time points.
@@ -115,11 +119,14 @@ def create_empty_label_container(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
+        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+            dimensions. Defaults to "/".
+        compressor: The compressor to use. Defaults to "default".
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
@@ -164,6 +171,8 @@ def create_empty_label_container(
         chunks=chunks,
         dtype=dtype,
         mode="a",
+        dimension_separator=dimension_separator,
+        compressor=compressor,
     )
     group_handler._mode = "r+"
     return group_handler
@@ -171,7 +180,7 @@ def create_empty_label_container(
 
 def create_empty_image_container(
     store: StoreOrGroup,
-    shape: Collection[int],
+    shape: Sequence[int],
     pixelsize: float,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
@@ -180,10 +189,12 @@ def create_empty_image_container(
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
-    axes_names: Collection[str] | None = None,
+    axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Collection[int] | None = None,
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -191,7 +202,7 @@ def create_empty_image_container(
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
-        shape (Collection[int]): The shape of the image.
+        shape (Sequence[int]): The shape of the image.
         pixelsize (float): The pixel size in x and y dimensions.
         z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
         time_spacing (float, optional): The spacing between time points.
@@ -206,12 +217,15 @@ def create_empty_image_container(
             DefaultSpaceUnit.
         time_unit (TimeUnits, optional): The unit of time. Defaults to
             DefaultTimeUnit.
-        axes_names (Collection[str] | None, optional): The names of the axes.
+        axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Collection[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
+        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+            dimensions. Defaults to "/".
+        compressor: The compressor to use. Defaults to "default".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
         version (str, optional): The version of the OME-Zarr specification.
@@ -254,6 +268,8 @@ def create_empty_image_container(
         chunks=chunks,
         dtype=dtype,
         mode="a",
+        dimension_separator=dimension_separator,
+        compressor=compressor,
     )
 
     group_handler._mode = "r+"

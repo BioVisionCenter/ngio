@@ -7,18 +7,15 @@ This models can be tr
 """
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
-    AxesExpand,
-    AxesMapper,
+    AxesHandler,
     AxesSetup,
-    AxesSqueeze,
-    AxesTransformation,
-    AxesTranspose,
     Axis,
     AxisType,
     DefaultSpaceUnit,
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
+    build_canonical_axes_handler,
     canonical_axes_order,
     canonical_label_axes_order,
 )
@@ -47,12 +44,8 @@ from ngio.ome_zarr_meta.ngio_specs._ngio_image import (
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 
 __all__ = [
-    "AxesExpand",
-    "AxesMapper",
+    "AxesHandler",
     "AxesSetup",
-    "AxesSqueeze",
-    "AxesTransformation",
-    "AxesTranspose",
     "Axis",
     "AxisType",
     "Channel",
@@ -74,6 +67,7 @@ __all__ = [
     "PixelSize",
     "SpaceUnits",
     "TimeUnits",
+    "build_canonical_axes_handler",
     "canonical_axes_order",
     "canonical_label_axes_order",
     "default_channel_name",

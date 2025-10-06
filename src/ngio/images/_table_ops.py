@@ -2,7 +2,7 @@
 
 import asyncio
 from collections import Counter
-from collections.abc import Collection
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -76,7 +76,7 @@ def _add_const_columns_pl(
 
 
 def _pd_concat(
-    tables: Collection[TableWithExtras], index_key: str | None = None
+    tables: Sequence[TableWithExtras], index_key: str | None = None
 ) -> pd.DataFrame:
     """Concatenate tables from different plates into a single table."""
     if len(tables) == 0:
@@ -93,7 +93,7 @@ def _pd_concat(
 
 
 def _pl_concat(
-    tables: Collection[TableWithExtras], index_key: str | None = None
+    tables: Sequence[TableWithExtras], index_key: str | None = None
 ) -> pl.LazyFrame:
     """Concatenate tables from different plates into a single table."""
     if len(tables) == 0:
@@ -113,7 +113,7 @@ def _pl_concat(
 
 
 def conctatenate_tables(
-    tables: Collection[TableWithExtras],
+    tables: Sequence[TableWithExtras],
     mode: Literal["eager", "lazy"] = "eager",
     index_key: str | None = None,
     table_cls: type[TableType] | None = None,
@@ -147,8 +147,8 @@ def conctatenate_tables(
 
 
 def _check_images_and_extras(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
 ) -> None:
     """Check if the images and extras are valid."""
     if len(images) == 0:
@@ -159,9 +159,9 @@ def _check_images_and_extras(
 
 
 def _concatenate_image_tables(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     table_cls: type[TableType] | None = None,
     index_key: str | None = None,
     strict: bool = True,
@@ -172,9 +172,9 @@ def _concatenate_image_tables(
 
     tables = []
     for image, extra in zip(images, extras, strict=True):
-        if not strict and table_name not in image.list_tables():
+        if not strict and name not in image.list_tables():
             continue
-        table = image.get_table(table_name)
+        table = image.get_table(name)
         tables.append(TableWithExtras(table=table, extras=extra))
 
     return conctatenate_tables(
@@ -186,9 +186,9 @@ def _concatenate_image_tables(
 
 
 def concatenate_image_tables(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
@@ -200,7 +200,7 @@ def concatenate_image_tables(
         extras: A collection of extras dictionaries for each image.
             this will be added as columns to the table, and will be
             concatenated with the table index to create a new index.
-        table_name: The name of the table to concatenate.
+        name: The name of the table to concatenate.
         index_key: The key to use for the index of the concatenated table.
         strict: If True, raise an error if the table is not found in the image.
         mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
@@ -210,7 +210,7 @@ def concatenate_image_tables(
     return _concatenate_image_tables(
         images=images,
         extras=extras,
-        table_name=table_name,
+        name=name,
         table_cls=None,
         index_key=index_key,
         strict=strict,
@@ -219,9 +219,9 @@ def concatenate_image_tables(
 
 
 def concatenate_image_tables_as(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     table_cls: type[TableType],
     index_key: str | None = None,
     strict: bool = True,
@@ -234,7 +234,7 @@ def concatenate_image_tables_as(
         extras: A collection of extras dictionaries for each image.
             this will be added as columns to the table, and will be
             concatenated with the table index to create a new index.
-        table_name: The name of the table to concatenate.
+        name: The name of the table to concatenate.
         table_cls: The output will be casted to this class, if the new table_cls is
             compatible with the table_cls of the input tables.
         index_key: The key to use for the index of the concatenated table.
@@ -246,7 +246,7 @@ def concatenate_image_tables_as(
     table = _concatenate_image_tables(
         images=images,
         extras=extras,
-        table_name=table_name,
+        name=name,
         table_cls=table_cls,
         index_key=index_key,
         strict=strict,
@@ -258,9 +258,9 @@ def concatenate_image_tables_as(
 
 
 async def _concatenate_image_tables_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     table_cls: type[TableType] | None = None,
     index_key: str | None = None,
     strict: bool = True,
@@ -271,15 +271,15 @@ async def _concatenate_image_tables_async(
 
     def process_image(
         image: OmeZarrContainer,
-        table_name: str,
+        name: str,
         extra: dict[str, str],
         mode: Literal["eager", "lazy"] = "eager",
         strict: bool = True,
     ) -> TableWithExtras | None:
         """Process a single image and return the table."""
-        if not strict and table_name not in image.list_tables():
+        if not strict and name not in image.list_tables():
             return None
-        _table = image.get_table(table_name)
+        _table = image.get_table(name)
         if mode == "lazy":
             # make sure the table is loaded lazily
             # It the backend is not lazy, this will be
@@ -299,7 +299,7 @@ async def _concatenate_image_tables_async(
         task = asyncio.to_thread(
             process_image,
             image=image,
-            table_name=table_name,
+            name=name,
             extra=extra,
             strict=strict,
         )
@@ -315,9 +315,9 @@ async def _concatenate_image_tables_async(
 
 
 async def concatenate_image_tables_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
@@ -329,7 +329,7 @@ async def concatenate_image_tables_async(
         extras: A collection of extras dictionaries for each image.
             this will be added as columns to the table, and will be
             concatenated with the table index to create a new index.
-        table_name: The name of the table to concatenate.
+        name: The name of the table to concatenate.
         index_key: The key to use for the index of the concatenated table.
         strict: If True, raise an error if the table is not found in the image.
         mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
@@ -339,7 +339,7 @@ async def concatenate_image_tables_async(
     return await _concatenate_image_tables_async(
         images=images,
         extras=extras,
-        table_name=table_name,
+        name=name,
         table_cls=None,
         index_key=index_key,
         strict=strict,
@@ -348,9 +348,9 @@ async def concatenate_image_tables_async(
 
 
 async def concatenate_image_tables_as_async(
-    images: Collection[OmeZarrContainer],
-    extras: Collection[dict[str, str]],
-    table_name: str,
+    images: Sequence[OmeZarrContainer],
+    extras: Sequence[dict[str, str]],
+    name: str,
     table_cls: type[TableType],
     index_key: str | None = None,
     strict: bool = True,
@@ -363,7 +363,7 @@ async def concatenate_image_tables_as_async(
         extras: A collection of extras dictionaries for each image.
             this will be added as columns to the table, and will be
             concatenated with the table index to create a new index.
-        table_name: The name of the table to concatenate.
+        name: The name of the table to concatenate.
         table_cls: The output will be casted to this class, if the new table_cls is
             compatible with the table_cls of the input tables.
         index_key: The key to use for the index of the concatenated table.
@@ -375,7 +375,7 @@ async def concatenate_image_tables_as_async(
     table = await _concatenate_image_tables_async(
         images=images,
         extras=extras,
-        table_name=table_name,
+        name=name,
         table_cls=table_cls,
         index_key=index_key,
         strict=strict,
@@ -394,7 +394,7 @@ def _tables_names_coalesce(
     if num_images == 0:
         raise ValueError("No images to concatenate.")
 
-    names = [name for _table_names in tables_names for name in _table_names]
+    names = [name for _names in tables_names for name in _names]
     names_counts = Counter(names)
 
     if mode == "common":
@@ -411,7 +411,7 @@ def _tables_names_coalesce(
 
 
 def list_image_tables(
-    images: Collection[OmeZarrContainer],
+    images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
 ) -> list[str]:
@@ -436,7 +436,7 @@ def list_image_tables(
 
 
 async def list_image_tables_async(
-    images: Collection[OmeZarrContainer],
+    images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
 ) -> list[str]:

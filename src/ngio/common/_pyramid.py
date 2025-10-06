@@ -1,12 +1,18 @@
 import math
-from collections.abc import Collection
+from collections.abc import Callable, Sequence
 from typing import Literal
 
 import dask.array as da
 import numpy as np
 import zarr
+from zarr.types import DIMENSION_SEPARATOR
 
-from ngio.common._zoom import _zoom_inputs_check, dask_zoom, numpy_zoom
+from ngio.common._zoom import (
+    InterpolationOrder,
+    _zoom_inputs_check,
+    dask_zoom,
+    numpy_zoom,
+)
 from ngio.utils import (
     AccessModeLiteral,
     NgioValueError,
@@ -18,7 +24,7 @@ from ngio.utils import (
 def _on_disk_numpy_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder,
 ) -> None:
     target[...] = numpy_zoom(source[...], target_shape=target.shape, order=order)
 
@@ -26,7 +32,7 @@ def _on_disk_numpy_zoom(
 def _on_disk_dask_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder,
 ) -> None:
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
@@ -39,18 +45,18 @@ def _on_disk_dask_zoom(
 def _on_disk_coarsen(
     source: zarr.Array,
     target: zarr.Array,
-    _order: Literal[0, 1] = 1,
-    aggregation_function: np.ufunc | None = None,
+    order: InterpolationOrder = "linear",
+    aggregation_function: Callable | None = None,
 ) -> None:
     """Apply a coarsening operation from a source zarr array to a target zarr array.
 
     Args:
         source (zarr.Array): The source array to coarsen.
         target (zarr.Array): The target array to save the coarsened result to.
-        _order (Literal[0, 1]): The order of interpolation is not really implemented
+        order (InterpolationOrder): The order of interpolation is not really implemented
             for coarsening, but it is kept for compatibility with the zoom function.
-            _order=1 -> linear interpolation ~ np.mean
-            _order=0 -> nearest interpolation ~ np.max
+            order="linear" -> linear interpolation ~ np.mean
+            order="nearest" -> nearest interpolation ~ np.max
         aggregation_function (np.ufunc): The aggregation function to use.
     """
     source_array = da.from_zarr(source)
@@ -64,13 +70,15 @@ def _on_disk_coarsen(
     )
 
     if aggregation_function is None:
-        if _order == 1:
+        if order == "linear":
             aggregation_function = np.mean
-        elif _order == 0:
+        elif order == "nearest":
             aggregation_function = np.max
+        elif order == "cubic":
+            raise NgioValueError("Cubic interpolation is not supported for coarsening.")
         else:
             raise NgioValueError(
-                f"Aggregation function must be provided for order {_order}"
+                f"Aggregation function must be provided for order {order}"
             )
 
     coarsening_setup = {}
@@ -96,7 +104,7 @@ def _on_disk_coarsen(
 def on_disk_zoom(
     source: zarr.Array,
     target: zarr.Array,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Apply a zoom operation from a source zarr array to a target zarr array.
@@ -104,7 +112,7 @@ def on_disk_zoom(
     Args:
         source (zarr.Array): The source array to zoom.
         target (zarr.Array): The target array to save the zoomed result to.
-        order (Literal[0, 1, 2]): The order of interpolation. Defaults to 1.
+        order (InterpolationOrder): The order of interpolation. Defaults to "linear".
         mode (Literal["dask", "numpy", "coarsen"]): The mode to use. Defaults to "dask".
     """
     if not isinstance(source, zarr.Array):
@@ -132,7 +140,7 @@ def on_disk_zoom(
 
 def _find_closest_arrays(
     processed: list[zarr.Array], to_be_processed: list[zarr.Array]
-) -> tuple[int, int]:
+) -> tuple[np.intp, np.intp]:
     dist_matrix = np.zeros((len(processed), len(to_be_processed)))
     for i, arr_to_proc in enumerate(to_be_processed):
         for j, proc_arr in enumerate(processed):
@@ -147,13 +155,15 @@ def _find_closest_arrays(
                 )
             )
 
-    return np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
+    indices = np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
+    assert len(indices) == 2, "Indices must be of length 2"
+    return indices
 
 
 def consolidate_pyramid(
     source: zarr.Array,
     targets: list[zarr.Array],
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Consolidate the Zarr array."""
@@ -175,14 +185,25 @@ def consolidate_pyramid(
         processed.append(target_image)
 
 
+def _maybe_int(value: float | int) -> float | int:
+    """Convert a float to an int if it is an integer."""
+    if isinstance(value, int):
+        return value
+    if value.is_integer():
+        return int(value)
+    return value
+
+
 def init_empty_pyramid(
     store: StoreOrGroup,
     paths: list[str],
-    ref_shape: Collection[int],
-    scaling_factors: Collection[float],
-    chunks: Collection[int] | None = None,
+    ref_shape: Sequence[int],
+    scaling_factors: Sequence[float],
+    chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
+    dimension_separator: DIMENSION_SEPARATOR = "/",
+    compressor="default",
 ) -> None:
     # Return the an Image object
     if chunks is not None and len(chunks) != len(ref_shape):
@@ -198,6 +219,10 @@ def init_empty_pyramid(
             "The shape and scaling factor must have the same number of dimensions."
         )
 
+    # Ensure scaling factors are int if possible
+    # To reduce the risk of floating point issues
+    scaling_factors = [_maybe_int(s) for s in scaling_factors]
+
     root_group = open_group_wrapper(store, mode=mode)
 
     for path in paths:
@@ -211,22 +236,18 @@ def init_empty_pyramid(
             shape=ref_shape,
             dtype=dtype,
             chunks=chunks,
-            dimension_separator="/",
+            dimension_separator=dimension_separator,
             overwrite=True,
+            compressor=compressor,
         )
 
-        # Todo redo this with when a proper build of pyramid is implemented
-        _shape = []
-        for s, sc in zip(ref_shape, scaling_factors, strict=True):
-            if math.floor(s / sc) % 2 == 0:
-                _shape.append(math.floor(s / sc))
-            else:
-                _shape.append(math.ceil(s / sc))
+        _shape = [
+            math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
+        ]
         ref_shape = _shape
 
         if chunks is None:
             chunks = new_arr.chunks
-            if chunks is None:
-                raise NgioValueError("Something went wrong with the chunks")
+            assert chunks is not None
         chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
     return None

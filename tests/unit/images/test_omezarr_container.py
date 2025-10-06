@@ -1,10 +1,40 @@
 from pathlib import Path
 
+import dask.array as da
 import numpy as np
 import pytest
 
 from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio.images._image import ChannelSelectionModel
+from ngio.io_pipes._ops_axes import AxesOps
+from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.utils import fractal_fsspec_store
+
+
+class IdentityTransform:
+    def get_as_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
+    ) -> np.ndarray:
+        """Apply the scaling transformation to a numpy array."""
+        return array
+
+    def get_as_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
+    ) -> da.Array:
+        """Apply the scaling transformation to a dask array."""
+        return array
+
+    def set_as_numpy_transform(
+        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
+    ) -> np.ndarray:
+        """Apply the inverse scaling transformation to a numpy array."""
+        return array
+
+    def set_as_dask_transform(
+        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
+    ) -> da.Array:
+        """Apply the inverse scaling transformation to a dask array."""
+        return array
 
 
 @pytest.mark.parametrize(
@@ -40,6 +70,23 @@ def test_open_ome_zarr_container(images_v04: dict[str, Path], zarr_name: str):
 def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
     cardiomyocyte_tiny_path = cardiomyocyte_tiny_path / "B" / "03" / "0"
     ome_zarr = open_ome_zarr_container(cardiomyocyte_tiny_path)
+
+    assert isinstance(ome_zarr.__repr__(), str)
+    _ = ome_zarr.images_container
+
+    assert not ome_zarr.is_2d
+    assert ome_zarr.is_3d
+    assert not ome_zarr.is_time_series
+    assert not ome_zarr.is_multi_channels
+    assert not ome_zarr.is_2d_time_series
+    assert not ome_zarr.is_3d_time_series
+    assert ome_zarr.channel_labels == ["DAPI"]
+    assert ome_zarr.wavelength_ids == ["A01_C01"]
+    assert ome_zarr.get_channel_idx("DAPI") == 0
+    assert ome_zarr.get_channel_idx(wavelength_id="A01_C01") == 0
+    assert ome_zarr.num_channels == 1
+    ome_zarr.set_axes_units(space_unit="micrometer")
+
     assert ome_zarr.list_tables() == ["FOV_ROI_table", "well_ROI_table"], (
         ome_zarr.list_tables()
     )
@@ -47,12 +94,13 @@ def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
         ome_zarr.list_roi_tables()
     )
 
+    assert ome_zarr.list_labels() == []
+
     fov_roi = ome_zarr.get_table("FOV_ROI_table")
-    assert len(fov_roi.rois()) == 2  # type: ignore
-    roi_table_1 = ome_zarr.get_table("well_ROI_table")
+    fov_roi = ome_zarr.get_roi_table("FOV_ROI_table")
+    assert len(fov_roi.rois()) == 2
+    roi_table_1 = ome_zarr.get_roi_table("well_ROI_table")
     assert len(roi_table_1.rois()) == 1
-    roi_table_2 = ome_zarr.get_table("well_ROI_table")
-    assert len(roi_table_2.rois()) == 1
 
     new_well_roi_table = ome_zarr.build_image_roi_table()
     ome_zarr.add_table("new_well_ROI_table", new_well_roi_table)
@@ -102,17 +150,27 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert image.meta.get_highest_resolution_dataset().path == "0"
     assert image.meta.get_lowest_resolution_dataset().path == "2"
 
+    array = image.get_as_numpy(transforms=[IdentityTransform()])
+    assert isinstance(array, np.ndarray)
+    assert array.shape == (10, 20, 30)
+
+    array_dask = image.get_as_dask(transforms=[IdentityTransform()])
+    assert array_dask.shape == (10, 20, 30)
+
     array = image.get_array(
         x=slice(None),
         axes_order=["c", "z", "y", "x"],
         mode=array_mode,  # type: ignore
     )
 
-    assert array.shape == (1, 10, 20, 30)
-
     array = array + 1  # type: ignore
 
-    image.set_array(array, x=slice(None), axes_order=["c", "z", "y", "x"])
+    image.set_array(
+        array,
+        x=slice(None),
+        axes_order=["c", "z", "y", "x"],
+        transforms=[IdentityTransform()],
+    )
     image.consolidate(mode=array_mode)  # type: ignore
 
     # Omemeta
@@ -122,7 +180,7 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     ome_zarr.set_channel_percentiles()
 
     image = ome_zarr.get_image(path="2")
-    assert np.mean(image.get_array()) == 1
+    assert np.mean(image.get_array()) == 1  # type: ignore
 
     new_ome_zarr = ome_zarr.derive_image(tmp_path / "derived2.zarr", ref_path="2")
 
@@ -132,7 +190,7 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
 
     new_label = new_ome_zarr.derive_label("new_label")
     assert new_label.shape == image.shape
-    assert new_label.meta.axes_mapper.on_disk_axes_names == ["z", "y", "x"]
+    assert new_label.meta.axes_handler.axes_names == ("z", "y", "x")
 
     assert new_ome_zarr.list_labels() == ["new_label"]
     assert new_ome_zarr.list_tables() == []
@@ -168,3 +226,73 @@ def test_remote_ome_zarr_container():
 
     _ = ome_zarr.get_label("nuclei", path="0")
     _ = ome_zarr.get_table("well_ROI_table")
+
+
+def test_get_and_squeeze(tmp_path: Path):
+    # Very basic test to check if the container is working
+    # to be expanded with more meaningful tests
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=(1, 20, 30),
+        xy_pixelsize=0.5,
+        levels=1,
+        axes_names=["c", "y", "x"],
+        dtype="uint8",
+    )
+    image = ome_zarr.get_image()
+    assert image.shape == (1, 20, 30)
+    assert image.get_array(axes_order=["c", "y", "x"]).shape == (1, 20, 30)
+    image.set_array(
+        np.ones((1, 20, 30), dtype="uint8"),
+        axes_order=["c", "y", "x"],
+    )
+    assert image.get_array(axes_order=["y", "x"]).shape == (20, 30)
+    image.set_array(
+        np.ones((20, 30), dtype="uint8"),
+        axes_order=["y", "x"],
+    )
+    assert image.get_array(axes_order=["y", "x"]).shape == (20, 30)
+    image.set_array(
+        np.ones((20, 30), dtype="uint8"),
+        axes_order=["y", "x"],
+    )
+    assert image.get_array(axes_order=["x"], y=0, c=0).shape == (30,)
+    image.set_array(
+        np.ones((30,), dtype="uint8"),
+        axes_order=["x"],
+        y=0,
+        c=0,
+    )
+
+    assert image.get_array(channel_selection=0, axes_order=["c", "y", "x"]).shape == (
+        1,
+        20,
+        30,
+    )
+    assert image.get_array(channel_selection=(0,), axes_order=["y", "x"]).shape == (
+        20,
+        30,
+    )
+    assert image.get_array(channel_selection=(0,), axes_order=None).shape == (1, 20, 30)
+    assert image.get_array(channel_selection=0, axes_order=None).shape == (20, 30)
+
+    # Reordering axes and adding a virtual axis
+    assert image.get_array(
+        channel_selection=0, axes_order=["c", "x", "y", "virtual"]
+    ).shape == (
+        1,
+        30,
+        20,
+        1,
+    )
+
+    # Test channel_labels
+    image.get_as_numpy(channel_selection="channel_0")
+    image.get_as_dask(channel_selection="channel_0")
+    image.get_as_dask(
+        channel_selection=ChannelSelectionModel(identifier="channel_0", mode="label")
+    )
+    image.get_as_dask(
+        channel_selection=ChannelSelectionModel(identifier="0", mode="index")
+    )

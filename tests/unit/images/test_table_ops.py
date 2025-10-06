@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from ngio import OmeZarrContainer, create_empty_ome_zarr
-from ngio.common import (
+from ngio.images import (
     concatenate_image_tables,
     concatenate_image_tables_as,
     concatenate_image_tables_as_async,
@@ -81,7 +81,7 @@ def test_cat_sync_api(
             concatenate_image_tables(
                 [ome_zarr_1, ome_zarr_2],
                 extras=[extras1, extras2],
-                table_name=table,
+                name=table,
                 mode=mode,
                 strict=strict,
             )
@@ -90,7 +90,7 @@ def test_cat_sync_api(
     concatenated_table = concatenate_image_tables(
         [ome_zarr_1, ome_zarr_2],
         extras=[extras1, extras2],
-        table_name=table,
+        name=table,
         mode=mode,
         strict=strict,
     )
@@ -115,7 +115,7 @@ def test_cat_as_sync(tmp_path: Path):
     concatenated_table = concatenate_image_tables_as(
         [ome_zarr_1, ome_zarr_2],
         extras=[extras1, extras2],
-        table_name="table1",
+        name="table1",
         table_cls=GenericTable,
     )
 
@@ -132,7 +132,7 @@ def test_set_index(tmp_path: Path):
     concatenated_table = concatenate_image_tables_as(
         [ome_zarr_1, ome_zarr_2],
         extras=[extras1, extras2],
-        table_name="table1",
+        name="table1",
         table_cls=GenericTable,
         index_key="Index",
     )
@@ -152,7 +152,7 @@ def test_cat_async_api(tmp_path: Path):
         concatenate_image_tables_async(
             [ome_zarr_1, ome_zarr_2],
             extras=[extras1, extras2],
-            table_name="table1",
+            name="table1",
         )
     )
     assert isinstance(concatenated_table, FeatureTable)
@@ -166,7 +166,7 @@ def test_cat_async_api(tmp_path: Path):
         concatenate_image_tables_as_async(
             [ome_zarr_1, ome_zarr_2],
             extras=[extras1, extras2],
-            table_name="table1",
+            name="table1",
             table_cls=GenericTable,
         )
     )

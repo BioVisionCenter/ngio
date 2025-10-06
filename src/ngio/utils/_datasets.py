@@ -38,6 +38,11 @@ class UnzipAndRename(pooch.Unzip):
             return None
 
         tmp_dir = Path(extract_dir) / "tmp"
+        # If tmp_dir exists, remove it
+        if tmp_dir.exists():
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+
         super()._extract_file(fname, tmp_dir)
 
         list_extracted_dirs = tmp_dir.iterdir()

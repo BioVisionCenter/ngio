@@ -127,7 +127,6 @@ class TableBackendProtocol(Protocol):
         self,
         table_data: DataFrame | AnnData | PolarsDataFrame | LazyFrame,
         metadata: dict[str, str] | None = None,
-        mode: Literal["pandas", "anndata", "polars"] | None = None,
     ) -> None:
         """This is a generic write method.
 

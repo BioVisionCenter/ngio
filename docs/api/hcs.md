@@ -1,6 +1,17 @@
-# ngio.hcs API documentation
+# HCS API Documentation
 
-!!! warning
-    Coming soon, ngio API documentation is not yet available.
-    If you have any questions please reach out to us on GitHub or via email.
-    We are happy to help you with any questions or issues you may have.
+## Open a Plate
+
+::: ngio.open_ome_zarr_plate
+
+## ngio.OmeZarrPlate Class Reference
+
+::: ngio.OmeZarrPlate
+
+## Open a Well
+
+::: ngio.open_ome_zarr_well
+
+## ngio.OmeZarrWell Class Reference
+
+::: ngio.OmeZarrWell

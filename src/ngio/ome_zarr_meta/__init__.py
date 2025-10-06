@@ -13,7 +13,7 @@ from ngio.ome_zarr_meta._meta_handlers import (
     get_well_meta_handler,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
-    AxesMapper,
+    AxesHandler,
     Dataset,
     ImageInWellPath,
     NgffVersions,
@@ -22,11 +22,12 @@ from ngio.ome_zarr_meta.ngio_specs import (
     NgioPlateMeta,
     NgioWellMeta,
     PixelSize,
+    build_canonical_axes_handler,
     path_in_well_validation,
 )
 
 __all__ = [
-    "AxesMapper",
+    "AxesHandler",
     "Dataset",
     "ImageInWellPath",
     "ImageMetaHandler",
@@ -40,6 +41,7 @@ __all__ = [
     "NgioPlateMeta",
     "NgioWellMeta",
     "PixelSize",
+    "build_canonical_axes_handler",
     "find_image_meta_handler",
     "find_label_meta_handler",
     "find_plate_meta_handler",

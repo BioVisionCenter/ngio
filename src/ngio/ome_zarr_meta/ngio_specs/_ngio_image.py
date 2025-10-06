@@ -6,7 +6,7 @@ But they can be built from the OME standard metadata, and the
 can be converted to the OME standard.
 """
 
-from collections.abc import Collection
+from collections.abc import Sequence
 from typing import Any, Literal, TypeVar
 
 import numpy as np
@@ -17,9 +17,9 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
-    canonical_axes,
+    build_canonical_axes_handler,
 )
-from ngio.ome_zarr_meta.ngio_specs._channels import Channel, ChannelsMeta
+from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.ome_zarr_meta.ngio_specs._dataset import Dataset
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError, NgioValueError
@@ -55,38 +55,39 @@ class AbstractNgioImageMeta:
             raise NgioValidationError("At least one dataset must be provided.")
 
         self._datasets = datasets
-        self._axes_mapper = datasets[0].axes_mapper
+        self._axes_handler = datasets[0].axes_handler
 
     def __repr__(self):
         class_name = type(self).__name__
         paths = [dataset.path for dataset in self.datasets]
-        on_disk_axes = self.axes_mapper.on_disk_axes_names
-        return f"{class_name}(name={self.name}, datasets={paths}, axes={on_disk_axes})"
+        axes = self.axes_handler.axes_names
+        return f"{class_name}(name={self.name}, datasets={paths}, axes={axes})"
 
     @classmethod
     def default_init(
         cls,
-        levels: int | Collection[str],
-        axes_names: Collection[str],
+        levels: int | Sequence[str],
+        axes_names: Sequence[str],
         pixel_size: PixelSize,
-        scaling_factors: Collection[float] | None = None,
+        scaling_factors: Sequence[float] | None = None,
         name: str | None = None,
         version: NgffVersions = DefaultNgffVersion,
     ):
         """Initialize the ImageMeta object."""
-        axes = canonical_axes(
+        axes_handler = build_canonical_axes_handler(
             axes_names,
-            space_units=pixel_size.space_unit,  # type: ignore[arg-type]
-            time_units=pixel_size.time_unit,  # type: ignore[arg-type]
+            space_units=pixel_size.space_unit,
+            time_units=pixel_size.time_unit,
         )
 
         px_size_dict = pixel_size.as_dict()
-        scale = [px_size_dict.get(ax.on_disk_name, 1.0) for ax in axes]
-        translation = [0.0] * len(scale)
+        scale = [px_size_dict.get(name, 1.0) for name in axes_handler.axes_names]
 
         if scaling_factors is None:
             _default = {"x": 2.0, "y": 2.0}
-            scaling_factors = [_default.get(ax.on_disk_name, 1.0) for ax in axes]
+            scaling_factors = [
+                _default.get(name, 1.0) for name in axes_handler.axes_names
+            ]
 
         if isinstance(levels, int):
             levels = [str(i) for i in range(levels)]
@@ -95,11 +96,9 @@ class AbstractNgioImageMeta:
         for level in levels:
             dataset = Dataset(
                 path=level,
-                on_disk_axes=axes,
-                on_disk_scale=scale,
-                on_disk_translation=translation,
-                allow_non_canonical_axes=False,
-                strict_canonical_order=True,
+                axes_handler=axes_handler,
+                scale=scale,
+                translation=None,
             )
             datasets.append(dataset)
             scale = [s * f for s, f in zip(scale, scaling_factors, strict=True)]
@@ -122,9 +121,18 @@ class AbstractNgioImageMeta:
             space_unit(str): The space unit to convert to.
             time_unit(str): The time unit to convert to.
         """
+        new_axes_handler = self.axes_handler.to_units(
+            space_unit=space_unit,
+            time_unit=time_unit,
+        )
         new_datasets = []
         for dataset in self.datasets:
-            new_dataset = dataset.to_units(space_unit=space_unit, time_unit=time_unit)
+            new_dataset = Dataset(
+                path=dataset.path,
+                axes_handler=new_axes_handler,
+                scale=dataset.scale,
+                translation=dataset.translation,
+            )
             new_datasets.append(new_dataset)
 
         return type(self)(
@@ -136,7 +144,7 @@ class AbstractNgioImageMeta:
     @property
     def version(self) -> NgffVersions:
         """Version of the OME-NFF metadata used to build the object."""
-        return self._version  # type: ignore[return-value]
+        return self._version  # type: ignore (version is a Literal type)
 
     @property
     def name(self) -> str | None:
@@ -149,9 +157,9 @@ class AbstractNgioImageMeta:
         return self._datasets
 
     @property
-    def axes_mapper(self):
+    def axes_handler(self):
         """Return the axes mapper."""
-        return self._axes_mapper
+        return self._axes_handler
 
     @property
     def levels(self) -> int:
@@ -166,12 +174,12 @@ class AbstractNgioImageMeta:
     @property
     def space_unit(self) -> str | None:
         """Get the space unit of the pixel size."""
-        return self.datasets[0].pixel_size.space_unit
+        return self.axes_handler.space_unit
 
     @property
     def time_unit(self) -> str | None:
         """Get the time unit of the pixel size."""
-        return self.datasets[0].pixel_size.time_unit
+        return self.axes_handler.time_unit
 
     def _get_dataset_by_path(self, path: str) -> Dataset:
         """Get a dataset by its path."""
@@ -321,11 +329,11 @@ class AbstractNgioImageMeta:
     def scaling_factor(self, path: str | None = None) -> list[float]:
         """Get the scaling factors from a dataset to its lower resolution."""
         if self.levels == 1:
-            return [1.0] * len(self.axes_mapper.on_disk_axes_names)
+            return [1.0] * len(self.axes_handler.axes_names)
         dataset, lr_dataset = self._get_closest_datasets(path=path)
 
         scaling_factors = []
-        for ax_name in self.axes_mapper.on_disk_axes_names:
+        for ax_name in self.axes_handler.axes_names:
             s_d = dataset.get_scale(ax_name)
             s_lr_d = lr_dataset.get_scale(ax_name)
             scaling_factors.append(s_lr_d / s_d)
@@ -359,8 +367,8 @@ class AbstractNgioImageMeta:
             return 1.0
         dataset, lr_dataset = self._get_closest_datasets(path=path)
 
-        s_d = dataset.get_scale("z")
-        s_lr_d = lr_dataset.get_scale("z")
+        s_d = dataset.get_scale("z", default=1.0)
+        s_lr_d = lr_dataset.get_scale("z", default=1.0)
         return s_lr_d / s_d
 
 
@@ -461,63 +469,6 @@ class NgioImageMeta(AbstractNgioImageMeta):
             data_type=data_type,
         )
         self.set_channels_meta(channels_meta=channels_meta)
-
-    @property
-    def channels(self) -> list[Channel]:
-        """Get the channels in the image."""
-        if self._channels_meta is None:
-            return []
-        assert self.channels_meta is not None
-        return self.channels_meta.channels
-
-    @property
-    def channel_labels(self) -> list[str]:
-        """Get the labels of the channels in the image."""
-        return [channel.label for channel in self.channels]
-
-    @property
-    def channel_wavelength_ids(self) -> list[str | None]:
-        """Get the wavelength IDs of the channels in the image."""
-        return [channel.wavelength_id for channel in self.channels]
-
-    def _get_channel_idx_by_label(self, label: str) -> int | None:
-        """Get the index of a channel by its label."""
-        if self._channels_meta is None:
-            return None
-
-        if label not in self.channel_labels:
-            raise NgioValueError(f"Channel with label {label} not found.")
-
-        return self.channel_labels.index(label)
-
-    def _get_channel_idx_by_wavelength_id(self, wavelength_id: str) -> int | None:
-        """Get the index of a channel by its wavelength ID."""
-        if self._channels_meta is None:
-            return None
-
-        if wavelength_id not in self.channel_wavelength_ids:
-            raise NgioValueError(
-                f"Channel with wavelength ID {wavelength_id} not found."
-            )
-
-        return self.channel_wavelength_ids.index(wavelength_id)
-
-    def get_channel_idx(
-        self, label: str | None = None, wavelength_id: str | None = None
-    ) -> int | None:
-        """Get the index of a channel by its label or wavelength ID."""
-        # Only one of the arguments must be provided
-        if sum([label is not None, wavelength_id is not None]) != 1:
-            raise NgioValueError("get_channel_idx must receive only one argument.")
-
-        if label is not None:
-            return self._get_channel_idx_by_label(label)
-        elif wavelength_id is not None:
-            return self._get_channel_idx_by_wavelength_id(wavelength_id)
-        else:
-            raise NgioValueError(
-                "get_channel_idx must receive either label or wavelength_id."
-            )
 
 
 NgioImageLabelMeta = NgioImageMeta | NgioLabelMeta

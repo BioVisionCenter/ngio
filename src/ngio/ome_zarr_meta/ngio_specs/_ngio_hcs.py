@@ -51,11 +51,11 @@ class CustomWellImage(WellImage04):
 
 
 class CustomWellMeta(WellMeta04):
-    images: list[CustomWellImage]  # type: ignore[valid-type]
+    images: list[CustomWellImage]  # type: ignore (override of WellMeta04.images)
 
 
 class CustomWellAttrs(WellAttrs04):
-    well: CustomWellMeta  # type: ignore[valid-type]
+    well: CustomWellMeta  # type: ignore (override of WellAttrs04.well)
 
 
 class NgioWellMeta(CustomWellAttrs):
@@ -531,7 +531,7 @@ class NgioPlateMeta(HCSAttrs):
             acquisitions = None
 
         if version is None:
-            version = self.plate.version  # type: ignore[assignment]
+            version = self.plate.version  # type: ignore (version is NgffVersions or None)
 
         return NgioPlateMeta(
             plate=Plate(

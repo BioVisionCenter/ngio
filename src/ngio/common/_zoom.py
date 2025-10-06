@@ -7,17 +7,29 @@ from scipy.ndimage import zoom as scipy_zoom
 
 from ngio.utils import NgioValueError
 
+InterpolationOrder = Literal["nearest", "linear", "cubic"]
+
+
+def order_to_int(order: InterpolationOrder | Literal[0, 1, 2]) -> Literal[0, 1, 2]:
+    if order == "nearest" or order == 0:
+        return 0
+    elif order == "linear" or order == 1:
+        return 1
+    elif order == "cubic" or order == 2:
+        return 2
+    else:
+        raise NgioValueError(f"Invalid order: {order}")
+
 
 def _stacked_zoom(x, zoom_y, zoom_x, order=1, mode="grid-constant", grid_mode=True):
     *rest, yshape, xshape = x.shape
     x = x.reshape(-1, yshape, xshape)
     scale_xy = (zoom_y, zoom_x)
-    x_out = np.stack(
-        [
-            scipy_zoom(x[i], scale_xy, order=order, mode=mode, grid_mode=True)
-            for i in range(x.shape[0])
-        ]
-    )
+    _x_out = [
+        scipy_zoom(x[i], scale_xy, order=order, mode=mode, grid_mode=grid_mode)
+        for i in range(x.shape[0])
+    ]
+    x_out = np.stack(_x_out)  # type: ignore (scipy_zoom returns np.ndarray, but type is not inferred correctly)
     return x_out.reshape(*rest, *x_out.shape[1:])
 
 
@@ -33,6 +45,10 @@ def fast_zoom(x, zoom, order=1, mode="grid-constant", grid_mode=True, auto_stack
          it stacks the first dimensions to call zoom only on the last two.
     """
     mask = np.isclose(x.shape, 1)
+    # Always keep the last two dimensions
+    # To avoid issues with singleton x or y dimensions
+    mask[-1] = False
+    mask[-2] = False
     zoom = np.array(zoom)
     singletons = tuple(np.where(mask)[0])
     xs = np.squeeze(x, axis=singletons)
@@ -45,13 +61,13 @@ def fast_zoom(x, zoom, order=1, mode="grid-constant", grid_mode=True, auto_stack
         )
     else:
         xs = scipy_zoom(xs, new_zoom, order=order, mode=mode, grid_mode=grid_mode)
-    x = np.expand_dims(xs, axis=singletons)
+    x = np.expand_dims(xs, axis=singletons)  # type: ignore (scipy_zoom returns np.ndarray, but type is not inferred correctly)
     return x
 
 
 def _zoom_inputs_check(
     source_array: np.ndarray | da.Array,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[int | float, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
 ) -> tuple[np.ndarray, tuple[int, ...]]:
     if scale is None and target_shape is None:
@@ -72,16 +88,22 @@ def _zoom_inputs_check(
         _target_shape = target_shape
     else:
         _scale = np.array(scale)
-        _target_shape = tuple(np.array(source_array.shape) * scale)
+        _target_shape = tuple(map(int, np.round(np.array(source_array.shape) * scale)))
+
+    if len(_scale) != source_array.ndim:
+        raise NgioValueError(
+            f"Cannot scale array of shape {source_array.shape} with factors {_scale}."
+            " Target shape must have the same number of dimensions as the source array."
+        )
 
     return _scale, _target_shape
 
 
 def dask_zoom(
     source_array: da.Array,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[float | int, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
 ) -> da.Array:
     """Dask implementation of zooming an array.
 
@@ -91,7 +113,8 @@ def dask_zoom(
         source_array (da.Array): The source array to zoom.
         scale (tuple[int, ...] | None): The scale factor to zoom by.
         target_shape (tuple[int, ...], None): The target shape to zoom to.
-        order (Literal[0, 1, 2]): The order of interpolation. Defaults to 1.
+        order (Literal["nearest", "linear", "cubic"]): The order of interpolation.
+            Defaults to "linear".
 
     Returns:
         da.Array: The zoomed array.
@@ -100,22 +123,25 @@ def dask_zoom(
     # https://github.com/ome/ome-zarr-py/blob/master/ome_zarr/dask_utils.py
     # The module was contributed by Andreas Eisenbarth @aeisenbarth
     # See https://github.com/toloudis/ome-zarr-py/pull/
-
     _scale, _target_shape = _zoom_inputs_check(
         source_array=source_array, scale=scale, target_shape=target_shape
     )
 
     # Rechunk to better match the scaling operation
-    source_chunks = np.array(source_array.chunksize)
+    source_chunks = np.array(source_array.chunksize)  # type: ignore (da.Array.chunksize is a tuple of ints)
     better_source_chunks = np.maximum(1, np.round(source_chunks * _scale) / _scale)
     better_source_chunks = better_source_chunks.astype(int)
-    source_array = source_array.rechunk(better_source_chunks)  # type: ignore
+    source_array = source_array.rechunk(better_source_chunks)  # type: ignore (better_source_chunks is a valid input for rechunk)
 
     # Calculate the block output shape
     block_output_shape = tuple(np.ceil(better_source_chunks * _scale).astype(int))
 
     zoom_wrapper = partial(
-        fast_zoom, zoom=_scale, order=order, mode="grid-constant", grid_mode=True
+        fast_zoom,
+        zoom=_scale,
+        order=order_to_int(order),
+        mode="grid-constant",
+        grid_mode=True,
     )
 
     out_array = da.map_blocks(
@@ -130,9 +156,9 @@ def dask_zoom(
 
 def numpy_zoom(
     source_array: np.ndarray,
-    scale: tuple[int, ...] | None = None,
+    scale: tuple[int | float, ...] | None = None,
     target_shape: tuple[int, ...] | None = None,
-    order: Literal[0, 1, 2] = 1,
+    order: InterpolationOrder = "linear",
 ) -> np.ndarray:
     """Numpy implementation of zooming an array.
 
@@ -152,7 +178,11 @@ def numpy_zoom(
     )
 
     out_array = fast_zoom(
-        source_array, zoom=_scale, order=order, mode="grid-constant", grid_mode=True
+        source_array,
+        zoom=_scale,
+        order=order_to_int(order),
+        mode="grid-constant",
+        grid_mode=True,
     )
     assert isinstance(out_array, np.ndarray)
     return out_array

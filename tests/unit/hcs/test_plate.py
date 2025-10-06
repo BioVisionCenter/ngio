@@ -200,8 +200,8 @@ def test_plate_table_aggregations(cardiomyocyte_small_mip_path: Path):
     roi_tables = ome_zarr_plate.list_image_tables(filter_types="roi_table")
     assert set(roi_tables) == {"FOV_ROI_table", "well_ROI_table"}
 
-    t1 = ome_zarr_plate.concatenate_image_tables(table_name="regionprops_DAPI")
+    t1 = ome_zarr_plate.concatenate_image_tables(name="regionprops_DAPI")
     t2 = asyncio.run(
-        ome_zarr_plate.concatenate_image_tables_async(table_name="regionprops_DAPI")
+        ome_zarr_plate.concatenate_image_tables_async(name="regionprops_DAPI")
     )
     pdt.assert_frame_equal(t1.dataframe, t2.dataframe)

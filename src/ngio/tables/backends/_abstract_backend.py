@@ -210,7 +210,6 @@ class AbstractTableBackend(ABC):
         self,
         table_data: TabularData,
         metadata: dict | None = None,
-        mode: Literal["pandas", "anndata", "polars"] | None = None,
     ) -> None:
         """Serialize the table to the store, and write the metadata.
 
@@ -218,11 +217,11 @@ class AbstractTableBackend(ABC):
         Based on the explicit mode or the type of the table,
         it will call the appropriate write method.
         """
-        if mode == "pandas" or isinstance(table_data, DataFrame):
-            self.write_from_pandas(table_data)  # type: ignore[arg-type]
-        elif mode == "anndata" or isinstance(table_data, AnnData):
-            self.write_from_anndata(table_data)  # type: ignore[arg-type]
-        elif mode == "polars" or isinstance(table_data, PolarsDataFrame | LazyFrame):
+        if isinstance(table_data, DataFrame):
+            self.write_from_pandas(table_data)
+        elif isinstance(table_data, AnnData):
+            self.write_from_anndata(table_data)
+        elif isinstance(table_data, PolarsDataFrame | LazyFrame):
             self.write_from_polars(table_data)
         else:
             raise NgioValueError(

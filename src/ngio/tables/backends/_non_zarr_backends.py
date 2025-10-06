@@ -80,7 +80,7 @@ class NonZarrBaseBackend(AbstractTableBackend):
         """Load the table from an FS store."""
         full_url = self._group_handler.full_url
         parquet_path = f"{full_url}/{self.table_name}"
-        store_fs = self._group_handler.store.fs  # type: ignore
+        store_fs = self._group_handler.store.fs  # type: ignore (in this context, store_fs is a fs.FSStore)
         with store_fs.open(parquet_path, "rb") as f:
             dataframe = reader(f)
         return dataframe
