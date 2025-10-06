@@ -1,13 +1,17 @@
 # Changelog
 
-## [v0.4.0a1]
+## [v0.4.0]
 
 ### Features
 
-- add support for time in rois and roi-tables
+- Add Iterators for image processing pipelines
+- Add support for time in rois and roi-tables
 - Building masking roi tables expanded to time series data
-- add experimental support for Iterators
-- add support for rescaling on-the-fly masks for masked images
+- Add zoom transformation
+- Add support for rescaling on-the-fly masks for masked images
+- Big refactor of the io pipeline to support iterators and lazy loading
+- Add support for customize dimension separators and compression codecs
+- Simplify AxesHandler and Dataset Classes
 
 ### API Changes
 
@@ -19,15 +23,12 @@
 - Image like objects now have a more clean API to load data. Instead of `get_array` and `set_array`, they now use `get_as_numpy`, and `get_as_dask` for delayed arrays.
 - Also for `get_roi` now specific methods are available. For ROI objects, the `get_roi_as_numpy`, and `get_roi_as_dask` methods.
 - Table ops moved to `ngio.images`
-- Make `label` an explicit attribute in `Roi` objects.
+- int `label` as an explicit attribute in `Roi` objects (previously only in stored in name and relying on convention)
+- Slight changes to `Image` and `Label` objects. Some minor attributes have been renamed for consistency.
 
 ### Table specs
 
-- add `t_second` and `len_t_second` to ROI tables and masking ROI tables
-
-### Bug Fixes
-
-- improve type consistency and remove non-necessary "type: ignore"
+- Add `t_second` and `len_t_second` to ROI tables and masking ROI tables
 
 ## [v0.3.5]
 

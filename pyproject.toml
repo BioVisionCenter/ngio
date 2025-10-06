@@ -43,7 +43,7 @@ dependencies = [
     "aiohttp",
     "dask[array]",
     "dask[distributed]",
-    "xarray",
+    # "xarray", still not used
     "ome-zarr-models",
     "pooch",
     "polars",
