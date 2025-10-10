@@ -14,6 +14,7 @@ from ngio.common import (
     RoiPixels,
     consolidate_pyramid,
 )
+from ngio.common._roi import RoiSlice
 from ngio.io_pipes import (
     DaskGetter,
     DaskRoiGetter,
@@ -444,23 +445,20 @@ class AbstractImage(Generic[_image_handler]):
 
     def roi(self, name: str | None = "image") -> Roi:
         """Return the ROI covering the entire image."""
-        dim_x = self.dimensions.get("x")
-        dim_y = self.dimensions.get("y")
-        assert dim_x is not None and dim_y is not None
+        dim_x = self.dimensions.get("x", default=1)
+        x = RoiSlice(start=0, length=dim_x)
+        dim_y = self.dimensions.get("y", default=1)
+        y = RoiSlice(start=0, length=dim_y)
         dim_z = self.dimensions.get("z")
-        z = None if dim_z is None else 0
+        z = RoiSlice(start=0, length=dim_z) if dim_z is not None else None
         dim_t = self.dimensions.get("t")
-        t = None if dim_t is None else 0
+        t = RoiSlice(start=0, length=dim_t) if dim_t is not None else None
         roi_px = RoiPixels(
             name=name,
-            x=0,
-            y=0,
+            x=x,
+            y=y,
             z=z,
             t=t,
-            x_length=dim_x,
-            y_length=dim_y,
-            z_length=dim_z,
-            t_length=dim_t,
         )
         return roi_px.to_roi(pixel_size=self.pixel_size)
 

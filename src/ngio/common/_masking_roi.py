@@ -7,7 +7,7 @@ import numpy as np
 import scipy.ndimage as ndi
 from dask.delayed import delayed
 
-from ngio.common._roi import Roi, RoiPixels
+from ngio.common._roi import Roi, RoiPixels, RoiSlice
 from ngio.ome_zarr_meta import PixelSize
 from ngio.utils import NgioValueError
 
@@ -135,49 +135,28 @@ def compute_masking_roi(
     rois = []
     for label, slice_ in slices.items():
         if len(slice_) == 2:
-            min_t, max_t = None, None
-            min_z, max_z = None, None
-            min_y, min_x = slice_[0].start, slice_[1].start
-            max_y, max_x = slice_[0].stop, slice_[1].stop
+            t, z = None, None
+            y = RoiSlice.from_slice(slice_[0])
+            x = RoiSlice.from_slice(slice_[1])
         elif len(slice_) == 3:
-            min_t, max_t = None, None
-            min_z, min_y, min_x = slice_[0].start, slice_[1].start, slice_[2].start
-            max_z, max_y, max_x = slice_[0].stop, slice_[1].stop, slice_[2].stop
+            t = None
+            z = RoiSlice.from_slice(slice_[0])
+            y = RoiSlice.from_slice(slice_[1])
+            x = RoiSlice.from_slice(slice_[2])
         elif len(slice_) == 4:
-            min_t, min_z, min_y, min_x = (
-                slice_[0].start,
-                slice_[1].start,
-                slice_[2].start,
-                slice_[3].start,
-            )
-            max_t, max_z, max_y, max_x = (
-                slice_[0].stop,
-                slice_[1].stop,
-                slice_[2].stop,
-                slice_[3].stop,
-            )
+            t = RoiSlice.from_slice(slice_[0])
+            z = RoiSlice.from_slice(slice_[1])
+            y = RoiSlice.from_slice(slice_[2])
+            x = RoiSlice.from_slice(slice_[3])
         else:
             raise ValueError("Invalid slice length.")
 
-        if max_t is None:
-            t_length = None
-        else:
-            t_length = max_t - min_t
-
-        if max_z is None:
-            z_length = None
-        else:
-            z_length = max_z - min_z
-
         roi = RoiPixels(
             name=str(label),
-            x_length=max_x - min_x,
-            y_length=max_y - min_y,
-            z_length=z_length,
-            t_length=t_length,
-            x=min_x,
-            y=min_y,
-            z=min_z,
+            x=x,
+            y=y,
+            z=z,
+            t=t,
             label=label,
         )
 

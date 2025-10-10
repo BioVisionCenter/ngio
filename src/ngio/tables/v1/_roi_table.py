@@ -12,6 +12,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from ngio.common import Roi
+from ngio.common._roi import RoiSlice
 from ngio.tables._abstract_table import (
     AbstractBaseTable,
     TabularData,
@@ -80,6 +81,24 @@ def _check_optional_columns(col_name: str) -> None:
         ngio_warn(f"Column {col_name} is not in the optional columns.")
 
 
+def to_roi_slice(start, length, ax_name: str) -> RoiSlice | None:
+    """Convert start and length to a RoiSlice."""
+    if start is None and length is None:
+        return None
+
+    if start is None:
+        raise NgioValueError(
+            f"Starting point is None for axis {ax_name}, but length is not None."
+        )
+
+    if length is None:
+        raise NgioValueError(
+            f"Length is None for axis {ax_name}, but starting point is not None."
+        )
+
+    return RoiSlice(start=start, length=length)
+
+
 def _dataframe_to_rois(
     dataframe: pd.DataFrame,
     required_columns: list[str] = REQUIRED_COLUMNS,
@@ -109,11 +128,23 @@ def _dataframe_to_rois(
         if len(extra_columns) > 0:
             extras = {col: getattr(row, col, None) for col in extra_columns}
 
+        x = RoiSlice(
+            start=row.x_micrometer,  # type: ignore (type can not be known here)
+            length=row.len_x_micrometer,  # type: ignore (type can not be known here)
+        )
+
+        y = RoiSlice(
+            start=row.y_micrometer,  # type: ignore (type can not be known here)
+            length=row.len_y_micrometer,  # type: ignore (type can not be known here)
+        )
+
         z_micrometer = getattr(row, "z_micrometer", None)
         z_length_micrometer = getattr(row, "len_z_micrometer", None)
+        z = to_roi_slice(start=z_micrometer, length=z_length_micrometer, ax_name="z")
 
         t_second = getattr(row, "t_second", None)
         t_length_second = getattr(row, "len_t_second", None)
+        t = to_roi_slice(start=t_second, length=t_length_second, ax_name="t")
 
         if label_is_index:
             label = int(row.Index)  # type: ignore (type can not be known here, but should be castable to int)
@@ -122,14 +153,10 @@ def _dataframe_to_rois(
 
         roi = Roi(
             name=str(row.Index),
-            x=row.x_micrometer,  # type: ignore (type can not be known here)
-            y=row.y_micrometer,  # type: ignore (type can not be known here)
-            z=z_micrometer,
-            t=t_second,
-            x_length=row.len_x_micrometer,  # type: ignore (type can not be known here)
-            y_length=row.len_y_micrometer,  # type: ignore (type can not be known here)
-            z_length=z_length_micrometer,
-            t_length=t_length_second,
+            x=x,
+            y=y,
+            z=z,
+            t=t,
             unit="micrometer",
             label=label,
             **extras,
@@ -143,24 +170,27 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
     data = []
     for roi in rois.values():
         # This normalization is necessary for backward compatibility
-        z_micrometer = roi.z if roi.z is not None else 0.0
-        len_z_micrometer = roi.z_length if roi.z_length is not None else 1.0
+
+        if roi.z is None:
+            z_micrometer = 0
+            len_z_micrometer = 1
+        else:
+            z_micrometer = roi.z.start
+            len_z_micrometer = roi.z.length
 
         row = {
             index_key: roi.get_name(),
-            "x_micrometer": roi.x,
-            "y_micrometer": roi.y,
+            "x_micrometer": roi.x.start,
+            "y_micrometer": roi.y.start,
             "z_micrometer": z_micrometer,
-            "len_x_micrometer": roi.x_length,
-            "len_y_micrometer": roi.y_length,
+            "len_x_micrometer": roi.x.length,
+            "len_y_micrometer": roi.y.length,
             "len_z_micrometer": len_z_micrometer,
         }
 
         if roi.t is not None:
-            row["t_second"] = roi.t
-
-        if roi.t_length is not None:
-            row["len_t_second"] = roi.t_length
+            row["t_second"] = roi.t.start
+            row["len_t_second"] = roi.t.length
 
         if roi.label is not None and index_key != "label":
             row["label"] = roi.label

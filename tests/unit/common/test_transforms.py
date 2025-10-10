@@ -24,7 +24,7 @@ def test_zoom_from_dimensions(tmp_path: Path):
         target_image=full_res_img,
         order="nearest",
     )
-    roi = Roi(name=None, x=0, y=0, x_length=21, y_length=21)
+    roi = Roi.from_values(name=None, x=(0, 21), y=(0, 21))
 
     full_res_data = full_res_img.get_roi_as_numpy(roi=roi)
     rescaled_data = img.get_roi_as_numpy(roi=roi, transforms=[zoom])
@@ -34,7 +34,7 @@ def test_zoom_from_dimensions(tmp_path: Path):
     except Exception as e:
         raise AssertionError(f"Failed inbound test: {e}") from e
 
-    roi = Roi(name=None, x=80, y=80, x_length=21, y_length=21)
+    roi = Roi.from_values(name=None, x=(80, 21), y=(80, 21))
 
     full_res_data = full_res_img.get_roi_as_numpy(roi=roi)
     rescaled_data = img.get_roi_as_numpy(roi=roi, transforms=[zoom])
