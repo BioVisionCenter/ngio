@@ -26,7 +26,7 @@ def test_basic_rois_ops():
     assert roi.__str__()
     assert roi.__repr__()
 
-    assert raster_roi.to_slicing_dict() == {
+    assert raster_roi.to_slicing_dict(pixel_size=pixel_size) == {
         "x": slice(0, 1),
         "y": slice(0, 1),
         "z": slice(0, 1),
@@ -49,7 +49,7 @@ def test_basic_rois_ops():
     with pytest.raises(ValueError):
         roi.zoom(-1.0)
 
-    assert roi_zoomed.to_roi_pixels(pixel_size).to_slicing_dict() == {
+    assert roi_zoomed.to_slicing_dict(pixel_size) == {
         "x": slice(0, 2),
         "y": slice(0, 2),
         "z": slice(0, 1),

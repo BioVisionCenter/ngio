@@ -102,6 +102,9 @@ class GenericRoi(BaseModel):
     def __str__(self) -> str:
         return self._nice_str()
 
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
+        raise NotImplementedError
+
 
 def _1d_intersection(
     a: T | None, a_length: T | None, b: T | None, b_length: T | None
@@ -263,6 +266,11 @@ class Roi(GenericRoi):
         """
         return zoom_roi(self, zoom_factor)
 
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
+        """Convert to a slicing dictionary."""
+        roi_pixels = self.to_roi_pixels(pixel_size)
+        return roi_pixels.to_slicing_dict(pixel_size)
+
 
 class RoiPixels(GenericRoi):
     """Region of interest (ROI) in pixel coordinates."""
@@ -314,7 +322,7 @@ class RoiPixels(GenericRoi):
             **extra_dict,
         )
 
-    def to_slicing_dict(self) -> dict[str, slice]:
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
         """Convert to a slicing dictionary."""
         x_slice = _to_slice(self.x, self.x_length)
         y_slice = _to_slice(self.y, self.y_length)
