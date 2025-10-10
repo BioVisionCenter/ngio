@@ -60,16 +60,28 @@ class GenericRoi(BaseModel):
 
     def _nice_str(self) -> str:
         if self.t is not None:
-            t_str = f"t={self.t}->{self.t_length}"
+            t_start = self.t
         else:
-            t_str = "t=None"
-        if self.z is not None:
-            z_str = f"z={self.z}->{self.z_length}"
+            t_start = None
+        if self.t_length is not None and t_start is not None:
+            t_end = t_start + self.t_length
         else:
-            z_str = "z=None"
+            t_end = None
 
-        y_str = f"y={self.y}->{self.y_length}"
-        x_str = f"x={self.x}->{self.x_length}"
+        t_str = f"t={t_start}->{t_end}"
+
+        if self.z is not None:
+            z_start = self.z
+        else:
+            z_start = None
+        if self.z_length is not None and z_start is not None:
+            z_end = z_start + self.z_length
+        else:
+            z_end = None
+        z_str = f"z={z_start}->{z_end}"
+
+        y_str = f"y={self.y}->{self.y + self.y_length}"
+        x_str = f"x={self.x}->{self.x + self.x_length}"
 
         if self.label is not None:
             label_str = f", label={self.label}"
