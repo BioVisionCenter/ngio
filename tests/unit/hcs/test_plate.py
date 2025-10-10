@@ -168,7 +168,7 @@ def test_tables_api(tmp_path: Path):
     test_plate.add_table("test_table", test_table, backend="csv")
 
     test_roi_table = RoiTable(
-        rois=[Roi(name="roi_1", x_length=10, y_length=10, z_length=10)]  # type: ignore
+        rois=[Roi.from_values(name="roi_1", x=(0, 10), y=(0, 10), z=(0, 10))]  # type: ignore
     )
     test_plate.add_table("test_roi_table", test_roi_table)
     assert test_plate.list_tables() == ["test_table", "test_roi_table"]

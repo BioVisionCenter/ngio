@@ -4,7 +4,7 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 
-from typing import TypeVar
+from typing import Self
 from warnings import warn
 
 from pydantic import BaseModel, ConfigDict
@@ -14,45 +14,109 @@ from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnit
 from ngio.utils import NgioValueError
 
 
-def _to_raster(value: float, length: float, pixel_size: float) -> tuple[float, float]:
-    raster_value = value / pixel_size
-    raster_length = length / pixel_size
-    return raster_value, raster_length
+class RoiSlice(BaseModel):
+    """A slice of a ROI along a single dimension."""
 
+    start: float
+    length: float
 
-def _to_slice(start: float | None, length: float | None) -> slice:
-    if length is not None:
-        assert start is not None
-        end = start + length
-    else:
-        end = None
-    return slice(start, end)
+    model_config = ConfigDict(extra="forbid")
 
+    @classmethod
+    def from_slice(cls, slice_: slice) -> "RoiSlice":
+        """Create a RoiSlice from a slice object."""
+        if slice_.start is None or slice_.stop is None:
+            raise NgioValueError("Cannot create RoiSlice from open-ended slice.")
+        start = float(slice_.start)
+        length = float(slice_.stop - slice_.start)
+        return cls(start=start, length=length)
 
-def _to_world(value: int | float, pixel_size: float) -> float:
-    """Convert to world coordinates."""
-    return value * pixel_size
+    @classmethod
+    def from_tuple(cls, tup: tuple[float, float]) -> "RoiSlice":
+        """Create a RoiSlice from a tuple of (start, length)."""
+        if len(tup) != 2:
+            raise NgioValueError("Tuple must be of length 2 (start, length).")
+        start, length = tup
+        return cls(start=start, length=length)
 
+    @property
+    def end(self) -> float:
+        """Get the end of the slice."""
+        return self.start + self.length
 
-T = TypeVar("T", int, float)
+    def to_slice(self) -> slice:
+        """Convert to a slice object."""
+        return slice(self.start, self.end)
+
+    def to_pixel(self, pixel_size: float) -> "RoiSlice":
+        """Convert to pixel coordinates."""
+        raster_start = self.start / pixel_size
+        raster_length = self.length / pixel_size
+        return RoiSlice(start=raster_start, length=raster_length)
+
+    def to_world(self, pixel_size: float) -> "RoiSlice":
+        """Convert to world coordinates."""
+        world_start = self.start * pixel_size
+        world_length = self.length * pixel_size
+        return RoiSlice(start=world_start, length=world_length)
+
+    def intersects(self, other: "RoiSlice") -> "RoiSlice | None":
+        """Check if this slice intersects with another slice."""
+        start = max(self.start, other.start)
+        end = min(self.end, other.end)
+        length = end - start
+        if length <= 0:
+            # No intersection
+            return None
+        return RoiSlice(start=start, length=length)
+
+    def union(self, other: "RoiSlice") -> "RoiSlice":
+        """Calculate the union of this slice with another slice."""
+        start = min(self.start, other.start)
+        end = max(self.end, other.end)
+        length = end - start
+        return RoiSlice(start=start, length=length)
+
+    def __repr__(self) -> str:
+        return f"{self.start}->{self.end}"
 
 
 class GenericRoi(BaseModel):
     """A generic Region of Interest (ROI) model."""
 
     name: str | None = None
-    x: float
-    y: float
-    z: float | None = None
-    t: float | None = None
-    x_length: float
-    y_length: float
-    z_length: float | None = None
-    t_length: float | None = None
+    x: RoiSlice
+    y: RoiSlice
+    z: RoiSlice | None = None
+    t: RoiSlice | None = None
     label: int | None = None
     unit: SpaceUnits | str | None = None
 
     model_config = ConfigDict(extra="allow")
+
+    @classmethod
+    def from_values(
+        cls,
+        x: tuple[float, float],
+        y: tuple[float, float],
+        z: tuple[float, float] | None = None,
+        t: tuple[float, float] | None = None,
+        name: str | None = None,
+        label: int | None = None,
+        unit: SpaceUnits | str | None = None,
+        **extras,
+    ) -> Self:
+        """Create a GenericRoi from individual values."""
+        return cls(
+            name=name,
+            x=RoiSlice.from_tuple(x),
+            y=RoiSlice.from_tuple(y),
+            z=RoiSlice.from_tuple(z) if z is not None else None,
+            t=RoiSlice.from_tuple(t) if t is not None else None,
+            label=label,
+            unit=unit,
+            **extras,
+        )
 
     def intersection(self, other: "GenericRoi") -> "GenericRoi | None":
         """Calculate the intersection of this ROI with another ROI."""
@@ -63,36 +127,21 @@ class GenericRoi(BaseModel):
         return roi_union(self, other)
 
     def _nice_str(self) -> str:
-        if self.t is not None:
-            t_start = self.t
-        else:
-            t_start = None
-        if self.t_length is not None and t_start is not None:
-            t_end = t_start + self.t_length
-        else:
-            t_end = None
-
-        t_str = f"t={t_start}->{t_end}"
-
-        if self.z is not None:
-            z_start = self.z
-        else:
-            z_start = None
-        if self.z_length is not None and z_start is not None:
-            z_end = z_start + self.z_length
-        else:
-            z_end = None
-        z_str = f"z={z_start}->{z_end}"
-
-        y_str = f"y={self.y}->{self.y + self.y_length}"
-        x_str = f"x={self.x}->{self.x + self.x_length}"
-
-        if self.label is not None:
-            label_str = f", label={self.label}"
-        else:
-            label_str = ""
         cls_name = self.__class__.__name__
-        return f"{cls_name}({t_str}, {z_str}, {y_str}, {x_str}{label_str})"
+        name_str = f"name={self.name}, "
+
+        t_str = f"t={self.t}, "
+        z_str = f"z={self.z}, "
+        y_str = f"y={self.y}, "
+        x_str = f"x={self.x}, "
+
+        roi_repr = f"{cls_name}({name_str}{t_str}{z_str}{y_str}{x_str}"
+        if self.label is not None:
+            roi_repr = f"{roi_repr}label={self.label})"
+        else:
+            roi_repr = f"{roi_repr})"
+
+        return roi_repr
 
     def get_name(self) -> str:
         """Get the name of the ROI, or a default if not set."""
@@ -129,33 +178,26 @@ def _label_safe_union(label1: int | None, label2: int | None) -> int | None:
     return label1 or label2
 
 
-def _1d_intersection(
-    a: T | None, a_length: T | None, b: T | None, b_length: T | None
-) -> tuple[T | None, T | None]:
+def _1d_intersection(a: RoiSlice | None, b: RoiSlice | None) -> RoiSlice | None:
     """Calculate the intersection of two 1D intervals."""
+    if a is None and b is None:
+        return None
     if a is None:
-        if b is not None and b_length is not None:
-            return b, b_length
-        return None, None
+        return b
     if b is None:
-        if a is not None and a_length is not None:
-            return a, a_length
-        return None, None
+        return a
+    return a.intersects(b)
 
-    assert (
-        a is not None
-        and a_length is not None
-        and b is not None
-        and b_length is not None
-    )
-    start = max(a, b)
-    end = min(a + a_length, b + b_length)
-    length = end - start
 
-    if length <= 0:
-        return None, None
-
-    return start, length
+def _1d_union(a: RoiSlice | None, b: RoiSlice | None) -> RoiSlice | None:
+    """Calculate the union of two 1D intervals."""
+    if a is None and b is None:
+        return None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return a.union(b)
 
 
 def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi | None:
@@ -169,34 +211,17 @@ def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi |
             "Cannot calculate intersection of ROIs with different units."
         )
 
-    x, x_length = _1d_intersection(
-        ref_roi.x, ref_roi.x_length, other_roi.x, other_roi.x_length
-    )
-    if x is None and x_length is None:
+    x = ref_roi.x.intersects(other_roi.x)
+    if x is None:
         # No intersection
         return None
-    assert x is not None and x_length is not None
-
-    y, y_length = _1d_intersection(
-        ref_roi.y, ref_roi.y_length, other_roi.y, other_roi.y_length
-    )
-    if y is None and y_length is None:
+    y = ref_roi.y.intersects(other_roi.y)
+    if y is None:
         # No intersection
         return None
-    assert y is not None and y_length is not None
 
-    z, z_length = _1d_intersection(
-        ref_roi.z, ref_roi.z_length, other_roi.z, other_roi.z_length
-    )
-    t, t_length = _1d_intersection(
-        ref_roi.t, ref_roi.t_length, other_roi.t, other_roi.t_length
-    )
-
-    if (z_length is not None and z_length <= 0) or (
-        t_length is not None and t_length <= 0
-    ):
-        # No intersection
-        return None
+    z = _1d_intersection(ref_roi.z, other_roi.z)
+    t = _1d_intersection(ref_roi.t, other_roi.t)
 
     # Find label
     label = _label_safe_union(ref_roi.label, other_roi.label)
@@ -209,30 +234,9 @@ def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi |
         y=y,
         z=z,
         t=t,
-        x_length=x_length,
-        y_length=y_length,
-        z_length=z_length,
-        t_length=t_length,
         unit=ref_roi.unit,
         label=label,
     )
-
-
-def _1d_union(
-    a: T | None, a_length: T | None, b: T | None, b_length: T | None
-) -> tuple[T | None, T | None]:
-    """Calculate the union of two 1D intervals."""
-    _a = a or 0
-    _b = b or 0
-    start = min(_a, _b)
-
-    if a_length is None or b_length is None:
-        length = None
-    else:
-        end = max(_a + a_length, _b + b_length)
-        length = end - start
-
-    return start, length
 
 
 def roi_union(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi:
@@ -245,32 +249,10 @@ def roi_union(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi:
         raise NgioValueError(
             "Cannot calculate intersection of ROIs with different units."
         )
-    x_start, x_length = _1d_union(
-        a=ref_roi.x,
-        a_length=ref_roi.x_length,
-        b=other_roi.x,
-        b_length=other_roi.x_length,
-    )
-    assert x_start is not None and x_length is not None
-    y_start, y_length = _1d_union(
-        a=ref_roi.y,
-        a_length=ref_roi.y_length,
-        b=other_roi.y,
-        b_length=other_roi.y_length,
-    )
-    assert y_start is not None and y_length is not None
-    z_start, z_length = _1d_union(
-        a=ref_roi.z,
-        a_length=ref_roi.z_length,
-        b=other_roi.z,
-        b_length=other_roi.z_length,
-    )
-    t_start, t_length = _1d_union(
-        a=ref_roi.t,
-        a_length=ref_roi.t_length,
-        b=other_roi.t,
-        b_length=other_roi.t_length,
-    )
+    x = ref_roi.x.union(other_roi.x)
+    y = ref_roi.y.union(other_roi.y)
+    z = _1d_union(ref_roi.z, other_roi.z)
+    t = _1d_union(ref_roi.t, other_roi.t)
 
     # Find label
     label = _label_safe_union(ref_roi.label, other_roi.label)
@@ -279,40 +261,26 @@ def roi_union(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi:
     cls_ref = ref_roi.__class__
     return cls_ref(
         name=name,
-        x=x_start,
-        y=y_start,
-        z=z_start,
-        t=t_start,
-        x_length=x_length,
-        y_length=y_length,
-        z_length=z_length,
-        t_length=t_length,
+        x=x,
+        y=y,
+        z=z,
+        t=t,
         unit=ref_roi.unit,
         label=label,
     )
 
 
 class Roi(GenericRoi):
-    x: float = 0.0
-    y: float = 0.0
     unit: SpaceUnits | str | None = DefaultSpaceUnit
 
     def to_roi_pixels(self, pixel_size: PixelSize) -> "RoiPixels":
         """Convert to raster coordinates."""
-        x, x_length = _to_raster(self.x, self.x_length, pixel_size.x)
-        y, y_length = _to_raster(self.y, self.y_length, pixel_size.y)
+        x = self.x.to_pixel(pixel_size.x)
+        y = self.y.to_pixel(pixel_size.y)
 
-        if self.z is None:
-            z, z_length = None, None
-        else:
-            assert self.z_length is not None
-            z, z_length = _to_raster(self.z, self.z_length, pixel_size.z)
+        z = self.z.to_pixel(pixel_size.z) if self.z else None
+        t = self.t.to_pixel(pixel_size.t) if self.t else None
 
-        if self.t is None:
-            t, t_length = None, None
-        else:
-            assert self.t_length is not None
-            t, t_length = _to_raster(self.t, self.t_length, pixel_size.t)
         extra_dict = self.model_extra if self.model_extra else {}
 
         return RoiPixels(
@@ -321,10 +289,6 @@ class Roi(GenericRoi):
             y=y,
             z=z,
             t=t,
-            x_length=x_length,
-            y_length=y_length,
-            z_length=z_length,
-            t_length=t_length,
             label=self.label,
             unit=self.unit,
             **extra_dict,
@@ -363,37 +327,14 @@ class Roi(GenericRoi):
 class RoiPixels(GenericRoi):
     """Region of interest (ROI) in pixel coordinates."""
 
-    x: float = 0
-    y: float = 0
     unit: SpaceUnits | str | None = None
 
     def to_roi(self, pixel_size: PixelSize) -> "Roi":
         """Convert to raster coordinates."""
-        x = _to_world(self.x, pixel_size.x)
-        x_length = _to_world(self.x_length, pixel_size.x)
-        y = _to_world(self.y, pixel_size.y)
-        y_length = _to_world(self.y_length, pixel_size.y)
-
-        if self.z is None:
-            z = None
-        else:
-            z = _to_world(self.z, pixel_size.z)
-
-        if self.z_length is None:
-            z_length = None
-        else:
-            z_length = _to_world(self.z_length, pixel_size.z)
-
-        if self.t is None:
-            t = None
-        else:
-            t = _to_world(self.t, pixel_size.t)
-
-        if self.t_length is None:
-            t_length = None
-        else:
-            t_length = _to_world(self.t_length, pixel_size.t)
-
+        x = self.x.to_world(pixel_size.x)
+        y = self.y.to_world(pixel_size.y)
+        z = self.z.to_world(pixel_size.z) if self.z else None
+        t = self.t.to_world(pixel_size.t) if self.t else None
         extra_dict = self.model_extra if self.model_extra else {}
         return Roi(
             name=self.name,
@@ -401,10 +342,6 @@ class RoiPixels(GenericRoi):
             y=y,
             z=z,
             t=t,
-            x_length=x_length,
-            y_length=y_length,
-            z_length=z_length,
-            t_length=t_length,
             label=self.label,
             unit=self.unit,
             **extra_dict,
@@ -412,10 +349,10 @@ class RoiPixels(GenericRoi):
 
     def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
         """Convert to a slicing dictionary."""
-        x_slice = _to_slice(self.x, self.x_length)
-        y_slice = _to_slice(self.y, self.y_length)
-        z_slice = _to_slice(self.z, self.z_length)
-        t_slice = _to_slice(self.t, self.t_length)
+        x_slice = self.x.to_slice()
+        y_slice = self.y.to_slice()
+        z_slice = self.z.to_slice() if self.z else slice(None)
+        t_slice = self.t.to_slice() if self.t else slice(None)
         return {
             "x": x_slice,
             "y": y_slice,
@@ -440,11 +377,16 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
     # the zoom factor needs to be rescaled
     # from the range [-1, inf) to [0, inf)
     zoom_factor -= 1
-    diff_x = roi.x_length * zoom_factor
-    diff_y = roi.y_length * zoom_factor
+    x_start, x_length = roi.x.start, roi.x.length
+    y_start, y_length = roi.y.start, roi.y.length
+    diff_x = x_length * zoom_factor
+    diff_y = y_length * zoom_factor
 
-    new_x = max(roi.x - diff_x / 2, 0)
-    new_y = max(roi.y - diff_y / 2, 0)
+    new_x_start = max(x_start - diff_x / 2, 0)
+    new_y_start = max(y_start - diff_y / 2, 0)
+
+    new_x = RoiSlice(start=new_x_start, length=x_length + diff_x)
+    new_y = RoiSlice(start=new_y_start, length=y_length + diff_y)
 
     new_roi = Roi(
         name=roi.name,
@@ -452,10 +394,6 @@ def zoom_roi(roi: Roi, zoom_factor: float = 1) -> Roi:
         y=new_y,
         z=roi.z,
         t=roi.t,
-        x_length=roi.x_length + diff_x,
-        y_length=roi.y_length + diff_y,
-        z_length=roi.z_length,
-        t_length=roi.t_length,
         label=roi.label,
         unit=roi.unit,
     )

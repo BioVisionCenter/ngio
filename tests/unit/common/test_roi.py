@@ -1,25 +1,22 @@
 import pytest
 
 from ngio import PixelSize
-from ngio.common import Roi
+from ngio.common import Roi, RoiSlice
 from ngio.utils import NgioValueError
 
 
 def test_basic_rois_ops():
     roi = Roi(
         name="test",
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        x_length=1.0,
-        y_length=1.0,
-        z_length=1.0,
+        x=RoiSlice(start=0.0, length=1.0),
+        y=RoiSlice(start=0.0, length=1.0),
+        z=RoiSlice(start=0.0, length=1.0),
         label=1,
-        unit="micrometer",  # type: ignore
+        unit="micrometer",
         other="other",  # type: ignore
     )
 
-    assert roi.x == 0.0
+    assert roi.x.start == 0.0
 
     pixel_size = PixelSize(x=1.0, y=1.0, z=1.0)
     raster_roi = roi.to_roi_pixels(pixel_size)
@@ -36,13 +33,15 @@ def test_basic_rois_ops():
     assert roi.model_extra["other"] == "other"
 
     world_roi_2 = raster_roi.to_roi(pixel_size)
+    assert world_roi_2.z is not None
 
-    assert world_roi_2.x == 0.0
-    assert world_roi_2.y == 0.0
-    assert world_roi_2.z == 0.0
-    assert world_roi_2.x_length == 1.0
-    assert world_roi_2.y_length == 1.0
-    assert world_roi_2.z_length == 1.0
+    assert world_roi_2.x.start == 0.0
+    assert world_roi_2.y.start == 0.0
+    assert world_roi_2.z.start == 0.0
+
+    assert world_roi_2.x.length == 1.0
+    assert world_roi_2.y.length == 1.0
+    assert world_roi_2.z.length == 1.0
     assert world_roi_2.other == "other"  # type: ignore
 
     roi_zoomed = roi.zoom(2.0)
@@ -58,12 +57,9 @@ def test_basic_rois_ops():
 
     roi2 = Roi(
         name="test2",
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        x_length=1.0,
-        y_length=1.0,
-        z_length=1.0,
+        x=RoiSlice(start=0, length=1.0),
+        y=RoiSlice(start=0, length=1.0),
+        z=RoiSlice(start=0, length=1.0),
         unit="micrometer",  # type: ignore
         label=1,
     )
@@ -83,33 +79,24 @@ def test_basic_rois_ops():
             # Basic intersection
             Roi(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=0.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                x=RoiSlice(start=0.0, length=1.0),
+                y=RoiSlice(start=0.0, length=1.0),
+                z=RoiSlice(start=0.0, length=1.0),
+                unit="micrometer",
             ),
             Roi(
                 name="other",
-                x=0.5,
-                y=0.5,
-                z=0.5,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                x=RoiSlice(start=0.5, length=1.0),
+                y=RoiSlice(start=0.5, length=1.0),
+                z=RoiSlice(start=0.5, length=1.0),
+                unit="micrometer",
             ),
             Roi(
                 name="ref:other",
-                x=0.5,
-                y=0.5,
-                z=0.5,
-                x_length=0.5,
-                y_length=0.5,
-                z_length=0.5,
-                unit="micrometer",  # type: ignore
+                x=RoiSlice(start=0.5, length=0.5),
+                y=RoiSlice(start=0.5, length=0.5),
+                z=RoiSlice(start=0.5, length=0.5),
+                unit="micrometer",
             ),
             "ref:other",
         ),
@@ -117,22 +104,16 @@ def test_basic_rois_ops():
             # No intersection
             Roi(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=0.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
+                x=RoiSlice(start=0.0, length=1.0),
+                y=RoiSlice(start=0.0, length=1.0),
+                z=RoiSlice(start=0.0, length=1.0),
                 unit="micrometer",  # type: ignore
             ),
             Roi(
                 name="other",
-                x=2.0,
-                y=2.0,
-                z=2.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
+                x=RoiSlice(start=2.0, length=1.0),
+                y=RoiSlice(start=2.0, length=1.0),
+                z=RoiSlice(start=2.0, length=1.0),
                 unit="micrometer",  # type: ignore
             ),
             None,
@@ -143,39 +124,27 @@ def test_basic_rois_ops():
             # t=None (expected behaves like infinite t)
             Roi(
                 name="ref",
-                x=0.0,
-                y=0.0,
+                x=RoiSlice(start=0.0, length=2.0),
+                y=RoiSlice(start=0.0, length=2.0),
                 z=None,
-                t=0,
-                x_length=2.0,
-                y_length=2.0,
-                z_length=None,
-                t_length=2.0,
-                unit="micrometer",  # type: ignore
+                t=RoiSlice(start=0, length=2),
+                unit="micrometer",
             ),
             Roi(
                 name=None,
-                x=-1.0,
-                y=-1.0,
-                z=-1.0,
+                x=RoiSlice(start=-1.0, length=2.0),
+                y=RoiSlice(start=-1.0, length=2.0),
+                z=RoiSlice(start=-1.0, length=2.0),
                 t=None,
-                x_length=2.0,
-                y_length=2.0,
-                z_length=2.0,
-                t_length=None,
-                unit="micrometer",  # type: ignore
+                unit="micrometer",
             ),
             Roi(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=-1.0,
-                t=0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=2.0,
-                t_length=2.0,
-                unit="micrometer",  # type: ignore
+                x=RoiSlice(start=0.0, length=1.0),
+                y=RoiSlice(start=0.0, length=1.0),
+                z=RoiSlice(start=-1.0, length=2.0),
+                t=RoiSlice(start=0, length=2),
+                unit="micrometer",
             ),
             "ref",
         ),
@@ -193,9 +162,13 @@ def test_rois_intersection(
     else:
         assert intersection is not None
         assert intersection.name == expected_name
-        assert intersection.x == expected_intersection.x
+        assert intersection.x.start == expected_intersection.x.start
+        assert intersection.y.start == expected_intersection.y.start
+        assert intersection.z is not None
+        assert expected_intersection.z is not None
+        assert intersection.z.start == expected_intersection.z.start
         assert intersection.y == expected_intersection.y
         assert intersection.z == expected_intersection.z
-        assert intersection.x_length == expected_intersection.x_length
-        assert intersection.y_length == expected_intersection.y_length
-        assert intersection.z_length == expected_intersection.z_length
+        assert intersection.x.length == expected_intersection.x.length
+        assert intersection.y.length == expected_intersection.y.length
+        assert intersection.z.length == expected_intersection.z.length

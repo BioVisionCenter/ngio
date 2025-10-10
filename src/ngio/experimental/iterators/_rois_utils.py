@@ -1,3 +1,5 @@
+from itertools import product
+
 from ngio import Roi, RoiPixels
 from ngio.images._abstract_image import AbstractImage
 
@@ -44,23 +46,21 @@ def grid(
 
     # Here we would create a grid of ROIs based on the specified parameters.
     new_rois = []
-    for t in range(0, t_dim, stride_t):
-        for z in range(0, z_dim, stride_z):
-            for y in range(0, y_dim, stride_y):
-                for x in range(0, x_dim, stride_x):
-                    roi = RoiPixels(
-                        name=base_name,
-                        x=x,
-                        y=y,
-                        z=z,
-                        t=t,
-                        x_length=size_x,
-                        y_length=size_y,
-                        z_length=size_z,
-                        t_length=size_t,
-                    )
-                    new_rois.append(roi.to_roi(pixel_size=ref_image.pixel_size))
-
+    grid_iter = product(
+        range(0, t_dim, stride_t),
+        range(0, z_dim, stride_z),
+        range(0, y_dim, stride_y),
+        range(0, x_dim, stride_x),
+    )
+    for t, z, y, x in grid_iter:
+        roi = RoiPixels.from_values(
+            name=base_name,
+            x=(x, size_x),
+            y=(y, size_y),
+            z=(z, size_z),
+            t=(t, size_t),
+        )
+        new_rois.append(roi.to_roi(pixel_size=ref_image.pixel_size))
     return rois_product(rois, new_rois)
 
 

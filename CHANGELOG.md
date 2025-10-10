@@ -6,6 +6,7 @@
 
 - Make roi.to_slicing_dict(pixel_size) always require pixel_size argument for consistency with other roi methods.
 - Make PixelSize object a Pydantic model to allow for serialization.
+- Roi refactor, now roi objects are more structured. The values can either be None or Slice object. This drastically simplifies the code.
 
 ## [v0.4.1]
 
