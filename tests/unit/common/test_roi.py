@@ -172,3 +172,82 @@ def test_rois_intersection(
         assert intersection.x.length == expected_intersection.x.length
         assert intersection.y.length == expected_intersection.y.length
         assert intersection.z.length == expected_intersection.z.length
+
+
+@pytest.mark.parametrize(
+    "roi_ref,roi_other,expected_union,expected_name",
+    [
+        (
+            # Basic intersection
+            Roi(
+                name="ref",
+                x=RoiSlice(start=0.0, length=1.0),
+                y=RoiSlice(start=0.0, length=1.0),
+                z=RoiSlice(start=0.0, length=1.0),
+                unit="micrometer",
+            ),
+            Roi(
+                name="other",
+                x=RoiSlice(start=0.5, length=1.5),
+                y=RoiSlice(start=0.5, length=1.5),
+                z=RoiSlice(start=0.5, length=1.5),
+                unit="micrometer",
+            ),
+            Roi(
+                name="ref:other",
+                x=RoiSlice(start=0.0, length=2.0),
+                y=RoiSlice(start=0.0, length=2.0),
+                z=RoiSlice(start=0.0, length=2.0),
+                unit="micrometer",
+            ),
+            "ref:other",
+        ),
+        (
+            # Union with z=None (expected behaves like infinite z)
+            Roi(
+                name="ref",
+                x=RoiSlice(start=0.0, length=2.0),
+                y=RoiSlice(start=0.0, length=2.0),
+                z=None,
+                t=RoiSlice(start=0, length=2),
+                unit="micrometer",
+            ),
+            Roi(
+                name=None,
+                x=RoiSlice(start=1.0, length=2.0),
+                y=RoiSlice(start=1.0, length=2.0),
+                z=RoiSlice(start=1.0, length=2.0),
+                t=None,
+                unit="micrometer",
+            ),
+            Roi(
+                name="ref",
+                x=RoiSlice(start=0.0, length=3.0),
+                y=RoiSlice(start=0.0, length=3.0),
+                z=RoiSlice(start=1.0, length=2.0),
+                t=RoiSlice(start=0, length=2),
+                unit="micrometer",
+            ),
+            "ref",
+        ),
+    ],
+)
+def test_rois_union(
+    roi_ref: Roi,
+    roi_other: Roi,
+    expected_union: Roi,
+    expected_name: str,
+):
+    union = roi_ref.union(roi_other)
+    assert union is not None
+    assert union.name == expected_name
+    assert union.x.start == expected_union.x.start
+    assert union.y.start == expected_union.y.start
+    assert union.z is not None
+    assert expected_union.z is not None
+    assert union.z.start == expected_union.z.start
+    assert union.y == expected_union.y
+    assert union.z == expected_union.z
+    assert union.x.length == expected_union.x.length
+    assert union.y.length == expected_union.y.length
+    assert union.z.length == expected_union.z.length
