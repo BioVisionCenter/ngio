@@ -5,6 +5,7 @@ from functools import total_ordering
 from typing import overload
 
 import numpy as np
+from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs import (
     DefaultSpaceUnit,
@@ -22,34 +23,16 @@ from ngio.ome_zarr_meta.ngio_specs import (
 #################################################################################################
 
 
-def _validate_type(value: float, name: str) -> float:
-    """Check the type of the value."""
-    if not isinstance(value, int | float):
-        raise TypeError(f"{name} must be a number.")
-    return float(value)
-
-
 @total_ordering
-class PixelSize:
+class PixelSize(BaseModel):
     """PixelSize class to store the pixel size in 3D space."""
 
-    def __init__(
-        self,
-        x: float,
-        y: float,
-        z: float,
-        t: float = 1,
-        space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
-        time_unit: TimeUnits | str | None = DefaultTimeUnit,
-    ):
-        """Initialize the pixel size."""
-        self.x = _validate_type(x, "x")
-        self.y = _validate_type(y, "y")
-        self.z = _validate_type(z, "z")
-        self.t = _validate_type(t, "t")
-
-        self._space_unit = space_unit
-        self._time_unit = time_unit
+    x: float
+    y: float
+    z: float
+    t: float = 1
+    space_unit: SpaceUnits | str | None = DefaultSpaceUnit
+    time_unit: TimeUnits | str | None = DefaultTimeUnit
 
     def __repr__(self) -> str:
         """Return a string representation of the pixel size."""
@@ -76,10 +59,10 @@ class PixelSize:
         if not isinstance(other, PixelSize):
             raise TypeError("Can only compare PixelSize with PixelSize.")
         ref = PixelSize(
-            0,
-            0,
-            0,
-            0,
+            x=0,
+            y=0,
+            z=0,
+            t=0,
             space_unit=self.space_unit,
             time_unit=self.time_unit,  # type: ignore
         )
@@ -103,16 +86,6 @@ class PixelSize:
                 f"Invalid axis name: {axis}, must be one of 'x', 'y', 'z', 't'."
             )
         return px_size
-
-    @property
-    def space_unit(self) -> SpaceUnits | str | None:
-        """Return the space unit."""
-        return self._space_unit
-
-    @property
-    def time_unit(self) -> TimeUnits | str | None:
-        """Return the time unit."""
-        return self._time_unit
 
     @property
     def tzyx(self) -> tuple[float, float, float, float]:
