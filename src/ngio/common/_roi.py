@@ -58,6 +58,10 @@ class GenericRoi(BaseModel):
         """Calculate the intersection of this ROI with another ROI."""
         return roi_intersection(self, other)
 
+    def union(self, other: "GenericRoi") -> "GenericRoi":
+        """Calculate the union of this ROI with another ROI."""
+        return roi_union(self, other)
+
     def _nice_str(self) -> str:
         if self.t is not None:
             t_start = self.t
@@ -104,6 +108,25 @@ class GenericRoi(BaseModel):
 
     def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
         raise NotImplementedError
+
+
+def _name_safe_union(name1: str | None, name2: str | None) -> str | None:
+    """Create a name for the union of two ROIs."""
+    if name1 is not None and name2 is not None:
+        if name1 != name2:
+            return f"{name1}:{name2}"
+        else:
+            return name1
+    return name1 or name2
+
+
+def _label_safe_union(label1: int | None, label2: int | None) -> int | None:
+    if label1 is not None and label2 is not None:
+        if label1 != label2:
+            raise NgioValueError("Cannot create union of ROIs with different labels.")
+        else:
+            return label1
+    return label1 or label2
 
 
 def _1d_intersection(
@@ -176,17 +199,8 @@ def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi |
         return None
 
     # Find label
-    if ref_roi.label is not None and other_roi.label is not None:
-        if ref_roi.label != other_roi.label:
-            raise NgioValueError(
-                "Cannot calculate intersection of ROIs with different labels."
-            )
-    label = ref_roi.label or other_roi.label
-
-    if ref_roi.name is not None and other_roi.name is not None:
-        name = f"{ref_roi.name}:{other_roi.name}"
-    else:
-        name = ref_roi.name or other_roi.name
+    label = _label_safe_union(ref_roi.label, other_roi.label)
+    name = _name_safe_union(ref_roi.name, other_roi.name)
 
     cls_ref = ref_roi.__class__
     return cls_ref(
@@ -195,6 +209,80 @@ def roi_intersection(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi |
         y=y,
         z=z,
         t=t,
+        x_length=x_length,
+        y_length=y_length,
+        z_length=z_length,
+        t_length=t_length,
+        unit=ref_roi.unit,
+        label=label,
+    )
+
+
+def _1d_union(
+    a: T | None, a_length: T | None, b: T | None, b_length: T | None
+) -> tuple[T | None, T | None]:
+    """Calculate the union of two 1D intervals."""
+    _a = a or 0
+    _b = b or 0
+    start = min(_a, _b)
+
+    if a_length is None or b_length is None:
+        length = None
+    else:
+        end = max(_a + a_length, _b + b_length)
+        length = end - start
+
+    return start, length
+
+
+def roi_union(ref_roi: GenericRoi, other_roi: GenericRoi) -> GenericRoi:
+    """Calculate the intersection of two ROIs."""
+    if (
+        ref_roi.unit is not None
+        and other_roi.unit is not None
+        and ref_roi.unit != other_roi.unit
+    ):
+        raise NgioValueError(
+            "Cannot calculate intersection of ROIs with different units."
+        )
+    x_start, x_length = _1d_union(
+        a=ref_roi.x,
+        a_length=ref_roi.x_length,
+        b=other_roi.x,
+        b_length=other_roi.x_length,
+    )
+    assert x_start is not None and x_length is not None
+    y_start, y_length = _1d_union(
+        a=ref_roi.y,
+        a_length=ref_roi.y_length,
+        b=other_roi.y,
+        b_length=other_roi.y_length,
+    )
+    assert y_start is not None and y_length is not None
+    z_start, z_length = _1d_union(
+        a=ref_roi.z,
+        a_length=ref_roi.z_length,
+        b=other_roi.z,
+        b_length=other_roi.z_length,
+    )
+    t_start, t_length = _1d_union(
+        a=ref_roi.t,
+        a_length=ref_roi.t_length,
+        b=other_roi.t,
+        b_length=other_roi.t_length,
+    )
+
+    # Find label
+    label = _label_safe_union(ref_roi.label, other_roi.label)
+    name = _name_safe_union(ref_roi.name, other_roi.name)
+
+    cls_ref = ref_roi.__class__
+    return cls_ref(
+        name=name,
+        x=x_start,
+        y=y_start,
+        z=z_start,
+        t=t_start,
         x_length=x_length,
         y_length=y_length,
         z_length=z_length,
