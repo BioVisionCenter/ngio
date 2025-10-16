@@ -13,24 +13,18 @@ from ngio.io_pipes._io_pipes import (
 from ngio.io_pipes._ops_slices import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
-from ngio.utils import NgioValueError
 
 
 def roi_to_slicing_dict(
     *,
     roi: Roi | RoiPixels,
-    pixel_size: PixelSize | None = None,
+    pixel_size: PixelSize,
     slicing_dict: dict[str, SlicingInputType] | None = None,
 ) -> dict[str, SlicingInputType]:
     """Convert a ROI to a slicing dictionary."""
-    if isinstance(roi, Roi):
-        if pixel_size is None:
-            raise NgioValueError(
-                "pixel_size must be provided when converting a Roi to slice_kwargs."
-            )
-        roi = roi.to_roi_pixels(pixel_size=pixel_size)
-
-    roi_slicing_dict: dict[str, SlicingInputType] = roi.to_slicing_dict()  # type: ignore
+    roi_slicing_dict: dict[str, SlicingInputType] = roi.to_slicing_dict(
+        pixel_size=pixel_size
+    )  # type: ignore
     if slicing_dict is None:
         return roi_slicing_dict
 
