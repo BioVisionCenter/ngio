@@ -14,8 +14,15 @@ from ngio.utils import NgioValueError, ZarrGroupHandler
 
 def test_roi_table_v1(tmp_path: Path):
     rois = [
-        Roi.from_values(
-            name="roi1", x=(0.0, 1.0), y=(0.0, 1.0), z=(0.0, 1.0), unit="micrometer"
+        Roi(
+            name="roi1",
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            x_length=1.0,
+            y_length=1.0,
+            z_length=1.0,
+            unit="micrometer",  # type: ignore
         )
     ]
 
@@ -23,35 +30,43 @@ def test_roi_table_v1(tmp_path: Path):
     assert isinstance(table.__repr__(), str)
 
     table.add(
-        roi=Roi.from_values(
-            name="roi2", x=(0.0, 1.0), y=(0.0, 1.0), z=(0.0, 1.0), unit="micrometer"
-        )
-    )
-
-    table = RoiTableV1(rois=rois)
-    assert isinstance(table.__repr__(), str)
-
-    table.add(
-        roi=Roi.from_values(
-            name="roi2", x=(0.0, 1.0), y=(0.0, 1.0), z=(0.0, 1.0), unit="micrometer"
+        roi=Roi(
+            name="roi2",
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            x_length=1.0,
+            y_length=1.0,
+            z_length=1.0,
+            unit="micrometer",  # type: ignore
         )
     )
 
     with pytest.raises(NgioValueError):
         # ROI name already exists
         table.add(
-            roi=Roi.from_values(
-                name="roi2", x=(0.0, 1.0), y=(0.0, 1.0), z=(0.0, 1.0), unit="micrometer"
+            roi=Roi(
+                name="roi2",
+                x=0.0,
+                y=0.0,
+                z=0.0,
+                x_length=1.0,
+                y_length=1.0,
+                z_length=1.0,
+                unit="micrometer",  # type: ignore
             )
         )
 
     table.add(
-        roi=Roi.from_values(
+        roi=Roi(
             name="roi2",
-            x=(0.0, 1.0),
-            y=(0.0, 1.0),
-            z=(0.0, 1.0),
-            unit="micrometer",
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            x_length=1.0,
+            y_length=1.0,
+            z_length=1.0,
+            unit="micrometer",  # type: ignore
         ),
         overwrite=True,
     )

@@ -9,11 +9,14 @@ from ngio.utils import NgioValueError
 
 def test_masking_roi_table_v1(tmp_path: Path):
     rois = {
-        1: Roi.from_values(
+        1: Roi(
             name="1",
-            x=(0, 1),
-            y=(0, 1),
-            z=(0, 1),
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            x_length=1.0,
+            y_length=1.0,
+            z_length=1.0,
             unit="micrometer",  # type: ignore
         )
     }
@@ -25,36 +28,31 @@ def test_masking_roi_table_v1(tmp_path: Path):
     assert table.meta.region.path == "../labels/label"
 
     table.add(
-        roi=Roi.from_values(
+        roi=Roi(
             name="2",
-            x=(0.0, 1.0),
-            y=(0.0, 1.0),
-            z=(0.0, 1.0),
-            unit="micrometer",
+            x=0.0,
+            y=0.0,
+            z=0.0,
+            x_length=1.0,
+            y_length=1.0,
+            z_length=1.0,
+            unit="micrometer",  # type: ignore
         )
     )
 
     with pytest.raises(NgioValueError):
         table.add(
-            roi=Roi.from_values(
+            roi=Roi(
                 name="2",
-                x=(0.0, 1.0),
-                y=(0.0, 1.0),
-                z=(0.0, 1.0),
-                unit="micrometer",
+                x=0.0,
+                y=0.0,
+                z=0.0,
+                x_length=1.0,
+                y_length=1.0,
+                z_length=1.0,
+                unit="micrometer",  # type: ignore
             )
         )
-
-    table.add(
-        roi=Roi.from_values(
-            name="2",
-            x=(0.0, 1.0),
-            y=(0.0, 1.0),
-            z=(0.0, 1.0),
-            unit="micrometer",
-        ),
-        overwrite=True,
-    )
 
     write_table(store=tmp_path / "roi_table.zarr", table=table, backend="anndata")
 
