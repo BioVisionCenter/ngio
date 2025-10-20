@@ -14,7 +14,7 @@ from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
 
 SlicingInputType: TypeAlias = slice | Sequence[int] | int | None
-SlicingType: TypeAlias = slice | tuple[int, ...] | int
+SlicingType: TypeAlias = slice | list[int] | int
 
 ##############################################################
 #
@@ -60,7 +60,7 @@ def _slicing_tuple_boundary_check(
         elif isinstance(sl, int):
             _int_boundary_check(sl, shape=sh)
             out_slicing_tuple.append(sl)
-        elif isinstance(sl, tuple):
+        elif isinstance(sl, list):
             [_int_boundary_check(i, shape=sh) for i in sl]
             out_slicing_tuple.append(sl)
         else:
@@ -115,32 +115,31 @@ class SlicingOps(BaseModel):
         return slicing_tuple[ax_index]
 
 
-def _check_tuple_in_slicing_tuple(
+def _check_list_in_slicing_tuple(
     slicing_tuple: tuple[SlicingType, ...],
-) -> tuple[None, None] | tuple[int, tuple[int, ...]]:
-    """Check if there are any tuple in the slicing tuple.
+) -> tuple[None, None] | tuple[int, list[int]]:
+    """Check if there are any lists in the slicing tuple.
 
-    The zarr python api only supports int or slices, not tuples.
-    Ngio support a single tuple in the slicing tuple to allow non-contiguous
+    Dask regions when setting data do not support non-contiguous
+    selections natively.
+    Ngio support a single list in the slicing tuple to allow non-contiguous
     selection (main use case: selecting multiple channels).
     """
-    # Find if the is any tuple in the slicing tuple
+    # Find if the is any list in the slicing tuple
     # If there is one we need to handle it differently
-    tuple_in_slice = [
-        (i, s) for i, s in enumerate(slicing_tuple) if isinstance(s, tuple)
-    ]
-    if not tuple_in_slice:
-        # No tuple in the slicing tuple
+    list_in_slice = [(i, s) for i, s in enumerate(slicing_tuple) if isinstance(s, list)]
+    if not list_in_slice:
+        # No list in the slicing tuple
         return None, None
 
-    if len(tuple_in_slice) > 1:
+    if len(list_in_slice) > 1:
         raise NotImplementedError(
             "Slicing with multiple non-contiguous tuples/lists "
             "is not supported yet in Ngio. Use directly the "
             "zarr.Array api to get the correct array slice."
         )
     # Complex case, we have exactly one tuple in the slicing tuple
-    ax, first_tuple = tuple_in_slice[0]
+    ax, first_tuple = list_in_slice[0]
     if len(first_tuple) > 100:
         warn(
             "Performance warning: "
@@ -164,38 +163,14 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
     slicing_tuple = slicing_ops.normalized_slicing_tuple
     # Find if the is any tuple in the slicing tuple
     # If there is one we need to handle it differently
-    ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
-    if ax is None:
-        # Simple case, no tuple in the slicing tuple
-        return zarr_array[slicing_tuple]
-
-    assert first_tuple is not None
-    slices = [
-        zarr_array[(*slicing_tuple[:ax], idx, *slicing_tuple[ax + 1 :])]
-        for idx in first_tuple
-    ]
-    out_array = np.stack(slices, axis=ax)
-    return out_array
+    return zarr_array[slicing_tuple]
 
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     """Get a slice of a zarr array as a dask array."""
     da_array = da.from_zarr(zarr_array)
     slicing_tuple = slicing_ops.normalized_slicing_tuple
-    # Find if the is any tuple in the slicing tuple
-    # If there is one we need to handle it differently
-    ax, first_tuple = _check_tuple_in_slicing_tuple(slicing_tuple)
-    if ax is None:
-        # Base case, no tuple in the slicing tuple
-        return da_array[slicing_tuple]
-
-    assert first_tuple is not None
-    slices = [
-        da_array[(*slicing_tuple[:ax], idx, *slicing_tuple[ax + 1 :])]
-        for idx in first_tuple
-    ]
-    out_array = da.stack(slices, axis=ax)
-    return out_array
+    return da_array[slicing_tuple]
 
 
 def set_slice_as_numpy(
@@ -204,17 +179,7 @@ def set_slice_as_numpy(
     slicing_ops: SlicingOps,
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
-    ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
-    if ax is None:
-        # Base case, no tuple in the slicing tuple
-        zarr_array[slice_tuple] = patch
-        return
-
-    # Complex case, we have exactly one tuple in the slicing tuple
-    assert first_tuple is not None
-    for i, idx in enumerate(first_tuple):
-        _sub_slice = (*slice_tuple[:ax], idx, *slice_tuple[ax + 1 :])
-        zarr_array[_sub_slice] = np.take(patch, indices=i, axis=ax)
+    zarr_array[slice_tuple] = patch
 
 
 def handle_int_set_as_dask(
@@ -237,7 +202,7 @@ def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
-    ax, first_tuple = _check_tuple_in_slicing_tuple(slice_tuple)
+    ax, first_tuple = _check_list_in_slicing_tuple(slice_tuple)
     patch, slice_tuple = handle_int_set_as_dask(patch, slice_tuple)
     if ax is None:
         # Base case, no tuple in the slicing tuple
@@ -261,13 +226,13 @@ def set_slice_as_dask(
 ##############################################################
 
 
-def _try_to_slice(value: Sequence[int]) -> slice | tuple[int, ...]:
+def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
     """Try to convert a list of integers into a slice if they are contiguous.
 
     - If the input is empty, return an empty tuple.
     - If the input is sorted, and contains contiguous integers,
       return a slice from the minimum to the maximum integer.
-    - Otherwise, return the input as a tuple.
+    - Otherwise, return the input as a list of integers.
 
     This is useful for optimizing array slicing operations
     by allowing the use of slices when possible, which can be more efficient.
@@ -293,7 +258,7 @@ def _try_to_slice(value: Sequence[int]) -> slice | tuple[int, ...]:
     if sorted(value) == list(range(min_input, max_input + 1)):
         return slice(min_input, max_input + 1)
 
-    return tuple(value)
+    return list(value)
 
 
 def _remove_channel_slicing(
@@ -393,7 +358,7 @@ def _normalize_slicing_tuple(
     The output types are:
     - slice
     - int
-    - tuple of int (for non-contiguous selection)
+    - list of int (for non-contiguous selection)
     """
     axis_name = axis.name
     if axis_name not in slicing_dict:
@@ -408,7 +373,7 @@ def _normalize_slicing_tuple(
     elif isinstance(value, Sequence):
         # If a contiguous sequence of integers is provided,
         # convert it to a slice for simplicity.
-        # Alternatively, it will be converted to a tuple of ints
+        # Alternatively, it will be converted to a list of ints
         return _try_to_slice(value)
 
     raise NgioValueError(
