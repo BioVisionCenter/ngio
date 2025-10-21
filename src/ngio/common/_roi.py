@@ -14,9 +14,22 @@ from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnit
 from ngio.utils import NgioValueError
 
 
-def _to_raster(value: float, length: float, pixel_size: float) -> tuple[float, float]:
+def _world_to_raster(value: float, pixel_size: float, eps: float = 1e-6) -> float:
     raster_value = value / pixel_size
-    raster_length = length / pixel_size
+
+    # If the value is very close to an integer, round it
+    # This ensures that we don't have floating point precision issues
+    # When loading ROIs that were originally defined in pixel coordinates
+    _rounded = round(raster_value)
+    if abs(_rounded - raster_value) < eps:
+        return _rounded
+    return raster_value
+
+
+def _to_raster(value: float, length: float, pixel_size: float) -> tuple[float, float]:
+    """Convert to raster coordinates."""
+    raster_value = _world_to_raster(value, pixel_size)
+    raster_length = _world_to_raster(length, pixel_size)
     return raster_value, raster_length
 
 
@@ -29,7 +42,7 @@ def _to_slice(start: float | None, length: float | None) -> slice:
     return slice(start, end)
 
 
-def _to_world(value: int | float, pixel_size: float) -> float:
+def _raster_to_world(value: int | float, pixel_size: float) -> float:
     """Convert to world coordinates."""
     return value * pixel_size
 
@@ -60,16 +73,28 @@ class GenericRoi(BaseModel):
 
     def _nice_str(self) -> str:
         if self.t is not None:
-            t_str = f"t={self.t}->{self.t_length}"
+            t_start = self.t
         else:
-            t_str = "t=None"
-        if self.z is not None:
-            z_str = f"z={self.z}->{self.z_length}"
+            t_start = None
+        if self.t_length is not None and t_start is not None:
+            t_end = t_start + self.t_length
         else:
-            z_str = "z=None"
+            t_end = None
 
-        y_str = f"y={self.y}->{self.y_length}"
-        x_str = f"x={self.x}->{self.x_length}"
+        t_str = f"t={t_start}->{t_end}"
+
+        if self.z is not None:
+            z_start = self.z
+        else:
+            z_start = None
+        if self.z_length is not None and z_start is not None:
+            z_end = z_start + self.z_length
+        else:
+            z_end = None
+        z_str = f"z={z_start}->{z_end}"
+
+        y_str = f"y={self.y}->{self.y + self.y_length}"
+        x_str = f"x={self.x}->{self.x + self.x_length}"
 
         if self.label is not None:
             label_str = f", label={self.label}"
@@ -89,6 +114,9 @@ class GenericRoi(BaseModel):
 
     def __str__(self) -> str:
         return self._nice_str()
+
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
+        raise NotImplementedError
 
 
 def _1d_intersection(
@@ -251,6 +279,11 @@ class Roi(GenericRoi):
         """
         return zoom_roi(self, zoom_factor)
 
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
+        """Convert to a slicing dictionary."""
+        roi_pixels = self.to_roi_pixels(pixel_size)
+        return roi_pixels.to_slicing_dict(pixel_size)
+
 
 class RoiPixels(GenericRoi):
     """Region of interest (ROI) in pixel coordinates."""
@@ -261,30 +294,30 @@ class RoiPixels(GenericRoi):
 
     def to_roi(self, pixel_size: PixelSize) -> "Roi":
         """Convert to raster coordinates."""
-        x = _to_world(self.x, pixel_size.x)
-        x_length = _to_world(self.x_length, pixel_size.x)
-        y = _to_world(self.y, pixel_size.y)
-        y_length = _to_world(self.y_length, pixel_size.y)
+        x = _raster_to_world(self.x, pixel_size.x)
+        x_length = _raster_to_world(self.x_length, pixel_size.x)
+        y = _raster_to_world(self.y, pixel_size.y)
+        y_length = _raster_to_world(self.y_length, pixel_size.y)
 
         if self.z is None:
             z = None
         else:
-            z = _to_world(self.z, pixel_size.z)
+            z = _raster_to_world(self.z, pixel_size.z)
 
         if self.z_length is None:
             z_length = None
         else:
-            z_length = _to_world(self.z_length, pixel_size.z)
+            z_length = _raster_to_world(self.z_length, pixel_size.z)
 
         if self.t is None:
             t = None
         else:
-            t = _to_world(self.t, pixel_size.t)
+            t = _raster_to_world(self.t, pixel_size.t)
 
         if self.t_length is None:
             t_length = None
         else:
-            t_length = _to_world(self.t_length, pixel_size.t)
+            t_length = _raster_to_world(self.t_length, pixel_size.t)
 
         extra_dict = self.model_extra if self.model_extra else {}
         return Roi(
@@ -302,7 +335,7 @@ class RoiPixels(GenericRoi):
             **extra_dict,
         )
 
-    def to_slicing_dict(self) -> dict[str, slice]:
+    def to_slicing_dict(self, pixel_size: PixelSize) -> dict[str, slice]:
         """Convert to a slicing dictionary."""
         x_slice = _to_slice(self.x, self.x_length)
         y_slice = _to_slice(self.y, self.y_length)

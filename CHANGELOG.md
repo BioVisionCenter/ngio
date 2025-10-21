@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.4.2]
+
+### API Changes
+
+- Make roi.to_slicing_dict(pixel_size) always require pixel_size argument for consistency with other roi methods.
+- Make PixelSize object a Pydantic model to allow for serialization.
+
+### Bug Fixes
+
+- Improve robustness when rounding Rois to pixel coordinates. 
+
 ## [v0.4.1]
 
 ### Bug Fixes

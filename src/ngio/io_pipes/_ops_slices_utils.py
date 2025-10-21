@@ -22,7 +22,7 @@ def _pairs_stream(iterable: Iterable[T]) -> Iterator[tuple[T, T]]:
         seen.append(a)
 
 
-SlicingType: TypeAlias = slice | tuple[int, ...] | int
+SlicingType: TypeAlias = slice | list[int] | int
 
 
 def check_elem_intersection(s1: SlicingType, s2: SlicingType) -> bool:
@@ -30,7 +30,7 @@ def check_elem_intersection(s1: SlicingType, s2: SlicingType) -> bool:
 
     If they are a slice, check if they overlap.
     If they are integers, check if they are equal.
-    If they are tuples, check if they have any common elements.
+    If they are lists, check if they have any common elements.
     """
     if not isinstance(s1, type(s2)):
         raise NgioValueError(
@@ -56,7 +56,7 @@ def check_elem_intersection(s1: SlicingType, s2: SlicingType) -> bool:
     elif isinstance(s1, int) and isinstance(s2, int):
         # Handle integer indices
         return s1 == s2
-    elif isinstance(s1, tuple) and isinstance(s2, tuple):
+    elif isinstance(s1, list) and isinstance(s2, list):
         if set(s1) & set(s2):
             return True
         return False
@@ -130,7 +130,7 @@ def _chunk_indices_for_axis(sel: SlicingType, size: int, csize: int) -> list[int
             raise IndexError(f"index {sel} out of bounds for axis of size {size}")
         return [sel // csize]
 
-    if isinstance(sel, tuple):
+    if isinstance(sel, list):
         if not sel:
             return []
         chunks_hit = {}
