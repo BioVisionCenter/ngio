@@ -14,9 +14,22 @@ from ngio.ome_zarr_meta.ngio_specs import DefaultSpaceUnit, PixelSize, SpaceUnit
 from ngio.utils import NgioValueError
 
 
-def _to_raster(value: float, length: float, pixel_size: float) -> tuple[float, float]:
+def _world_to_raster(value: float, pixel_size: float, eps: float = 1e-6) -> float:
     raster_value = value / pixel_size
-    raster_length = length / pixel_size
+
+    # If the value is very close to an integer, round it
+    # This ensures that we don't have floating point precision issues
+    # When loading ROIs that were originally defined in pixel coordinates
+    _rounded = round(raster_value)
+    if abs(_rounded - raster_value) < eps:
+        return _rounded
+    return raster_value
+
+
+def _to_raster(value: float, length: float, pixel_size: float) -> tuple[float, float]:
+    """Convert to raster coordinates."""
+    raster_value = _world_to_raster(value, pixel_size)
+    raster_length = _world_to_raster(length, pixel_size)
     return raster_value, raster_length
 
 
@@ -29,7 +42,7 @@ def _to_slice(start: float | None, length: float | None) -> slice:
     return slice(start, end)
 
 
-def _to_world(value: int | float, pixel_size: float) -> float:
+def _raster_to_world(value: int | float, pixel_size: float) -> float:
     """Convert to world coordinates."""
     return value * pixel_size
 
@@ -281,30 +294,30 @@ class RoiPixels(GenericRoi):
 
     def to_roi(self, pixel_size: PixelSize) -> "Roi":
         """Convert to raster coordinates."""
-        x = _to_world(self.x, pixel_size.x)
-        x_length = _to_world(self.x_length, pixel_size.x)
-        y = _to_world(self.y, pixel_size.y)
-        y_length = _to_world(self.y_length, pixel_size.y)
+        x = _raster_to_world(self.x, pixel_size.x)
+        x_length = _raster_to_world(self.x_length, pixel_size.x)
+        y = _raster_to_world(self.y, pixel_size.y)
+        y_length = _raster_to_world(self.y_length, pixel_size.y)
 
         if self.z is None:
             z = None
         else:
-            z = _to_world(self.z, pixel_size.z)
+            z = _raster_to_world(self.z, pixel_size.z)
 
         if self.z_length is None:
             z_length = None
         else:
-            z_length = _to_world(self.z_length, pixel_size.z)
+            z_length = _raster_to_world(self.z_length, pixel_size.z)
 
         if self.t is None:
             t = None
         else:
-            t = _to_world(self.t, pixel_size.t)
+            t = _raster_to_world(self.t, pixel_size.t)
 
         if self.t_length is None:
             t_length = None
         else:
-            t_length = _to_world(self.t_length, pixel_size.t)
+            t_length = _raster_to_world(self.t_length, pixel_size.t)
 
         extra_dict = self.model_extra if self.model_extra else {}
         return Roi(
