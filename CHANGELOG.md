@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.4.3]
+
+### Bug Fixes
+
+- Fix bug in deriving labels and image from OME-Zarr with non standard path names.
+- Add missing pillow dependency.
+- Update pixi workspace config.
+
 ## [v0.4.2]
 
 ### API Changes
