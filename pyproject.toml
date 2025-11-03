@@ -48,6 +48,7 @@ dependencies = [
     "pooch",
     "polars",
     "pyarrow",
+    "pillow",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
@@ -186,7 +187,7 @@ source = ["ngio"]
 [tool.check-manifest]
 ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = ["conda-forge"]
 platforms = ["osx-arm64", "linux-64", "win-64"]
 

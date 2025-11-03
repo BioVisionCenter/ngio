@@ -318,7 +318,7 @@ def derive_label(
         pixelsize=ref_image.pixel_size.x,
         z_spacing=ref_image.pixel_size.z,
         time_spacing=ref_image.pixel_size.t,
-        levels=ref_meta.levels,
+        levels=ref_meta.paths,
         yx_scaling_factor=ref_meta.yx_scaling(),
         z_scaling_factor=ref_meta.z_scaling(),
         time_unit=ref_image.pixel_size.time_unit,

@@ -220,3 +220,24 @@ def test_zoom_virtual_axes(
     # Roi data should match exactly except for virtual axis
     assert img1_data.shape[1:] == img2_roi_data.shape[1:]
     img2.set_roi(roi=roi, patch=img2_roi_data, transforms=[zoom], axes_order="czyx")
+
+
+def test_derive_image_consistency(
+    tmp_path: Path,
+):
+    path1 = tmp_path / "image1.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store=path1,
+        shape=(3, 16, 16, 16),
+        axes_names="czyx",
+        xy_pixelsize=1.0,
+        levels=["s0", "s1", "s2"],
+    )
+    ome_zarr_der = ome_zarr.derive_image(tmp_path / "derived_image.zarr")
+    assert ome_zarr.channel_labels == ome_zarr_der.channel_labels
+    assert ome_zarr.levels_paths == ome_zarr_der.levels_paths
+    assert ome_zarr.space_unit == ome_zarr_der.space_unit
+    assert ome_zarr.time_unit == ome_zarr_der.time_unit
+
+    label = ome_zarr.derive_label("derived_label")
+    assert label.path == "s0"

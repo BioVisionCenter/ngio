@@ -296,3 +296,18 @@ def test_get_and_squeeze(tmp_path: Path):
     image.get_as_dask(
         channel_selection=ChannelSelectionModel(identifier="0", mode="index")
     )
+
+
+def test_derive_image_and_labels(tmp_path: Path):
+    # Testing for #116
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=(3, 20, 30),
+        xy_pixelsize=0.5,
+        levels=1,
+        axes_names=["c", "y", "x"],
+        dtype="uint8",
+    )
+    derived_ome_zarr = ome_zarr.derive_image(tmp_path / "derived.zarr")
+    _ = derived_ome_zarr.derive_label("derived_label")
