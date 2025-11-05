@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.4.4]
+
+### Bug Fixes
+
+- Fix bug in channel visualization when using hex colors with leading '#'.
+- Remove strict range check in channel window.
+
 ## [v0.4.3]
 
 ### Bug Fixes
