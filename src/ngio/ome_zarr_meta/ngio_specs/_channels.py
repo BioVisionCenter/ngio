@@ -102,6 +102,20 @@ def valid_hex_color(v: str) -> bool:
     return True
 
 
+def into_valid_hex_color(v: str) -> str:
+    """Convert a string into a valid hexadecimal color.
+
+    If the string is already a valid hexadecimal color, return it.
+    Otherwise, return a hexadecimal color based on the hash of the string.
+    """
+    # strip leading '#' if present
+    v = v.lstrip("#")
+    if valid_hex_color(v):
+        return v
+
+    return NgioColors.semi_random_pick(v.lower()).value
+
+
 class ChannelVisualisation(BaseModel):
     """Channel visualisation model.
 
@@ -135,13 +149,10 @@ class ChannelVisualisation(BaseModel):
         """
         if value is None:
             return NgioColors.semi_random_pick().value
-        if isinstance(value, str) and valid_hex_color(value):
-            return value
+        if isinstance(value, str):
+            return into_valid_hex_color(value)
         elif isinstance(value, NgioColors):
             return value.value
-        elif isinstance(value, str):
-            value_lower = value.lower()
-            return NgioColors.semi_random_pick(value_lower).value
         else:
             raise NgioValueError(f"Invalid color {value}.")
 
@@ -158,19 +169,6 @@ class ChannelVisualisation(BaseModel):
         if abs(end - start) < 1e-6:
             data["end"] = start + 1
         return data
-
-    @model_validator(mode="after")
-    def check_model(self) -> "ChannelVisualisation":
-        """Check that the start and end values are within the min and max values."""
-        if self.start < self.min or self.start > self.max:
-            raise NgioValidationError(
-                f"Start value {self.start} is out of range [{self.min}, {self.max}]"
-            )
-        if self.end < self.min or self.end > self.max:
-            raise NgioValidationError(
-                f"End value {self.end} is out of range [{self.min}, {self.max}]"
-            )
-        return self
 
     @classmethod
     def default_init(
