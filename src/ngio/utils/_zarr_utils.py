@@ -8,7 +8,7 @@ import zarr
 from filelock import BaseFileLock, FileLock
 from zarr.abc.store import Store
 from zarr.core.array import CompressorLike
-from zarr.errors import ContainsGroupError, GroupNotFoundError
+from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
 from ngio.utils import NgioFileExistsError, NgioFileNotFoundError, NgioValueError
@@ -38,13 +38,12 @@ def _check_store(store) -> NgioSupportedStore:
 
 def _check_group(group: zarr.Group, mode: AccessModeLiteral) -> zarr.Group:
     """Check the group and return a valid group."""
-    is_read_only = getattr(group, "_read_only", False)
-    if is_read_only and mode in ["w", "w-"]:
+    if group.read_only and mode in ["w", "w-"]:
         raise NgioValueError(
             "The group is read only. Cannot open in write mode ['w', 'w-']"
         )
 
-    if mode == "r" and not is_read_only:
+    if mode == "r" and not group.read_only:
         # let's make sure we don't accidentally write to the group
         group = zarr.open_group(store=group.store, path=group.path, mode="r")
 
@@ -75,13 +74,18 @@ def open_group_wrapper(
         _check_store(store)
         group = zarr.open_group(store=store, mode=mode, zarr_format=zarr_format)
 
-    except ContainsGroupError as e:
+    except FileExistsError as e:
         raise NgioFileExistsError(
             f"A Zarr group already exists at {store}, consider setting overwrite=True."
         ) from e
 
-    except GroupNotFoundError as e:
+    except FileNotFoundError as e:
         raise NgioFileNotFoundError(f"No Zarr group found at {store}") from e
+
+    except ContainsGroupError as e:
+        raise NgioFileExistsError(
+            f"A Zarr group already exists at {store}, consider setting overwrite=True."
+        ) from e
 
     return group
 
@@ -215,6 +219,19 @@ class ZarrGroupHandler:
     @property
     def group(self) -> zarr.Group:
         """Return the group."""
+        if self._parallel_safe:
+            # If we are parallel safe, we need to reopen the group
+            # to make sure that the attributes are up to date
+            if self.mode == "r":
+                mode = "r"
+            else:
+                mode = "r+"
+            return zarr.open_group(
+                store=self._group.store,
+                path=self._group.path,
+                mode=mode,
+                zarr_format=self._group.metadata.zarr_format,
+            )
         return self._group
 
     def add_to_cache(self, key: str, value: object) -> None:
@@ -246,8 +263,7 @@ class ZarrGroupHandler:
 
     def _write_attrs(self, attrs: dict, overwrite: bool = False) -> None:
         """Write the metadata to the store."""
-        is_read_only = getattr(self._group, "_read_only", False)
-        if is_read_only:
+        if self.group.read_only:
             raise NgioValueError("The group is read only. Cannot write metadata.")
 
         # we need to invalidate the current attrs cache

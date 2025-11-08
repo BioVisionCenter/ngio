@@ -7,6 +7,7 @@ import fsspec.implementations.http
 import numpy as np
 import pytest
 import zarr
+from zarr.storage import LocalStore
 
 from ngio.utils import (
     NgioFileExistsError,
@@ -23,8 +24,8 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
     handler = ZarrGroupHandler(store=store, cache=cache, mode="a")
 
     _store = handler.group.store
-    assert isinstance(_store, zarr.DirectoryStore)
-    assert Path(_store.path) == store
+    assert isinstance(_store, LocalStore)
+    assert Path(_store.root.as_posix()) == store
     assert handler.use_cache == cache
 
     attrs = handler.load_attrs()
@@ -65,12 +66,12 @@ def test_group_handler_from_group(tmp_path: Path):
 def test_group_handler_read(tmp_path: Path):
     store = tmp_path / "test_group_handler_read.zarr"
 
-    group = zarr.group(store=store, overwrite=True)
+    group = zarr.create_group(store=store, overwrite=True)
     input_attrs = {"a": 1, "b": 2, "c": 3}
     group.attrs.update(input_attrs)
 
     group.create_group("group1")
-    group.create_dataset("array1", shape=(10, 10), dtype="int32")
+    group.create_array("array1", shape=(10, 10), dtype="int32")
 
     handler = ZarrGroupHandler(store=store, cache=True, mode="r")
 
@@ -97,10 +98,10 @@ def test_group_handler_read(tmp_path: Path):
 
 def test_open_fail(tmp_path: Path):
     store = tmp_path / "test_open_fail.zarr"
-    group = zarr.group(store=store, overwrite=True)
+    group = zarr.create_group(store=store, overwrite=True)
 
     read_only_group = open_group_wrapper(store=group, mode="r")
-    assert read_only_group._read_only
+    assert read_only_group.read_only
 
     with pytest.raises(NgioFileExistsError):
         open_group_wrapper(store=store, mode="w-")

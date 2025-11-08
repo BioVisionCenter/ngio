@@ -794,7 +794,7 @@ def derive_image_container(
         dimension_separator = find_dimension_separator(ref_image.zarr_array)
 
     if compressors is None:
-        compressors = ref_image.zaxxr_array.compressors  # type: ignore
+        compressors = ref_image.zarr_array.compressors  # type: ignore
 
     handler = create_empty_image_container(
         store=store,

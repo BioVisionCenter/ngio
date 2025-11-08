@@ -262,15 +262,10 @@ def init_empty_pyramid(
             **array_static_kwargs,
         )
 
-        _shape = [
+        ref_shape = [
             math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
         ]
-        ref_shape = _shape
-
-        if chunks == "auto":
-            # We keep the same chunks as the first level
-            chunks = new_arr.chunks
-        else:
-            # Adjust chunks to not be larger than the new shape
-            chunks = tuple(min(c, s) for c, s in zip(chunks, ref_shape, strict=True))
+        chunks = tuple(
+            min(c, s) for c, s in zip(new_arr.chunks, ref_shape, strict=True)
+        )
     return None

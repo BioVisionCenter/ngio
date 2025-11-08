@@ -155,7 +155,7 @@ def test_parquet_backend(tmp_path: Path):
 
 def test_anndata_backend(tmp_path: Path):
     store = tmp_path / "test_anndata_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a", zarr_format=2)
     backend = AnnDataBackend()
     backend.set_group_handler(handler, index_type="int")
 
