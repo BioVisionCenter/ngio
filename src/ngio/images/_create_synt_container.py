@@ -1,10 +1,10 @@
 """Abstract class for handling OME-NGFF images."""
 
 from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 import PIL.Image
-from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common._synt_images_utils import fit_to_shape
 from ngio.images._ome_zarr_container import OmeZarrContainer, create_ome_zarr_from_array
@@ -36,7 +36,7 @@ def create_synthetic_ome_zarr(
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     table_backend: TableBackend = DefaultTableBackend,
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,

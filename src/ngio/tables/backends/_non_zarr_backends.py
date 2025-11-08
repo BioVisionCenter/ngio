@@ -5,7 +5,7 @@ from typing import Any
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
-from zarr.storage import DirectoryStore, FSStore
+from zarr.storage import FsspecStore, LocalStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._utils import normalize_pandas_df, normalize_polars_lf
@@ -88,9 +88,9 @@ class NonZarrBaseBackend(AbstractTableBackend):
     def load_as_pandas_df(self) -> DataFrame:
         """Load the table as a pandas DataFrame."""
         store = self._group_handler.store
-        if isinstance(store, DirectoryStore):
+        if isinstance(store, LocalStore):
             dataframe = self._load_from_directory_store(reader=self.df_reader)
-        elif isinstance(store, FSStore):
+        elif isinstance(store, FsspecStore):
             dataframe = self._load_from_fs_store_df(reader=self.df_reader)
         else:
             ext = self.table_name.split(".")[-1]
@@ -117,9 +117,9 @@ class NonZarrBaseBackend(AbstractTableBackend):
     def load_as_polars_lf(self) -> LazyFrame:
         """Load the table as a polars LazyFrame."""
         store = self._group_handler.store
-        if isinstance(store, DirectoryStore):
+        if isinstance(store, LocalStore):
             lazy_frame = self._load_from_directory_store(reader=self.lf_reader)
-        elif isinstance(store, FSStore):
+        elif isinstance(store, FsspecStore):
             lazy_frame = self._load_from_fs_store_lf(reader=self.lf_reader)
         else:
             ext = self.table_name.split(".")[-1]
@@ -146,7 +146,7 @@ class NonZarrBaseBackend(AbstractTableBackend):
     def _get_store_url(self) -> str:
         """Get the store URL."""
         store = self._group_handler.store
-        if isinstance(store, DirectoryStore):
+        if isinstance(store, LocalStore):
             full_url = self._group_handler.full_url
         else:
             ext = self.table_name.split(".")[-1]

@@ -9,7 +9,6 @@ For Images and Labels implements the following functionalities:
 - A function to convert a ngio image metadata to a v04 image metadata.
 """
 
-from ome_zarr_models.common.multiscales import ValidTransform as ValidTransformV04
 from ome_zarr_models.v04.axes import Axis as AxisV04
 from ome_zarr_models.v04.coordinate_transformations import VectorScale as VectorScaleV04
 from ome_zarr_models.v04.coordinate_transformations import (
@@ -20,6 +19,7 @@ from ome_zarr_models.v04.image import ImageAttrs as ImageAttrsV04
 from ome_zarr_models.v04.image_label import ImageLabelAttrs as LabelAttrsV04
 from ome_zarr_models.v04.multiscales import Dataset as DatasetV04
 from ome_zarr_models.v04.multiscales import Multiscale as MultiscaleV04
+from ome_zarr_models.v04.multiscales import ValidTransform as ValidTransformV04
 from ome_zarr_models.v04.omero import Channel as ChannelV04
 from ome_zarr_models.v04.omero import Omero as OmeroV04
 from ome_zarr_models.v04.omero import Window as WindowV04
@@ -169,7 +169,7 @@ def _v04_to_ngio_datasets(
             unit = str(unit)
         axes.append(
             Axis(
-                name=v04_axis.name,
+                name=str(v04_axis.name),
                 axis_type=AxisType(v04_axis.type),
                 # (for some reason the type is a generic JsonValue,
                 # but it should be a string or None)

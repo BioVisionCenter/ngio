@@ -1,9 +1,7 @@
 """Utility functions for working with OME-Zarr images."""
 
 from collections.abc import Sequence
-from typing import TypeVar
-
-from zarr.types import DIMENSION_SEPARATOR
+from typing import Literal, TypeVar
 
 from ngio.common._pyramid import init_empty_pyramid
 from ngio.ome_zarr_meta import (
@@ -95,7 +93,7 @@ def create_empty_label_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str = "uint32",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
@@ -193,7 +191,7 @@ def create_empty_image_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor="default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
@@ -256,7 +254,9 @@ def create_empty_image_container(
         version=version,
     )
     mode = "w" if overwrite else "w-"
-    group_handler = ZarrGroupHandler(store=store, mode=mode, cache=False)
+    group_handler = ZarrGroupHandler(
+        store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
+    )
     image_handler = get_image_meta_handler(version=version, group_handler=group_handler)
     image_handler.write_meta(meta)
 
@@ -270,6 +270,7 @@ def create_empty_image_container(
         mode="a",
         dimension_separator=dimension_separator,
         compressor=compressor,
+        zarr_format=meta.zarr_format,
     )
 
     group_handler._mode = "r+"

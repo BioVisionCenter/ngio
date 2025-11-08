@@ -2,9 +2,9 @@
 
 import warnings
 from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
-from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.images._create import create_empty_image_container
 from ngio.images._image import Image, ImagesContainer
@@ -409,7 +409,7 @@ class OmeZarrContainer:
         name: str | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str | None = None,
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
         compressor=None,
         copy_labels: bool = False,
         copy_tables: bool = False,
@@ -693,7 +693,7 @@ class OmeZarrContainer:
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str = "uint32",
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
         compressor=None,
         overwrite: bool = False,
     ) -> "Label":
@@ -838,7 +838,7 @@ def create_empty_ome_zarr(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor="default",
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
@@ -939,7 +939,7 @@ def create_ome_zarr_from_array(
     channel_active: Sequence[bool] | None = None,
     name: str | None = None,
     chunks: Sequence[int] | None = None,
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor: str = "default",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,

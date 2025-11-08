@@ -3,8 +3,6 @@
 from collections.abc import Sequence
 from typing import Literal
 
-from zarr.types import DIMENSION_SEPARATOR
-
 from ngio.common import compute_masking_roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_label_container
@@ -169,7 +167,7 @@ class LabelsContainer:
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str = "uint32",
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
         compressor=None,
         overwrite: bool = False,
     ) -> "Label":
@@ -236,7 +234,7 @@ def derive_label(
     pixel_size: PixelSize | None = None,
     axes_names: Sequence[str] | None = None,
     chunks: Sequence[int] | None = None,
-    dimension_separator: DIMENSION_SEPARATOR | None = None,
+    dimension_separator: Literal[".", "/"] | None = None,
     compressor=None,
     dtype: str = "uint32",
     overwrite: bool = False,

@@ -5,8 +5,8 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 import zarr
-from zarr.types import DIMENSION_SEPARATOR
 
+# from zarr.types import DIMENSION_SEPARATOR
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -26,7 +26,10 @@ def _on_disk_numpy_zoom(
     target: zarr.Array,
     order: InterpolationOrder,
 ) -> None:
-    target[...] = numpy_zoom(source[...], target_shape=target.shape, order=order)
+    source_array = source[...]
+    if not isinstance(source_array, np.ndarray):
+        raise NgioValueError("source zarr array could not be read as a numpy array")
+    target[...] = numpy_zoom(source_array, target_shape=target.shape, order=order)
 
 
 def _on_disk_dask_zoom(
@@ -37,7 +40,7 @@ def _on_disk_dask_zoom(
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
 
-    target_array = target_array.rechunk(target.chunks)
+    target_array = target_array.rechunk(target.chunks)  # type: ignore
     target_array.compute_chunk_sizes()
     target_array.to_zarr(target)
 
@@ -202,8 +205,9 @@ def init_empty_pyramid(
     chunks: Sequence[int] | None = None,
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
+    dimension_separator: Literal[".", "/"] = "/",
     compressor="default",
+    zarr_format: Literal[2, 3] = 2,
 ) -> None:
     # Return the an Image object
     if chunks is not None and len(chunks) != len(ref_shape):
@@ -233,12 +237,13 @@ def init_empty_pyramid(
             )
         new_arr = root_group.zeros(
             name=path,
-            shape=ref_shape,
+            shape=tuple(ref_shape),
             dtype=dtype,
             chunks=chunks,
             dimension_separator=dimension_separator,
             overwrite=True,
             compressor=compressor,
+            zarr_format=zarr_format,
         )
 
         _shape = [

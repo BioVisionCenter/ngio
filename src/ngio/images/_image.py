@@ -6,7 +6,6 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 from pydantic import BaseModel, model_validator
-from zarr.types import DIMENSION_SEPARATOR
 
 from ngio.common import (
     Dimensions,
@@ -604,7 +603,7 @@ class ImagesContainer:
         name: str | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str | None = None,
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
         compressor: str | None = None,
         overwrite: bool = False,
     ) -> "ImagesContainer":
@@ -725,7 +724,7 @@ def derive_image_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str | None = None,
-    dimension_separator: DIMENSION_SEPARATOR | None = None,
+    dimension_separator: Literal[".", "/"] | None = None,
     compressor=None,
     overwrite: bool = False,
 ) -> ImagesContainer:

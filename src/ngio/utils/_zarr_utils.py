@@ -1,14 +1,15 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
+# %%
 from pathlib import Path
 from typing import Literal
 
 import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
+from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError, GroupNotFoundError
-from zarr.storage import DirectoryStore, FSStore, MemoryStore, Store, StoreLike
-from zarr.types import DIMENSION_SEPARATOR
+from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
 from ngio.utils import NgioFileExistsError, NgioFileNotFoundError, NgioValueError
 from ngio.utils._errors import NgioError
@@ -18,7 +19,7 @@ AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # but to make sure we can handle the store correctly
 # we need to be more restrictive
 NgioSupportedStore = (
-    str | Path | fsspec.mapping.FSMap | FSStore | DirectoryStore | MemoryStore
+    str | Path | fsspec.mapping.FSMap | FsspecStore | MemoryStore | LocalStore
 )
 GenericStore = Store | NgioSupportedStore
 StoreOrGroup = GenericStore | zarr.Group
@@ -50,12 +51,15 @@ def _check_group(group: zarr.Group, mode: AccessModeLiteral) -> zarr.Group:
     return group
 
 
-def open_group_wrapper(store: StoreOrGroup, mode: AccessModeLiteral) -> zarr.Group:
+def open_group_wrapper(
+    store: StoreOrGroup, mode: AccessModeLiteral, zarr_format: Literal[2, 3] = 2
+) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
     Args:
         store (StoreOrGroup): The store or group to open.
-        mode (ReadOrEdirLiteral): The mode to open the group in.
+        mode (AccessModeLiteral): The mode to open the group in.
+        zarr_format (int): The Zarr format version to use.
 
     Returns:
         zarr.Group: The opened Zarr group.
@@ -67,7 +71,7 @@ def open_group_wrapper(store: StoreOrGroup, mode: AccessModeLiteral) -> zarr.Gro
 
     try:
         _check_store(store)
-        group = zarr.open_group(store=store, mode=mode)
+        group = zarr.open_group(store=store, mode=mode, zarr_format=zarr_format)
 
     except ContainsGroupError as e:
         raise NgioFileExistsError(
@@ -90,6 +94,7 @@ class ZarrGroupHandler:
         mode: AccessModeLiteral = "a",
         parallel_safe: bool = False,
         parent: "ZarrGroupHandler | None" = None,
+        zarr_format: Literal[2, 3] = 2,
     ):
         """Initialize the handler.
 
@@ -102,6 +107,7 @@ class ZarrGroupHandler:
                 that can be used to make the handler parallel safe.
                 Be aware that the lock needs to be used manually.
             parent (ZarrGroupHandler | None): The parent handler.
+            zarr_format (int): The Zarr format version to use.
         """
         if mode not in ["r", "r+", "w", "w-", "a"]:
             raise NgioValueError(f"Mode {mode} is not supported.")
@@ -112,20 +118,24 @@ class ZarrGroupHandler:
                 "If you want to use the lock mechanism, you should not use the cache."
             )
 
-        group = open_group_wrapper(store, mode)
+        group = open_group_wrapper(store=store, mode=mode, zarr_format=zarr_format)
         _store = group.store
 
         # Make sure the cache is set in the attrs
         # in the same way as the cache in the handler
-        group.attrs.cache = cache
+
+        ## TODO
+        # Figure out how to handle the cache in the new zarr version
+        # group.attrs.cache = cache
 
         if parallel_safe:
-            if not isinstance(_store, DirectoryStore):
+            if not isinstance(_store, LocalStore):
                 raise NgioValueError(
-                    "The store needs to be a DirectoryStore to use the lock mechanism. "
+                    "The store needs to be a LocalStore to use the lock mechanism. "
                     f"Instead, got {_store.__class__.__name__}."
                 )
-            store_path = Path(_store.path) / group.path
+
+            store_path = _store.root / group.path
             self._lock_path = store_path.with_suffix(".lock")
             self._lock = FileLock(self._lock_path, timeout=10)
 
@@ -148,23 +158,28 @@ class ZarrGroupHandler:
         )
 
     @property
-    def store(self) -> StoreLike:
+    def store(self) -> Store:
         """Return the store of the group."""
         return self.group.store
 
     @property
     def full_url(self) -> str | None:
         """Return the store path."""
-        if isinstance(self.store, DirectoryStore | FSStore):
-            _store_path = str(self.store.path)
-            _store_path = _store_path.rstrip("/")
-            return f"{self.store.path}/{self._group.path}"
+        if isinstance(self.store, LocalStore):
+            return self.store.root.as_posix()
+        if isinstance(self.store, FsspecStore):
+            return self.store.fs.map.root_path
         return None
+
+    @property
+    def zarr_format(self) -> Literal[2, 3]:
+        """Return the Zarr format version."""
+        return self._group.zarr_format
 
     @property
     def mode(self) -> AccessModeLiteral:
         """Return the mode of the group."""
-        return self._mode  # type: ignore (return type is Literal)
+        return self._mode  # type: ignore
 
     @property
     def lock(self) -> BaseFileLock:
@@ -343,8 +358,6 @@ class ZarrGroupHandler:
         shape: tuple[int, ...],
         dtype: str,
         chunks: tuple[int, ...] | None = None,
-        dimension_separator: DIMENSION_SEPARATOR = "/",
-        compressor: str = "default",
         overwrite: bool = False,
     ) -> zarr.Array:
         if self.mode == "r":
@@ -356,9 +369,10 @@ class ZarrGroupHandler:
                 shape=shape,
                 dtype=dtype,
                 chunks=chunks,
-                dimension_separator=dimension_separator,
-                compressor=compressor,
+                # chunk_key_encoding={"name": "default", "separator": "/"},
+                dimension_separator="/",
                 overwrite=overwrite,
+                zarr_format=2,  # Use Zarr v2 format
             )
         except ContainsGroupError as e:
             raise NgioFileExistsError(
@@ -413,3 +427,6 @@ class ZarrGroupHandler:
                 f"Error copying group to {handler.full_url}, "
                 f"#{n_skipped} files where skipped."
             )
+
+
+# %%
