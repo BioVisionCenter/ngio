@@ -5,6 +5,7 @@ from typing import Literal
 
 import numpy as np
 import PIL.Image
+from zarr.core.array import CompressorLike
 
 from ngio.common._synt_images_utils import fit_to_shape
 from ngio.images._ome_zarr_container import OmeZarrContainer, create_ome_zarr_from_array
@@ -30,14 +31,14 @@ def create_synthetic_ome_zarr(
     xy_scaling_factor: float = 2,
     z_scaling_factor: float = 1.0,
     axes_names: Sequence[str] | None = None,
-    chunks: Sequence[int] | None = None,
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     table_backend: TableBackend = DefaultTableBackend,
     dimension_separator: Literal[".", "/"] = "/",
-    compressor="default",
+    compressors: CompressorLike = "auto",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
@@ -55,8 +56,8 @@ def create_synthetic_ome_zarr(
             Defaults to 1.0.
         axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
-        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
-            is used. Defaults to None.
+        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
+            is used. Defaults to "auto".
         channel_labels (list[str] | None, optional): The labels of the channels.
             Defaults to None.
         channel_wavelengths (list[str] | None, optional): The wavelengths of the
@@ -68,7 +69,7 @@ def create_synthetic_ome_zarr(
         table_backend (TableBackend): Table backend to be used to store tables
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
-        compressor: The compressor to use. Defaults to "default".
+        compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
         version (NgffVersion, optional): The version of the OME-Zarr specification.
@@ -103,7 +104,7 @@ def create_synthetic_ome_zarr(
         chunks=chunks,
         overwrite=overwrite,
         dimension_separator=dimension_separator,
-        compressor=compressor,
+        compressors=compressors,
         version=version,
     )
 

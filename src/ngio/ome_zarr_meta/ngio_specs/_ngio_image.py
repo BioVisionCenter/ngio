@@ -25,7 +25,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError, NgioValueError
 
 T = TypeVar("T")
-NgffVersions = Literal["0.4"]
+NgffVersions = Literal["0.4", "0.5"]
 DefaultNgffVersion: Literal["0.4"] = "0.4"
 
 

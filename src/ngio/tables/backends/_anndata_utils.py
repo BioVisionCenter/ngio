@@ -88,6 +88,8 @@ def custom_anndata_read_zarr(
     if isinstance(group["obs"], zarr.Array):
         _clean_uns(adata)
 
+    if isinstance(adata, dict):
+        adata = AnnData(**adata)
     if not isinstance(adata, AnnData):
         raise NgioValueError(f"Expected an AnnData object, but got {type(adata)}")
     return adata

@@ -1,4 +1,5 @@
 from anndata import AnnData
+from anndata._settings import settings
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
@@ -58,7 +59,8 @@ class AnnDataBackend(AbstractTableBackend):
                 "Please make sure to use a compatible "
                 "store like a zarr.DirectoryStore."
             )
-        table.write_zarr(full_url)  # type: ignore (AnnData writer requires a str path)
+        settings.zarr_write_format = self._group_handler.zarr_format
+        table.write_zarr(full_url)
 
     def write_from_pandas(self, table: DataFrame) -> None:
         """Serialize the table from a pandas DataFrame."""

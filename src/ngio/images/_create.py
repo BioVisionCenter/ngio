@@ -3,6 +3,8 @@
 from collections.abc import Sequence
 from typing import Literal, TypeVar
 
+from zarr.core.array import CompressorLike
+
 from ngio.common._pyramid import init_empty_pyramid
 from ngio.ome_zarr_meta import (
     NgioImageMeta,
@@ -91,10 +93,10 @@ def create_empty_label_container(
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | None = None,
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint32",
     dimension_separator: Literal[".", "/"] = "/",
-    compressor="default",
+    compressors: CompressorLike = "auto",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -120,11 +122,11 @@ def create_empty_label_container(
         axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
             is used. Defaults to None.
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
-        compressor: The compressor to use. Defaults to "default".
+        compressors (CompressorLike): The compressors to use. Defaults to "auto".
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
@@ -157,7 +159,9 @@ def create_empty_label_container(
     )
 
     mode = "w" if overwrite else "w-"
-    group_handler = ZarrGroupHandler(store=store, mode=mode, cache=False)
+    group_handler = ZarrGroupHandler(
+        store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
+    )
     image_handler = get_label_meta_handler(version=version, group_handler=group_handler)
     image_handler.write_meta(meta)
 
@@ -170,7 +174,7 @@ def create_empty_label_container(
         dtype=dtype,
         mode="a",
         dimension_separator=dimension_separator,
-        compressor=compressor,
+        compressors=compressors,
     )
     group_handler._mode = "r+"
     return group_handler
@@ -189,10 +193,10 @@ def create_empty_image_container(
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | None = None,
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint16",
     dimension_separator: Literal[".", "/"] = "/",
-    compressor="default",
+    compressors: CompressorLike = "auto",
     overwrite: bool = False,
     version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -218,12 +222,12 @@ def create_empty_image_container(
         axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
+        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
             is used. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
-        compressor: The compressor to use. Defaults to "default".
+        compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
         version (str, optional): The version of the OME-Zarr specification.
@@ -269,7 +273,7 @@ def create_empty_image_container(
         dtype=dtype,
         mode="a",
         dimension_separator=dimension_separator,
-        compressor=compressor,
+        compressors=compressors,
         zarr_format=meta.zarr_format,
     )
 

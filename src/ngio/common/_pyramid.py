@@ -5,6 +5,7 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 import zarr
+from zarr.core.array import CompressorLike
 
 # from zarr.types import DIMENSION_SEPARATOR
 from ngio.common._zoom import (
@@ -202,21 +203,23 @@ def init_empty_pyramid(
     paths: list[str],
     ref_shape: Sequence[int],
     scaling_factors: Sequence[float],
-    chunks: Sequence[int] | None = None,
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
     dimension_separator: Literal[".", "/"] = "/",
-    compressor="default",
+    compressors: CompressorLike = "auto",
     zarr_format: Literal[2, 3] = 2,
 ) -> None:
     # Return the an Image object
-    if chunks is not None and len(chunks) != len(ref_shape):
+    if chunks != "auto" and len(chunks) != len(ref_shape):
         raise NgioValueError(
             "The shape and chunks must have the same number of dimensions."
         )
 
-    if chunks is not None:
-        chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
+    if chunks != "auto":
+        chunks = tuple(min(c, s) for c, s in zip(chunks, ref_shape, strict=True))
+    else:
+        chunks = "auto"
 
     if len(ref_shape) != len(scaling_factors):
         raise NgioValueError(
@@ -227,7 +230,24 @@ def init_empty_pyramid(
     # To reduce the risk of floating point issues
     scaling_factors = [_maybe_int(s) for s in scaling_factors]
 
-    root_group = open_group_wrapper(store, mode=mode)
+    root_group = open_group_wrapper(store, mode=mode, zarr_format=zarr_format)
+
+    array_static_kwargs = {
+        "dtype": dtype,
+        "overwrite": True,
+        "compressors": compressors,
+    }
+
+    if zarr_format == 2:
+        array_static_kwargs["chunk_key_encoding"] = {
+            "name": "v2",
+            "separator": dimension_separator,
+        }
+    else:
+        array_static_kwargs["chunk_key_encoding"] = {
+            "name": "default",
+            "separator": dimension_separator,
+        }
 
     for path in paths:
         if any(s < 1 for s in ref_shape):
@@ -235,15 +255,11 @@ def init_empty_pyramid(
                 "Level shape must be at least 1 on all dimensions. "
                 f"Calculated shape: {ref_shape} at level {path}."
             )
-        new_arr = root_group.zeros(
+        new_arr = root_group.create_array(
             name=path,
             shape=tuple(ref_shape),
-            dtype=dtype,
             chunks=chunks,
-            dimension_separator=dimension_separator,
-            overwrite=True,
-            compressor=compressor,
-            zarr_format=zarr_format,
+            **array_static_kwargs,
         )
 
         _shape = [
@@ -251,8 +267,10 @@ def init_empty_pyramid(
         ]
         ref_shape = _shape
 
-        if chunks is None:
+        if chunks == "auto":
+            # We keep the same chunks as the first level
             chunks = new_arr.chunks
-            assert chunks is not None
-        chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
+        else:
+            # Adjust chunks to not be larger than the new shape
+            chunks = tuple(min(c, s) for c, s in zip(chunks, ref_shape, strict=True))
     return None

@@ -403,7 +403,7 @@ def convert_anndata_to_pandas(
         DataFrame: Converted and normalized pandas DataFrame.
     """
     pandas_df = anndata.to_df()
-    pandas_df[anndata.obs_keys()] = anndata.obs
+    pandas_df[anndata.obs.columns.to_list()] = anndata.obs
     pandas_df = normalize_pandas_df(
         pandas_df,
         index_key=index_key,

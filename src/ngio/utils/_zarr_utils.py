@@ -1,6 +1,5 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
-# %%
 from pathlib import Path
 from typing import Literal
 
@@ -8,6 +7,7 @@ import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
 from zarr.abc.store import Store
+from zarr.core.array import CompressorLike
 from zarr.errors import ContainsGroupError, GroupNotFoundError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
@@ -52,7 +52,9 @@ def _check_group(group: zarr.Group, mode: AccessModeLiteral) -> zarr.Group:
 
 
 def open_group_wrapper(
-    store: StoreOrGroup, mode: AccessModeLiteral, zarr_format: Literal[2, 3] = 2
+    store: StoreOrGroup,
+    mode: AccessModeLiteral,
+    zarr_format: Literal[2, 3] | None = None,
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
@@ -90,24 +92,24 @@ class ZarrGroupHandler:
     def __init__(
         self,
         store: StoreOrGroup,
+        zarr_format: Literal[2, 3] | None = None,
         cache: bool = False,
         mode: AccessModeLiteral = "a",
         parallel_safe: bool = False,
         parent: "ZarrGroupHandler | None" = None,
-        zarr_format: Literal[2, 3] = 2,
     ):
         """Initialize the handler.
 
         Args:
             store (StoreOrGroup): The Zarr store or group containing the image data.
             meta_mode (str): The mode of the metadata handler.
+            zarr_format (int): The Zarr format version to use.
             cache (bool): Whether to cache the metadata.
             mode (str): The mode of the store.
             parallel_safe (bool): If True, the handler will create a lock file to make
                 that can be used to make the handler parallel safe.
                 Be aware that the lock needs to be used manually.
             parent (ZarrGroupHandler | None): The parent handler.
-            zarr_format (int): The Zarr format version to use.
         """
         if mode not in ["r", "r+", "w", "w-", "a"]:
             raise NgioValueError(f"Mode {mode} is not supported.")
@@ -166,7 +168,7 @@ class ZarrGroupHandler:
     def full_url(self) -> str | None:
         """Return the store path."""
         if isinstance(self.store, LocalStore):
-            return self.store.root.as_posix()
+            return (self.store.root / self.group.path).as_posix()
         if isinstance(self.store, FsspecStore):
             return self.store.fs.map.root_path
         return None
@@ -174,7 +176,7 @@ class ZarrGroupHandler:
     @property
     def zarr_format(self) -> Literal[2, 3]:
         """Return the Zarr format version."""
-        return self._group.zarr_format
+        return self.group.metadata.zarr_format
 
     @property
     def mode(self) -> AccessModeLiteral:
@@ -357,22 +359,34 @@ class ZarrGroupHandler:
         path: str,
         shape: tuple[int, ...],
         dtype: str,
-        chunks: tuple[int, ...] | None = None,
+        chunks: tuple[int, ...] | Literal["auto"] = "auto",
+        compressors: CompressorLike = "auto",
+        separator: Literal[".", "/"] = "/",
         overwrite: bool = False,
     ) -> zarr.Array:
         if self.mode == "r":
             raise NgioValueError("Cannot create an array in read only mode.")
 
+        if self.zarr_format == 2:
+            chunks_encoding = {
+                "name": "v2",
+                "separator": separator,
+            }
+        else:
+            chunks_encoding = {
+                "name": "default",
+                "separator": separator,
+            }
+
         try:
-            return self.group.zeros(
+            return self.group.create_array(
                 name=path,
                 shape=shape,
                 dtype=dtype,
                 chunks=chunks,
-                # chunk_key_encoding={"name": "default", "separator": "/"},
-                dimension_separator="/",
+                chunk_key_encoding=chunks_encoding,
                 overwrite=overwrite,
-                zarr_format=2,  # Use Zarr v2 format
+                compressors=compressors,
             )
         except ContainsGroupError as e:
             raise NgioFileExistsError(
@@ -396,6 +410,7 @@ class ZarrGroupHandler:
         group = self.get_group(path, create_mode=True, overwrite=overwrite)
         return ZarrGroupHandler(
             store=group,
+            zarr_format=self.zarr_format,
             cache=self.use_cache,
             mode=self.mode,
             parallel_safe=self._parallel_safe,
@@ -429,4 +444,24 @@ class ZarrGroupHandler:
             )
 
 
-# %%
+def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
+    """Find the dimension separator used in the Zarr store.
+
+    Args:
+        array (zarr.Array): The Zarr array to check.
+
+    Returns:
+        Literal[".", "/"]: The dimension separator used in the store.
+    """
+    from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
+
+    if array.metadata.zarr_format == 2:
+        separator = array.metadata.dimension_separator
+    else:
+        separator = array.metadata.chunk_key_encoding
+        if not isinstance(separator, DefaultChunkKeyEncoding):
+            raise ValueError(
+                "Only DefaultChunkKeyEncoding is supported in this example."
+            )
+        separator = separator.separator
+    return separator

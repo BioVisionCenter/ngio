@@ -21,6 +21,16 @@ from ngio.ome_zarr_meta.v04 import (
     v04_to_ngio_plate_meta,
     v04_to_ngio_well_meta,
 )
+from ngio.ome_zarr_meta.v05 import (
+    ngio_to_v05_image_meta,
+    ngio_to_v05_label_meta,
+    ngio_to_v05_plate_meta,
+    ngio_to_v05_well_meta,
+    v05_to_ngio_image_meta,
+    v05_to_ngio_label_meta,
+    v05_to_ngio_plate_meta,
+    v05_to_ngio_well_meta,
+)
 from ngio.utils import (
     NgioValidationError,
     NgioValueError,
@@ -678,16 +688,35 @@ ImplementedMetaImporterExporter().register_image_ie(
     importer=v04_to_ngio_image_meta,
     exporter=ngio_to_v04_image_meta,
 )
+
+ImplementedMetaImporterExporter().register_label_ie(
+    version="0.5",
+    importer=v05_to_ngio_label_meta,
+    exporter=ngio_to_v05_label_meta,
+)
+
 ImplementedMetaImporterExporter().register_label_ie(
     version="0.4",
     importer=v04_to_ngio_label_meta,
     exporter=ngio_to_v04_label_meta,
 )
+ImplementedMetaImporterExporter().register_image_ie(
+    version="0.5",
+    importer=v05_to_ngio_image_meta,
+    exporter=ngio_to_v05_image_meta,
+)
+
 ImplementedMetaImporterExporter().register_well_ie(
     version="0.4", importer=v04_to_ngio_well_meta, exporter=ngio_to_v04_well_meta
 )
+ImplementedMetaImporterExporter().register_well_ie(
+    version="0.5", importer=v05_to_ngio_well_meta, exporter=ngio_to_v05_well_meta
+)
 ImplementedMetaImporterExporter().register_plate_ie(
     version="0.4", importer=v04_to_ngio_plate_meta, exporter=ngio_to_v04_plate_meta
+)
+ImplementedMetaImporterExporter().register_plate_ie(
+    version="0.5", importer=v05_to_ngio_plate_meta, exporter=ngio_to_v05_plate_meta
 )
 
 
