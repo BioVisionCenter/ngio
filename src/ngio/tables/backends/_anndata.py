@@ -41,6 +41,7 @@ class AnnDataBackend(AbstractTableBackend):
 
     def load_as_anndata(self) -> AnnData:
         """Load the table as an AnnData object."""
+        settings.zarr_write_format = self._group_handler.zarr_format
         anndata = custom_anndata_read_zarr(self._group_handler._group)
         anndata = normalize_anndata(anndata, index_key=self.index_key)
         return anndata

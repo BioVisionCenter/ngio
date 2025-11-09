@@ -198,6 +198,14 @@ class AbstractTableBackend(ABC):
         if metadata is None:
             metadata = {}
 
+        attrs = self._group_handler.reopen_group().attrs.asdict()
+        print(attrs, self._group_handler.full_url)
+        # This is required by anndata to identify the format
+        if "encoding-type" in attrs:
+            metadata["encoding-type"] = attrs["encoding-type"]
+        if "encoding-version" in attrs:
+            metadata["encoding-version"] = attrs["encoding-version"]
+
         backend_metadata = BackendMeta(
             backend=self.backend_name(),
             index_key=self.index_key,

@@ -166,7 +166,7 @@ class ZarrGroupHandler:
     @property
     def store(self) -> Store:
         """Return the store of the group."""
-        return self.group.store
+        return self._group.store
 
     @property
     def full_url(self) -> str | None:
@@ -180,7 +180,7 @@ class ZarrGroupHandler:
     @property
     def zarr_format(self) -> Literal[2, 3]:
         """Return the Zarr format version."""
-        return self.group.metadata.zarr_format
+        return self._group.metadata.zarr_format
 
     @property
     def mode(self) -> AccessModeLiteral:
@@ -216,22 +216,30 @@ class ZarrGroupHandler:
 
         raise NgioValueError("The lock is still in use. Cannot remove it.")
 
+    def reopen_group(self) -> zarr.Group:
+        """Reopen the group.
+
+        This is useful when the group has been modified
+        outside of the handler.
+        """
+        if self.mode == "r":
+            mode = "r"
+        else:
+            mode = "r+"
+        return zarr.open_group(
+            store=self._group.store,
+            path=self._group.path,
+            mode=mode,
+            zarr_format=self._group.metadata.zarr_format,
+        )
+
     @property
     def group(self) -> zarr.Group:
         """Return the group."""
         if self._parallel_safe:
             # If we are parallel safe, we need to reopen the group
             # to make sure that the attributes are up to date
-            if self.mode == "r":
-                mode = "r"
-            else:
-                mode = "r+"
-            return zarr.open_group(
-                store=self._group.store,
-                path=self._group.path,
-                mode=mode,
-                zarr_format=self._group.metadata.zarr_format,
-            )
+            return self.reopen_group()
         return self._group
 
     def add_to_cache(self, key: str, value: object) -> None:

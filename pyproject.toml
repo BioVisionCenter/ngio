@@ -155,7 +155,7 @@ minversion = "7.0"
 testpaths = ["tests"]
 filterwarnings = [
     "error",
-    "ignore::FutureWarning", # TODO remove after zarr-python v3 
+    "ignore::zarr.errors.ZarrUserWarning", # required for anndata
 ]
 addopts = [
     "-vv",
