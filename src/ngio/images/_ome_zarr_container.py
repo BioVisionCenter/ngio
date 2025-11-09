@@ -845,7 +845,7 @@ def create_empty_ome_zarr(
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
@@ -885,7 +885,7 @@ def create_empty_ome_zarr(
             active. Defaults to None.
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (NgffVersion, optional): The version of the OME-Zarr specification.
+        ngff_version (NgffVersion, optional): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
     """
     handler = create_empty_image_container(
@@ -906,7 +906,7 @@ def create_empty_ome_zarr(
         dimension_separator=dimension_separator,
         compressors=compressors,
         overwrite=overwrite,
-        version=version,
+        ngff_version=ngff_version,
     )
 
     ome_zarr = OmeZarrContainer(group_handler=handler)
@@ -942,7 +942,7 @@ def create_ome_zarr_from_array(
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
@@ -983,7 +983,7 @@ def create_ome_zarr_from_array(
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (str, optional): The version of the OME-Zarr specification.
+        ngff_version (str, optional): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
     """
     handler = create_empty_image_container(
@@ -1004,7 +1004,7 @@ def create_ome_zarr_from_array(
         overwrite=overwrite,
         dimension_separator=dimension_separator,
         compressors=compressors,
-        version=version,
+        ngff_version=ngff_version,
     )
 
     ome_zarr = OmeZarrContainer(group_handler=handler)

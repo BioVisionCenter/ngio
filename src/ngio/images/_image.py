@@ -823,7 +823,7 @@ def derive_image_container(
         dimension_separator=dimension_separator,
         compressors=compressors,
         overwrite=overwrite,
-        version=ngff_version,
+        ngff_version=ngff_version,
     )
     image_container = ImagesContainer(handler)
 

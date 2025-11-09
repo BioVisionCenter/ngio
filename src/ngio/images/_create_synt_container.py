@@ -40,7 +40,7 @@ def create_synthetic_ome_zarr(
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
@@ -72,7 +72,7 @@ def create_synthetic_ome_zarr(
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (NgffVersion, optional): The version of the OME-Zarr specification.
+        ngff_version (NgffVersion, optional): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
     """
     if isinstance(reference_sample, str):
@@ -105,7 +105,7 @@ def create_synthetic_ome_zarr(
         overwrite=overwrite,
         dimension_separator=dimension_separator,
         compressors=compressors,
-        version=version,
+        ngff_version=ngff_version,
     )
 
     image = ome_zarr.get_image()

@@ -329,7 +329,7 @@ def derive_label(
         dimension_separator=dimension_separator,
         compressors=compressors,
         overwrite=overwrite,
-        version=ref_meta.version,
+        ngff_version=ref_meta.version,
         name=name,
     )
     return None

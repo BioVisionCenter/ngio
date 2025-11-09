@@ -40,7 +40,7 @@ def _init_generic_meta(
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
     name: str | None = None,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> tuple[_image_or_label_meta, list[float]]:
     """Initialize the metadata for an image or label."""
     scaling_factors = []
@@ -75,7 +75,7 @@ def _init_generic_meta(
         axes_names=axes_names,
         pixel_size=pixel_sizes,
         scaling_factors=scaling_factors,
-        version=version,
+        version=ngff_version,
     )
     return meta, scaling_factors
 
@@ -98,7 +98,7 @@ def create_empty_label_container(
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
     """Create an empty label with the given shape and metadata.
 
@@ -130,7 +130,7 @@ def create_empty_label_container(
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (str, optional): The version of the OME-Zarr specification.
+        ngff_version (str, optional): The version of the OME-Zarr specification.
             Defaults to DefaultVersion.
 
     """
@@ -155,14 +155,16 @@ def create_empty_label_container(
         time_unit=time_unit,
         axes_names=axes_names,
         name=name,
-        version=version,
+        ngff_version=ngff_version,
     )
 
     mode = "w" if overwrite else "w-"
     group_handler = ZarrGroupHandler(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
-    image_handler = get_label_meta_handler(version=version, group_handler=group_handler)
+    image_handler = get_label_meta_handler(
+        version=ngff_version, group_handler=group_handler
+    )
     image_handler.write_meta(meta)
 
     init_empty_pyramid(
@@ -199,7 +201,7 @@ def create_empty_image_container(
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
@@ -231,7 +233,7 @@ def create_empty_image_container(
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (str, optional): The version of the OME-Zarr specification.
+        ngff_version (str, optional): The version of the OME-Zarr specification.
             Defaults to DefaultVersion.
 
     """
@@ -256,13 +258,15 @@ def create_empty_image_container(
         time_unit=time_unit,
         axes_names=axes_names,
         name=name,
-        version=version,
+        ngff_version=ngff_version,
     )
     mode = "w" if overwrite else "w-"
     group_handler = ZarrGroupHandler(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
-    image_handler = get_image_meta_handler(version=version, group_handler=group_handler)
+    image_handler = get_image_meta_handler(
+        version=ngff_version, group_handler=group_handler
+    )
     image_handler.write_meta(meta)
 
     init_empty_pyramid(
