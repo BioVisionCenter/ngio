@@ -414,6 +414,7 @@ class OmeZarrContainer:
         compressors: CompressorLike | None = None,
         copy_labels: bool = False,
         copy_tables: bool = False,
+        ngff_version: NgffVersions | None = None,
         overwrite: bool = False,
     ) -> "OmeZarrContainer":
         """Create an empty OME-Zarr container from an existing image.
@@ -436,13 +437,14 @@ class OmeZarrContainer:
                 the compressors of the reference image will be used.
             copy_labels (bool): Whether to copy the labels from the reference image.
             copy_tables (bool): Whether to copy the tables from the reference image.
+            ngff_version (NgffVersions): The NGFF version to use.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
             OmeZarrContainer: The new image container.
 
         """
-        _ = self._images_container.derive(
+        new_container = self._images_container.derive(
             store=store,
             ref_path=ref_path,
             shape=shape,
@@ -454,18 +456,12 @@ class OmeZarrContainer:
             dtype=dtype,
             dimension_separator=dimension_separator,
             compressors=compressors,
+            ngff_version=ngff_version,
             overwrite=overwrite,
         )
 
-        handler = ZarrGroupHandler(
-            store,
-            cache=self._group_handler.use_cache,
-            mode=self._group_handler.mode,
-            zarr_format=self._group_handler.zarr_format,
-        )
-
         new_ome_zarr = OmeZarrContainer(
-            group_handler=handler,
+            group_handler=new_container._group_handler,
             validate_paths=False,
         )
 

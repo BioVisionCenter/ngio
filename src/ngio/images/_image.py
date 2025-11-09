@@ -32,6 +32,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ChannelVisualisation,
     DefaultSpaceUnit,
     DefaultTimeUnit,
+    NgffVersions,
     SpaceUnits,
     TimeUnits,
 )
@@ -607,6 +608,7 @@ class ImagesContainer:
         dtype: str | None = None,
         dimension_separator: Literal[".", "/"] | None = None,
         compressors: CompressorLike | None = None,
+        ngff_version: NgffVersions | None = None,
         overwrite: bool = False,
     ) -> "ImagesContainer":
         """Create an empty OME-Zarr image from an existing image.
@@ -626,6 +628,7 @@ class ImagesContainer:
             compressors: The compressor to use. If None it will use
                 the same as the reference image.
             dtype (str | None): The data type of the new image.
+            ngff_version (NgffVersions): The NGFF version to use.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -644,6 +647,7 @@ class ImagesContainer:
             dtype=dtype,
             dimension_separator=dimension_separator,
             compressors=compressors,
+            ngff_version=ngff_version,
             overwrite=overwrite,
         )
 
@@ -728,6 +732,7 @@ def derive_image_container(
     dtype: str | None = None,
     dimension_separator: Literal[".", "/"] | None = None,
     compressors: CompressorLike | None = None,
+    ngff_version: NgffVersions | None = None,
     overwrite: bool = False,
 ) -> ImagesContainer:
     """Create an empty OME-Zarr image from an existing image.
@@ -746,6 +751,7 @@ def derive_image_container(
             dimensions. If None it will use the same as the reference image.
         compressors (CompressorLike | None): The compressors to use. If None it will use
             the same as the reference image.
+        ngff_version (NgffVersions): The NGFF version to use.
         dtype (str | None): The data type of the new image.
         overwrite (bool): Whether to overwrite an existing image.
 
@@ -796,6 +802,9 @@ def derive_image_container(
     if compressors is None:
         compressors = ref_image.zarr_array.compressors  # type: ignore
 
+    if ngff_version is None:
+        ngff_version = ref_meta.version
+
     handler = create_empty_image_container(
         store=store,
         shape=shape,
@@ -814,7 +823,7 @@ def derive_image_container(
         dimension_separator=dimension_separator,
         compressors=compressors,
         overwrite=overwrite,
-        version=ref_meta.version,
+        version=ngff_version,
     )
     image_container = ImagesContainer(handler)
 

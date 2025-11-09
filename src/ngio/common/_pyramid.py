@@ -203,6 +203,7 @@ def init_empty_pyramid(
     paths: list[str],
     ref_shape: Sequence[int],
     scaling_factors: Sequence[float],
+    axes: Sequence[str],
     chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
@@ -248,6 +249,7 @@ def init_empty_pyramid(
             "name": "default",
             "separator": dimension_separator,
         }
+        array_static_kwargs["dimension_names"] = axes
 
     for path in paths:
         if any(s < 1 for s in ref_shape):
