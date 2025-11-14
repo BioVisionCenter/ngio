@@ -86,10 +86,10 @@ def _dataframe_to_rois(
 ) -> dict[str, Roi]:
     """Convert a DataFrame to a WorldCooROI object."""
     # Validate the columns of the DataFrame
-    _required_columns = set(dataframe.columns).intersection(set(required_columns))
-    if len(_required_columns) != len(required_columns):
+    _missing_columns = set(required_columns).difference(set(dataframe.columns))
+    if len(_missing_columns) != 0:
         raise NgioTableValidationError(
-            f"Could not find required columns: {_required_columns} in the table."
+            f"Could not find required columns: {_missing_columns} in the table."
         )
 
     extra_columns = set(dataframe.columns).difference(
