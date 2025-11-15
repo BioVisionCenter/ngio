@@ -6,7 +6,7 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 from pydantic import BaseModel, model_validator
-from zarr.types import DIMENSION_SEPARATOR
+from zarr.core.array import CompressorLike
 
 from ngio.common import (
     Dimensions,
@@ -32,6 +32,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ChannelVisualisation,
     DefaultSpaceUnit,
     DefaultTimeUnit,
+    NgffVersions,
     SpaceUnits,
     TimeUnits,
 )
@@ -40,6 +41,7 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
 )
+from ngio.utils._zarr_utils import find_dimension_separator
 
 
 class ChannelSelectionModel(BaseModel):
@@ -604,8 +606,9 @@ class ImagesContainer:
         name: str | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str | None = None,
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
-        compressor: str | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
+        ngff_version: NgffVersions | None = None,
         overwrite: bool = False,
     ) -> "ImagesContainer":
         """Create an empty OME-Zarr image from an existing image.
@@ -619,12 +622,13 @@ class ImagesContainer:
             pixel_size (PixelSize | None): The pixel size of the new image.
             axes_names (Sequence[str] | None): The axes names of the new image.
             name (str | None): The name of the new image.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
+            chunks (Sequence[int] | Literal["auto"]): The chunk shape of the new image.
             dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
                 dimensions. If None it will use the same as the reference image.
-            compressor (str | None): The compressor to use. If None it will use
+            compressors: The compressor to use. If None it will use
                 the same as the reference image.
             dtype (str | None): The data type of the new image.
+            ngff_version (NgffVersions): The NGFF version to use.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -642,7 +646,8 @@ class ImagesContainer:
             chunks=chunks,
             dtype=dtype,
             dimension_separator=dimension_separator,
-            compressor=compressor,
+            compressors=compressors,
+            ngff_version=ngff_version,
             overwrite=overwrite,
         )
 
@@ -725,8 +730,9 @@ def derive_image_container(
     name: str | None = None,
     chunks: Sequence[int] | None = None,
     dtype: str | None = None,
-    dimension_separator: DIMENSION_SEPARATOR | None = None,
-    compressor=None,
+    dimension_separator: Literal[".", "/"] | None = None,
+    compressors: CompressorLike | None = None,
+    ngff_version: NgffVersions | None = None,
     overwrite: bool = False,
 ) -> ImagesContainer:
     """Create an empty OME-Zarr image from an existing image.
@@ -743,8 +749,9 @@ def derive_image_container(
         chunks (Sequence[int] | None): The chunk shape of the new image.
         dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
             dimensions. If None it will use the same as the reference image.
-        compressor: The compressor to use. If None it will use
+        compressors (CompressorLike | None): The compressors to use. If None it will use
             the same as the reference image.
+        ngff_version (NgffVersions): The NGFF version to use.
         dtype (str | None): The data type of the new image.
         overwrite (bool): Whether to overwrite an existing image.
 
@@ -790,10 +797,13 @@ def derive_image_container(
         dtype = ref_image.dtype
 
     if dimension_separator is None:
-        dimension_separator = ref_image.zarr_array._dimension_separator  # type: ignore
+        dimension_separator = find_dimension_separator(ref_image.zarr_array)
 
-    if compressor is None:
-        compressor = ref_image.zarr_array.compressor  # type: ignore
+    if compressors is None:
+        compressors = ref_image.zarr_array.compressors  # type: ignore
+
+    if ngff_version is None:
+        ngff_version = ref_meta.version
 
     handler = create_empty_image_container(
         store=store,
@@ -810,10 +820,10 @@ def derive_image_container(
         name=name,
         chunks=chunks,
         dtype=dtype,
-        dimension_separator=dimension_separator,  # type: ignore
-        compressor=compressor,  # type: ignore
+        dimension_separator=dimension_separator,
+        compressors=compressors,
         overwrite=overwrite,
-        version=ref_meta.version,
+        ngff_version=ngff_version,
     )
     image_container = ImagesContainer(handler)
 

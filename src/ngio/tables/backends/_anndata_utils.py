@@ -9,6 +9,7 @@ from anndata._io.utils import _read_legacy_raw
 from anndata._io.zarr import read_dataframe
 from anndata.compat import _clean_uns
 from anndata.experimental import read_dispatched
+from zarr.storage import LocalStore
 
 from ngio.utils import (
     NgioValueError,
@@ -35,7 +36,7 @@ def custom_anndata_read_zarr(
     """
     group = open_group_wrapper(store=store, mode="r")
 
-    if not isinstance(group.store, zarr.DirectoryStore):
+    if not isinstance(group.store, LocalStore):
         elem_to_read = ["X", "obs", "var"]
 
     if elem_to_read is None:
@@ -87,6 +88,8 @@ def custom_anndata_read_zarr(
     if isinstance(group["obs"], zarr.Array):
         _clean_uns(adata)
 
+    if isinstance(adata, dict):
+        adata = AnnData(**adata)
     if not isinstance(adata, AnnData):
         raise NgioValueError(f"Expected an AnnData object, but got {type(adata)}")
     return adata
