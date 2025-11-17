@@ -1,5 +1,6 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
+import warnings
 from pathlib import Path
 from typing import Literal
 
@@ -11,8 +12,13 @@ from zarr.core.array import CompressorLike
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
-from ngio.utils import NgioFileExistsError, NgioFileNotFoundError, NgioValueError
-from ngio.utils._errors import NgioError
+from ngio.utils._cache import NgioCache
+from ngio.utils._errors import (
+    NgioError,
+    NgioFileExistsError,
+    NgioFileNotFoundError,
+    NgioValueError,
+)
 
 AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # StoreLike is more restrictive than it could be
@@ -27,32 +33,33 @@ StoreOrGroup = GenericStore | zarr.Group
 
 def _check_store(store) -> NgioSupportedStore:
     """Check the store and return a valid store."""
-    if isinstance(store, NgioSupportedStore):
-        return store
-
-    raise NotImplementedError(
-        f"Store type {type(store)} is not supported. "
-        f"Supported types are: {NgioSupportedStore}"
-    )
-
-
-def _check_group(group: zarr.Group, mode: AccessModeLiteral) -> zarr.Group:
-    """Check the group and return a valid group."""
-    if group.read_only and mode in ["w", "w-"]:
-        raise NgioValueError(
-            "The group is read only. Cannot open in write mode ['w', 'w-']"
+    if not isinstance(store, NgioSupportedStore):
+        warnings.warn(
+            f"Store type {type(store)} is not explicitly supported. "
+            f"Supported types are: {NgioSupportedStore}. "
+            "Proceeding, but this may lead to unexpected behavior.",
+            UserWarning,
+            stacklevel=2,
         )
+    return store
+
+
+def _check_group(
+    group: zarr.Group, mode: AccessModeLiteral | None = None
+) -> zarr.Group:
+    """Check the group and return a valid group."""
+    if group.read_only and mode not in [None, "r"]:
+        raise NgioValueError(f"The group is read only. Cannot open in mode {mode}.")
 
     if mode == "r" and not group.read_only:
         # let's make sure we don't accidentally write to the group
         group = zarr.open_group(store=group.store, path=group.path, mode="r")
-
     return group
 
 
 def open_group_wrapper(
     store: StoreOrGroup,
-    mode: AccessModeLiteral,
+    mode: AccessModeLiteral | None = None,
     zarr_format: Literal[2, 3] | None = None,
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
@@ -72,6 +79,7 @@ def open_group_wrapper(
 
     try:
         _check_store(store)
+        mode = mode if mode is not None else "a"
         group = zarr.open_group(store=store, mode=mode, zarr_format=zarr_format)
 
     except FileExistsError as e:
@@ -98,7 +106,7 @@ class ZarrGroupHandler:
         store: StoreOrGroup,
         zarr_format: Literal[2, 3] | None = None,
         cache: bool = False,
-        mode: AccessModeLiteral = "a",
+        mode: AccessModeLiteral | None = None,
         parallel_safe: bool = False,
         parent: "ZarrGroupHandler | None" = None,
     ):
@@ -107,15 +115,15 @@ class ZarrGroupHandler:
         Args:
             store (StoreOrGroup): The Zarr store or group containing the image data.
             meta_mode (str): The mode of the metadata handler.
-            zarr_format (int): The Zarr format version to use.
+            zarr_format (int | None): The Zarr format version to use.
             cache (bool): Whether to cache the metadata.
-            mode (str): The mode of the store.
+            mode (str | None): The mode of the store.
             parallel_safe (bool): If True, the handler will create a lock file to make
                 that can be used to make the handler parallel safe.
                 Be aware that the lock needs to be used manually.
             parent (ZarrGroupHandler | None): The parent handler.
         """
-        if mode not in ["r", "r+", "w", "w-", "a"]:
+        if mode not in ["r", "r+", "w", "w-", "a", None]:
             raise NgioValueError(f"Mode {mode} is not supported.")
 
         if parallel_safe and cache:
@@ -150,16 +158,17 @@ class ZarrGroupHandler:
             self._lock = None
 
         self._group = group
-        self._mode = mode
         self.use_cache = cache
         self._parallel_safe = parallel_safe
-        self._cache = {}
         self._parent = parent
+
+        self._group_cache: NgioCache[zarr.Group] = NgioCache(use_cache=cache)
+        self._array_cache: NgioCache[zarr.Array] = NgioCache(use_cache=cache)
 
     def __repr__(self) -> str:
         """Return a string representation of the handler."""
         return (
-            f"ZarrGroupHandler(full_url={self.full_url}, mode={self.mode}, "
+            f"ZarrGroupHandler(full_url={self.full_url}, read_only={self.read_only}, "
             f"cache={self.use_cache}"
         )
 
@@ -183,9 +192,9 @@ class ZarrGroupHandler:
         return self._group.metadata.zarr_format
 
     @property
-    def mode(self) -> AccessModeLiteral:
-        """Return the mode of the group."""
-        return self._mode  # type: ignore
+    def read_only(self) -> bool:
+        """Return whether the group is read only."""
+        return self._group.read_only
 
     @property
     def lock(self) -> BaseFileLock:
@@ -222,15 +231,41 @@ class ZarrGroupHandler:
         This is useful when the group has been modified
         outside of the handler.
         """
-        if self.mode == "r":
-            mode = "r"
-        else:
-            mode = "r+"
+        mode = "r" if self.read_only else "r+"
         return zarr.open_group(
             store=self._group.store,
             path=self._group.path,
             mode=mode,
             zarr_format=self._group.metadata.zarr_format,
+        )
+
+    def reopen_handler(self) -> "ZarrGroupHandler":
+        """Reopen the handler.
+
+        This is useful when the group has been modified
+        outside of the handler.
+        """
+        mode = "r" if self.read_only else "r+"
+        group = self.reopen_group()
+        return ZarrGroupHandler(
+            store=group,
+            zarr_format=group.metadata.zarr_format,
+            cache=self.use_cache,
+            mode=mode,
+            parallel_safe=self._parallel_safe,
+            parent=self._parent,
+        )
+
+    def clean_cache(self) -> None:
+        """Clear the cached metadata."""
+        group = self.reopen_group()
+        self.__init__(
+            store=group,
+            zarr_format=group.metadata.zarr_format,
+            cache=self.use_cache,
+            mode="r" if self.read_only else "r+",
+            parallel_safe=self._parallel_safe,
+            parent=self._parent,
         )
 
     @property
@@ -242,63 +277,23 @@ class ZarrGroupHandler:
             return self.reopen_group()
         return self._group
 
-    def add_to_cache(self, key: str, value: object) -> None:
-        """Add an object to the cache."""
-        if not self.use_cache:
-            return None
-        self._cache[key] = value
-
-    def get_from_cache(self, key: str) -> object | None:
-        """Get an object from the cache."""
-        if not self.use_cache:
-            return None
-        return self._cache.get(key, None)
-
-    def clean_cache(self) -> None:
-        """Clear the cached metadata."""
-        self._cache = {}
-
     def load_attrs(self) -> dict:
         """Load the attributes of the group."""
-        attrs = self.get_from_cache("attrs")
-        if attrs is not None and isinstance(attrs, dict):
-            return attrs
-
-        attrs = dict(self.group.attrs)
-
-        self.add_to_cache("attrs", attrs)
-        return attrs
-
-    def _write_attrs(self, attrs: dict, overwrite: bool = False) -> None:
-        """Write the metadata to the store."""
-        if self.group.read_only:
-            raise NgioValueError("The group is read only. Cannot write metadata.")
-
-        # we need to invalidate the current attrs cache
-        self.add_to_cache("attrs", None)
-        if overwrite:
-            self.group.attrs.clear()
-
-        self.group.attrs.update(attrs)
+        return self.reopen_group().attrs.asdict()
 
     def write_attrs(self, attrs: dict, overwrite: bool = False) -> None:
         """Write the metadata to the store."""
         # Maybe we should use the lock here
-        self._write_attrs(attrs, overwrite)
-
-    def _obj_get(self, path: str):
-        """Get a group from the group."""
-        group_or_array = self.get_from_cache(path)
-        if group_or_array is not None:
-            return group_or_array
-
-        group_or_array = self.group.get(path, None)
-        self.add_to_cache(path, group_or_array)
-        return group_or_array
+        if self.read_only:
+            raise NgioValueError("The group is read only. Cannot write metadata.")
+        group = self.reopen_group()
+        if overwrite:
+            group.attrs.clear()
+        group.attrs.update(attrs)
 
     def create_group(self, path: str, overwrite: bool = False) -> zarr.Group:
         """Create a group in the group."""
-        if self.mode == "r":
+        if self.group.read_only:
             raise NgioValueError("Cannot create a group in read only mode.")
 
         try:
@@ -308,7 +303,7 @@ class ZarrGroupHandler:
                 f"A Zarr group already exists at {path}, "
                 "consider setting overwrite=True."
             ) from e
-        self.add_to_cache(path, group)
+        self._group_cache.set(path, group, overwrite=overwrite)
         return group
 
     def get_group(
@@ -334,18 +329,22 @@ class ZarrGroupHandler:
         if overwrite:
             return self.create_group(path, overwrite=overwrite)
 
-        group = self._obj_get(path)
+        group = self._group_cache.get(path)
         if isinstance(group, zarr.Group):
             return group
 
-        if group is not None:
-            raise NgioValueError(
-                f"The object at {path} is not a group, but a {type(group)}"
-            )
+        group = self.group.get(path, default=None)
+        if isinstance(group, zarr.Group):
+            self._group_cache.set(path, group, overwrite=overwrite)
+            return group
+
+        if isinstance(group, zarr.Array):
+            raise NgioValueError(f"The object at {path} is not a group, but an array.")
 
         if not create_mode:
             raise NgioFileNotFoundError(f"No group found at {path}")
         group = self.create_group(path)
+        self._group_cache.set(path, group, overwrite=overwrite)
         return group
 
     def safe_get_group(
@@ -369,14 +368,17 @@ class ZarrGroupHandler:
 
     def get_array(self, path: str) -> zarr.Array:
         """Get an array from the group."""
-        array = self._obj_get(path)
-        if array is None:
-            raise NgioFileNotFoundError(f"No array found at {path}")
-        if not isinstance(array, zarr.Array):
-            raise NgioValueError(
-                f"The object at {path} is not an array, but a {type(array)}"
-            )
-        return array
+        array = self._array_cache.get(path)
+        if isinstance(array, zarr.Array):
+            return array
+        array = self.group.get(path, default=None)
+        if isinstance(array, zarr.Array):
+            self._array_cache.set(path, array)
+            return array
+
+        if isinstance(array, zarr.Group):
+            raise NgioValueError(f"The object at {path} is not an array, but a group.")
+        raise NgioFileNotFoundError(f"No array found at {path}")
 
     def create_array(
         self,
@@ -388,7 +390,7 @@ class ZarrGroupHandler:
         separator: Literal[".", "/"] = "/",
         overwrite: bool = False,
     ) -> zarr.Array:
-        if self.mode == "r":
+        if self.group.read_only:
             raise NgioValueError("Cannot create an array in read only mode.")
 
         if self.zarr_format == 2:
@@ -436,7 +438,7 @@ class ZarrGroupHandler:
             store=group,
             zarr_format=self.zarr_format,
             cache=self.use_cache,
-            mode=self.mode,
+            mode="r+",
             parallel_safe=self._parallel_safe,
             parent=self,
         )

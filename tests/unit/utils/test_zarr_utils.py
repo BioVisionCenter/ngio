@@ -33,10 +33,7 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
     attrs = {"a": 1, "b": 2, "c": 3}
     handler.write_attrs(attrs)
     assert handler.load_attrs() == attrs
-    if cache:
-        assert handler.get_from_cache("attrs") == attrs
     handler.clean_cache()
-    assert handler.get_from_cache("attrs") is None
 
     handler.write_attrs({"a": 2}, overwrite=False)
     assert handler.load_attrs()["a"] == 2
@@ -78,7 +75,7 @@ def test_group_handler_read(tmp_path: Path):
     assert handler.load_attrs() == input_attrs
     assert isinstance(handler.get_array("array1"), zarr.Array)
     assert isinstance(handler.get_group("group1"), zarr.Group)
-    assert handler.mode == "r"
+    assert handler.read_only
 
     with pytest.raises(NgioFileNotFoundError):
         handler.get_array("array2")
