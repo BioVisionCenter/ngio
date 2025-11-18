@@ -18,6 +18,7 @@ from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
 from ngio.utils._logger import ngio_logger, ngio_warn, set_logger_level
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
+    NgioCache,
     StoreOrGroup,
     ZarrGroupHandler,
     open_group_wrapper,
@@ -28,6 +29,7 @@ set_logger_level(os.getenv("NGIO_LOGGER_LEVEL", "WARNING"))
 __all__ = [
     # Zarr
     "AccessModeLiteral",
+    "NgioCache",
     # Errors
     "NgioFileExistsError",
     "NgioFileNotFoundError",

@@ -17,6 +17,18 @@ class NgioCache(Generic[T]):
                 "This indicates a logic error."
             )
 
+    @property
+    def use_cache(self) -> bool:
+        return self._use_cache
+
+    @property
+    def cache(self) -> dict[str, T]:
+        return self._cache
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self._cache) == 0
+
     def get(self, key: str, default: T | None = None) -> T | None:
         if not self._use_cache:
             self._cache_sanity_check()
