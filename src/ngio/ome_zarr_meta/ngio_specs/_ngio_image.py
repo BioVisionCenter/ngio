@@ -25,7 +25,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError, NgioValueError
 
 T = TypeVar("T")
-NgffVersions = Literal["0.4"]
+NgffVersions = Literal["0.4", "0.5"]
 DefaultNgffVersion: Literal["0.4"] = "0.4"
 
 
@@ -145,6 +145,17 @@ class AbstractNgioImageMeta:
     def version(self) -> NgffVersions:
         """Version of the OME-NFF metadata used to build the object."""
         return self._version  # type: ignore (version is a Literal type)
+
+    @property
+    def zarr_format(self) -> Literal[2, 3]:
+        """Zarr version used to store the data."""
+        match self.version:
+            case "0.4":
+                return 2
+            case "0.5":
+                return 3
+            case _:
+                raise NgioValueError(f"Unsupported NGFF version: {self.version}")
 
     @property
     def name(self) -> str | None:

@@ -2,9 +2,10 @@
 
 import warnings
 from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
-from zarr.types import DIMENSION_SEPARATOR
+from zarr.core.array import CompressorLike
 
 from ngio.images._create import create_empty_image_container
 from ngio.images._image import Image, ImagesContainer
@@ -409,10 +410,11 @@ class OmeZarrContainer:
         name: str | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str | None = None,
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
-        compressor=None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
         copy_labels: bool = False,
         copy_tables: bool = False,
+        ngff_version: NgffVersions | None = None,
         overwrite: bool = False,
     ) -> "OmeZarrContainer":
         """Create an empty OME-Zarr container from an existing image.
@@ -431,17 +433,18 @@ class OmeZarrContainer:
             dimension_separator (DIMENSION_SEPARATOR | None): The dimension
                 separator to use. If None, the dimension separator of the
                 reference image will be used.
-            compressor: The compressor to use. If None, the compressor of the
-                reference image will be used.
+            compressors (CompressorLike | None): The compressors to use. If None,
+                the compressors of the reference image will be used.
             copy_labels (bool): Whether to copy the labels from the reference image.
             copy_tables (bool): Whether to copy the tables from the reference image.
+            ngff_version (NgffVersions): The NGFF version to use.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
             OmeZarrContainer: The new image container.
 
         """
-        _ = self._images_container.derive(
+        new_container = self._images_container.derive(
             store=store,
             ref_path=ref_path,
             shape=shape,
@@ -452,16 +455,13 @@ class OmeZarrContainer:
             chunks=chunks,
             dtype=dtype,
             dimension_separator=dimension_separator,
-            compressor=compressor,
+            compressors=compressors,
+            ngff_version=ngff_version,
             overwrite=overwrite,
         )
 
-        handler = ZarrGroupHandler(
-            store, cache=self._group_handler.use_cache, mode=self._group_handler.mode
-        )
-
         new_ome_zarr = OmeZarrContainer(
-            group_handler=handler,
+            group_handler=new_container._group_handler,
             validate_paths=False,
         )
 
@@ -693,8 +693,8 @@ class OmeZarrContainer:
         axes_names: Sequence[str] | None = None,
         chunks: Sequence[int] | None = None,
         dtype: str = "uint32",
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
-        compressor=None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
         overwrite: bool = False,
     ) -> "Label":
         """Create an empty OME-Zarr label from a reference image.
@@ -714,8 +714,8 @@ class OmeZarrContainer:
             dimension_separator (DIMENSION_SEPARATOR | None): The dimension
                 separator to use. If None, the dimension separator of the
                 reference image will be used.
-            compressor: The compressor to use. If None, the compressor of the
-                reference image will be used.
+            compressors (CompressorLike | None): The compressors to use. If None,
+                the compressors of the reference image will be used.
             overwrite (bool): Whether to overwrite an existing image.
 
         Returns:
@@ -733,7 +733,7 @@ class OmeZarrContainer:
             chunks=chunks,
             dtype=dtype,
             dimension_separator=dimension_separator,
-            compressor=compressor,
+            compressors=compressors,
             overwrite=overwrite,
         )
 
@@ -773,7 +773,7 @@ def open_image(
         mode (AccessModeLiteral): The
             access mode for the image. Defaults to "r+".
     """
-    group_handler = ZarrGroupHandler(store, cache, mode)
+    group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     images_container = ImagesContainer(group_handler)
     return images_container.get(
         path=path,
@@ -806,7 +806,7 @@ def open_label(
         mode (AccessModeLiteral): The access mode for the image. Defaults to "r+".
 
     """
-    group_handler = ZarrGroupHandler(store, cache, mode)
+    group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     if name is None:
         label_meta_handler = find_label_meta_handler(group_handler)
         path = label_meta_handler.meta.get_dataset(
@@ -836,16 +836,16 @@ def create_empty_ome_zarr(
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | None = None,
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint16",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
-    compressor="default",
+    dimension_separator: Literal[".", "/"] = "/",
+    compressors: CompressorLike = "auto",
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
@@ -874,7 +874,7 @@ def create_empty_ome_zarr(
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         dimension_separator (DIMENSION_SEPARATOR): The dimension
             separator to use. Defaults to "/".
-        compressor: The compressor to use. Defaults to "default".
+        compressors (CompressorLike): The compressor to use. Defaults to "auto".
         channel_labels (list[str] | None, optional): The labels of the channels.
             Defaults to None.
         channel_wavelengths (list[str] | None, optional): The wavelengths of the
@@ -885,7 +885,7 @@ def create_empty_ome_zarr(
             active. Defaults to None.
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (NgffVersion, optional): The version of the OME-Zarr specification.
+        ngff_version (NgffVersion, optional): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
     """
     handler = create_empty_image_container(
@@ -904,9 +904,9 @@ def create_empty_ome_zarr(
         chunks=chunks,
         dtype=dtype,
         dimension_separator=dimension_separator,
-        compressor=compressor,
+        compressors=compressors,
         overwrite=overwrite,
-        version=version,
+        ngff_version=ngff_version,
     )
 
     ome_zarr = OmeZarrContainer(group_handler=handler)
@@ -938,11 +938,11 @@ def create_ome_zarr_from_array(
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | None = None,
-    dimension_separator: DIMENSION_SEPARATOR = "/",
-    compressor: str = "default",
+    chunks: Sequence[int] | Literal["auto"] = "auto",
+    dimension_separator: Literal[".", "/"] = "/",
+    compressors: CompressorLike = "auto",
     overwrite: bool = False,
-    version: NgffVersions = DefaultNgffVersion,
+    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
@@ -980,10 +980,10 @@ def create_ome_zarr_from_array(
             active. Defaults to None.
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
-        compressor: The compressor to use. Defaults to "default".
+        compressors (CompressorLike): The compressors to use. Defaults to "auto".
         overwrite (bool, optional): Whether to overwrite an existing image.
             Defaults to True.
-        version (str, optional): The version of the OME-Zarr specification.
+        ngff_version (str, optional): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
     """
     handler = create_empty_image_container(
@@ -1003,8 +1003,8 @@ def create_ome_zarr_from_array(
         dtype=str(array.dtype),
         overwrite=overwrite,
         dimension_separator=dimension_separator,
-        compressor=compressor,
-        version=version,
+        compressors=compressors,
+        ngff_version=ngff_version,
     )
 
     ome_zarr = OmeZarrContainer(group_handler=handler)

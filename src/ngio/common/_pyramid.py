@@ -5,8 +5,9 @@ from typing import Literal
 import dask.array as da
 import numpy as np
 import zarr
-from zarr.types import DIMENSION_SEPARATOR
+from zarr.core.array import CompressorLike
 
+# from zarr.types import DIMENSION_SEPARATOR
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -26,7 +27,10 @@ def _on_disk_numpy_zoom(
     target: zarr.Array,
     order: InterpolationOrder,
 ) -> None:
-    target[...] = numpy_zoom(source[...], target_shape=target.shape, order=order)
+    source_array = source[...]
+    if not isinstance(source_array, np.ndarray):
+        raise NgioValueError("source zarr array could not be read as a numpy array")
+    target[...] = numpy_zoom(source_array, target_shape=target.shape, order=order)
 
 
 def _on_disk_dask_zoom(
@@ -37,7 +41,7 @@ def _on_disk_dask_zoom(
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
 
-    target_array = target_array.rechunk(target.chunks)
+    target_array = target_array.rechunk(target.chunks)  # type: ignore
     target_array.compute_chunk_sizes()
     target_array.to_zarr(target)
 
@@ -199,20 +203,24 @@ def init_empty_pyramid(
     paths: list[str],
     ref_shape: Sequence[int],
     scaling_factors: Sequence[float],
-    chunks: Sequence[int] | None = None,
+    axes: Sequence[str],
+    chunks: Sequence[int] | Literal["auto"] = "auto",
     dtype: str = "uint16",
     mode: AccessModeLiteral = "a",
-    dimension_separator: DIMENSION_SEPARATOR = "/",
-    compressor="default",
+    dimension_separator: Literal[".", "/"] = "/",
+    compressors: CompressorLike = "auto",
+    zarr_format: Literal[2, 3] = 2,
 ) -> None:
     # Return the an Image object
-    if chunks is not None and len(chunks) != len(ref_shape):
+    if chunks != "auto" and len(chunks) != len(ref_shape):
         raise NgioValueError(
             "The shape and chunks must have the same number of dimensions."
         )
 
-    if chunks is not None:
-        chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
+    if chunks != "auto":
+        chunks = tuple(min(c, s) for c, s in zip(chunks, ref_shape, strict=True))
+    else:
+        chunks = "auto"
 
     if len(ref_shape) != len(scaling_factors):
         raise NgioValueError(
@@ -223,7 +231,25 @@ def init_empty_pyramid(
     # To reduce the risk of floating point issues
     scaling_factors = [_maybe_int(s) for s in scaling_factors]
 
-    root_group = open_group_wrapper(store, mode=mode)
+    root_group = open_group_wrapper(store, mode=mode, zarr_format=zarr_format)
+
+    array_static_kwargs = {
+        "dtype": dtype,
+        "overwrite": True,
+        "compressors": compressors,
+    }
+
+    if zarr_format == 2:
+        array_static_kwargs["chunk_key_encoding"] = {
+            "name": "v2",
+            "separator": dimension_separator,
+        }
+    else:
+        array_static_kwargs["chunk_key_encoding"] = {
+            "name": "default",
+            "separator": dimension_separator,
+        }
+        array_static_kwargs["dimension_names"] = axes
 
     for path in paths:
         if any(s < 1 for s in ref_shape):
@@ -231,23 +257,17 @@ def init_empty_pyramid(
                 "Level shape must be at least 1 on all dimensions. "
                 f"Calculated shape: {ref_shape} at level {path}."
             )
-        new_arr = root_group.zeros(
+        new_arr = root_group.create_array(
             name=path,
-            shape=ref_shape,
-            dtype=dtype,
+            shape=tuple(ref_shape),
             chunks=chunks,
-            dimension_separator=dimension_separator,
-            overwrite=True,
-            compressor=compressor,
+            **array_static_kwargs,
         )
 
-        _shape = [
+        ref_shape = [
             math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
         ]
-        ref_shape = _shape
-
-        if chunks is None:
-            chunks = new_arr.chunks
-            assert chunks is not None
-        chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
+        chunks = tuple(
+            min(c, s) for c, s in zip(new_arr.chunks, ref_shape, strict=True)
+        )
     return None

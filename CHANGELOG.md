@@ -1,5 +1,16 @@
 # Changelog
 
+## [v0.5.0]
+
+### Features
+- Add support for OME-NGFF v0.5
+- Move to zarr-python v3
+
+### API Changes
+
+- The `compressor` argument has been renamed to `compressors` in all relevant functions and methods to reflect the support for multiple compressors in zarr v3.
+- The `version` argument has been renamed to `ngff_version` in all relevant functions and methods to specify the OME-NGFF version.
+
 ## [v0.4.4]
 
 ### Bug Fixes

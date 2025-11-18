@@ -40,6 +40,7 @@ from ngio.tables import (
 )
 from ngio.utils import (
     AccessModeLiteral,
+    NgioCache,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -239,6 +240,12 @@ class OmeZarrPlate:
         self._group_handler = group_handler
         self._meta_handler = find_plate_meta_handler(group_handler)
         self._tables_container = table_container
+        self._wells_cache: NgioCache[OmeZarrWell] = NgioCache(
+            use_cache=self._group_handler.use_cache
+        )
+        self._images_cache: NgioCache[OmeZarrContainer] = NgioCache(
+            use_cache=self._group_handler.use_cache
+        )
 
     def __repr__(self) -> str:
         """Return a string representation of the plate."""
@@ -356,6 +363,24 @@ class OmeZarrPlate:
         well = self.get_well(row=row, column=column)
         return well.get_image_acquisition_id(image_path=image_path)
 
+    def _get_well(self, well_path: str) -> OmeZarrWell:
+        """Get a well from the plate by its path.
+
+        Args:
+            well_path (str): The path of the well.
+
+        Returns:
+            OmeZarrWell: The well.
+
+        """
+        cached_well = self._wells_cache.get(well_path)
+        if cached_well is not None:
+            return cached_well
+
+        group_handler = self._group_handler.derive_handler(well_path)
+        self._wells_cache.set(well_path, OmeZarrWell(group_handler))
+        return OmeZarrWell(group_handler)
+
     def get_well(self, row: str, column: int | str) -> OmeZarrWell:
         """Get a well from the plate.
 
@@ -367,8 +392,7 @@ class OmeZarrPlate:
             OmeZarrWell: The well.
         """
         well_path = self._well_path(row=row, column=column)
-        group_handler = self._group_handler.derive_handler(well_path)
-        return OmeZarrWell(group_handler)
+        return self._get_well(well_path=well_path)
 
     async def get_wells_async(self) -> dict[str, OmeZarrWell]:
         """Get all wells in the plate asynchronously.
@@ -380,26 +404,17 @@ class OmeZarrPlate:
             dict[str, OmeZarrWell]: A dictionary of wells, where the key is the well
                 path and the value is the well object.
         """
-        wells = self._group_handler.get_from_cache("wells")
-        if wells is not None:
-            assert isinstance(wells, dict)
-            return wells
-
-        def process_well(well_path):
-            group_handler = self._group_handler.derive_handler(well_path)
-            well = OmeZarrWell(group_handler)
-            return well_path, well
-
         wells, tasks = {}, []
         for well_path in self.wells_paths():
-            task = asyncio.to_thread(process_well, well_path)
+            task = asyncio.to_thread(
+                lambda well_path: (well_path, self._get_well(well_path)), well_path
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks)
         for well_path, well in results:
             wells[well_path] = well
 
-        self._group_handler.add_to_cache("wells", wells)
         return wells
 
     def get_wells(self) -> dict[str, OmeZarrWell]:
@@ -409,23 +424,24 @@ class OmeZarrPlate:
             dict[str, OmeZarrWell]: A dictionary of wells, where the key is the well
                 path and the value is the well object.
         """
-        wells = self._group_handler.get_from_cache("wells")
-        if wells is not None:
-            assert isinstance(wells, dict)
-            return wells
-
-        def process_well(well_path):
-            group_handler = self._group_handler.derive_handler(well_path)
-            well = OmeZarrWell(group_handler)
-            return well_path, well
-
         wells = {}
         for well_path in self.wells_paths():
-            _, well = process_well(well_path)
-            wells[well_path] = well
-
-        self._group_handler.add_to_cache("wells", wells)
+            wells[well_path] = self._get_well(well_path)
         return wells
+
+    def _get_image(self, image_path: str) -> OmeZarrContainer:
+        """Get an image from the plate by its path.
+
+        Args:
+            image_path (str): The path of the image.
+        """
+        cached_image = self._images_cache.get(image_path)
+        if cached_image is not None:
+            return cached_image
+        img_group_handler = self._group_handler.derive_handler(image_path)
+        image = OmeZarrContainer(img_group_handler)
+        self._images_cache.set(image_path, image)
+        return image
 
     async def get_images_async(
         self, acquisition: int | None = None
@@ -442,30 +458,19 @@ class OmeZarrPlate:
             dict[str, OmeZarrContainer]: A dictionary of images, where the key is the
                 image path and the value is the image object.
         """
-        images = self._group_handler.get_from_cache("images")
-        if images is not None:
-            assert isinstance(images, dict)
-            return images
-
         paths = await self.images_paths_async(acquisition=acquisition)
-
-        def process_image(image_path):
-            """Process a single image and return the image path and image object."""
-            img_group_handler = self._group_handler.derive_handler(image_path)
-            image = OmeZarrContainer(img_group_handler)
-            return image_path, image
 
         images, tasks = {}, []
         for image_path in paths:
-            task = asyncio.to_thread(process_image, image_path)
+            task = asyncio.to_thread(
+                lambda image_path: (image_path, self._get_image(image_path)), image_path
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks)
 
         for image_path, image in results:
             images[image_path] = image
-
-        self._group_handler.add_to_cache("images", images)
         return images
 
     def get_images(self, acquisition: int | None = None) -> dict[str, OmeZarrContainer]:
@@ -474,24 +479,11 @@ class OmeZarrPlate:
         Args:
             acquisition: The acquisition id to filter the images.
         """
-        images = self._group_handler.get_from_cache("images")
-        if images is not None:
-            assert isinstance(images, dict)
-            return images
         paths = self.images_paths(acquisition=acquisition)
-
-        def process_image(image_path):
-            """Process a single image and return the image path and image object."""
-            img_group_handler = self._group_handler.derive_handler(image_path)
-            image = OmeZarrContainer(img_group_handler)
-            return image_path, image
-
         images = {}
         for image_path in paths:
-            _, image = process_image(image_path)
-            images[image_path] = image
+            images[image_path] = self._get_image(image_path)
 
-        self._group_handler.add_to_cache("images", images)
         return images
 
     def get_image(
@@ -508,8 +500,7 @@ class OmeZarrPlate:
             OmeZarrContainer: The image.
         """
         image_path = self._image_path(row=row, column=column, path=image_path)
-        group_handler = self._group_handler.derive_handler(image_path)
-        return OmeZarrContainer(group_handler)
+        return self._get_image(image_path)
 
     def get_image_store(
         self, row: str, column: int | str, image_path: str
