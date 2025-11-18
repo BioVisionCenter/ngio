@@ -360,12 +360,9 @@ def open_tables_container(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
-    parallel_safe: bool = False,
 ) -> TablesContainer:
     """Open a table handler from a Zarr store."""
-    handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     return TablesContainer(handler)
 
 
@@ -374,11 +371,12 @@ def open_table(
     backend: TableBackend | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
-    parallel_safe: bool = False,
 ) -> Table:
     """Open a table from a Zarr store."""
     handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     meta = _get_meta(handler)
     return ImplementedTables().get_table(
@@ -392,11 +390,12 @@ def open_table_as(
     backend: TableBackend | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
-    parallel_safe: bool = False,
 ) -> TableType:
     """Open a table from a Zarr store as a specific type."""
     handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     return table_cls.from_handler(
         handler=handler,
@@ -410,12 +409,20 @@ def write_table(
     backend: TableBackend = DefaultTableBackend,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
-    parallel_safe: bool = False,
 ) -> None:
-    """Write a table to a Zarr store."""
-    handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    """Write a table to a Zarr store.
+
+    A table will be created at the given store location.
+
+    Args:
+        store (StoreOrGroup): The Zarr store or group to write the table to.
+        table (Table): The table to write.
+        backend (TableBackend): The backend to use for writing the table.
+        cache (bool): Whether to use caching for the Zarr group handler.
+        mode (AccessModeLiteral): The access mode to use for the Zarr group handler.
+
+    """
+    handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     table.set_backend(
         handler=handler,
         backend=backend,

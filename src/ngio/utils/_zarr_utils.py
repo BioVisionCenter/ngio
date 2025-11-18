@@ -8,7 +8,6 @@ import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
 from zarr.abc.store import Store
-from zarr.core.array import CompressorLike
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
@@ -107,8 +106,6 @@ class ZarrGroupHandler:
         zarr_format: Literal[2, 3] | None = None,
         cache: bool = False,
         mode: AccessModeLiteral | None = None,
-        parallel_safe: bool = False,
-        parent: "ZarrGroupHandler | None" = None,
     ):
         """Initialize the handler.
 
@@ -118,52 +115,17 @@ class ZarrGroupHandler:
             zarr_format (int | None): The Zarr format version to use.
             cache (bool): Whether to cache the metadata.
             mode (str | None): The mode of the store.
-            parallel_safe (bool): If True, the handler will create a lock file to make
-                that can be used to make the handler parallel safe.
-                Be aware that the lock needs to be used manually.
-            parent (ZarrGroupHandler | None): The parent handler.
         """
         if mode not in ["r", "r+", "w", "w-", "a", None]:
             raise NgioValueError(f"Mode {mode} is not supported.")
 
-        if parallel_safe and cache:
-            raise NgioValueError(
-                "The cache and parallel_safe options are mutually exclusive."
-                "If you want to use the lock mechanism, you should not use the cache."
-            )
-
         group = open_group_wrapper(store=store, mode=mode, zarr_format=zarr_format)
-        _store = group.store
-
-        # Make sure the cache is set in the attrs
-        # in the same way as the cache in the handler
-
-        ## TODO
-        # Figure out how to handle the cache in the new zarr version
-        # group.attrs.cache = cache
-
-        if parallel_safe:
-            if not isinstance(_store, LocalStore):
-                raise NgioValueError(
-                    "The store needs to be a LocalStore to use the lock mechanism. "
-                    f"Instead, got {_store.__class__.__name__}."
-                )
-
-            store_path = _store.root / group.path
-            self._lock_path = store_path.with_suffix(".lock")
-            self._lock = FileLock(self._lock_path, timeout=10)
-
-        else:
-            self._lock_path = None
-            self._lock = None
-
         self._group = group
         self.use_cache = cache
-        self._parallel_safe = parallel_safe
-        self._parent = parent
 
         self._group_cache: NgioCache[zarr.Group] = NgioCache(use_cache=cache)
         self._array_cache: NgioCache[zarr.Array] = NgioCache(use_cache=cache)
+        self._lock: tuple[Path, BaseFileLock] | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the handler."""
@@ -196,31 +158,51 @@ class ZarrGroupHandler:
         """Return whether the group is read only."""
         return self._group.read_only
 
+    def _create_lock(self) -> tuple[Path, BaseFileLock]:
+        """Create the lock."""
+        if self._lock is not None:
+            return self._lock
+
+        if self.use_cache is True:
+            raise NgioValueError(
+                "Lock mechanism is not compatible with caching. "
+                "Please set cache=False to use the lock mechanism."
+            )
+
+        if not isinstance(self.store, LocalStore):
+            raise NgioValueError(
+                "The store needs to be a LocalStore to use the lock mechanism. "
+                f"Instead, got {self.store.__class__.__name__}."
+            )
+
+        store_path = Path(self.store.root) / self.group.path
+        _lock_path = store_path.with_suffix(".lock")
+        _lock = FileLock(_lock_path, timeout=10)
+        return _lock_path, _lock
+
     @property
     def lock(self) -> BaseFileLock:
         """Return the lock."""
         if self._lock is None:
-            raise NgioValueError(
-                "The handler is not parallel safe. "
-                "Reopen the handler with parallel_safe=True."
-            )
-        return self._lock
+            self._lock = self._create_lock()
+        return self._lock[1]
 
     @property
-    def parent(self) -> "ZarrGroupHandler | None":
-        """Return the parent handler."""
-        return self._parent
+    def lock_path(self) -> Path:
+        """Return the lock path."""
+        if self._lock is None:
+            self._lock = self._create_lock()
+        return self._lock[0]
 
     def remove_lock(self) -> None:
         """Return the lock."""
-        if self._lock is None or self._lock_path is None:
+        if self._lock is None:
             return None
 
-        lock_path = Path(self._lock_path)
-        if lock_path.exists() and self._lock.lock_counter == 0:
+        lock_path, lock = self._lock
+        if lock_path.exists() and lock.lock_counter == 0:
             lock_path.unlink()
             self._lock = None
-            self._lock_path = None
             return None
 
         raise NgioValueError("The lock is still in use. Cannot remove it.")
@@ -252,8 +234,6 @@ class ZarrGroupHandler:
             zarr_format=group.metadata.zarr_format,
             cache=self.use_cache,
             mode=mode,
-            parallel_safe=self._parallel_safe,
-            parent=self._parent,
         )
 
     def clean_cache(self) -> None:
@@ -264,15 +244,13 @@ class ZarrGroupHandler:
             zarr_format=group.metadata.zarr_format,
             cache=self.use_cache,
             mode="r" if self.read_only else "r+",
-            parallel_safe=self._parallel_safe,
-            parent=self._parent,
         )
 
     @property
     def group(self) -> zarr.Group:
         """Return the group."""
-        if self._parallel_safe:
-            # If we are parallel safe, we need to reopen the group
+        if self.use_cache is False:
+            # If we are not using cache, we need to reopen the group
             # to make sure that the attributes are up to date
             return self.reopen_group()
         return self._group
@@ -380,48 +358,6 @@ class ZarrGroupHandler:
             raise NgioValueError(f"The object at {path} is not an array, but a group.")
         raise NgioFileNotFoundError(f"No array found at {path}")
 
-    def create_array(
-        self,
-        path: str,
-        shape: tuple[int, ...],
-        dtype: str,
-        chunks: tuple[int, ...] | Literal["auto"] = "auto",
-        compressors: CompressorLike = "auto",
-        separator: Literal[".", "/"] = "/",
-        overwrite: bool = False,
-    ) -> zarr.Array:
-        if self.group.read_only:
-            raise NgioValueError("Cannot create an array in read only mode.")
-
-        if self.zarr_format == 2:
-            chunks_encoding = {
-                "name": "v2",
-                "separator": separator,
-            }
-        else:
-            chunks_encoding = {
-                "name": "default",
-                "separator": separator,
-            }
-
-        try:
-            return self.group.create_array(
-                name=path,
-                shape=shape,
-                dtype=dtype,
-                chunks=chunks,
-                chunk_key_encoding=chunks_encoding,
-                overwrite=overwrite,
-                compressors=compressors,
-            )
-        except ContainsGroupError as e:
-            raise NgioFileExistsError(
-                f"A Zarr array already exists at {path}, "
-                "consider setting overwrite=True."
-            ) from e
-        except Exception as e:
-            raise NgioValueError(f"Error creating array at {path}") from e
-
     def derive_handler(
         self,
         path: str,
@@ -435,12 +371,7 @@ class ZarrGroupHandler:
         """
         group = self.get_group(path, create_mode=True, overwrite=overwrite)
         return ZarrGroupHandler(
-            store=group,
-            zarr_format=self.zarr_format,
-            cache=self.use_cache,
-            mode="r+",
-            parallel_safe=self._parallel_safe,
-            parent=self,
+            store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode="r+"
         )
 
     def safe_derive_handler(

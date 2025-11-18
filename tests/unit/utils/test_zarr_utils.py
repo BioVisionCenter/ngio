@@ -115,9 +115,7 @@ def test_multiprocessing_safety(tmp_path: Path):
 
     @dask.delayed  # type: ignore
     def add_item(i):
-        handler = ZarrGroupHandler(
-            zarr_store, cache=False, mode="a", parallel_safe=True
-        )
+        handler = ZarrGroupHandler(zarr_store, cache=False, mode="a")
         assert handler.lock is not None
 
         with handler.lock:
@@ -127,7 +125,7 @@ def test_multiprocessing_safety(tmp_path: Path):
 
         return i
 
-    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w", parallel_safe=True)
+    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w")
     attrs = handler.load_attrs()
     attrs = {"test_list": []}
     handler.write_attrs(attrs, overwrite=True)
@@ -143,7 +141,7 @@ def test_multiprocessing_safety(tmp_path: Path):
     assert len(counts) == num_items
     assert np.all(counts == 1)
 
-    assert handler._lock_path is not None
+    assert handler.lock_path is not None
 
     if sys.platform.startswith("win"):
         # The file lock path is not removed on Windows
@@ -151,17 +149,25 @@ def test_multiprocessing_safety(tmp_path: Path):
         # even though the file should exist (or at least it does on Mac/Linux)
         return None
 
-    assert Path(handler._lock_path).exists()
-    lock_path = Path(handler._lock_path)
+    assert handler.lock_path.exists()
+    lock_path = handler.lock_path
     handler.remove_lock()
     assert not lock_path.exists()
     handler.remove_lock()
 
-    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w", parallel_safe=True)
+    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w")
     assert handler.lock is not None
     with pytest.raises(NgioValueError):
+        # Attempt to remove the lock while it is in use
         with handler.lock:
             handler.remove_lock()
+
+    # If cache is used, raise error when creating lock
+    # Since caching creates a temporary local copy
+    # which cannot be locked properly
+    handler = ZarrGroupHandler(zarr_store, cache=True, mode="r")
+    with pytest.raises(NgioValueError):
+        handler._create_lock()
 
 
 def test_remote_storage():
@@ -178,9 +184,3 @@ def test_remote_storage():
     assert handler.load_attrs()
     assert isinstance(handler.get_array("0"), zarr.Array)
     assert isinstance(handler.get_group("labels"), zarr.Group)
-
-    # Check if the fsspec store based group is handled correctly
-    open_group_wrapper(store=handler.group, mode="r")
-
-    with pytest.raises(NgioValueError):
-        ZarrGroupHandler(store=store, parallel_safe=True)

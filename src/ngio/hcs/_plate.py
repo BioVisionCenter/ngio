@@ -776,7 +776,6 @@ class OmeZarrPlate:
         keep_acquisitions: bool = False,
         cache: bool = False,
         overwrite: bool = False,
-        parallel_safe: bool = True,
     ) -> "OmeZarrPlate":
         """Derive a new OME-Zarr plate from an existing one.
 
@@ -787,7 +786,6 @@ class OmeZarrPlate:
             keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
             cache (bool): Whether to use a cache for the zarr group metadata.
             overwrite (bool): Whether to overwrite the existing plate.
-            parallel_safe (bool): Whether the group handler is parallel safe.
         """
         return derive_ome_zarr_plate(
             ome_zarr_plate=self,
@@ -797,7 +795,6 @@ class OmeZarrPlate:
             keep_acquisitions=keep_acquisitions,
             cache=cache,
             overwrite=overwrite,
-            parallel_safe=parallel_safe,
         )
 
     def _get_tables_container(self) -> TablesContainer | None:
@@ -1134,7 +1131,6 @@ def open_ome_zarr_plate(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
     """Open an OME-Zarr plate.
 
@@ -1143,11 +1139,8 @@ def open_ome_zarr_plate(
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The
             access mode for the image. Defaults to "r+".
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
-    group_handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     return OmeZarrPlate(group_handler)
 
 
@@ -1159,9 +1152,7 @@ def _create_empty_plate_from_meta(
 ) -> ZarrGroupHandler:
     """Create an empty OME-Zarr plate from metadata."""
     mode = "w" if overwrite else "w-"
-    group_handler = ZarrGroupHandler(
-        store=store, cache=True, mode=mode, parallel_safe=False
-    )
+    group_handler = ZarrGroupHandler(store=store, cache=True, mode=mode)
     meta_handler = get_plate_meta_handler(group_handler, version=version)
     meta_handler.write_meta(meta)
     return group_handler
@@ -1174,9 +1165,18 @@ def create_empty_plate(
     version: NgffVersions = "0.4",
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
-    """Initialize and create an empty OME-Zarr plate."""
+    """Initialize and create an empty OME-Zarr plate.
+
+    Args:
+        store (StoreOrGroup): The Zarr store or group that stores the plate.
+        name (str): The name of the plate.
+        images (list[ImageInWellPath] | None): A list of images to add to the plate.
+            If None, no images are added. Defaults to None.
+        version (NgffVersion): The version of the new plate.
+        cache (bool): Whether to use a cache for the zarr group metadata.
+        overwrite (bool): Whether to overwrite the existing plate.
+    """
     plate_meta = NgioPlateMeta.default_init(
         name=name,
         version=version,
@@ -1202,7 +1202,6 @@ def create_empty_plate(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )
 
 
@@ -1214,7 +1213,6 @@ def derive_ome_zarr_plate(
     keep_acquisitions: bool = False,
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
     """Derive a new OME-Zarr plate from an existing one.
 
@@ -1226,7 +1224,6 @@ def derive_ome_zarr_plate(
         keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing plate.
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
     if plate_name is None:
         plate_name = ome_zarr_plate.meta.plate.name
@@ -1246,7 +1243,6 @@ def derive_ome_zarr_plate(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )
 
 
@@ -1254,7 +1250,6 @@ def open_ome_zarr_well(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = True,
 ) -> OmeZarrWell:
     """Open an OME-Zarr well.
 
@@ -1262,10 +1257,11 @@ def open_ome_zarr_well(
         store (StoreOrGroup): The Zarr store or group that stores the plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The access mode for the image. Defaults to "r+".
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
     group_handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     return OmeZarrWell(group_handler)
 
@@ -1275,7 +1271,6 @@ def create_empty_well(
     version: NgffVersions = "0.4",
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrWell:
     """Create an empty OME-Zarr well.
 
@@ -1284,10 +1279,9 @@ def create_empty_well(
         version (NgffVersion): The version of the new well.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing well.
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
     group_handler = ZarrGroupHandler(
-        store=store, cache=True, mode="w" if overwrite else "w-", parallel_safe=False
+        store=store, cache=True, mode="w" if overwrite else "w-"
     )
     meta_handler = get_well_meta_handler(group_handler, version=version)
     meta = NgioWellMeta.default_init()
@@ -1297,5 +1291,4 @@ def create_empty_well(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )
