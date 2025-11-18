@@ -2,6 +2,7 @@ import math
 from collections.abc import Callable, Sequence
 from typing import Literal
 
+import dask
 import dask.array as da
 import numpy as np
 import zarr
@@ -36,9 +37,17 @@ def _on_disk_dask_zoom(
 ) -> None:
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
-
+    # This is a potential fix for Dask 2025.11
+    # chunk_size_bytes = np.prod(target.chunks) * target_array.dtype.itemsize
+    # current_chunk_size = dask.config.get("array.chunk-size", 0)
+    #
+    #if current_chunk_size < chunk_size_bytes:
+    #    # Increase the chunk size to avoid dask potentially creating 
+    #    # corrupted chunks when writing chunks that are not multiple of the
+    #    # target chunk size
+    #    dask.config.set({"array.chunk-size": f"{chunk_size_bytes}B"})
     target_array = target_array.rechunk(target.chunks)
-    target_array.compute_chunk_sizes()
+    target_array = target_array.compute_chunk_sizes()
     target_array.to_zarr(target)
 
 
@@ -241,13 +250,11 @@ def init_empty_pyramid(
             compressor=compressor,
         )
 
-        _shape = [
+        ref_shape = [
             math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
         ]
-        ref_shape = _shape
+        chunks = tuple(
+            min(c, s) for c, s in zip(new_arr.chunks, ref_shape, strict=True)
+        )
 
-        if chunks is None:
-            chunks = new_arr.chunks
-            assert chunks is not None
-        chunks = [min(c, s) for c, s in zip(chunks, ref_shape, strict=True)]
     return None

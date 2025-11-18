@@ -36,13 +36,13 @@ dependencies = [
     "numpy",
     "filelock",
     "zarr<3",
-    "anndata>=0.8.0,<0.11.4", # To be removed when we transition to zarr v3
+    "anndata>=0.8.0,<0.11.4",      # To be removed when we transition to zarr v3
     "pydantic",
     "pandas>=1.2.0",
     "requests",
     "aiohttp",
-    "dask[array]",
-    "dask[distributed]",
+    "dask[array]<2025.11.0",
+    "dask[distributed]<2025.11.0",
     # "xarray", still not used
     "ome-zarr-models",
     "pooch",
