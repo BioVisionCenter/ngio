@@ -1,5 +1,10 @@
 # Changelog
 
+## [v0.4.5]
+
+### Bug Fixes
+- Pin Dask to version <2025.11 to avoid errors when writing zarr pyramids with dask (see https://github.com/dask/dask/issues/12159#issuecomment-3548421833)
+
 ## [v0.4.4]
 
 ### Bug Fixes
