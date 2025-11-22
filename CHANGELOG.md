@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Bug Fixes
+- Fix channel selection from `wavelenght_id`
+
 ## [v0.4.5]
 
 ### Bug Fixes
