@@ -13,6 +13,16 @@
 - Remove the `parallel_safe` argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the 
 `cache`.
 - Remove the unused `parent` argument from `ZarrGroupHandler`.
+## [v0.4.6]
+
+### Bug Fixes
+- Fix channel selection from `wavelength_id`
+- Fix table opening mode to stop wrtiting groups when opening in append mode.
+
+## [v0.4.5]
+
+### Bug Fixes
+- Pin Dask to version <2025.11 to avoid errors when writing zarr pyramids with dask (see https://github.com/dask/dask/issues/12159#issuecomment-3548421833)
 
 ## [v0.4.4]
 

@@ -885,7 +885,7 @@ def _parse_str_or_model(
             )
         elif channel_selection.mode == "wavelength_id":
             return image.get_channel_idx(
-                channel_label=str(channel_selection.identifier)
+                wavelength_id=str(channel_selection.identifier)
             )
         elif channel_selection.mode == "index":
             return int(channel_selection.identifier)

@@ -41,8 +41,8 @@ dependencies = [
     "pandas>=1.2.0",
     "requests",
     "aiohttp",
-    "dask[array]",
-    "dask[distributed]",
+    "dask[array]<2025.11.0",
+    "dask[distributed]<2025.11.0",
     # "xarray", still not used
     "ome-zarr-models",
     "pooch",
