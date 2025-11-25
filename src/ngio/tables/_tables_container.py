@@ -359,7 +359,7 @@ ImplementedTables().add_implementation(ConditionTableV1)
 def open_tables_container(
     store: StoreOrGroup,
     cache: bool = False,
-    mode: AccessModeLiteral = "a",
+    mode: AccessModeLiteral = "r+",
     parallel_safe: bool = False,
 ) -> TablesContainer:
     """Open a table handler from a Zarr store."""
@@ -373,7 +373,7 @@ def open_table(
     store: StoreOrGroup,
     backend: TableBackend | None = None,
     cache: bool = False,
-    mode: AccessModeLiteral = "a",
+    mode: AccessModeLiteral = "r+",
     parallel_safe: bool = False,
 ) -> Table:
     """Open a table from a Zarr store."""
@@ -391,7 +391,7 @@ def open_table_as(
     table_cls: type[TableType],
     backend: TableBackend | None = None,
     cache: bool = False,
-    mode: AccessModeLiteral = "a",
+    mode: AccessModeLiteral = "r+",
     parallel_safe: bool = False,
 ) -> TableType:
     """Open a table from a Zarr store as a specific type."""

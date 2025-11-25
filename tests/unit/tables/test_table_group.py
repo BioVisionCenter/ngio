@@ -12,7 +12,7 @@ from ngio.utils import NgioValueError
 
 
 def test_table_container(tmp_path: Path):
-    table_group = open_tables_container(tmp_path / "test.zarr")
+    table_group = open_tables_container(tmp_path / "test.zarr", mode="a")
     assert isinstance(table_group, TablesContainer)
     assert table_group.list() == []
 
