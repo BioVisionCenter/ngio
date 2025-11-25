@@ -1,9 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [v0.4.6]
 
 ### Bug Fixes
 - Fix channel selection from `wavelenght_id`
+- Fix table opening mode to stop wrtiting groups when opening in append mode.
 
 ## [v0.4.5]
 
