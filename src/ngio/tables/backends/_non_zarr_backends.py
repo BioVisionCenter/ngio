@@ -5,7 +5,7 @@ from typing import Any
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
-from zarr.storage import FsspecStore, LocalStore
+from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._utils import normalize_pandas_df, normalize_polars_lf
@@ -51,17 +51,22 @@ class NonZarrBaseBackend(AbstractTableBackend):
             "The backend_name method must be implemented in the subclass."
         )
 
-    def _load_from_directory_store(self, reader):
+    def _raise_store_type_not_supported(self):
+        """Raise an error for unsupported store types."""
+        ext = self.table_name.split(".")[-1]
+        store = self._group_handler.store
+        raise NgioValueError(
+            f"Ngio does not support reading a {ext} table from a "
+            f"store of type {type(store)}. "
+            "Please make sure to use a compatible "
+            "store like a LocalStore, or "
+            "FsspecStore, or MemoryStore, or ZipStore."
+        )
+
+    def _load_from_local_store(self, reader):
         """Load the table from a directory store."""
         url = self._group_handler.full_url
-        if url is None:
-            ext = self.table_name.split(".")[-1]
-            raise NgioValueError(
-                f"Ngio does not support reading a {ext} table from a "
-                f"store of type {type(self._group_handler)}. "
-                "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore."
-            )
+        assert url is not None
         table_path = f"{url}/{self.table_name}"
         dataframe = reader(table_path)
         return dataframe
@@ -85,22 +90,27 @@ class NonZarrBaseBackend(AbstractTableBackend):
             dataframe = reader(f)
         return dataframe
 
+    def _load_from_in_memory_store(self, reader):
+        """Load the table from an in-memory store."""
+        raise NotImplementedError("In-memory store loading is not implemented yet.")
+
+    def _load_from_zip_store(self, reader):
+        """Load the table from a zip store."""
+        raise NotImplementedError("Zip store loading is not implemented yet.")
+
     def load_as_pandas_df(self) -> DataFrame:
         """Load the table as a pandas DataFrame."""
         store = self._group_handler.store
         if isinstance(store, LocalStore):
-            dataframe = self._load_from_directory_store(reader=self.df_reader)
+            dataframe = self._load_from_local_store(reader=self.df_reader)
         elif isinstance(store, FsspecStore):
             dataframe = self._load_from_fs_store_df(reader=self.df_reader)
+        elif isinstance(store, MemoryStore):
+            dataframe = self._load_from_in_memory_store(reader=self.df_reader)
+        elif isinstance(store, ZipStore):
+            dataframe = self._load_from_zip_store(reader=self.df_reader)
         else:
-            ext = self.table_name.split(".")[-1]
-            raise NgioValueError(
-                f"Ngio does not support reading a {ext} table from a "
-                f"store of type {type(store)}. "
-                "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore or "
-                "zarr.FSStore."
-            )
+            self._raise_store_type_not_supported()
 
         dataframe = normalize_pandas_df(
             dataframe,
@@ -118,18 +128,16 @@ class NonZarrBaseBackend(AbstractTableBackend):
         """Load the table as a polars LazyFrame."""
         store = self._group_handler.store
         if isinstance(store, LocalStore):
-            lazy_frame = self._load_from_directory_store(reader=self.lf_reader)
+            lazy_frame = self._load_from_local_store(reader=self.lf_reader)
         elif isinstance(store, FsspecStore):
             lazy_frame = self._load_from_fs_store_lf(reader=self.lf_reader)
+        elif isinstance(store, MemoryStore):
+            lazy_frame = self._load_from_in_memory_store(reader=self.lf_reader)
+        elif isinstance(store, ZipStore):
+            lazy_frame = self._load_from_zip_store(reader=self.lf_reader)
         else:
-            ext = self.table_name.split(".")[-1]
-            raise NgioValueError(
-                f"Ngio does not support reading a {ext} from a "
-                f"store of type {type(store)}. "
-                "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore or "
-                "zarr.FSStore."
-            )
+            self._raise_store_type_not_supported()
+
         if not isinstance(lazy_frame, LazyFrame):
             raise NgioValueError(
                 "Table is not a lazy frame. Please report this issue as an ngio bug."
@@ -143,30 +151,24 @@ class NonZarrBaseBackend(AbstractTableBackend):
         )
         return lazy_frame
 
-    def _get_store_url(self) -> str:
-        """Get the store URL."""
-        store = self._group_handler.store
-        if isinstance(store, LocalStore):
-            full_url = self._group_handler.full_url
-        else:
-            ext = self.table_name.split(".")[-1]
-            raise NgioValueError(
-                f"Ngio does not support writing a {ext} file to a "
-                f"store of type {type(store)}. "
-                "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore or "
-                "zarr.FSStore."
-            )
-        if full_url is None:
-            ext = self.table_name.split(".")[-1]
-            raise NgioValueError(
-                f"Ngio does not support writing a {ext} file to a "
-                f"store of type {type(store)}. "
-                "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore or "
-                "zarr.FSStore."
-            )
-        return full_url
+    def _write_to_local_store(self, writer, table):
+        """Write the table to a directory store."""
+        url = self._group_handler.full_url
+        assert url is not None
+        table_path = f"{url}/{self.table_name}"
+        writer(table_path, table)
+
+    def _write_to_fs_store(self, writer, table):
+        """Write the table to an FS store."""
+        raise NotImplementedError("Writing to FS store is not implemented yet.")
+
+    def _write_to_in_memory_store(self, writer, table):
+        """Write the table to an in-memory store."""
+        raise NotImplementedError("Writing to in-memory store is not implemented yet.")
+
+    def _write_to_zip_store(self, writer, table):
+        """Write the table to a zip store."""
+        raise NotImplementedError("Writing to zip store is not implemented yet.")
 
     def write_from_pandas(self, table: DataFrame) -> None:
         """Write the table from a pandas DataFrame."""
@@ -176,9 +178,16 @@ class NonZarrBaseBackend(AbstractTableBackend):
             index_type=self.index_type,
             reset_index=True,
         )
-        full_url = self._get_store_url()
-        table_path = f"{full_url}/{self.table_name}"
-        self.df_writer(table_path, table)
+        if isinstance(self._group_handler.store, LocalStore):
+            self._write_to_local_store(writer=self.df_writer, table=table)
+        elif isinstance(self._group_handler.store, FsspecStore):
+            self._write_to_fs_store(writer=self.df_writer, table=table)
+        elif isinstance(self._group_handler.store, MemoryStore):
+            self._write_to_in_memory_store(writer=self.df_writer, table=table)
+        elif isinstance(self._group_handler.store, ZipStore):
+            self._write_to_zip_store(writer=self.df_writer, table=table)
+        else:
+            self._raise_store_type_not_supported()
 
     def write_from_polars(self, table: PolarsDataFrame | LazyFrame) -> None:
         """Write the table from a polars DataFrame or LazyFrame."""
@@ -191,6 +200,13 @@ class NonZarrBaseBackend(AbstractTableBackend):
         if isinstance(table, LazyFrame):
             table = table.collect()
 
-        full_url = self._get_store_url()
-        table_path = f"{full_url}/{self.table_name}"
-        self.lf_writer(table_path, table)
+        if isinstance(self._group_handler.store, LocalStore):
+            self._write_to_local_store(writer=self.lf_writer, table=table)
+        elif isinstance(self._group_handler.store, FsspecStore):
+            self._write_to_fs_store(writer=self.lf_writer, table=table)
+        elif isinstance(self._group_handler.store, MemoryStore):
+            self._write_to_in_memory_store(writer=self.lf_writer, table=table)
+        elif isinstance(self._group_handler.store, ZipStore):
+            self._write_to_zip_store(writer=self.lf_writer, table=table)
+        else:
+            self._raise_store_type_not_supported()

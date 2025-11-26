@@ -3,6 +3,7 @@ from anndata._settings import settings
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
+from zarr.storage import LocalStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._anndata_utils import (
@@ -52,14 +53,15 @@ class AnnDataBackend(AbstractTableBackend):
 
     def write_from_anndata(self, table: AnnData) -> None:
         """Serialize the table from an AnnData object."""
-        full_url = self._group_handler.full_url
-        if full_url is None:
+        if not isinstance(self._group_handler.store, LocalStore):
             raise NgioValueError(
-                f"Ngio does not support writing file from a "
-                f"store of type {type(self._group_handler)}. "
+                f"Ngio does not support writing an AnnData table to a "
+                f"store of type {type(self._group_handler.store)}. "
                 "Please make sure to use a compatible "
-                "store like a zarr.DirectoryStore."
+                "store like a LocalStore "
             )
+        full_url = self._group_handler.full_url
+        assert full_url is not None
         settings.zarr_write_format = self._group_handler.zarr_format
         table.write_zarr(full_url)
 
