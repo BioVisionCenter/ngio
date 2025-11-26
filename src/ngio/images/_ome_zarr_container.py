@@ -35,6 +35,7 @@ from ngio.tables import (
 )
 from ngio.utils import (
     AccessModeLiteral,
+    NgioError,
     NgioValidationError,
     NgioValueError,
     StoreOrGroup,
@@ -42,18 +43,26 @@ from ngio.utils import (
 )
 
 
-def _default_table_container(handler: ZarrGroupHandler) -> TablesContainer | None:
+def _try_get_table_container(
+    handler: ZarrGroupHandler, create_mode: bool = True
+) -> TablesContainer | None:
     """Return a default table container."""
-    success, table_handler = handler.safe_derive_handler("tables")
-    if success and isinstance(table_handler, ZarrGroupHandler):
+    try:
+        table_handler = handler.get_handler("tables", create_mode=create_mode)
         return TablesContainer(table_handler)
+    except NgioError:
+        return None
 
 
-def _default_label_container(handler: ZarrGroupHandler) -> LabelsContainer | None:
+def _try_get_label_container(
+    handler: ZarrGroupHandler, create_mode: bool = True
+) -> LabelsContainer | None:
     """Return a default label container."""
-    success, label_handler = handler.safe_derive_handler("labels")
-    if success and isinstance(label_handler, ZarrGroupHandler):
+    try:
+        label_handler = handler.get_handler("labels", create_mode=create_mode)
         return LabelsContainer(label_handler)
+    except NgioError:
+        return None
 
 
 class OmeZarrContainer:
@@ -128,13 +137,15 @@ class OmeZarrContainer:
         """
         return self._images_container
 
-    def _get_labels_container(self) -> LabelsContainer | None:
+    def _get_labels_container(self, create_mode: bool = True) -> LabelsContainer | None:
         """Return the labels container."""
-        if self._labels_container is None:
-            _labels_container = _default_label_container(self._group_handler)
-            if _labels_container is None:
-                return None
-            self._labels_container = _labels_container
+        if self._labels_container is not None:
+            return self._labels_container
+
+        _labels_container = _try_get_label_container(
+            self._group_handler, create_mode=create_mode
+        )
+        self._labels_container = _labels_container
         return self._labels_container
 
     @property
@@ -145,13 +156,15 @@ class OmeZarrContainer:
             raise NgioValidationError("No labels found in the image.")
         return _labels_container
 
-    def _get_tables_container(self) -> TablesContainer | None:
+    def _get_tables_container(self, create_mode: bool = True) -> TablesContainer | None:
         """Return the tables container."""
-        if self._tables_container is None:
-            _tables_container = _default_table_container(self._group_handler)
-            if _tables_container is None:
-                return None
-            self._tables_container = _tables_container
+        if self._tables_container is not None:
+            return self._tables_container
+
+        _tables_container = _try_get_table_container(
+            self._group_handler, create_mode=create_mode
+        )
+        self._tables_container = _tables_container
         return self._tables_container
 
     @property
@@ -478,7 +491,7 @@ class OmeZarrContainer:
 
     def list_tables(self, filter_types: TypedTable | str | None = None) -> list[str]:
         """List all tables in the image."""
-        table_container = self._get_tables_container()
+        table_container = self._get_tables_container(create_mode=False)
         if table_container is None:
             return []
 
@@ -621,7 +634,7 @@ class OmeZarrContainer:
 
     def list_labels(self) -> list[str]:
         """List all labels in the image."""
-        label_container = self._get_labels_container()
+        label_container = self._get_labels_container(create_mode=False)
         if label_container is None:
             return []
         return label_container.list()

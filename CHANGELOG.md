@@ -13,6 +13,8 @@
 - Remove the `parallel_safe` argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the 
 `cache`.
 - Remove the unused `parent` argument from `ZarrGroupHandler`.
+- Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
+
 ## [v0.4.6]
 
 ### Bug Fixes

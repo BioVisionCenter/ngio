@@ -9,11 +9,10 @@ import zarr
 from filelock import BaseFileLock, FileLock
 from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
-from zarr.storage import FsspecStore, LocalStore, MemoryStore
+from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
 from ngio.utils._cache import NgioCache
 from ngio.utils._errors import (
-    NgioError,
     NgioFileExistsError,
     NgioFileNotFoundError,
     NgioValueError,
@@ -24,7 +23,13 @@ AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # but to make sure we can handle the store correctly
 # we need to be more restrictive
 NgioSupportedStore = (
-    str | Path | fsspec.mapping.FSMap | FsspecStore | MemoryStore | LocalStore
+    str
+    | Path
+    | fsspec.mapping.FSMap
+    | FsspecStore
+    | MemoryStore
+    | LocalStore
+    | ZipStore
 )
 GenericStore = Store | NgioSupportedStore
 StoreOrGroup = GenericStore | zarr.Group
@@ -125,6 +130,7 @@ class ZarrGroupHandler:
 
         self._group_cache: NgioCache[zarr.Group] = NgioCache(use_cache=cache)
         self._array_cache: NgioCache[zarr.Array] = NgioCache(use_cache=cache)
+        self._handlers_cache: NgioCache[ZarrGroupHandler] = NgioCache(use_cache=cache)
         self._lock: tuple[Path, BaseFileLock] | None = None
 
     def __repr__(self) -> str:
@@ -144,8 +150,17 @@ class ZarrGroupHandler:
         """Return the store path."""
         if isinstance(self.store, LocalStore):
             return (self.store.root / self.group.path).as_posix()
-        if isinstance(self.store, FsspecStore):
-            return self.store.fs.map.root_path
+        elif isinstance(self.store, FsspecStore):
+            return f"{self.store.path}/{self.group.path}"
+        elif isinstance(self.store, ZipStore):
+            return (self.store.path / self.group.path).as_posix()
+        elif isinstance(self.store, MemoryStore):
+            return None
+        warnings.warn(
+            f"Cannot determine full URL for store type {type(self.store)}. ",
+            UserWarning,
+            stacklevel=2,
+        )
         return None
 
     @property
@@ -325,25 +340,6 @@ class ZarrGroupHandler:
         self._group_cache.set(path, group, overwrite=overwrite)
         return group
 
-    def safe_get_group(
-        self, path: str, create_mode: bool = False
-    ) -> tuple[bool, zarr.Group | NgioError]:
-        """Get a group from the group.
-
-        Args:
-            path (str): The path to the group.
-            create_mode (bool): If True, create the group if it does not exist.
-
-        Returns:
-            zarr.Group | None: The Zarr group or None if it does not exist
-                or an error occurs.
-
-        """
-        try:
-            return True, self.get_group(path, create_mode)
-        except NgioError as e:
-            return False, e
-
     def get_array(self, path: str) -> zarr.Array:
         """Get an array from the group."""
         array = self._array_cache.get(path)
@@ -358,32 +354,28 @@ class ZarrGroupHandler:
             raise NgioValueError(f"The object at {path} is not an array, but a group.")
         raise NgioFileNotFoundError(f"No array found at {path}")
 
-    def derive_handler(
+    def get_handler(
         self,
         path: str,
+        create_mode: bool = True,
         overwrite: bool = False,
     ) -> "ZarrGroupHandler":
-        """Derive a new handler from the current handler.
+        """Get a new handler for a group in the current handler group.
 
         Args:
             path (str): The path to the group.
+            create_mode (bool): If True, create the group if it does not exist.
             overwrite (bool): If True, overwrite the group if it exists.
         """
-        group = self.get_group(path, create_mode=True, overwrite=overwrite)
-        return ZarrGroupHandler(
+        handler = self._handlers_cache.get(path)
+        if handler is not None:
+            return handler
+        group = self.get_group(path, create_mode=create_mode, overwrite=overwrite)
+        handler = ZarrGroupHandler(
             store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode="r+"
         )
-
-    def safe_derive_handler(
-        self,
-        path: str,
-        overwrite: bool = False,
-    ) -> tuple[bool, "ZarrGroupHandler | NgioError"]:
-        """Derive a new handler from the current handler."""
-        try:
-            return True, self.derive_handler(path, overwrite=overwrite)
-        except NgioError as e:
-            return False, e
+        self._handlers_cache.set(path, handler)
+        return handler
 
     def copy_handler(self, handler: "ZarrGroupHandler") -> None:
         """Copy the group to a new store."""

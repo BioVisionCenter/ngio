@@ -8,6 +8,7 @@ from ngio.utils._datasets import (
     print_datasets_infos,
 )
 from ngio.utils._errors import (
+    NgioError,
     NgioFileExistsError,
     NgioFileNotFoundError,
     NgioTableValidationError,
@@ -31,6 +32,7 @@ __all__ = [
     "AccessModeLiteral",
     "NgioCache",
     # Errors
+    "NgioError",
     "NgioFileExistsError",
     "NgioFileNotFoundError",
     "NgioTableValidationError",

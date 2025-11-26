@@ -41,17 +41,22 @@ from ngio.tables import (
 from ngio.utils import (
     AccessModeLiteral,
     NgioCache,
+    NgioError,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
 )
 
 
-def _default_table_container(handler: ZarrGroupHandler) -> TablesContainer | None:
+def _try_get_table_container(
+    handler: ZarrGroupHandler, create_mode: bool = True
+) -> TablesContainer | None:
     """Return a default table container."""
-    success, table_handler = handler.safe_derive_handler("tables")
-    if success and isinstance(table_handler, ZarrGroupHandler):
+    try:
+        table_handler = handler.get_handler("tables", create_mode=create_mode)
         return TablesContainer(table_handler)
+    except NgioError:
+        return None
 
 
 # Mock lock class that does nothing
@@ -137,7 +142,7 @@ class OmeZarrWell:
         Returns:
             OmeZarrContainer: The image.
         """
-        handler = self._group_handler.derive_handler(image_path)
+        handler = self._group_handler.get_handler(image_path)
         return OmeZarrContainer(handler)
 
     def _add_image(
@@ -377,7 +382,7 @@ class OmeZarrPlate:
         if cached_well is not None:
             return cached_well
 
-        group_handler = self._group_handler.derive_handler(well_path)
+        group_handler = self._group_handler.get_handler(well_path)
         self._wells_cache.set(well_path, OmeZarrWell(group_handler))
         return OmeZarrWell(group_handler)
 
@@ -438,7 +443,7 @@ class OmeZarrPlate:
         cached_image = self._images_cache.get(image_path)
         if cached_image is not None:
             return cached_image
-        img_group_handler = self._group_handler.derive_handler(image_path)
+        img_group_handler = self._group_handler.get_handler(image_path)
         image = OmeZarrContainer(img_group_handler)
         self._images_cache.set(image_path, image)
         return image
@@ -529,7 +534,7 @@ class OmeZarrPlate:
         for image_paths in self.well_images_paths(
             row=row, column=column, acquisition=acquisition
         ):
-            group_handler = self._group_handler.derive_handler(image_paths)
+            group_handler = self._group_handler.get_handler(image_paths)
             images[image_paths] = OmeZarrContainer(group_handler)
         return images
 
@@ -562,7 +567,7 @@ class OmeZarrPlate:
             self.meta_handler._group_handler.clean_cache()
 
         well_path = self.meta.get_well_path(row=row, column=column)
-        group_handler = self._group_handler.derive_handler(well_path)
+        group_handler = self._group_handler.get_handler(well_path)
 
         if atomic:
             well_lock = group_handler.lock
@@ -582,7 +587,7 @@ class OmeZarrPlate:
                 meta_handler = find_well_meta_handler(group_handler)
                 well_meta = meta_handler.meta
 
-            group_handler = self._group_handler.derive_handler(well_path)
+            group_handler = self._group_handler.get_handler(well_path)
 
             if image_path is not None:
                 well_meta = well_meta.add_image(
@@ -797,13 +802,14 @@ class OmeZarrPlate:
             overwrite=overwrite,
         )
 
-    def _get_tables_container(self) -> TablesContainer | None:
+    def _get_tables_container(self, create_mode: bool = True) -> TablesContainer | None:
         """Return the tables container."""
-        if self._tables_container is None:
-            _tables_container = _default_table_container(self._group_handler)
-            if _tables_container is None:
-                return None
-            self._tables_container = _tables_container
+        if self._tables_container is not None:
+            return self._tables_container
+        _tables_container = _try_get_table_container(
+            self._group_handler, create_mode=create_mode
+        )
+        self._tables_container = _tables_container
         return self._tables_container
 
     @property
@@ -818,17 +824,20 @@ class OmeZarrPlate:
 
     def list_tables(self, filter_types: TypedTable | str | None = None) -> list[str]:
         """List all tables in the image."""
+        _tables_container = self._get_tables_container(create_mode=False)
+        if _tables_container is None:
+            return []
         return self.tables_container.list(filter_types=filter_types)
 
     def list_roi_tables(self) -> list[str]:
         """List all ROI tables in the image."""
-        masking_roi = self.tables_container.list(
-            filter_types="masking_roi_table",
-        )
         roi = self.tables_container.list(
             filter_types="roi_table",
         )
-        return masking_roi + roi
+        masking_roi = self.tables_container.list(
+            filter_types="masking_roi_table",
+        )
+        return roi + masking_roi
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.

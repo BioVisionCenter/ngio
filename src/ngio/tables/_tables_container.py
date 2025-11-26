@@ -258,7 +258,7 @@ class TablesContainer:
 
     def _get_table_group_handler(self, name: str) -> ZarrGroupHandler:
         """Get the group handler for a table."""
-        handler = self._group_handler.derive_handler(path=name)
+        handler = self._group_handler.get_handler(path=name)
         return handler
 
     def list(self, filter_types: TypedTable | str | None = None) -> list[str]:
@@ -326,9 +326,7 @@ class TablesContainer:
                 "Use overwrite=True to replace it."
             )
 
-        table_handler = self._group_handler.derive_handler(
-            path=name, overwrite=overwrite
-        )
+        table_handler = self._group_handler.get_handler(path=name, overwrite=overwrite)
 
         if backend is None:
             backend = table.backend_name

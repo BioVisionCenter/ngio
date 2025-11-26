@@ -153,7 +153,7 @@ class LabelsContainer:
                 f"Available labels: {self.list()}"
             )
 
-        group_handler = self._group_handler.derive_handler(name)
+        group_handler = self._group_handler.get_handler(name)
         label_meta_handler = find_label_meta_handler(group_handler)
         path = label_meta_handler.meta.get_dataset(
             path=path, pixel_size=pixel_size, strict=strict
