@@ -179,7 +179,8 @@ def create_empty_label_container(
         dimension_separator=dimension_separator,
         compressors=compressors,
     )
-    group_handler._mode = "r+"
+    # Reopen in r+ mode
+    group_handler = group_handler.reopen_handler()
     return group_handler
 
 
@@ -282,6 +283,6 @@ def create_empty_image_container(
         compressors=compressors,
         zarr_format=meta.zarr_format,
     )
-
-    group_handler._mode = "r+"
+    # Reopen in r+ mode
+    group_handler = group_handler.reopen_handler()
     return group_handler

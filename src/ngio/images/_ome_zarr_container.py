@@ -843,7 +843,7 @@ def create_empty_ome_zarr(
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     levels: int | list[str] = 5,
-    xy_scaling_factor: float = 2,
+    xy_scaling_factor: float | tuple[float, float] = 2,
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
@@ -871,8 +871,8 @@ def create_empty_ome_zarr(
             Defaults to 1.0.
         levels (int | list[str], optional): The number of levels in the pyramid or a
             list of level names. Defaults to 5.
-        xy_scaling_factor (float, optional): The down-scaling factor in x and y
-            dimensions. Defaults to 2.0.
+        xy_scaling_factor (float | tuple[float, float], optional): The down-scaling
+            factor in x and y dimensions. Defaults to 2.0.
         z_scaling_factor (float, optional): The down-scaling factor in z dimension.
             Defaults to 1.0.
         space_unit (SpaceUnits, optional): The unit of space. Defaults to
@@ -940,7 +940,7 @@ def create_ome_zarr_from_array(
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     levels: int | list[str] = 5,
-    xy_scaling_factor: float = 2.0,
+    xy_scaling_factor: float | tuple[float, float] = 2.0,
     z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
