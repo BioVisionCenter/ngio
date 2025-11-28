@@ -4,7 +4,11 @@ import dask.array as da
 import numpy as np
 import pytest
 
-from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio import (
+    create_empty_ome_zarr,
+    create_synthetic_ome_zarr,
+    open_ome_zarr_container,
+)
 from ngio.images._image import ChannelSelectionModel
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
@@ -311,3 +315,19 @@ def test_derive_image_and_labels(tmp_path: Path):
     )
     derived_ome_zarr = ome_zarr.derive_image(tmp_path / "derived.zarr")
     _ = derived_ome_zarr.derive_label("derived_label")
+
+
+def test_derive_copy_labels_and_tables(tmp_path: Path):
+    # Testing for #116
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_synthetic_ome_zarr(
+        store,
+        shape=(3, 20, 30),
+        levels=1,
+        axes_names=["c", "y", "x"],
+    )
+    derived_ome_zarr = ome_zarr.derive_image(
+        tmp_path / "derived.zarr", copy_labels=True, copy_tables=True
+    )
+    assert ome_zarr.list_labels() == derived_ome_zarr.list_labels()
+    assert ome_zarr.list_tables() == derived_ome_zarr.list_tables()

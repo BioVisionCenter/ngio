@@ -479,13 +479,13 @@ class OmeZarrContainer:
         )
 
         if copy_labels:
-            self.labels_container._group_handler.copy_handler(
-                new_ome_zarr.labels_container._group_handler
+            self.labels_container._group_handler.copy_group(
+                new_ome_zarr.labels_container._group_handler.group
             )
 
         if copy_tables:
-            self.tables_container._group_handler.copy_handler(
-                new_ome_zarr.tables_container._group_handler
+            self.tables_container._group_handler.copy_group(
+                new_ome_zarr.tables_container._group_handler.group
             )
         return new_ome_zarr
 
