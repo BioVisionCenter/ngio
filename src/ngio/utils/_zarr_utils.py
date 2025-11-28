@@ -371,8 +371,9 @@ class ZarrGroupHandler:
         if handler is not None:
             return handler
         group = self.get_group(path, create_mode=create_mode, overwrite=overwrite)
+        mode = "r" if group.read_only else "r+"
         handler = ZarrGroupHandler(
-            store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode="r+"
+            store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode=mode
         )
         self._handlers_cache.set(path, handler)
         return handler

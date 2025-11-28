@@ -225,7 +225,7 @@ def test_remote_ome_zarr_container():
     # ]
 
     _ = ome_zarr.get_label("nuclei", path="0")
-    _ = ome_zarr.get_table("well_ROI_table")
+    _ = ome_zarr.get_table("well_ROI_table").dataframe
 
 
 def test_get_and_squeeze(tmp_path: Path):

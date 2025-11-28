@@ -3,7 +3,7 @@ from anndata._settings import settings
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
-from zarr.storage import LocalStore
+from zarr.storage import FsspecStore, LocalStore, MemoryStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._anndata_utils import (
@@ -53,17 +53,38 @@ class AnnDataBackend(AbstractTableBackend):
 
     def write_from_anndata(self, table: AnnData) -> None:
         """Serialize the table from an AnnData object."""
-        if not isinstance(self._group_handler.store, LocalStore):
+        # Make sure to use the correct zarr format
+        settings.zarr_write_format = self._group_handler.zarr_format
+
+        if isinstance(self._group_handler.store, LocalStore):
+            store = self._group_handler.full_url
+            assert store is not None
+            table.write_zarr(store)
+        elif isinstance(self._group_handler.store, FsspecStore):
+            full_url = self._group_handler.full_url
+            assert full_url is not None
+            # Remap to fsspec store to the new full URL
+            fs = self._group_handler.store.fs
+            store = fs.get_mapper(full_url)
+            table.write_zarr(store)
+        elif isinstance(self._group_handler.store, MemoryStore):
+            store = MemoryStore()
+            table.write_zarr(store)
+            import zarr
+
+            anndata_group = zarr.open(store, mode="r")
+            zarr.copy_store()
+            path = self._group_handler.group
+            for key in anndata_group:
+                self._group_handler.store._store_dict[f"{path}/{key}"] = store[key]
+            return None
+        else:
             raise NgioValueError(
                 f"Ngio does not support writing an AnnData table to a "
                 f"store of type {type(self._group_handler.store)}. "
                 "Please make sure to use a compatible "
-                "store like a LocalStore "
+                "store like a LocalStore, or FsspecStore."
             )
-        full_url = self._group_handler.full_url
-        assert full_url is not None
-        settings.zarr_write_format = self._group_handler.zarr_format
-        table.write_zarr(full_url)
 
     def write_from_pandas(self, table: DataFrame) -> None:
         """Serialize the table from a pandas DataFrame."""
