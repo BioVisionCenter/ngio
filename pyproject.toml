@@ -156,6 +156,7 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning", # required for anndata
+    "ignore::UserWarning",                 # from ngio.utils._zarr_utils
 ]
 addopts = [
     "-vv",

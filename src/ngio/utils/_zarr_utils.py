@@ -500,7 +500,7 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
             da.to_zarr(dask_array, dst, overwrite=False)
     # Copy subgroups
     for name, subgroup in src_group.groups():
-        dest_subgroup = dest_group.create_group(name)
+        dest_subgroup = dest_group.create_group(name, overwrite=True)
         _zarr_python_copy(subgroup, dest_subgroup)
 
 
@@ -520,6 +520,7 @@ def copy_group(src_group: zarr.Group, dest_group: zarr.Group):
         dest_group.store, LocalStore | FsspecStore
     ):
         _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
+        return
     warnings.warn(
         "Fsspec copy not possible, falling back to Python copy. "
         "This may be slower for large datasets.",

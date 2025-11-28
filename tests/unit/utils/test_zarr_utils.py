@@ -184,3 +184,35 @@ def test_remote_storage():
     assert handler.load_attrs()
     assert isinstance(handler.get_array("0"), zarr.Array)
     assert isinstance(handler.get_group("labels"), zarr.Group)
+    assert not handler.is_listable
+
+
+@pytest.mark.parametrize(
+    "src_store,dest_store",
+    [
+        (Path("src.zarr"), Path("dest.zarr")),
+        (Path("src.zarr"), {}),
+        (Path("dest.zarr"), {}),
+    ],
+)
+def test_copy_group(tmp_path: Path, src_store, dest_store):
+    if isinstance(src_store, Path):
+        src_store = tmp_path / src_store
+    if isinstance(dest_store, Path):
+        dest_store = tmp_path / dest_store
+
+    src_group = zarr.create_group(store=src_store, overwrite=True)
+    src_group.attrs.update({"a": 1, "b": 2, "c": 3})
+    src_group.create_array("array1", shape=(10, 10), dtype="int32")
+    sub_group = src_group.create_group("group1")
+    sub_group.create_array("sub_array1", shape=(5, 5), dtype="float32")
+    handler = ZarrGroupHandler(store=src_group, cache=False, mode="r")
+
+    dest_group = zarr.group(store=dest_store, overwrite=True)
+    handler.copy_group(dest_group=dest_group)
+    # Reopen dest group to ensure all data is read from store
+    dest_group = zarr.open_group(dest_store, mode="r")
+    assert dest_group.attrs.asdict() == src_group.attrs.asdict()
+    assert "array1" in dest_group
+    assert "group1" in dest_group
+    assert "sub_array1" in dest_group["group1"]
