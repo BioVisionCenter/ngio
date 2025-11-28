@@ -51,6 +51,11 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
     with pytest.raises(NgioFileExistsError):
         handler.create_group("new_group", overwrite=False)
 
+    # Delete the group
+    handler.delete_group("new_group")
+    with pytest.raises(NgioFileNotFoundError):
+        handler.get_group("new_group")
+
 
 def test_group_handler_from_group(tmp_path: Path):
     store = tmp_path / "test_group_handler_from_group.zarr"
