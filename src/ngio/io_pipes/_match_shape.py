@@ -1,10 +1,11 @@
+import warnings
 from collections.abc import Sequence
 from enum import Enum
 
 import dask.array as da
 import numpy as np
 
-from ngio.utils import NgioValueError, ngio_logger
+from ngio.utils import NgioValueError
 
 
 class Action(str, Enum):
@@ -28,7 +29,7 @@ def _compute_pad_widths(
             pad_def.append((before, after))
         else:
             pad_def.append((0, 0))
-    ngio_logger.warning(
+    warnings.warn(
         f"Images have a different shape ({array_shape} vs {target_shape}). "
         f"Resolving by padding: {pad_def}",
         stacklevel=2,
@@ -75,7 +76,7 @@ def _compute_trim_slices(
         else:
             slices.append(slice(0, s))
 
-    ngio_logger.warning(
+    warnings.warn(
         f"Images have a different shape ({array_shape} vs {target_shape}). "
         f"Resolving by trimming: {slices}",
         stacklevel=2,
@@ -117,7 +118,7 @@ def _compute_rescaling_shape(
             rescaling_shape.append(s)
             factor.append(1.0)
 
-    ngio_logger.warning(
+    warnings.warn(
         f"Images have a different shape ({array_shape} vs {target_shape}). "
         f"Resolving by scaling with factors {factor}.",
         stacklevel=2,

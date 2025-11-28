@@ -1,5 +1,6 @@
 """HCS (High Content Screening) specific metadata classes for NGIO."""
 
+import warnings
 from typing import Annotated
 
 from ome_zarr_models.v04.hcs import HCSAttrs
@@ -16,17 +17,18 @@ from ome_zarr_models.v04.well_types import WellMeta as WellMeta04
 from pydantic import BaseModel, SkipValidation, field_serializer
 
 from ngio.ome_zarr_meta.ngio_specs._ngio_image import DefaultNgffVersion, NgffVersions
-from ngio.utils import NgioValueError, ngio_logger
+from ngio.utils import NgioValueError
 
 
 def path_in_well_validation(path: str) -> str:
     """Validate the path in the well."""
     # Check if the value contains only alphanumeric characters
     if not path.isalnum():
-        ngio_logger.warning(
+        warnings.warn(
             f"Path '{path}' contains non-alphanumeric characters. "
             "This may cause issues with some tools. "
-            "Consider using only alphanumeric characters in the path."
+            "Consider using only alphanumeric characters in the path.",
+            stacklevel=2,
         )
     return path
 

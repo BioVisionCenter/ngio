@@ -14,6 +14,7 @@
 `cache`.
 - Remove the unused `parent` argument from `ZarrGroupHandler`.
 - Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
+- Remove `ngio_logger` in favor of standard warnings module.
 
 ## [v0.4.6]
 

@@ -1,8 +1,9 @@
+import warnings
 from collections.abc import Iterable, Iterator
 from itertools import product
 from typing import TypeAlias, TypeVar
 
-from ngio.utils import NgioValueError, ngio_logger
+from ngio.utils import NgioValueError
 
 T = TypeVar("T")
 
@@ -85,9 +86,10 @@ def check_if_regions_overlap(slices: Iterable[tuple[SlicingType, ...]]) -> bool:
             return True
 
         if it == 10_000:
-            ngio_logger.warning(
+            warnings.warn(
                 "Performance Warning check_for_overlaps is O(n^2) and may be slow for "
-                "large numbers of regions."
+                "large numbers of regions.",
+                stacklevel=2,
             )
     return False
 
@@ -189,8 +191,9 @@ def check_if_chunks_overlap(
         if si & sj:
             return True
         if it == 10_000:
-            ngio_logger.warning(
+            warnings.warn(
                 "Performance Warning check_for_chunks_overlaps is O(n^2) and may be "
-                "slow for large numbers of regions."
+                "slow for large numbers of regions.",
+                stacklevel=2,
             )
     return False
