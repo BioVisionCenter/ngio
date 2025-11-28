@@ -1,12 +1,16 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
+import json
 import warnings
 from pathlib import Path
 from typing import Literal
 
+import dask.array as da
 import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
+from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
+from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
@@ -378,20 +382,25 @@ class ZarrGroupHandler:
         self._handlers_cache.set(path, handler)
         return handler
 
-    def copy_handler(self, handler: "ZarrGroupHandler") -> None:
+    @property
+    def is_listable(self) -> bool:
+        return is_group_listable(self.group)
+
+    def delete_group(self, path: str) -> None:
+        """Delete a group from the current group.
+
+        Args:
+            path (str): The path to the group to delete.
+        """
+        if self.group.read_only:
+            raise NgioValueError("Cannot delete a group in read only mode.")
+        self.group.__delitem__(path)
+        self._group_cache._cache.pop(path, None)
+        self._handlers_cache._cache.pop(path, None)
+
+    def copy_group(self, dest_group: zarr.Group):
         """Copy the group to a new store."""
-        _, n_skipped, _ = zarr.copy_store(
-            source=self.group.store,
-            dest=handler.group.store,
-            source_path=self.group.path,
-            dest_path=handler.group.path,
-            if_exists="replace",
-        )
-        if n_skipped > 0:
-            raise NgioValueError(
-                f"Error copying group to {handler.full_url}, "
-                f"#{n_skipped} files where skipped."
-            )
+        copy_group(self.group, dest_group)
 
 
 def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
@@ -410,8 +419,111 @@ def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
     else:
         separator = array.metadata.chunk_key_encoding
         if not isinstance(separator, DefaultChunkKeyEncoding):
-            raise ValueError(
+            raise NgioValueError(
                 "Only DefaultChunkKeyEncoding is supported in this example."
             )
         separator = separator.separator
     return separator
+
+
+def is_group_listable(group: zarr.Group) -> bool:
+    """Check if a Zarr group is listable.
+
+    A group is considered listable if it contains at least one array or subgroup.
+
+    Args:
+        group (zarr.Group): The Zarr group to check.
+
+    Returns:
+        bool: True if the group is listable, False otherwise.
+    """
+    if not group.store.supports_listing:
+        # If the store does not support listing
+        # then for sure it is not listable
+        return False
+    try:
+        next(group.keys())
+        return True
+    except StopIteration:
+        # Group is listable but empty
+        return True
+    except Exception as _:
+        # Some stores may raise errors when listing
+        # consider those not listable
+        return False
+
+
+def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
+    fs_dict = json.loads(fs.to_json())
+    fs_dict["asynchronous"] = False
+    return fsspec.AbstractFileSystem.from_json(json.dumps(fs_dict))
+
+
+def _get_mapper(store: LocalStore | FsspecStore, path: str):
+    if isinstance(store, LocalStore):
+        fs = fsspec.filesystem("file")
+        full_path = (store.root / path).as_posix()
+    else:
+        fs = _make_sync_fs(store.fs)
+        full_path = f"{store.path}/{path}"
+    return fs.get_mapper(full_path)
+
+
+def _fsspec_copy(
+    src_fs: LocalStore | FsspecStore,
+    src_path: str,
+    dest_fs: LocalStore | FsspecStore,
+    dest_path: str,
+):
+    src_mapper = _get_mapper(src_fs, src_path)
+    dest_mapper = _get_mapper(dest_fs, dest_path)
+    for key in src_mapper.keys():
+        dest_mapper[key] = src_mapper[key]
+
+
+def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
+    # Copy attributes
+    dest_group.attrs.put(src_group.attrs.asdict())
+    # Copy arrays
+    for name, array in src_group.arrays():
+        if array.metadata.zarr_format == 2:
+            spec = AnyArraySpecV2.from_zarr(array)
+        else:
+            spec = AnyArraySpecV3.from_zarr(array)
+        dst = spec.to_zarr(
+            store=dest_group.store,
+            path=f"{dest_group.path}/{name}",
+            overwrite=True,
+        )
+        if array.ndim > 0:
+            dask_array = da.from_zarr(array)
+            da.to_zarr(dask_array, dst, overwrite=False)
+    # Copy subgroups
+    for name, subgroup in src_group.groups():
+        dest_subgroup = dest_group.create_group(name)
+        _zarr_python_copy(subgroup, dest_subgroup)
+
+
+def copy_group(src_group: zarr.Group, dest_group: zarr.Group):
+    if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
+        raise NgioValueError(
+            "Different Zarr format versions between source and destination, "
+            "cannot copy."
+        )
+
+    if not is_group_listable(src_group):
+        raise NgioValueError("Source group is not listable, cannot copy.")
+
+    if dest_group.read_only:
+        raise NgioValueError("Destination group is read only, cannot copy.")
+    if isinstance(src_group.store, LocalStore | FsspecStore) and isinstance(
+        dest_group.store, LocalStore | FsspecStore
+    ):
+        _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
+    warnings.warn(
+        "Fsspec copy not possible, falling back to Python copy. "
+        "This may be slower for large datasets.",
+        UserWarning,
+        stacklevel=2,
+    )
+    _zarr_python_copy(src_group, dest_group)
