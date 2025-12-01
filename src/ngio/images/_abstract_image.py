@@ -85,7 +85,7 @@ class AbstractImage(Generic[_image_handler]):
     @property
     def dataset(self) -> Dataset:
         """Return the dataset of the image."""
-        return self.meta_handler.meta.get_dataset(path=self.path)
+        return self.meta_handler.get_meta().get_dataset(path=self.path)
 
     @property
     def dimensions(self) -> Dimensions:
@@ -576,7 +576,7 @@ def consolidate_image(
     mode: Literal["dask", "numpy", "coarsen"] = "dask",
 ) -> None:
     """Consolidate the image on disk."""
-    target_paths = image._meta_handler.meta.paths
+    target_paths = image.meta_handler.get_meta().paths
     targets = [
         image._group_handler.get_array(path)
         for path in target_paths

@@ -26,7 +26,6 @@ __all__ = [
     "ImageInWellPath",
     "ImageMetaHandler",
     "LabelMetaHandler",
-    "WellMetaHandler",
     "NgffVersions",
     "NgffVersions",
     "NgioImageMeta",
@@ -36,6 +35,7 @@ __all__ = [
     "PixelSize",
     "PlateMetaHandler",
     "PlateMetaHandler",
+    "WellMetaHandler",
     "build_canonical_axes_handler",
     "path_in_well_validation",
 ]

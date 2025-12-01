@@ -10,8 +10,10 @@ from ngio.ome_zarr_meta import (
     NgioImageMeta,
     NgioLabelMeta,
     PixelSize,
-    get_image_meta_handler,
-    get_label_meta_handler,
+)
+from ngio.ome_zarr_meta._meta_handlers import (
+    update_ngio_image_meta,
+    update_ngio_label_meta,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     DefaultNgffVersion,
@@ -162,10 +164,7 @@ def create_empty_label_container(
     group_handler = ZarrGroupHandler(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
-    image_handler = get_label_meta_handler(
-        version=ngff_version, group_handler=group_handler
-    )
-    image_handler.write_meta(meta)
+    update_ngio_label_meta(group_handler, meta)
 
     init_empty_pyramid(
         store=store,
@@ -265,10 +264,7 @@ def create_empty_image_container(
     group_handler = ZarrGroupHandler(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
-    image_handler = get_image_meta_handler(
-        version=ngff_version, group_handler=group_handler
-    )
-    image_handler.write_meta(meta)
+    update_ngio_image_meta(group_handler, meta)
 
     init_empty_pyramid(
         store=store,

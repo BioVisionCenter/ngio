@@ -11,7 +11,7 @@ from ngio.images._create import create_empty_image_container
 from ngio.images._image import Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
 from ngio.images._masked_image import MaskedImage, MaskedLabel
-from ngio.ome_zarr_meta import NgioImageMeta, PixelSize, find_label_meta_handler
+from ngio.ome_zarr_meta import NgioImageMeta, PixelSize, LabelMetaHandler
 from ngio.ome_zarr_meta.ngio_specs import (
     DefaultNgffVersion,
     DefaultSpaceUnit,
@@ -821,10 +821,12 @@ def open_label(
     """
     group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     if name is None:
-        label_meta_handler = find_label_meta_handler(group_handler)
-        path = label_meta_handler.meta.get_dataset(
-            path=path, pixel_size=pixel_size, strict=strict
-        ).path
+        label_meta_handler = LabelMetaHandler(group_handler)
+        path = (
+            label_meta_handler.get_meta()
+            .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
+            .path
+        )
         return Label(group_handler, path, label_meta_handler)
 
     labels_container = LabelsContainer(group_handler)

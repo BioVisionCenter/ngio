@@ -19,11 +19,13 @@ from ngio.ome_zarr_meta import (
     NgffVersions,
     NgioPlateMeta,
     NgioWellMeta,
-    find_plate_meta_handler,
-    find_well_meta_handler,
-    get_plate_meta_handler,
-    get_well_meta_handler,
+    PlateMetaHandler,
+    WellMetaHandler,
     path_in_well_validation,
+)
+from ngio.ome_zarr_meta._meta_handlers import (
+    update_ngio_plate_meta,
+    update_ngio_well_meta,
 )
 from ngio.tables import (
     ConditionTable,
@@ -82,7 +84,7 @@ class OmeZarrWell:
             group_handler: The Zarr group handler that contains the Well.
         """
         self._group_handler = group_handler
-        self._meta_handler = find_well_meta_handler(group_handler)
+        self._meta_handler = WellMetaHandler(group_handler)
 
     def __repr__(self) -> str:
         """Return a string representation of the well."""
@@ -96,7 +98,7 @@ class OmeZarrWell:
     @property
     def meta(self):
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def acquisition_ids(self) -> list[int]:
@@ -164,7 +166,7 @@ class OmeZarrWell:
             meta = self.meta.add_image(
                 path=image_path, acquisition=acquisition_id, strict=strict
             )
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
         return self._group_handler.get_group(image_path, create_mode=True)
@@ -243,7 +245,7 @@ class OmeZarrPlate:
             table_container: The tables container that contains plate level tables.
         """
         self._group_handler = group_handler
-        self._meta_handler = find_plate_meta_handler(group_handler)
+        self._meta_handler = PlateMetaHandler(group_handler)
         self._tables_container = table_container
         self._wells_cache: NgioCache[OmeZarrWell] = NgioCache(
             use_cache=self._group_handler.use_cache
@@ -264,7 +266,7 @@ class OmeZarrPlate:
     @property
     def meta(self):
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def columns(self) -> list[str]:
@@ -563,7 +565,7 @@ class OmeZarrPlate:
                 meta = meta.add_acquisition(
                     acquisition_id=acquisition_id, acquisition_name=acquisition_name
                 )
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
         well_path = self.meta.get_well_path(row=row, column=column)
@@ -582,10 +584,11 @@ class OmeZarrPlate:
                 well_meta = NgioWellMeta.default_init()
                 version = self.meta.plate.version
                 version = version if version is not None else "0.4"
-                meta_handler = get_well_meta_handler(group_handler, version=version)
+                update_ngio_well_meta(group_handler, well_meta)
+                meta_handler = WellMetaHandler(group_handler=group_handler)
             else:
-                meta_handler = find_well_meta_handler(group_handler)
-                well_meta = meta_handler.meta
+                meta_handler = WellMetaHandler(group_handler=group_handler)
+                well_meta = meta_handler.get_meta()
 
             group_handler = self._group_handler.get_handler(well_path)
 
@@ -593,7 +596,7 @@ class OmeZarrPlate:
                 well_meta = well_meta.add_image(
                     path=image_path, acquisition=acquisition_id, strict=False
                 )
-            meta_handler.write_meta(well_meta)
+            meta_handler.update_meta(well_meta)
             meta_handler._group_handler.clean_cache()
 
         if image_path is not None:
@@ -670,7 +673,7 @@ class OmeZarrPlate:
     ) -> "OmeZarrPlate":
         """Add a column to an ome-zarr plate."""
         meta, _ = self.meta.add_column(column)
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -680,7 +683,7 @@ class OmeZarrPlate:
     ) -> "OmeZarrPlate":
         """Add a row to an ome-zarr plate."""
         meta, _ = self.meta.add_row(row)
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -700,7 +703,7 @@ class OmeZarrPlate:
         meta = self.meta.add_acquisition(
             acquisition_id=acquisition_id, acquisition_name=acquisition_name
         )
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -719,7 +722,7 @@ class OmeZarrPlate:
         with plate_lock:
             meta = self.meta
             meta = meta.remove_well(row, column)
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
     def _remove_image(
@@ -740,7 +743,7 @@ class OmeZarrPlate:
         with well_lock:
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
-            well.meta_handler.write_meta(well_meta)
+            well.meta_handler.update_meta(well_meta)
             well.meta_handler._group_handler.clean_cache()
             if len(well_meta.paths()) == 0:
                 self._remove_well(row, column, atomic=atomic)
@@ -1162,8 +1165,7 @@ def _create_empty_plate_from_meta(
     """Create an empty OME-Zarr plate from metadata."""
     mode = "w" if overwrite else "w-"
     group_handler = ZarrGroupHandler(store=store, cache=True, mode=mode)
-    meta_handler = get_plate_meta_handler(group_handler, version=version)
-    meta_handler.write_meta(meta)
+    update_ngio_plate_meta(group_handler, meta)
     return group_handler
 
 
@@ -1292,9 +1294,7 @@ def create_empty_well(
     group_handler = ZarrGroupHandler(
         store=store, cache=True, mode="w" if overwrite else "w-"
     )
-    meta_handler = get_well_meta_handler(group_handler, version=version)
-    meta = NgioWellMeta.default_init()
-    meta_handler.write_meta(meta)
+    update_ngio_well_meta(group_handler, NgioWellMeta.default_init())
 
     return open_ome_zarr_well(
         store=store,

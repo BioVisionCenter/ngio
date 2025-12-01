@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from ngio.ome_zarr_meta import NgioImageMeta, ImageMetaHandler
+from ngio.ome_zarr_meta import ImageMetaHandler, NgioImageMeta
 from ngio.utils import ZarrGroupHandler
 
 

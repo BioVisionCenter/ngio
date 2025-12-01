@@ -13,7 +13,6 @@ from ngio.ome_zarr_meta import (
     LabelMetaHandler,
     NgioLabelMeta,
     PixelSize,
-    find_label_meta_handler,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     DefaultSpaceUnit,
@@ -58,7 +57,7 @@ class Label(AbstractImage[LabelMetaHandler]):
 
         """
         if meta_handler is None:
-            meta_handler = find_label_meta_handler(group_handler)
+            meta_handler = LabelMetaHandler(group_handler)
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
@@ -70,7 +69,7 @@ class Label(AbstractImage[LabelMetaHandler]):
     @property
     def meta(self) -> NgioLabelMeta:
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     def set_axes_unit(
         self,
@@ -85,7 +84,7 @@ class Label(AbstractImage[LabelMetaHandler]):
         """
         meta = self.meta
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.write_meta(meta)
+        self._meta_handler.update_meta(meta)
 
     def build_masking_roi_table(self) -> MaskingRoiTable:
         """Compute the masking ROI table."""
@@ -154,10 +153,12 @@ class LabelsContainer:
             )
 
         group_handler = self._group_handler.get_handler(name)
-        label_meta_handler = find_label_meta_handler(group_handler)
-        path = label_meta_handler.meta.get_dataset(
-            path=path, pixel_size=pixel_size, strict=strict
-        ).path
+        label_meta_handler = LabelMetaHandler(group_handler)
+        path = (
+            label_meta_handler.get_meta()
+            .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
+            .path
+        )
         return Label(group_handler, path, label_meta_handler)
 
     def derive(

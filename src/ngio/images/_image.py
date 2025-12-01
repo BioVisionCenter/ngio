@@ -24,7 +24,6 @@ from ngio.ome_zarr_meta import (
     ImageMetaHandler,
     NgioImageMeta,
     PixelSize,
-    find_image_meta_handler,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     Channel,
@@ -119,7 +118,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
         """
         if meta_handler is None:
-            meta_handler = find_image_meta_handler(group_handler)
+            meta_handler = ImageMetaHandler(group_handler)
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
@@ -127,7 +126,7 @@ class Image(AbstractImage[ImageMetaHandler]):
     @property
     def meta(self) -> NgioImageMeta:
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def channels_meta(self) -> ChannelsMeta:
@@ -401,22 +400,22 @@ class ImagesContainer:
     def __init__(self, group_handler: ZarrGroupHandler) -> None:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
-        self._meta_handler = find_image_meta_handler(group_handler)
+        self._meta_handler = ImageMetaHandler(group_handler)
 
     @property
     def meta(self) -> NgioImageMeta:
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def levels(self) -> int:
         """Return the number of levels in the image."""
-        return self._meta_handler.meta.levels
+        return self._meta_handler.get_meta().levels
 
     @property
     def levels_paths(self) -> list[str]:
         """Return the paths of the levels in the image."""
-        return self._meta_handler.meta.paths
+        return self._meta_handler.get_meta().paths
 
     @property
     def num_channels(self) -> int:
@@ -544,7 +543,7 @@ class ImagesContainer:
 
         meta = self.meta
         meta.set_channels_meta(channel_meta)
-        self._meta_handler.write_meta(meta)
+        self._meta_handler.update_meta(meta)
 
     def set_channel_percentiles(
         self,
@@ -578,7 +577,7 @@ class ImagesContainer:
 
         meta = self.meta
         meta.set_channels_meta(new_meta)
-        self._meta_handler.write_meta(meta)
+        self._meta_handler.update_meta(meta)
 
     def set_axes_unit(
         self,
@@ -593,7 +592,7 @@ class ImagesContainer:
         """
         meta = self.meta
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.write_meta(meta)
+        self._meta_handler.update_meta(meta)
 
     def derive(
         self,
@@ -667,7 +666,7 @@ class ImagesContainer:
                 closest pixel size level will be returned.
 
         """
-        dataset = self._meta_handler.meta.get_dataset(
+        dataset = self._meta_handler.get_meta().get_dataset(
             path=path, pixel_size=pixel_size, strict=strict
         )
         return Image(
