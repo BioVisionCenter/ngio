@@ -23,7 +23,7 @@ from ome_zarr_models.v05.image_label import ImageLabelAttrs as LabelAttrsV05
 from ome_zarr_models.v05.multiscales import Dataset as DatasetV05
 from ome_zarr_models.v05.multiscales import Multiscale as MultiscaleV05
 from ome_zarr_models.v05.multiscales import ValidTransform as ValidTransformV05
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
@@ -54,36 +54,6 @@ class ImageV05WithOmero(BaseModel):
 
 class ImageLabelV05(BaseModel):
     ome: LabelAttrsV05
-
-
-def _is_v05_image_meta(metadata: dict) -> ImageV05WithOmero | ValidationError:
-    """Check if the metadata is a valid OME-Zarr v05 metadata.
-
-    Args:
-        metadata (dict): The metadata to check.
-
-    Returns:
-        bool: True if the metadata is a valid OME-Zarr v05 metadata, False otherwise.
-    """
-    try:
-        return ImageV05WithOmero(**metadata)
-    except ValidationError as e:
-        return e
-
-
-def _is_v05_label_meta(metadata: dict) -> ImageLabelV05 | ValidationError:
-    """Check if the metadata is a valid OME-Zarr v05 metadata.
-
-    Args:
-        metadata (dict): The metadata to check.
-
-    Returns:
-        bool: True if the metadata is a valid OME-Zarr v05 metadata, False otherwise.
-    """
-    try:
-        return ImageLabelV05(**metadata)
-    except ValidationError as e:
-        return e
 
 
 def _v05_omero_to_channels(v05_omero: OmeroV05 | None) -> ChannelsMeta | None:
@@ -214,7 +184,7 @@ def v05_to_ngio_image_meta(
     axes_setup: AxesSetup | None = None,
     allow_non_canonical_axes: bool = False,
     strict_canonical_order: bool = True,
-) -> tuple[bool, NgioImageMeta | ValidationError]:
+) -> NgioImageMeta:
     """Convert a v05 image metadata to a ngio image metadata.
 
     Args:
@@ -227,9 +197,7 @@ def v05_to_ngio_image_meta(
     Returns:
         NgioImageMeta: The ngio image metadata.
     """
-    v05_image = _is_v05_image_meta(metadata)
-    if isinstance(v05_image, ValidationError):
-        return False, v05_image
+    v05_image = ImageV05WithOmero(**metadata)
     v05_image = v05_image.ome
     if len(v05_image.multiscales) > 1:
         raise NotImplementedError(
@@ -250,7 +218,7 @@ def v05_to_ngio_image_meta(
     name = v05_multiscale.name
     if name is not None and not isinstance(name, str):
         name = str(name)
-    return True, NgioImageMeta(
+    return NgioImageMeta(
         version="0.5",
         name=name,
         datasets=datasets,
@@ -263,7 +231,7 @@ def v05_to_ngio_label_meta(
     axes_setup: AxesSetup | None = None,
     allow_non_canonical_axes: bool = False,
     strict_canonical_order: bool = True,
-) -> tuple[bool, NgioLabelMeta | ValidationError]:
+) -> NgioLabelMeta:
     """Convert a v05 image metadata to a ngio image metadata.
 
     Args:
@@ -274,11 +242,9 @@ def v05_to_ngio_label_meta(
         strict_canonical_order (bool, optional): Strict canonical order.
 
     Returns:
-        NgioImageMeta: The ngio image metadata.
+        NgioLabelMeta: The ngio label metadata.
     """
-    v05_label = _is_v05_label_meta(metadata)
-    if isinstance(v05_label, ValidationError):
-        return False, v05_label
+    v05_label = ImageLabelV05(**metadata)
     v05_label = v05_label.ome
 
     if len(v05_label.multiscales) > 1:
@@ -316,7 +282,7 @@ def v05_to_ngio_label_meta(
     if name is not None and not isinstance(name, str):
         name = str(name)
 
-    return True, NgioLabelMeta(
+    return NgioLabelMeta(
         version="0.5",
         name=name,
         datasets=datasets,
@@ -452,42 +418,32 @@ class HCSV05(BaseModel):
 
 def v05_to_ngio_well_meta(
     metadata: dict,
-) -> tuple[bool, NgioWellMeta | ValidationError]:
+) -> NgioWellMeta:
     """Convert a v05 well metadata to a ngio well metadata.
 
     Args:
         metadata (dict): The v05 well metadata.
 
     Returns:
-        result (bool): True if the conversion was successful, False otherwise.
-        ngio_well_meta (NgioWellMeta): The ngio well metadata.
+        NgioWellMeta: The ngio well metadata.
     """
-    try:
-        v05_well = WellV05(**metadata)
-    except ValidationError as e:
-        return False, e
-
-    return True, NgioWellMeta(**v05_well.ome.model_dump())
+    v05_well = WellV05(**metadata)
+    return NgioWellMeta(**v05_well.ome.model_dump())
 
 
 def v05_to_ngio_plate_meta(
     metadata: dict,
-) -> tuple[bool, NgioPlateMeta | ValidationError]:
+) -> NgioPlateMeta:
     """Convert a v05 plate metadata to a ngio plate metadata.
 
     Args:
         metadata (dict): The v05 plate metadata.
 
     Returns:
-        result (bool): True if the conversion was successful, False otherwise.
-        ngio_plate_meta (NgioPlateMeta): The ngio plate metadata.
+        NgioPlateMeta: The ngio plate metadata.
     """
-    try:
-        v05_plate = HCSV05(**metadata)
-    except ValidationError as e:
-        return False, e
-
-    return True, NgioPlateMeta(**v05_plate.ome.model_dump())
+    v05_plate = HCSV05(**metadata)
+    return NgioPlateMeta(**v05_plate.ome.model_dump())
 
 
 def ngio_to_v05_well_meta(metadata: NgioWellMeta) -> dict:

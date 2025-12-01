@@ -74,6 +74,11 @@ class NgioWellMeta(CustomWellAttrs):
         return well
 
     @property
+    def version(self) -> NgffVersions:
+        """Return the NGFF version of the well metadata."""
+        return self.well.version  # type: ignore (version is NgffVersions)
+
+    @property
     def acquisition_ids(self) -> list[int]:
         """Return the acquisition ids in the well."""
         acquisitions = []
@@ -285,6 +290,11 @@ class NgioPlateMeta(HCSAttrs):
     def wells_paths(self) -> list[str]:
         """Return the wells paths in the plate."""
         return [wells.path for wells in self.plate.wells]
+
+    @property
+    def version(self) -> NgffVersions:
+        """Return the NGFF version of the well metadata."""
+        return self.plate.version  # type: ignore (version is NgffVersions)
 
     def get_well_path(self, row: str, column: str | int) -> str:
         """Return the well path for the given row and column.

@@ -23,7 +23,6 @@ from ome_zarr_models.v04.multiscales import ValidTransform as ValidTransformV04
 from ome_zarr_models.v04.omero import Channel as ChannelV04
 from ome_zarr_models.v04.omero import Omero as OmeroV04
 from ome_zarr_models.v04.omero import Window as WindowV04
-from pydantic import ValidationError
 
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
@@ -42,37 +41,6 @@ from ngio.ome_zarr_meta.ngio_specs import (
     default_channel_name,
 )
 from ngio.ome_zarr_meta.v04._custom_models import CustomWellAttrs as WellAttrsV04
-
-
-def _is_v04_image_meta(metadata: dict) -> ImageAttrsV04 | ValidationError:
-    """Check if the metadata is a valid OME-Zarr v04 metadata.
-
-    Args:
-        metadata (dict): The metadata to check.
-
-    Returns:
-        bool: True if the metadata is a valid OME-Zarr v04 metadata, False otherwise.
-    """
-    try:
-        return ImageAttrsV04(**metadata)
-    except ValidationError as e:
-        return e
-
-
-def _is_v04_label_meta(metadata: dict) -> LabelAttrsV04 | ValidationError:
-    """Check if the metadata is a valid OME-Zarr v04 metadata.
-
-    Args:
-        metadata (dict): The metadata to check.
-
-    Returns:
-        bool: True if the metadata is a valid OME-Zarr v04 metadata, False otherwise.
-    """
-    try:
-        return LabelAttrsV04(**metadata)
-    except ValidationError as e:
-        return e
-    raise RuntimeError("Unreachable code")
 
 
 def _v04_omero_to_channels(v04_omero: OmeroV04 | None) -> ChannelsMeta | None:
@@ -203,7 +171,7 @@ def v04_to_ngio_image_meta(
     axes_setup: AxesSetup | None = None,
     allow_non_canonical_axes: bool = False,
     strict_canonical_order: bool = True,
-) -> tuple[bool, NgioImageMeta | ValidationError]:
+) -> NgioImageMeta:
     """Convert a v04 image metadata to a ngio image metadata.
 
     Args:
@@ -216,9 +184,7 @@ def v04_to_ngio_image_meta(
     Returns:
         NgioImageMeta: The ngio image metadata.
     """
-    v04_image = _is_v04_image_meta(metadata)
-    if isinstance(v04_image, ValidationError):
-        return False, v04_image
+    v04_image = ImageAttrsV04(**metadata)
 
     if len(v04_image.multiscales) > 1:
         raise NotImplementedError(
@@ -239,7 +205,7 @@ def v04_to_ngio_image_meta(
     name = v04_muliscale.name
     if name is not None and not isinstance(name, str):
         name = str(name)
-    return True, NgioImageMeta(
+    return NgioImageMeta(
         version="0.4",
         name=name,
         datasets=datasets,
@@ -252,7 +218,7 @@ def v04_to_ngio_label_meta(
     axes_setup: AxesSetup | None = None,
     allow_non_canonical_axes: bool = False,
     strict_canonical_order: bool = True,
-) -> tuple[bool, NgioLabelMeta | ValidationError]:
+) -> NgioLabelMeta:
     """Convert a v04 image metadata to a ngio image metadata.
 
     Args:
@@ -265,9 +231,7 @@ def v04_to_ngio_label_meta(
     Returns:
         NgioImageMeta: The ngio image metadata.
     """
-    v04_label = _is_v04_label_meta(metadata)
-    if isinstance(v04_label, ValidationError):
-        return False, v04_label
+    v04_label = LabelAttrsV04(**metadata)
 
     if len(v04_label.multiscales) > 1:
         raise NotImplementedError(
@@ -301,7 +265,7 @@ def v04_to_ngio_label_meta(
     if name is not None and not isinstance(name, str):
         name = str(name)
 
-    return True, NgioLabelMeta(
+    return NgioLabelMeta(
         version="0.4",
         name=name,
         datasets=datasets,
@@ -423,42 +387,32 @@ def ngio_to_v04_label_meta(metadata: NgioLabelMeta) -> dict:
 
 def v04_to_ngio_well_meta(
     metadata: dict,
-) -> tuple[bool, NgioWellMeta | ValidationError]:
+) -> NgioWellMeta:
     """Convert a v04 well metadata to a ngio well metadata.
 
     Args:
         metadata (dict): The v04 well metadata.
 
     Returns:
-        result (bool): True if the conversion was successful, False otherwise.
-        ngio_well_meta (NgioWellMeta): The ngio well metadata.
+        NgioWellMeta: The ngio well metadata.
     """
-    try:
-        v04_well = WellAttrsV04(**metadata)
-    except ValidationError as e:
-        return False, e
-
-    return True, NgioWellMeta(**v04_well.model_dump())
+    v04_well = WellAttrsV04(**metadata)
+    return NgioWellMeta(**v04_well.model_dump())
 
 
 def v04_to_ngio_plate_meta(
     metadata: dict,
-) -> tuple[bool, NgioPlateMeta | ValidationError]:
+) -> NgioPlateMeta:
     """Convert a v04 plate metadata to a ngio plate metadata.
 
     Args:
         metadata (dict): The v04 plate metadata.
 
     Returns:
-        result (bool): True if the conversion was successful, False otherwise.
-        ngio_plate_meta (NgioPlateMeta): The ngio plate metadata.
+        NgioPlateMeta: The ngio plate metadata.
     """
-    try:
-        v04_plate = HCSAttrsV04(**metadata)
-    except ValidationError as e:
-        return False, e
-
-    return True, NgioPlateMeta(**v04_plate.model_dump())
+    v04_plate = HCSAttrsV04(**metadata)
+    return NgioPlateMeta(**v04_plate.model_dump())
 
 
 def ngio_to_v04_well_meta(metadata: NgioWellMeta) -> dict:
