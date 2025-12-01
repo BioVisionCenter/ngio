@@ -1,6 +1,6 @@
 """Utility to read/write OME-Zarr metadata v0.4."""
 
-from ngio.ome_zarr_meta.v05._v05_spec_utils import (
+from ngio.ome_zarr_meta.v05._v05_spec import (
     ngio_to_v05_image_meta,
     ngio_to_v05_label_meta,
     ngio_to_v05_plate_meta,

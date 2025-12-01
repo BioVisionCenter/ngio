@@ -5,7 +5,7 @@ from ome_zarr_models.v04.image_label import ImageLabelAttrs as LabelAttrsV04
 from ome_zarr_models.v04.well import WellAttrs as WellAttrsV04
 
 from ngio.ome_zarr_meta import NgioImageMeta, NgioLabelMeta, NgioWellMeta
-from ngio.ome_zarr_meta.v04._v04_spec_utils import (
+from ngio.ome_zarr_meta.v04._v04_spec import (
     ngio_to_v04_image_meta,
     ngio_to_v04_label_meta,
     ngio_to_v04_well_meta,
