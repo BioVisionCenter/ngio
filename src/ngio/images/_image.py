@@ -12,7 +12,6 @@ from ngio.common import (
     Dimensions,
     InterpolationOrder,
     Roi,
-    RoiPixels,
 )
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create import create_empty_image_container
@@ -186,7 +185,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def get_roi_as_numpy(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -240,7 +239,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def get_roi_as_dask(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -297,7 +296,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def get_roi(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -357,7 +356,7 @@ class Image(AbstractImage[ImageMetaHandler]):
 
     def set_roi(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         patch: np.ndarray | da.Array,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,

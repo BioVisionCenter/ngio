@@ -1,4 +1,4 @@
-from ngio import Roi, RoiPixels
+from ngio import Roi
 from ngio.images._abstract_image import AbstractImage
 
 
@@ -48,18 +48,17 @@ def grid(
         for z in range(0, z_dim, stride_z):
             for y in range(0, y_dim, stride_y):
                 for x in range(0, x_dim, stride_x):
-                    roi = RoiPixels(
+                    roi = Roi.from_values(
                         name=base_name,
-                        x=x,
-                        y=y,
-                        z=z,
-                        t=t,
-                        x_length=size_x,
-                        y_length=size_y,
-                        z_length=size_z,
-                        t_length=size_t,
+                        slices={
+                            "x": (x, size_x),
+                            "y": (y, size_y),
+                            "z": (z, size_z),
+                            "t": (t, size_t),
+                        },
+                        space="pixel",
                     )
-                    new_rois.append(roi.to_roi(pixel_size=ref_image.pixel_size))
+                    new_rois.append(roi.to_world(pixel_size=ref_image.pixel_size))
 
     return rois_product(rois, new_rois)
 

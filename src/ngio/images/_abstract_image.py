@@ -11,7 +11,6 @@ from ngio.common import (
     Dimensions,
     InterpolationOrder,
     Roi,
-    RoiPixels,
     consolidate_pyramid,
 )
 from ngio.io_pipes import (
@@ -202,7 +201,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def _get_roi_as_numpy(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: SlicingInputType,
@@ -252,7 +251,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def _get_roi_as_dask(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         **slicing_kwargs: SlicingInputType,
@@ -309,7 +308,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def _get_roi(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
@@ -385,7 +384,7 @@ class AbstractImage(Generic[_image_handler]):
 
     def _set_roi(
         self,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
@@ -444,25 +443,12 @@ class AbstractImage(Generic[_image_handler]):
 
     def roi(self, name: str | None = "image") -> Roi:
         """Return the ROI covering the entire image."""
-        dim_x = self.dimensions.get("x")
-        dim_y = self.dimensions.get("y")
-        assert dim_x is not None and dim_y is not None
-        dim_z = self.dimensions.get("z")
-        z = None if dim_z is None else 0
-        dim_t = self.dimensions.get("t")
-        t = None if dim_t is None else 0
-        roi_px = RoiPixels(
-            name=name,
-            x=0,
-            y=0,
-            z=z,
-            t=t,
-            x_length=dim_x,
-            y_length=dim_y,
-            z_length=dim_z,
-            t_length=dim_t,
-        )
-        return roi_px.to_roi(pixel_size=self.pixel_size)
+        slices = {}
+        for ax_name in self.axes:
+            axis_size = self.dimensions.get(ax_name)
+            slices[ax_name] = slice(0, axis_size)
+        roi_px = Roi.from_values(name=name, slices=slices, space="pixel")
+        return roi_px.to_world(pixel_size=self.pixel_size)
 
     def build_image_roi_table(self, name: str | None = "image") -> RoiTable:
         """Build the ROI table containing the ROI covering the entire image."""

@@ -9,7 +9,7 @@ except PackageNotFoundError:  # pragma: no cover
 __author__ = "Lorenzo Cerrone"
 __email__ = "lorenzo.cerrone@uzh.ch"
 
-from ngio.common import Dimensions, Roi, RoiPixels
+from ngio.common import Dimensions, Roi, RoiSlice
 from ngio.hcs import (
     OmeZarrPlate,
     OmeZarrWell,
@@ -52,7 +52,7 @@ __all__ = [
     "OmeZarrWell",
     "PixelSize",
     "Roi",
-    "RoiPixels",
+    "RoiSlice",
     "create_empty_ome_zarr",
     "create_empty_plate",
     "create_empty_well",

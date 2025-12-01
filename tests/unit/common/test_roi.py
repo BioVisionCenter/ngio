@@ -6,43 +6,50 @@ from ngio.utils import NgioValueError
 
 
 def test_basic_rois_ops():
-    roi = Roi(
+    roi = Roi.from_values(
         name="test",
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        x_length=1.0,
-        y_length=1.0,
-        z_length=1.0,
-        label=1,
+        slices={
+            "x": (0, 1),
+            "y": (0, 1),
+            "z": (0, 1),
+        },
+        space="world",
         unit="micrometer",  # type: ignore
         other="other",  # type: ignore
     )
 
-    assert roi.x == 0.0
+    slixe_x = roi.get("x")
+    assert slixe_x is not None
+    assert slixe_x.axis_name == "x"
+    assert slixe_x.start == 0
+    assert slixe_x.length == 1
 
     pixel_size = PixelSize(x=1.0, y=1.0, z=1.0)
-    raster_roi = roi.to_roi_pixels(pixel_size)
+    raster_roi = roi.to_pixel(pixel_size)
     assert roi.__str__()
     assert roi.__repr__()
 
     assert raster_roi.to_slicing_dict(pixel_size=pixel_size) == {
-        "x": slice(0, 1),
-        "y": slice(0, 1),
-        "z": slice(0, 1),
-        "t": slice(None),
+        "x": slice(0.0, 1.0),
+        "y": slice(0.0, 1.0),
+        "z": slice(0.0, 1.0),
     }
     assert roi.model_extra is not None
     assert roi.model_extra["other"] == "other"
 
-    world_roi_2 = raster_roi.to_roi(pixel_size)
+    world_roi_2 = raster_roi.to_world(pixel_size)
 
-    assert world_roi_2.x == 0.0
-    assert world_roi_2.y == 0.0
-    assert world_roi_2.z == 0.0
-    assert world_roi_2.x_length == 1.0
-    assert world_roi_2.y_length == 1.0
-    assert world_roi_2.z_length == 1.0
+    x_slice_2 = world_roi_2.get("x")
+    assert x_slice_2 is not None
+    assert x_slice_2.axis_name == "x"
+    assert x_slice_2.start == 0
+    assert x_slice_2.length == 1
+
+    y_slice_2 = world_roi_2.get("y")
+    assert y_slice_2 is not None
+    assert y_slice_2.axis_name == "y"
+    assert y_slice_2.start == 0
+    assert y_slice_2.length == 1
     assert world_roi_2.other == "other"  # type: ignore
 
     roi_zoomed = roi.zoom(2.0)
@@ -50,20 +57,19 @@ def test_basic_rois_ops():
         roi.zoom(-1.0)
 
     assert roi_zoomed.to_slicing_dict(pixel_size) == {
-        "x": slice(0, 2),
-        "y": slice(0, 2),
-        "z": slice(0, 1),
-        "t": slice(None),
+        "x": slice(0.0, 2.0),
+        "y": slice(0.0, 2.0),
+        "z": slice(0.0, 1.0),
     }
 
-    roi2 = Roi(
+    roi2 = Roi.from_values(
         name="test2",
-        x=0.0,
-        y=0.0,
-        z=0.0,
-        x_length=1.0,
-        y_length=1.0,
-        z_length=1.0,
+        slices={
+            "x": (0.0, 1.0),
+            "y": (0.0, 1.0),
+            "z": (0.0, 1.0),
+        },
+        space="world",
         unit="micrometer",  # type: ignore
         label=1,
     )
@@ -81,59 +87,59 @@ def test_basic_rois_ops():
     [
         (
             # Basic intersection
-            Roi(
+            Roi.from_values(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=0.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.0, 1.0),
+                    "y": (0.0, 1.0),
+                    "z": (0.0, 1.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
-            Roi(
+            Roi.from_values(
                 name="other",
-                x=0.5,
-                y=0.5,
-                z=0.5,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.5, 1.0),
+                    "y": (0.5, 1.0),
+                    "z": (0.5, 1.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
-            Roi(
+            Roi.from_values(
                 name="ref:other",
-                x=0.5,
-                y=0.5,
-                z=0.5,
-                x_length=0.5,
-                y_length=0.5,
-                z_length=0.5,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.5, 0.5),
+                    "y": (0.5, 0.5),
+                    "z": (0.5, 0.5),
+                },
+                space="world",
+                unit="micrometer",
             ),
             "ref:other",
         ),
         (
             # No intersection
-            Roi(
+            Roi.from_values(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=0.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.0, 1.0),
+                    "y": (0.0, 1.0),
+                    "z": (0.0, 1.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
-            Roi(
+            Roi.from_values(
                 name="other",
-                x=2.0,
-                y=2.0,
-                z=2.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (2.0, 1.0),
+                    "y": (2.0, 1.0),
+                    "z": (2.0, 1.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
             None,
             "",
@@ -141,41 +147,36 @@ def test_basic_rois_ops():
         (
             # Intersection with z=None (expected behaves like infinite z)
             # t=None (expected behaves like infinite t)
-            Roi(
+            Roi.from_values(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=None,
-                t=0,
-                x_length=2.0,
-                y_length=2.0,
-                z_length=None,
-                t_length=2.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.0, 1.0),
+                    "y": (0.0, 1.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
-            Roi(
+            Roi.from_values(
                 name=None,
-                x=-1.0,
-                y=-1.0,
-                z=-1.0,
-                t=None,
-                x_length=2.0,
-                y_length=2.0,
-                z_length=2.0,
-                t_length=None,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.5, 1.0),
+                    "y": (0.5, 1.0),
+                    "z": (-1.0, 2.0),
+                    "t": (0.0, 2.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
-            Roi(
+            Roi.from_values(
                 name="ref",
-                x=0.0,
-                y=0.0,
-                z=-1.0,
-                t=0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=2.0,
-                t_length=2.0,
-                unit="micrometer",  # type: ignore
+                slices={
+                    "x": (0.5, 0.5),
+                    "y": (0.5, 0.5),
+                    "z": (-1.0, 2.0),
+                    "t": (0.0, 2.0),
+                },
+                space="world",
+                unit="micrometer",
             ),
             "ref",
         ),
@@ -193,9 +194,7 @@ def test_rois_intersection(
     else:
         assert intersection is not None
         assert intersection.name == expected_name
-        assert intersection.x == expected_intersection.x
-        assert intersection.y == expected_intersection.y
-        assert intersection.z == expected_intersection.z
-        assert intersection.x_length == expected_intersection.x_length
-        assert intersection.y_length == expected_intersection.y_length
-        assert intersection.z_length == expected_intersection.z_length
+        assert intersection.get("x") == expected_intersection.get("x")
+        assert intersection.get("y") == expected_intersection.get("y")
+        assert intersection.get("z") == expected_intersection.get("z")
+        assert intersection.get("t") == expected_intersection.get("t")

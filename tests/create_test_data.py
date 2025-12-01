@@ -49,8 +49,9 @@ IMAGE_SPECS = [
         "name": "test_image_czyx.zarr",
         "shape": (2, 10, 64, 64),
         "axes": "czyx",
-    }
+    },
 ]
+
 
 def create_test_images_dataset(version: NgffVersions) -> None:
     version_str = "".join(version.split("."))
@@ -71,6 +72,7 @@ def create_test_images_dataset(version: NgffVersions) -> None:
         well_roi_table = ome_zarr.build_image_roi_table()
         ome_zarr.add_table(name="well_ROI_table", table=well_roi_table, backend="csv")
 
+
 if __name__ == "__main__":
     for version in ["0.4", "0.5"]:
-        create_test_images_dataset(version) # type: ignore
+        create_test_images_dataset(version)  # type: ignore

@@ -122,16 +122,16 @@ def _dataframe_to_rois(
         else:
             label = getattr(row, "label", None)
 
-        roi = Roi(
+        slices = {
+            "x": (row.x_micrometer, row.len_x_micrometer),
+            "y": (row.y_micrometer, row.len_y_micrometer),
+            "z": (z_micrometer, z_length_micrometer),
+            "t": (t_second, t_length_second),
+        }
+        roi = Roi.from_values(
             name=str(row.Index),
-            x=row.x_micrometer,  # type: ignore (type can not be known here)
-            y=row.y_micrometer,  # type: ignore (type can not be known here)
-            z=z_micrometer,
-            t=t_second,
-            x_length=row.len_x_micrometer,  # type: ignore (type can not be known here)
-            y_length=row.len_y_micrometer,  # type: ignore (type can not be known here)
-            z_length=z_length_micrometer,
-            t_length=t_length_second,
+            slices=slices,
+            space="world",
             unit="micrometer",
             label=label,
             **extras,
@@ -145,24 +145,39 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
     data = []
     for roi in rois.values():
         # This normalization is necessary for backward compatibility
-        z_micrometer = roi.z if roi.z is not None else 0.0
-        len_z_micrometer = roi.z_length if roi.z_length is not None else 1.0
+        if roi.space != "world":
+            raise NotImplementedError(
+                "Only ROIs in world coordinates can be serialized."
+            )
 
+        z_slice = roi.get("z")
+        if z_slice is None:
+            z_micrometer = 0.0
+            len_z_micrometer = 1.0
+        else:
+            z_micrometer = z_slice.start if z_slice.start is not None else 0.0
+            len_z_micrometer = z_slice.length if z_slice.length is not None else 1.0
+
+        x_slice = roi.get("x")
+        if x_slice is None:
+            raise NgioValueError("ROI is missing 'x' slice.")
+        y_slice = roi.get("y")
+        if y_slice is None:
+            raise NgioValueError("ROI is missing 'y' slice.")
         row = {
             index_key: roi.get_name(),
-            "x_micrometer": roi.x,
-            "y_micrometer": roi.y,
+            "x_micrometer": x_slice.start if x_slice.start is not None else 0.0,
+            "y_micrometer": y_slice.start if y_slice.start is not None else 0.0,
             "z_micrometer": z_micrometer,
-            "len_x_micrometer": roi.x_length,
-            "len_y_micrometer": roi.y_length,
+            "len_x_micrometer": x_slice.length if x_slice.length is not None else 1.0,
+            "len_y_micrometer": y_slice.length if y_slice.length is not None else 1.0,
             "len_z_micrometer": len_z_micrometer,
         }
 
-        if roi.t is not None:
-            row["t_second"] = roi.t
-
-        if roi.t_length is not None:
-            row["len_t_second"] = roi.t_length
+        t_slice = roi.get("t")
+        if t_slice is not None:
+            row["t_second"] = t_slice.start if t_slice.start is not None else 0.0
+            row["len_t_second"] = t_slice.length if t_slice.length is not None else 1.0
 
         if roi.label is not None and index_key != "label":
             row["label"] = roi.label
@@ -185,7 +200,7 @@ class RoiDictWrapper:
         self._rois_by_name = {}
         self._rois_by_label = {}
         for roi in rois:
-            name = roi.get_name()
+            name = roi.name
             if name in self._rois_by_name:
                 name = f"{name}_{uuid4().hex[:8]}"
             self._rois_by_name[name] = roi

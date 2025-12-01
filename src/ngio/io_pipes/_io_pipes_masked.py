@@ -6,7 +6,7 @@ import zarr
 from dask.array import Array as DaskArray
 
 from ngio.common._dimensions import Dimensions
-from ngio.common._roi import Roi, RoiPixels
+from ngio.common._roi import Roi
 from ngio.io_pipes._io_pipes import (
     DaskGetter,
     DaskSetter,
@@ -57,7 +57,7 @@ def _setup_numpy_getters(
     dimensions: Dimensions,
     label_zarr_array: zarr.Array,
     label_dimensions: Dimensions,
-    roi: Roi | RoiPixels,
+    roi: Roi,
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     label_transforms: Sequence[TransformProtocol] | None = None,
@@ -117,7 +117,7 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
         label_dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
@@ -187,7 +187,7 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
         label_dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
@@ -290,7 +290,7 @@ def _setup_dask_getters(
     dimensions: Dimensions,
     label_zarr_array: zarr.Array,
     label_dimensions: Dimensions,
-    roi: Roi | RoiPixels,
+    roi: Roi,
     axes_order: Sequence[str] | None = None,
     transforms: Sequence[TransformProtocol] | None = None,
     label_transforms: Sequence[TransformProtocol] | None = None,
@@ -350,7 +350,7 @@ class DaskGetterMasked(DataGetter[DaskArray]):
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
         label_dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
@@ -418,7 +418,7 @@ class DaskSetterMasked(DataSetter[DaskArray]):
         dimensions: Dimensions,
         label_zarr_array: zarr.Array,
         label_dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
