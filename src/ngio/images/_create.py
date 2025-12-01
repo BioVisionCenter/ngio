@@ -10,8 +10,6 @@ from ngio.ome_zarr_meta import (
     NgioImageMeta,
     NgioLabelMeta,
     PixelSize,
-)
-from ngio.ome_zarr_meta._meta_handlers import (
     update_ngio_image_meta,
     update_ngio_label_meta,
 )

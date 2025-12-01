@@ -22,8 +22,6 @@ from ngio.ome_zarr_meta import (
     PlateMetaHandler,
     WellMetaHandler,
     path_in_well_validation,
-)
-from ngio.ome_zarr_meta._meta_handlers import (
     update_ngio_plate_meta,
     update_ngio_well_meta,
 )

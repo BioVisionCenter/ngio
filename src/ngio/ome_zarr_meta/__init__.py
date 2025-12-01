@@ -5,6 +5,10 @@ from ngio.ome_zarr_meta._meta_handlers import (
     LabelMetaHandler,
     PlateMetaHandler,
     WellMetaHandler,
+    update_ngio_image_meta,
+    update_ngio_label_meta,
+    update_ngio_plate_meta,
+    update_ngio_well_meta,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
@@ -38,4 +42,8 @@ __all__ = [
     "WellMetaHandler",
     "build_canonical_axes_handler",
     "path_in_well_validation",
+    "update_ngio_image_meta",
+    "update_ngio_label_meta",
+    "update_ngio_plate_meta",
+    "update_ngio_well_meta",
 ]
