@@ -396,8 +396,9 @@ def v04_to_ngio_well_meta(
     Returns:
         NgioWellMeta: The ngio well metadata.
     """
-    v04_well = WellAttrsV04(**metadata)
-    return NgioWellMeta(**v04_well.model_dump())
+    v04_well = WellAttrsV04(**metadata).well.model_dump()
+    images = v04_well.get("images", [])
+    return NgioWellMeta(images=images, version="0.4")
 
 
 def v04_to_ngio_plate_meta(
@@ -411,8 +412,8 @@ def v04_to_ngio_plate_meta(
     Returns:
         NgioPlateMeta: The ngio plate metadata.
     """
-    v04_plate = HCSAttrsV04(**metadata)
-    return NgioPlateMeta(**v04_plate.model_dump())
+    v04_plate = HCSAttrsV04(**metadata).plate.model_dump()
+    return NgioPlateMeta(plate=v04_plate, version="0.4")  # type: ignore
 
 
 def ngio_to_v04_well_meta(metadata: NgioWellMeta) -> dict:
@@ -424,7 +425,7 @@ def ngio_to_v04_well_meta(metadata: NgioWellMeta) -> dict:
     Returns:
         dict: The v04 well metadata.
     """
-    v04_well = WellAttrsV04(**metadata.model_dump())
+    v04_well = WellAttrsV04(well=metadata.model_dump())  # type: ignore
     return v04_well.model_dump(exclude_none=True, by_alias=True)
 
 

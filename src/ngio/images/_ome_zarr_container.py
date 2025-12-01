@@ -822,9 +822,11 @@ def open_label(
     group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     if name is None:
         label_meta_handler = LabelMetaHandler(group_handler)
-        path = label_meta_handler.get_meta().get_dataset(
-            path=path, pixel_size=pixel_size, strict=strict
-        ).path
+        path = (
+            label_meta_handler.get_meta()
+            .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
+            .path
+        )
         return Label(group_handler, path, label_meta_handler)
 
     labels_container = LabelsContainer(group_handler)
