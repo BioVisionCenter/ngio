@@ -1,0 +1,9 @@
+{
+  "attributes": {
+    "labels": [
+      "label"
+    ]
+  },
+  "zarr_format": 3,
+  "node_type": "group"
+}

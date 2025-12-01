@@ -1,59 +1,59 @@
 {
-    "image-label": {
-        "source": {
-            "image": "../../"
-        },
-        "version": "0.4"
+  "image-label": {
+    "source": {
+      "image": "../../"
     },
-    "multiscales": [
+    "version": "0.4"
+  },
+  "multiscales": [
+    {
+      "axes": [
         {
-            "axes": [
-                {
-                    "name": "z",
-                    "type": "space",
-                    "unit": "micrometer"
-                },
-                {
-                    "name": "y",
-                    "type": "space",
-                    "unit": "micrometer"
-                },
-                {
-                    "name": "x",
-                    "type": "space",
-                    "unit": "micrometer"
-                }
-            ],
-            "datasets": [
-                {
-                    "coordinateTransformations": [
-                        {
-                            "scale": [
-                                1.0,
-                                0.5,
-                                0.5
-                            ],
-                            "type": "scale"
-                        }
-                    ],
-                    "path": "0"
-                },
-                {
-                    "coordinateTransformations": [
-                        {
-                            "scale": [
-                                1.0,
-                                1.0,
-                                1.0
-                            ],
-                            "type": "scale"
-                        }
-                    ],
-                    "path": "1"
-                }
-            ],
-            "name": "label",
-            "version": "0.4"
+          "name": "z",
+          "type": "space",
+          "unit": "micrometer"
+        },
+        {
+          "name": "y",
+          "type": "space",
+          "unit": "micrometer"
+        },
+        {
+          "name": "x",
+          "type": "space",
+          "unit": "micrometer"
         }
-    ]
+      ],
+      "datasets": [
+        {
+          "path": "0",
+          "coordinateTransformations": [
+            {
+              "type": "scale",
+              "scale": [
+                1.0,
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "path": "1",
+          "coordinateTransformations": [
+            {
+              "type": "scale",
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ]
+            }
+          ]
+        }
+      ],
+      "name": "label",
+      "version": "0.4"
+    }
+  ]
 }
