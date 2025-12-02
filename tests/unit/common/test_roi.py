@@ -192,3 +192,88 @@ def test_rois_intersection(
         assert intersection.get("z") == expected_intersection.get("z")
 
         assert intersection.get("t") == expected_intersection.get("t")
+
+
+@pytest.mark.parametrize(
+    "roi_ref,roi_other,expected_union,expected_name",
+    [
+        (
+            # Basic intersection
+            Roi.from_values(
+                name="ref",
+                slices={
+                    "x": (0.0, 1.0),
+                    "y": (0.0, 1.0),
+                    "z": (0.0, 1.0),
+                },
+                space="world",
+            ),
+            Roi.from_values(
+                name="other",
+                slices={
+                    "x": (0.5, 1.0),
+                    "y": (0.5, 1.0),
+                    "z": (0.5, 1.0),
+                },
+                space="world",
+            ),
+            Roi.from_values(
+                name="ref:other",
+                slices={
+                    "x": (0.0, 1.5),
+                    "y": (0.0, 1.5),
+                    "z": (0.0, 1.5),
+                },
+                space="world",
+            ),
+            "ref:other",
+        ),
+        (
+            # Intersection with z=None (expected behaves like infinite z)
+            # t=None (expected behaves like infinite t)
+            Roi.from_values(
+                name="ref",
+                slices={
+                    "x": (0.0, 1.0),
+                    "y": (0.0, 1.0),
+                },
+                space="world",
+            ),
+            Roi.from_values(
+                name=None,
+                slices={
+                    "x": (0.5, 1.0),
+                    "y": (0.5, 1.0),
+                    "z": (-1.0, 2.0),
+                    "t": (0.0, 2.0),
+                },
+                space="world",
+                unit="micrometer",
+            ),
+            Roi.from_values(
+                name="ref",
+                slices={
+                    "x": (0.0, 1.5),
+                    "y": (0.0, 1.5),
+                    "z": (-1.0, 2.0),
+                    "t": (0.0, 2.0),
+                },
+                space="world",
+            ),
+            "ref",
+        ),
+    ],
+)
+def test_rois_union(
+    roi_ref: Roi,
+    roi_other: Roi,
+    expected_union: Roi,
+    expected_name: str,
+):
+    union = roi_ref.union(roi_other)
+    assert union is not None
+    assert union.name == expected_name
+    assert union.get("x") == expected_union.get("x")
+    assert union.get("y") == expected_union.get("y")
+    assert union.get("z") == expected_union.get("z")
+    assert union.get("t") == expected_union.get("t")
