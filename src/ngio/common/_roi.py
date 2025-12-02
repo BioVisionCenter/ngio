@@ -76,7 +76,7 @@ class RoiSlice(BaseModel):
             return cls._from_slice(axis_name=axis_name, selection=value)
         elif isinstance(value, tuple):
             return cls(axis_name=axis_name, start=value[0], length=value[1])
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             return cls(axis_name=axis_name, start=value, length=1)
         else:
             raise TypeError(f"Unsupported type for slice value: {type(value)}")
