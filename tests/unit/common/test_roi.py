@@ -159,6 +159,7 @@ def test_basic_rois_ops():
                     "t": (0.0, 2.0),
                 },
                 space="world",
+                unit="micrometer",
             ),
             Roi.from_values(
                 name="ref",

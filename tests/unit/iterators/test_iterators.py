@@ -98,7 +98,9 @@ def test_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: 
         "v05/test_image_tczyx.zarr",
     ],
 )
-def test_masked_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+def test_masked_segmentation_iterator(
+    images_all_versions: dict[str, Path], zarr_name: str
+):
     # Base test only the API, not the actual segmentation logic
     path = images_all_versions[zarr_name]
     ome_zarr = open_ome_zarr_container(path)

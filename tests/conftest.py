@@ -30,6 +30,7 @@ def cardiomyocyte_small_mip_path(tmp_path: Path) -> Path:
     shutil.copytree(cardiomyocyte_small_mip_source_path, dest_path, dirs_exist_ok=True)
     return dest_path
 
+
 @pytest.fixture
 def images_all_versions(tmp_path: Path) -> dict[str, Path]:
     dest_base = tmp_path / "all_versions" / "images"
