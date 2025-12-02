@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
 
 from ngio import (
     create_empty_ome_zarr,
@@ -128,7 +129,7 @@ def test_create_fail(tmp_path: Path):
             overwrite=True,
         )
 
-    with pytest.raises(NgioValueError):
+    with pytest.raises(ValidationError):
         create_ome_zarr_from_array(
             array=np.random.randint(0, 255, (2, 64, 64), dtype="uint8"),
             store=tmp_path / "fail.zarr",

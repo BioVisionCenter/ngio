@@ -5,7 +5,7 @@ from typing import Literal, TypeVar
 
 from zarr.core.array import CompressorLike
 
-from ngio.common._pyramid import init_empty_pyramid
+from ngio.common._pyramid import ChunksLike, ImagePyramidBuilder, ShardsLike
 from ngio.ome_zarr_meta import (
     NgioImageMeta,
     NgioLabelMeta,
@@ -93,7 +93,8 @@ def create_empty_label_container(
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | Literal["auto"] = "auto",
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
     dtype: str = "uint32",
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
@@ -122,8 +123,9 @@ def create_empty_label_container(
         axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
-            is used. Defaults to None.
+        chunks (ChunksLike): The chunk shape. If "auto" zarr python will decide
+            on the fly. Defaults to "auto".
+        shards (ShardsLike | None): The shards configuration. Defaults to None.
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
@@ -157,27 +159,42 @@ def create_empty_label_container(
         name=name,
         ngff_version=ngff_version,
     )
-
     mode = "w" if overwrite else "w-"
     group_handler = ZarrGroupHandler(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
-    update_ngio_label_meta(group_handler, meta)
-
-    init_empty_pyramid(
-        store=store,
-        paths=meta.paths,
-        scaling_factors=scaling_factors,
-        ref_shape=shape,
-        chunks=chunks,
-        axes=axes_names,
-        dtype=dtype,
-        mode="a",
-        dimension_separator=dimension_separator,
-        compressors=compressors,
-    )
     # Reopen in r+ mode
     group_handler = group_handler.reopen_handler()
+
+    update_ngio_label_meta(group_handler, meta)
+
+    pixel_size = []
+    for ax in axes_names:
+        if ax == "x":
+            pixel_size.append(pixelsize)
+        elif ax == "y":
+            pixel_size.append(pixelsize)
+        elif ax == "z":
+            pixel_size.append(z_spacing)
+        elif ax == "t":
+            pixel_size.append(time_spacing)
+        else:
+            pixel_size.append(1.0)
+
+    image_pyramid_builder = ImagePyramidBuilder.from_scaling_factors(
+        levels_paths=meta.paths,
+        scaling_factors=tuple(scaling_factors),
+        base_shape=tuple(shape),
+        base_scale=tuple(pixel_size),
+        axes=list(axes_names),
+        chunks=chunks,
+        shards=shards,
+        data_type=dtype,
+        dimension_separator=dimension_separator,
+        compressors=compressors,
+        zarr_format=meta.zarr_format,
+    )
+    image_pyramid_builder.to_zarr(group=group_handler.group)
     return group_handler
 
 
@@ -194,10 +211,11 @@ def create_empty_image_container(
     time_unit: TimeUnits | str | None = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | Literal["auto"] = "auto",
+    chunks: ChunksLike = "auto",
     dtype: str = "uint16",
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
+    shards: ShardsLike | None = None,
     overwrite: bool = False,
     ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> ZarrGroupHandler:
@@ -223,8 +241,9 @@ def create_empty_image_container(
         axes_names (Sequence[str] | None, optional): The names of the axes.
             If None the canonical names are used. Defaults to None.
         name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
-            is used. Defaults to None.
+        chunks (ChunksLike): The chunk shape. If "auto" zarr python will decide
+            on the fly. Defaults to "auto".
+        shards (ShardsLike | None): The shards configuration. Defaults to None.
         dtype (str, optional): The data type of the image. Defaults to "uint16".
         dimension_separator (DIMENSION_SEPARATOR): The separator to use for
             dimensions. Defaults to "/".
@@ -263,20 +282,34 @@ def create_empty_image_container(
         store=store, mode=mode, cache=False, zarr_format=meta.zarr_format
     )
     update_ngio_image_meta(group_handler, meta)
-
-    init_empty_pyramid(
-        store=store,
-        paths=meta.paths,
-        scaling_factors=scaling_factors,
-        ref_shape=shape,
-        chunks=chunks,
-        axes=axes_names,
-        dtype=dtype,
-        mode="a",
-        dimension_separator=dimension_separator,
-        compressors=compressors,
-        zarr_format=meta.zarr_format,
-    )
     # Reopen in r+ mode
     group_handler = group_handler.reopen_handler()
+
+    pixel_size = []
+    for ax in axes_names:
+        if ax == "x":
+            pixel_size.append(pixelsize)
+        elif ax == "y":
+            pixel_size.append(pixelsize)
+        elif ax == "z":
+            pixel_size.append(z_spacing)
+        elif ax == "t":
+            pixel_size.append(time_spacing)
+        else:
+            pixel_size.append(1.0)
+
+    image_pyramid_builder = ImagePyramidBuilder.from_scaling_factors(
+        levels_paths=meta.paths,
+        scaling_factors=tuple(scaling_factors),
+        base_shape=tuple(shape),
+        base_scale=tuple(pixel_size),
+        axes=list(axes_names),
+        chunks=chunks,
+        data_type=dtype,
+        dimension_separator=dimension_separator,
+        compressors=compressors,
+        shards=shards,
+        zarr_format=meta.zarr_format,
+    )
+    image_pyramid_builder.to_zarr(group=group_handler.group)
     return group_handler

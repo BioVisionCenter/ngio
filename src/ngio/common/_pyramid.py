@@ -1,13 +1,11 @@
-import math
-from collections.abc import Callable, Sequence
-from typing import Literal
+from collections.abc import Callable
+from typing import Any, Literal
 
 import dask.array as da
 import numpy as np
 import zarr
-from zarr.core.array import CompressorLike
+from pydantic import BaseModel, model_validator
 
-# from zarr.types import DIMENSION_SEPARATOR
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -15,10 +13,7 @@ from ngio.common._zoom import (
     numpy_zoom,
 )
 from ngio.utils import (
-    AccessModeLiteral,
     NgioValueError,
-    StoreOrGroup,
-    open_group_wrapper,
 )
 
 
@@ -199,85 +194,176 @@ def consolidate_pyramid(
         processed.append(target_image)
 
 
-def _maybe_int(value: float | int) -> float | int:
-    """Convert a float to an int if it is an integer."""
-    if isinstance(value, int):
-        return value
-    if value.is_integer():
-        return int(value)
-    return value
+################################################
+#
+# Builders for image pyramids
+#
+################################################
+
+ChunksLike = tuple[int, ...] | Literal["auto"]
+ShardsLike = tuple[int, ...] | Literal["auto"]
 
 
-def init_empty_pyramid(
-    store: StoreOrGroup,
-    paths: list[str],
-    ref_shape: Sequence[int],
-    scaling_factors: Sequence[float],
-    axes: Sequence[str],
-    chunks: Sequence[int] | Literal["auto"] = "auto",
-    dtype: str = "uint16",
-    mode: AccessModeLiteral = "a",
-    dimension_separator: Literal[".", "/"] = "/",
-    compressors: CompressorLike = "auto",
-    zarr_format: Literal[2, 3] = 2,
-) -> None:
-    # Return the an Image object
-    if chunks != "auto" and len(chunks) != len(ref_shape):
-        raise NgioValueError(
-            "The shape and chunks must have the same number of dimensions."
-        )
+class PyramidLevel(BaseModel):
+    path: str
+    shape: tuple[int, ...]
+    scale: tuple[float, ...]
+    chunks: ChunksLike = "auto"
+    shards: ShardsLike | None = None
 
-    if chunks != "auto":
-        chunks = tuple(min(c, s) for c, s in zip(chunks, ref_shape, strict=True))
-    else:
-        chunks = "auto"
-
-    if len(ref_shape) != len(scaling_factors):
-        raise NgioValueError(
-            "The shape and scaling factor must have the same number of dimensions."
-        )
-
-    # Ensure scaling factors are int if possible
-    # To reduce the risk of floating point issues
-    scaling_factors = [_maybe_int(s) for s in scaling_factors]
-
-    root_group = open_group_wrapper(store, mode=mode, zarr_format=zarr_format)
-
-    array_static_kwargs = {
-        "dtype": dtype,
-        "overwrite": True,
-        "compressors": compressors,
-    }
-
-    if zarr_format == 2:
-        array_static_kwargs["chunk_key_encoding"] = {
-            "name": "v2",
-            "separator": dimension_separator,
-        }
-    else:
-        array_static_kwargs["chunk_key_encoding"] = {
-            "name": "default",
-            "separator": dimension_separator,
-        }
-        array_static_kwargs["dimension_names"] = axes
-
-    for path in paths:
-        if any(s < 1 for s in ref_shape):
+    @model_validator(mode="after")
+    def _model_validation(self) -> "PyramidLevel":
+        # Same length as shape
+        if len(self.scale) != len(self.shape):
             raise NgioValueError(
-                "Level shape must be at least 1 on all dimensions. "
-                f"Calculated shape: {ref_shape} at level {path}."
+                "Scale must have the same length as shape "
+                f"({len(self.shape)}), got {len(self.scale)}"
             )
-        new_arr = root_group.create_array(
-            name=path,
-            shape=tuple(ref_shape),
-            chunks=chunks,
-            **array_static_kwargs,
+        if isinstance(self.chunks, tuple):
+            if len(self.chunks) != len(self.shape):
+                raise NgioValueError(
+                    "Chunks must have the same length as shape "
+                    f"({len(self.shape)}), got {len(self.chunks)}"
+                )
+        if isinstance(self.shards, tuple):
+            if len(self.shards) != len(self.shape):
+                raise NgioValueError(
+                    "Shards must have the same length as shape "
+                    f"({len(self.shape)}), got {len(self.shards)}"
+                )
+        return self
+
+
+class ImagePyramidBuilder(BaseModel):
+    levels: list[PyramidLevel]
+    axes: list[str]
+    data_type: str = "uint16"
+    dimension_separator: Literal[".", "/"] = "/"
+    compressors: Any = "auto"
+    zarr_format: Literal[2, 3] = 2
+
+    @classmethod
+    def from_scaling_factors(
+        cls,
+        levels_paths: list[str] | int,
+        scaling_factors: tuple[float, ...],
+        base_shape: tuple[int, ...],
+        base_scale: tuple[float, ...],
+        axes: list[str],
+        chunks: ChunksLike = "auto",
+        shards: ShardsLike | None = None,
+        data_type: str = "uint16",
+        dimension_separator: Literal[".", "/"] = "/",
+        compressors="auto",
+        zarr_format: Literal[2, 3] = 2,
+    ) -> "ImagePyramidBuilder":
+        levels = []
+        if isinstance(levels_paths, int):
+            levels_paths = [str(i) for i in range(levels_paths)]
+
+        # Rename for clarity
+        scale = base_scale
+        for path in levels_paths:
+            levels.append(
+                PyramidLevel(
+                    path=path,
+                    shape=base_shape,
+                    scale=scale,
+                    chunks=chunks,
+                    shards=shards,
+                )
+            )
+            base_shape = tuple(
+                max(1, int(s / f))
+                for s, f in zip(base_shape, scaling_factors, strict=True)
+            )
+            scale = tuple(s * f for s, f in zip(scale, scaling_factors, strict=True))
+        return cls(
+            levels=levels,
+            axes=axes,
+            data_type=data_type,
+            dimension_separator=dimension_separator,
+            compressors=compressors,
+            zarr_format=zarr_format,
         )
 
-        ref_shape = [
-            math.floor(s / sc) for s, sc in zip(ref_shape, scaling_factors, strict=True)
-        ]
-        chunks = tuple(
-            min(c, s) for c, s in zip(new_arr.chunks, ref_shape, strict=True)
+    @classmethod
+    def from_shapes(
+        cls,
+        shapes: list[tuple[int, ...]],
+        base_scale: tuple[float, ...],
+        axes: list[str],
+        levels_paths: list[str] | None = None,
+        chunks: ChunksLike = "auto",
+        shards: ShardsLike | None = None,
+        data_type: str = "uint16",
+        dimension_separator: Literal[".", "/"] = "/",
+        compressors="auto",
+        zarr_format: Literal[2, 3] = 2,
+    ) -> "ImagePyramidBuilder":
+        levels = []
+        if levels_paths is None:
+            levels_paths = [str(i) for i in range(len(shapes))]
+
+        base_scale = base_scale
+        for i, (path, shape) in enumerate(zip(levels_paths, shapes, strict=True)):
+            levels.append(
+                PyramidLevel(
+                    path=path,
+                    shape=shape,
+                    scale=base_scale,
+                    chunks=chunks,
+                    shards=shards,
+                )
+            )
+            if i + 1 < len(shapes):
+                next_shape = shapes[i + 1]
+                base_scale = tuple(
+                    s * (s1 / s2)
+                    for s, s1, s2 in zip(
+                        base_scale,
+                        shape,
+                        next_shape,
+                        strict=True,
+                    )
+                )
+        return cls(
+            levels=levels,
+            axes=axes,
+            data_type=data_type,
+            dimension_separator=dimension_separator,
+            compressors=compressors,
+            zarr_format=zarr_format,
         )
-    return None
+
+    def to_zarr(self, group: zarr.Group) -> None:
+        """Save the pyramid specification to a Zarr group.
+
+        Args:
+            group (zarr.Group): The Zarr group to save the pyramid specification to.
+        """
+        array_static_kwargs = {
+            "dtype": self.data_type,
+            "overwrite": True,
+            "compressors": self.compressors,
+        }
+
+        if self.zarr_format == 2:
+            array_static_kwargs["chunk_key_encoding"] = {
+                "name": "v2",
+                "separator": self.dimension_separator,
+            }
+        else:
+            array_static_kwargs["chunk_key_encoding"] = {
+                "name": "default",
+                "separator": self.dimension_separator,
+            }
+            array_static_kwargs["dimension_names"] = self.axes
+        for p_level in self.levels:
+            group.create_array(
+                name=p_level.path,
+                shape=tuple(p_level.shape),
+                chunks=p_level.chunks,
+                shards=p_level.shards,
+                **array_static_kwargs,
+            )
