@@ -4,11 +4,13 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 
+from collections.abc import Callable
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ngio.ome_zarr_meta import PixelSize
+from ngio.utils import NgioValueError
 
 
 def world_to_pixel(value: float, pixel_size: float, eps: float = 1e-6) -> float:
@@ -39,7 +41,7 @@ def _join_roi_labels(label1: int | None, label2: int | None) -> int | None:
     if label1 is not None and label2 is not None:
         if label1 == label2:
             return label1
-        raise ValueError("Cannot join ROIs with different labels")
+        raise NgioValueError("Cannot join ROIs with different labels")
     return label1 or label2
 
 
@@ -93,7 +95,7 @@ class RoiSlice(BaseModel):
 
     def _is_compatible(self, other: "RoiSlice", msg: str) -> None:
         if self.axis_name != other.axis_name:
-            raise ValueError(
+            raise NgioValueError(
                 f"{msg}: Cannot operate on RoiSlices with different axis names"
             )
 
@@ -138,7 +140,7 @@ class RoiSlice(BaseModel):
 
     def zoom(self, zoom_factor: float = 1.0) -> "RoiSlice":
         if zoom_factor <= 0:
-            raise ValueError("Zoom factor must be greater than 0")
+            raise NgioValueError("Zoom factor must be greater than 0")
         zoom_factor -= 1.0
         if self.length is None:
             return self
@@ -151,7 +153,7 @@ class RoiSlice(BaseModel):
 
 class Roi(BaseModel):
     name: str | None
-    slices: list[RoiSlice]
+    slices: list[RoiSlice] = Field(min_length=2)
     label: int | None = Field(default=None, ge=0)
     space: Literal["world", "pixel"] = "world"
 
@@ -162,7 +164,7 @@ class Roi(BaseModel):
     def validate_no_duplicate_axes(cls, v: list[RoiSlice]) -> list[RoiSlice]:
         axis_names = [s.axis_name for s in v]
         if len(axis_names) != len(set(axis_names)):
-            raise ValueError("Roi slices must have unique axis names")
+            raise NgioValueError("Roi slices must have unique axis names")
         return v
 
     def _nice_repr__(self) -> str:
@@ -207,52 +209,66 @@ class Roi(BaseModel):
             return str(self.label)
         return self._nice_repr__()
 
-    def union(self, other: Self) -> Self:
-        if self.space != other.space:
-            raise ValueError(
-                "Roi union failed: One ROI is in pixel space and the "
-                "other in world space"
-            )
-
+    @staticmethod
+    def _apply_sym_ops(
+        self_slices: list[RoiSlice],
+        other_slices: list[RoiSlice],
+        op: Callable[[RoiSlice, RoiSlice], RoiSlice | None],
+    ) -> list[RoiSlice] | None:
+        self_axis_dict = {s.axis_name: s for s in self_slices}
+        other_axis_dict = {s.axis_name: s for s in other_slices}
+        common_axis_names = self_axis_dict.keys() | other_axis_dict.keys()
         new_slices = []
-        for slice_a in self.slices:
-            slice_b = other.get(slice_a.axis_name)
-            if slice_b is not None:
-                new_slices.append(slice_a.union(slice_b))
-            else:
+        for axis_name in common_axis_names:
+            slice_a = self_axis_dict.get(axis_name)
+            slice_b = other_axis_dict.get(axis_name)
+            if slice_a is not None and slice_b is not None:
+                result = op(slice_a, slice_b)
+                if result is None:
+                    return None
+                new_slices.append(result)
+            elif slice_a is not None:
                 new_slices.append(slice_a)
-
-        for slice_b in other.slices:
-            if slice_b.axis_name not in [s.axis_name for s in self.slices]:
+            elif slice_b is not None:
                 new_slices.append(slice_b)
-
-        name = _join_roi_names(self.name, other.name)
-        label = _join_roi_labels(self.label, other.label)
-        return self.model_copy(
-            update={"name": name, "slices": new_slices, "label": label}
-        )
+        return new_slices
 
     def intersection(self, other: Self) -> Self | None:
         if self.space != other.space:
-            raise ValueError(
+            raise NgioValueError(
                 "Roi intersection failed: One ROI is in pixel space and the "
                 "other in world space"
             )
 
-        new_slices = []
-        for slice_a in self.slices:
-            slice_b = other.get(slice_a.axis_name)
-            if slice_b is None:
-                slice_b = RoiSlice(axis_name=slice_a.axis_name)
-            intersection = slice_a.intersection(slice_b)
-            if intersection is None:
-                return None
-            new_slices.append(intersection)
+        out_slices = self._apply_sym_ops(
+            self.slices, other.slices, op=lambda a, b: a.intersection(b)
+        )
+        if out_slices is None:
+            return None
 
         name = _join_roi_names(self.name, other.name)
         label = _join_roi_labels(self.label, other.label)
         return self.model_copy(
-            update={"name": name, "slices": new_slices, "label": label}
+            update={"name": name, "slices": out_slices, "label": label}
+        )
+
+    def union(self, other: Self) -> Self:
+        if self.space != other.space:
+            raise NgioValueError(
+                "Roi union failed: One ROI is in pixel space and the "
+                "other in world space"
+            )
+
+        out_slices = self._apply_sym_ops(
+            self.slices, other.slices, op=lambda a, b: a.union(b)
+        )
+        if out_slices is None:
+            raise NgioValueError("Roi union failed: could not compute union")
+
+        name = _join_roi_names(self.name, other.name)
+        label = _join_roi_labels(self.label, other.label)
+        return self.model_copy(
+            update={"name": name, "slices": out_slices, "label": label}
         )
 
     def zoom(
@@ -270,7 +286,7 @@ class Roi(BaseModel):
         if self.space == "world":
             return self.model_copy()
         if pixel_size is None:
-            raise ValueError(
+            raise NgioValueError(
                 "Pixel sizes must be provided to convert ROI from pixel to world"
             )
         new_slices = []
@@ -284,7 +300,7 @@ class Roi(BaseModel):
             return self.model_copy()
 
         if pixel_size is None:
-            raise ValueError(
+            raise NgioValueError(
                 "Pixel sizes must be provided to convert ROI from world to pixel"
             )
 

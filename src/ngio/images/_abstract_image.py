@@ -444,8 +444,10 @@ class AbstractImage(Generic[_image_handler]):
     def roi(self, name: str | None = "image") -> Roi:
         """Return the ROI covering the entire image."""
         slices = {}
-        for ax_name in self.axes:
-            axis_size = self.dimensions.get(ax_name)
+        for ax_name in ["t", "z", "y", "x"]:
+            axis_size = self.dimensions.get(ax_name, default=None)
+            if axis_size is None:
+                continue
             slices[ax_name] = slice(0, axis_size)
         roi_px = Roi.from_values(name=name, slices=slices, space="pixel")
         return roi_px.to_world(pixel_size=self.pixel_size)

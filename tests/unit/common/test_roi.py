@@ -14,8 +14,8 @@ def test_basic_rois_ops():
             "z": (0, 1),
         },
         space="world",
-        unit="micrometer",  # type: ignore
         other="other",  # type: ignore
+        label=1,
     )
 
     slixe_x = roi.get("x")
@@ -70,7 +70,7 @@ def test_basic_rois_ops():
             "z": (0.0, 1.0),
         },
         space="world",
-        unit="micrometer",  # type: ignore
+        # type: ignore
         label=1,
     )
     roi_i = roi.intersection(roi2)
@@ -95,7 +95,6 @@ def test_basic_rois_ops():
                     "z": (0.0, 1.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             Roi.from_values(
                 name="other",
@@ -105,7 +104,6 @@ def test_basic_rois_ops():
                     "z": (0.5, 1.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             Roi.from_values(
                 name="ref:other",
@@ -115,7 +113,6 @@ def test_basic_rois_ops():
                     "z": (0.5, 0.5),
                 },
                 space="world",
-                unit="micrometer",
             ),
             "ref:other",
         ),
@@ -129,7 +126,6 @@ def test_basic_rois_ops():
                     "z": (0.0, 1.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             Roi.from_values(
                 name="other",
@@ -139,7 +135,6 @@ def test_basic_rois_ops():
                     "z": (2.0, 1.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             None,
             "",
@@ -154,7 +149,6 @@ def test_basic_rois_ops():
                     "y": (0.0, 1.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             Roi.from_values(
                 name=None,
@@ -165,7 +159,6 @@ def test_basic_rois_ops():
                     "t": (0.0, 2.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             Roi.from_values(
                 name="ref",
@@ -176,7 +169,6 @@ def test_basic_rois_ops():
                     "t": (0.0, 2.0),
                 },
                 space="world",
-                unit="micrometer",
             ),
             "ref",
         ),
@@ -197,4 +189,5 @@ def test_rois_intersection(
         assert intersection.get("x") == expected_intersection.get("x")
         assert intersection.get("y") == expected_intersection.get("y")
         assert intersection.get("z") == expected_intersection.get("z")
+
         assert intersection.get("t") == expected_intersection.get("t")

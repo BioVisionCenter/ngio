@@ -9,15 +9,9 @@ from ngio.utils import NgioValueError
 
 def test_masking_roi_table_v1(tmp_path: Path):
     rois = {
-        1: Roi(
+        1: Roi.from_values(
             name="1",
-            x=0.0,
-            y=0.0,
-            z=0.0,
-            x_length=1.0,
-            y_length=1.0,
-            z_length=1.0,
-            unit="micrometer",  # type: ignore
+            slices={"x": slice(0, 10), "y": slice(0, 10), "z": slice(0, 5)},
         )
     }
 
@@ -28,29 +22,17 @@ def test_masking_roi_table_v1(tmp_path: Path):
     assert table.meta.region.path == "../labels/label"
 
     table.add(
-        roi=Roi(
+        roi=Roi.from_values(
             name="2",
-            x=0.0,
-            y=0.0,
-            z=0.0,
-            x_length=1.0,
-            y_length=1.0,
-            z_length=1.0,
-            unit="micrometer",  # type: ignore
+            slices={"x": slice(0, 10), "y": slice(0, 10), "z": slice(0, 5)},
         )
     )
 
     with pytest.raises(NgioValueError):
         table.add(
-            roi=Roi(
+            roi=Roi.from_values(
                 name="2",
-                x=0.0,
-                y=0.0,
-                z=0.0,
-                x_length=1.0,
-                y_length=1.0,
-                z_length=1.0,
-                unit="micrometer",  # type: ignore
+                slices={"x": slice(0, 10), "y": slice(0, 10), "z": slice(0, 5)},
             )
         )
 

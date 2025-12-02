@@ -126,13 +126,13 @@ def _dataframe_to_rois(
             "x": (row.x_micrometer, row.len_x_micrometer),
             "y": (row.y_micrometer, row.len_y_micrometer),
             "z": (z_micrometer, z_length_micrometer),
-            "t": (t_second, t_length_second),
         }
+        if t_second is not None or t_length_second is not None:
+            slices["t"] = (t_second, t_length_second)
         roi = Roi.from_values(
             name=str(row.Index),
             slices=slices,
             space="world",
-            unit="micrometer",
             label=label,
             **extras,
         )

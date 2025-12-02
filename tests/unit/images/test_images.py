@@ -216,6 +216,7 @@ def test_zoom_virtual_axes(
     assert img2_data.shape[0] == 1  # Virtual channel axis
 
     roi = img1.build_image_roi_table().rois()[0]
+    print(roi)
     img2_roi_data = img2.get_roi_as_numpy(roi, transforms=[zoom], axes_order="czyx")
     # Roi data should match exactly except for virtual axis
     assert img1_data.shape[1:] == img2_roi_data.shape[1:]
