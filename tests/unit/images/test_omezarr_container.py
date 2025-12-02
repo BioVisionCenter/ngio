@@ -44,19 +44,28 @@ class IdentityTransform:
 @pytest.mark.parametrize(
     "zarr_name",
     [
-        "test_image_yx.zarr",
-        "test_image_cyx.zarr",
-        "test_image_zyx.zarr",
-        "test_image_czyx.zarr",
-        "test_image_c1yx.zarr",
-        "test_image_tyx.zarr",
-        "test_image_tcyx.zarr",
-        "test_image_tzyx.zarr",
-        "test_image_tczyx.zarr",
+        "v04/test_image_yx.zarr",
+        "v04/test_image_cyx.zarr",
+        "v04/test_image_zyx.zarr",
+        "v04/test_image_czyx.zarr",
+        "v04/test_image_c1yx.zarr",
+        "v04/test_image_tyx.zarr",
+        "v04/test_image_tcyx.zarr",
+        "v04/test_image_tzyx.zarr",
+        "v04/test_image_tczyx.zarr",
+        "v05/test_image_yx.zarr",
+        "v05/test_image_cyx.zarr",
+        "v05/test_image_zyx.zarr",
+        "v05/test_image_czyx.zarr",
+        "v05/test_image_c1yx.zarr",
+        "v05/test_image_tyx.zarr",
+        "v05/test_image_tcyx.zarr",
+        "v05/test_image_tzyx.zarr",
+        "v05/test_image_tczyx.zarr",
     ],
 )
-def test_open_ome_zarr_container(images_v04: dict[str, Path], zarr_name: str):
-    path = images_v04[zarr_name]
+def test_open_ome_zarr_container(images_all_versions: dict[str, Path], zarr_name: str):
+    path = images_all_versions[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     whole_image_roi = ome_zarr.build_image_roi_table().get("image")
