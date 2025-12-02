@@ -254,7 +254,7 @@ class ImagePyramidBuilder(BaseModel):
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
-        compressors="auto",
+        compressors: Any = "auto",
         zarr_format: Literal[2, 3] = 2,
     ) -> "ImagePyramidBuilder":
         levels = []
@@ -298,7 +298,7 @@ class ImagePyramidBuilder(BaseModel):
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
-        compressors="auto",
+        compressors: Any = "auto",
         zarr_format: Literal[2, 3] = 2,
     ) -> "ImagePyramidBuilder":
         levels = []
