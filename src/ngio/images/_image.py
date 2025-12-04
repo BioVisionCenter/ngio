@@ -779,42 +779,40 @@ def derive_image_container(
     labels: Sequence[str] | None = None,
     pixel_size: PixelSize | None = None,
 ) -> ImagesContainer:
-    """Create an empty OME-Zarr image from an existing image.
+    """Derive a new OME-Zarr image container from an existing image.
 
     If a kwarg is not provided, the value from the reference image will be used.
 
     Args:
-        image_container (ImagesContainer): The image container to derive the new image.
+        image_container (ImagesContainer): The image container to derive the new image
+            from.
         store (StoreOrGroup): The Zarr store or group to create the image in.
         ref_path (str | None): The path to the reference image in the image container.
         shape (Sequence[int] | None): The shape of the new image.
         pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
-        scaling_factors (Sequence[float] | Literal["auto"] | None): The scaling factors
-            of the new image.
-        axes_names (Sequence[str] | None): The axes names of the new image.
         name (str | None): The name of the new image.
         channels_meta (Sequence[str | Channel] | None): The channels metadata
             of the new image.
         ngff_version (NgffVersions | None): The NGFF version to use.
-        chunks (Sequence[int] | None): The chunk shape of the new image.
+        chunks (ChunksLike): The chunk shape of the new image. Defaults to "auto".
         shards (ShardsLike | None): The shard shape of the new image.
         dtype (str | None): The data type of the new image.
-        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+        dimension_separator (Literal[".", "/"] | None): The separator to use for
             dimensions.
         compressors (CompressorLike | None): The compressors to use.
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation.
-        overwrite (bool): Whether to overwrite an existing image.
-        labels (Sequence[str] | None): The labels of the new image.
-            This argument is deprecated please use channels_meta instead.
-        pixel_size (PixelSize | None): The pixel size of the new image.
-            This argument is deprecated please use pixelsize, z_spacing,
+        overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+        labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+            please use channels_meta instead.
+        pixel_size (PixelSize | None): Deprecated. The pixel size of the new image.
+            This argument is deprecated, please use pixelsize, z_spacing,
             and time_spacing instead.
 
     Returns:
-        ImagesContainer: The new derived image.
+        ImagesContainer: The new derived image container.
 
     """
     ref_image = image_container.get(path=ref_path)

@@ -445,7 +445,7 @@ class OmeZarrContainer:
         labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
     ) -> "OmeZarrContainer":
-        """Create an empty OME-Zarr image from an existing image.
+        """Derive a new OME-Zarr container from the current image.
 
         If a kwarg is not provided, the value from the reference image will be used.
 
@@ -475,14 +475,14 @@ class OmeZarrContainer:
                 Defaults to False.
             copy_tables (bool): Whether to copy the tables from the current image.
                 Defaults to False.
-            labels (Sequence[str] | None): The labels of the new image.
-                This argument is deprecated please use channels_meta instead.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-                This argument is deprecated please use pixelsize, z_spacing,
+            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+                please use channels_meta instead.
+            pixel_size (PixelSize | None): Deprecated. The pixel size of the new image.
+                This argument is deprecated, please use pixelsize, z_spacing,
                 and time_spacing instead.
 
         Returns:
-            OmeZarrContainer: The new derived image.
+            OmeZarrContainer: The new derived OME-Zarr container.
 
         """
         new_container = self._images_container.derive(
@@ -753,7 +753,7 @@ class OmeZarrContainer:
         labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
     ) -> "Label":
-        """Create an empty OME-Zarr label from an existing image.
+        """Derive a new label from an existing image or label.
 
         If a kwarg is not provided, the value from the reference image will be used.
 
@@ -782,10 +782,10 @@ class OmeZarrContainer:
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
             overwrite (bool): Whether to overwrite an existing label. Defaults to False.
-            labels (Sequence[str] | None): The labels of the new image.
-                This argument is deprecated please use channels_meta instead.
-            pixel_size (PixelSize | None): The pixel size of the new label.
-                This argument is deprecated please use pixelsize, z_spacing,
+            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+                please use channels_meta instead.
+            pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
+                This argument is deprecated, please use pixelsize, z_spacing,
                 and time_spacing instead.
 
         Returns:
