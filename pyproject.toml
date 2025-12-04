@@ -157,6 +157,7 @@ filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning", # required for anndata
     "ignore::UserWarning",                 # from ngio.utils._zarr_utils
+    "ignore::DeprecationWarning",          # temporary ignore deprecation warnings
 ]
 addopts = [
     "-vv",

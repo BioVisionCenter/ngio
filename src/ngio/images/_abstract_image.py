@@ -1,17 +1,25 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
-from collections.abc import Sequence
-from typing import Generic, Literal, TypeVar
+import warnings
+from abc import ABC, abstractmethod
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import dask.array as da
 import numpy as np
 import zarr
+from zarr.core.array import CompressorLike
 
 from ngio.common import (
     Dimensions,
     InterpolationOrder,
     Roi,
     consolidate_pyramid,
+)
+from ngio.common._pyramid import ChunksLike, ShardsLike, shapes_from_scaling_factors
+from ngio.images._create_utils import (
+    _image_or_label_meta,
+    init_image_like_from_shapes,
 )
 from ngio.io_pipes import (
     DaskGetter,
@@ -30,15 +38,25 @@ from ngio.ome_zarr_meta import (
     Dataset,
     ImageMetaHandler,
     LabelMetaHandler,
+    NgioImageMeta,
     PixelSize,
 )
+from ngio.ome_zarr_meta.ngio_specs import (
+    Channel,
+    NgffVersions,
+    NgioLabelMeta,
+)
 from ngio.tables import RoiTable
-from ngio.utils import NgioFileExistsError, ZarrGroupHandler
+from ngio.utils import (
+    NgioFileExistsError,
+    NgioValueError,
+    StoreOrGroup,
+    ZarrGroupHandler,
+)
+from ngio.utils._zarr_utils import find_dimension_separator
 
-_image_handler = TypeVar("_image_handler", ImageMetaHandler, LabelMetaHandler)
 
-
-class AbstractImage(Generic[_image_handler]):
+class AbstractImage(ABC):
     """A class to handle a single image (or level) in an OME-Zarr image.
 
     This class is meant to be subclassed by specific image types.
@@ -48,7 +66,7 @@ class AbstractImage(Generic[_image_handler]):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: _image_handler,
+        meta_handler: ImageMetaHandler | LabelMetaHandler,
     ) -> None:
         """Initialize the Image at a single level.
 
@@ -77,9 +95,16 @@ class AbstractImage(Generic[_image_handler]):
         return self._path
 
     @property
-    def meta_handler(self) -> _image_handler:
+    @abstractmethod
+    def meta_handler(self) -> ImageMetaHandler | LabelMetaHandler:
         """Return the metadata."""
-        return self._meta_handler
+        pass
+
+    @property
+    @abstractmethod
+    def meta(self) -> NgioImageMeta | NgioLabelMeta:
+        """Return the metadata."""
+        pass
 
     @property
     def dataset(self) -> Dataset:
@@ -573,3 +598,372 @@ def consolidate_image(
     consolidate_pyramid(
         source=image.zarr_array, targets=targets, order=order, mode=mode
     )
+
+
+def _shapes_from_ref_image(
+    ref_image: AbstractImage,
+) -> list[tuple[int, ...]]:
+    """Rebuild base shape based on a new shape."""
+    paths = ref_image.meta.paths
+    index_path = paths.index(ref_image.path)
+    sub_paths = paths[index_path:]
+    group_handler = ref_image._group_handler
+    shapes = []
+    for path in sub_paths:
+        zarr_array = group_handler.get_array(path)
+        shapes.append(zarr_array.shape)
+    if len(shapes) == len(paths):
+        return shapes
+    missing_levels = len(paths) - len(shapes)
+    print(ref_image.meta.scaling_factor())
+    extended_shapes = shapes_from_scaling_factors(
+        base_shape=shapes[-1],
+        scaling_factors=ref_image.meta.scaling_factor(),
+        num_levels=missing_levels + 1,
+    )
+    shapes.extend(extended_shapes[1:])
+    return shapes
+
+
+def _shapes_from_new_shape(
+    ref_image: AbstractImage,
+    shape: Sequence[int],
+) -> list[tuple[int, ...]]:
+    """Rebuild pyramid shapes based on a new base shape."""
+    if len(shape) != len(ref_image.shape):
+        raise NgioValueError(
+            "The shape of the new image does not match the reference image."
+            f"Got shape {shape} for reference shape {ref_image.shape}."
+        )
+    base_shape = tuple(shape)
+    scaling_factors = ref_image.meta.scaling_factor()
+    num_levels = len(ref_image.meta.paths)
+    return shapes_from_scaling_factors(
+        base_shape=base_shape,
+        scaling_factors=scaling_factors,
+        num_levels=num_levels,
+    )
+
+
+def _compute_pyramid_shapes(
+    ref_image: AbstractImage,
+    shape: Sequence[int] | None,
+) -> list[tuple[int, ...]]:
+    """Rebuild pyramid shapes based on a new base shape."""
+    if shape is None:
+        return _shapes_from_ref_image(ref_image=ref_image)
+    return _shapes_from_new_shape(ref_image=ref_image, shape=shape)
+
+
+def _check_chunks_and_shards_compatibility(
+    ref_shape: tuple[int, ...],
+    chunks: ChunksLike,
+    shards: ShardsLike | None,
+) -> None:
+    """Check if the chunks and shards are compatible with the reference shape.
+
+    Args:
+        ref_shape: The reference shape.
+        chunks: The chunks to check.
+        shards: The shards to check.
+    """
+    if chunks != "auto":
+        if len(chunks) != len(ref_shape):
+            raise NgioValueError(
+                "The length of the chunks must be the same as the number of dimensions."
+            )
+    if shards is not None and shards != "auto":
+        if len(shards) != len(ref_shape):
+            raise NgioValueError(
+                "The length of the shards must be the same as the number of dimensions."
+            )
+
+
+def _apply_channel_policy(
+    ref_image: AbstractImage,
+    channels_policy: Literal["squeeze", "same"] | int,
+    shapes: list[tuple[int, ...]],
+    axes: tuple[str, ...],
+    chunks: ChunksLike,
+    shards: ShardsLike | None,
+) -> tuple[list[tuple[int, ...]], tuple[str, ...], ChunksLike, ShardsLike | None]:
+    """Apply the channel policy to the shapes and axes.
+
+    Args:
+        ref_image: The reference image.
+        channels_policy: The channels policy to apply.
+        shapes: The shapes of the pyramid levels.
+        axes: The axes of the image.
+        chunks: The chunks of the image.
+        shards: The shards of the image.
+
+    Returns:
+        The new shapes and axes after applying the channel policy.
+    """
+    if channels_policy == "same":
+        return shapes, axes, chunks, shards
+
+    channel_index = ref_image.axes_handler.get_index("c")
+    if channel_index is None:
+        if channels_policy == "squeeze":
+            return shapes, axes, chunks, shards
+        raise NgioValueError(
+            f"Cannot apply channel policy {channels_policy=} to an image "
+            "without channels axis."
+        )
+    if channels_policy == "squeeze":
+        new_shapes = []
+        for shape in shapes:
+            new_shape = shape[:channel_index] + shape[channel_index + 1 :]
+            new_shapes.append(new_shape)
+        new_axes = axes[:channel_index] + axes[channel_index + 1 :]
+        if chunks == "auto":
+            new_chunks: ChunksLike = "auto"
+        else:
+            new_chunks = chunks[:channel_index] + chunks[channel_index + 1 :]
+        if shards == "auto" or shards is None:
+            new_shards: ShardsLike | None = shards
+        else:
+            new_shards = shards[:channel_index] + shards[channel_index + 1 :]
+        return new_shapes, new_axes, new_chunks, new_shards
+    elif isinstance(channels_policy, int):
+        new_shapes = []
+        for shape in shapes:
+            if shape[channel_index] != channels_policy:
+                raise NgioValueError(
+                    f"Cannot apply channel policy {channels_policy=} to an image "
+                    f"with {shape[channel_index]} channels."
+                )
+            new_shape = (
+                *shape[:channel_index],
+                channels_policy,
+                *shape[channel_index + 1 :],
+            )
+            new_shapes.append(new_shape)
+        return new_shapes, axes, chunks, shards
+    else:
+        raise NgioValueError(
+            f"Invalid channels policy: {channels_policy}. "
+            "Must be 'squeeze', 'same', or an integer."
+        )
+
+
+def _check_channels_meta_compatibility(
+    meta_type: type[_image_or_label_meta],
+    ref_image: AbstractImage,
+    channels_meta: Sequence[str | Channel] | None,
+) -> Sequence[str | Channel] | None:
+    """Check if the channels metadata is compatible with the reference image.
+
+    Args:
+        meta_type: The metadata type.
+        ref_image: The reference image.
+        channels_meta: The channels metadata to check.
+
+    Returns:
+        The channels metadata if compatible, None otherwise.
+    """
+    if issubclass(meta_type, NgioLabelMeta):
+        if channels_meta is not None:
+            raise NgioValueError("Cannot set channels_meta for a label image.")
+        return None
+    if channels_meta is not None:
+        return channels_meta
+    assert isinstance(ref_image.meta, NgioImageMeta)
+    ref_meta = ref_image.meta
+    index_c = ref_meta.axes_handler.get_index("c")
+    if index_c is None:
+        return None
+
+    # If the channels number does not match, return None
+    # Else return the channels metadata from the reference image
+    ref_shape = ref_image.shape
+    ref_num_channels = ref_shape[index_c] if index_c is not None else 1
+    channels_ = ref_meta.channels_meta.channels if ref_meta.channels_meta else []
+    # Reset to None if number of channels do not match
+    channels_meta_ = channels_ if ref_num_channels == len(channels_) else None
+    return channels_meta_
+
+
+def abstract_derive(
+    *,
+    ref_image: AbstractImage,
+    meta_type: type[_image_or_label_meta],
+    store: StoreOrGroup,
+    overwrite: bool = False,
+    # Metadata parameters
+    shape: Sequence[int] | None = None,
+    pixelsize: float | tuple[float, float] | None = None,
+    z_spacing: float | None = None,
+    time_spacing: float | None = None,
+    name: str | None = None,
+    channels_policy: Literal["squeeze", "same"] | int = "same",
+    channels_meta: Sequence[str | Channel] | None = None,
+    ngff_version: NgffVersions | None = None,
+    # Zarr Array parameters
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
+    dtype: str | None = None,
+    dimension_separator: Literal[".", "/"] | None = None,
+    compressors: CompressorLike | None = None,
+    extra_array_kwargs: Mapping[str, Any] | None = None,
+    # Deprecated arguments
+    labels: Sequence[str] | None = None,
+    pixel_size: PixelSize | None = None,
+) -> ZarrGroupHandler:
+    """Create an empty OME-Zarr image from an existing image.
+
+    If a kwarg is not provided, the value from the reference image will be used.
+
+    Args:
+        ref_image (AbstractImage): The reference image to derive from.
+        meta_type (type[_image_or_label_meta]): The metadata type to use.
+        store (StoreOrGroup): The Zarr store or group to create the image in.
+        overwrite (bool): Whether to overwrite an existing image.
+        shape (Sequence[int] | None): The shape of the new image.
+        pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
+        z_spacing (float | None): The z spacing of the new image.
+        time_spacing (float | None): The time spacing of the new image.
+        axes_names (Sequence[str] | None): The axes names of the new image.
+        name (str | None): The name of the new image.
+        channels_policy (Literal["squeeze", "same"] | int): Possible policies:
+            - If "squeeze", the channels axis will be removed (no matter its size).
+            - If "same", the channels axis will be kept as is (if it exists).
+            - If an integer is provided, the channels axis will be changed to have that
+                size.
+        channels_meta (Sequence[str | Channel] | None): The channels metadata
+            of the new image.
+        ngff_version (NgffVersions | None): The NGFF version to use.
+        chunks (Sequence[int] | None): The chunk shape of the new image.
+        shards (ShardsLike | None): The shard shape of the new image.
+        dtype (str | None): The data type of the new image.
+        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            dimensions.
+        compressors (CompressorLike | None): The compressors to use.
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation.
+        labels (Sequence[str] | None): The labels of the new image.
+            This argument is DEPRECATED please use channels_meta instead.
+        pixel_size (PixelSize | None): The pixel size of the new image.
+            This argument is DEPRECATED please use pixelsize, z_spacing,
+            and time_spacing instead.
+
+    Returns:
+        ImagesContainer: The new derived image.
+
+    """
+    # TODO: remove in ngio 0.6
+    if labels is not None:
+        warnings.warn(
+            "The 'labels' argument is deprecated and will be removed in "
+            "a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        channels_meta = list(labels)
+    if pixel_size is not None:
+        warnings.warn(
+            "The 'pixel_size' argument is deprecated and will be removed in "
+            "a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        pixelsize_ = (pixel_size.y, pixel_size.x)
+        z_spacing_ = pixel_size.z
+        time_spacing_ = pixel_size.t
+    else:
+        if pixelsize is None:
+            pixelsize_ = (ref_image.pixel_size.y, ref_image.pixel_size.x)
+        else:
+            pixelsize_ = pixelsize
+
+        if z_spacing is None:
+            z_spacing_ = ref_image.pixel_size.z
+        else:
+            z_spacing_ = z_spacing
+
+        if time_spacing is None:
+            time_spacing_ = ref_image.pixel_size.t
+        else:
+            time_spacing_ = time_spacing
+    ref_meta = ref_image.meta
+
+    shapes = _compute_pyramid_shapes(
+        shape=shape,
+        ref_image=ref_image,
+    )
+    ref_shape = next(iter(shapes))
+
+    if pixelsize is None:
+        pixelsize = (ref_image.pixel_size.y, ref_image.pixel_size.x)
+
+    if z_spacing is None:
+        z_spacing = ref_image.pixel_size.z
+
+    if time_spacing is None:
+        time_spacing = ref_image.pixel_size.t
+
+    if name is None:
+        name = ref_meta.name
+
+    if dtype is None:
+        dtype = ref_image.dtype
+
+    if dimension_separator is None:
+        dimension_separator = find_dimension_separator(ref_image.zarr_array)
+
+    if compressors is None:
+        compressors = ref_image.zarr_array.compressors  # type: ignore
+
+    if chunks is None:
+        chunks = ref_image.zarr_array.chunks
+
+    if shards is None:
+        shards = ref_image.zarr_array.shards
+
+    _check_chunks_and_shards_compatibility(
+        ref_shape=ref_shape,
+        chunks=chunks,
+        shards=shards,
+    )
+
+    if ngff_version is None:
+        ngff_version = ref_meta.version
+
+    shapes, axes, chunks, shards = _apply_channel_policy(
+        ref_image=ref_image,
+        channels_policy=channels_policy,
+        shapes=shapes,
+        axes=ref_image.axes,
+        chunks=chunks,
+        shards=shards,
+    )
+    channels_meta_ = _check_channels_meta_compatibility(
+        meta_type=meta_type,
+        ref_image=ref_image,
+        channels_meta=channels_meta,
+    )
+
+    handler = init_image_like_from_shapes(
+        store=store,
+        meta_type=meta_type,
+        shapes=shapes,
+        pixelsize=pixelsize_,
+        z_spacing=z_spacing_,
+        time_spacing=time_spacing_,
+        levels=ref_meta.paths,
+        time_unit=ref_image.time_unit,
+        space_unit=ref_image.space_unit,
+        axes_names=axes,
+        name=name,
+        channels_meta=channels_meta_,
+        chunks=chunks,
+        shards=shards,
+        dtype=dtype,
+        dimension_separator=dimension_separator,
+        compressors=compressors,
+        overwrite=overwrite,
+        ngff_version=ngff_version,
+        extra_array_kwargs=extra_array_kwargs,
+    )
+    return handler

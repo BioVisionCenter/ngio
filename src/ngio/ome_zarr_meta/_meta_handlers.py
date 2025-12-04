@@ -66,7 +66,7 @@ def _find_encoder_registry(
         raise NgioValueError(f"Unsupported NGIO metadata type: {type(ngio_meta)}")
 
 
-def _generic_update_meta(
+def update_ngio_meta(
     group_handler: ZarrGroupHandler,
     ngio_meta: _meta_type,
 ) -> None:
@@ -101,7 +101,7 @@ def _find_decoder_registry(
         raise NgioValueError(f"Unsupported NGIO metadata type: {meta_type}")
 
 
-def _generic_get_ngio_meta(
+def get_ngio_meta(
     group_handler: ZarrGroupHandler,
     meta_type: type[_meta_type],
     version: str | None = None,
@@ -168,7 +168,7 @@ def get_ngio_image_meta(
     Returns:
         NgioImageMeta: The NGIO image metadata.
     """
-    return _generic_get_ngio_meta(
+    return get_ngio_meta(
         group_handler=group_handler,
         meta_type=NgioImageMeta,
         version=version,
@@ -189,7 +189,7 @@ def update_ngio_image_meta(
         ngio_meta (NgioImageMeta): The new NGIO image metadata.
 
     """
-    _generic_update_meta(
+    update_ngio_meta(
         group_handler=group_handler,
         ngio_meta=ngio_meta,
     )
@@ -227,7 +227,7 @@ class ImageMetaHandler:
 
     def update_meta(self, ngio_meta: NgioImageMeta) -> None:
         """Update the NGIO image metadata."""
-        _generic_update_meta(
+        update_ngio_meta(
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
@@ -252,7 +252,7 @@ def get_ngio_label_meta(
     Returns:
         NgioLabelMeta: The NGIO label metadata.
     """
-    return _generic_get_ngio_meta(
+    return get_ngio_meta(
         group_handler=group_handler,
         meta_type=NgioLabelMeta,
         version=version,
@@ -273,7 +273,7 @@ def update_ngio_label_meta(
         ngio_meta (NgioLabelMeta): The new NGIO label metadata.
 
     """
-    _generic_update_meta(
+    update_ngio_meta(
         group_handler=group_handler,
         ngio_meta=ngio_meta,
     )
@@ -311,7 +311,7 @@ class LabelMetaHandler:
 
     def update_meta(self, ngio_meta: NgioLabelMeta) -> None:
         """Update the NGIO label metadata."""
-        _generic_update_meta(
+        update_ngio_meta(
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
@@ -330,7 +330,7 @@ def get_ngio_plate_meta(
     Returns:
         NgioPlateMeta: The NGIO plate metadata.
     """
-    return _generic_get_ngio_meta(
+    return get_ngio_meta(
         group_handler=group_handler,
         meta_type=NgioPlateMeta,
         version=version,
@@ -348,7 +348,7 @@ def update_ngio_plate_meta(
         ngio_meta (NgioPlateMeta): The new NGIO plate metadata.
 
     """
-    _generic_update_meta(
+    update_ngio_meta(
         group_handler=group_handler,
         ngio_meta=ngio_meta,
     )
@@ -377,7 +377,7 @@ class PlateMetaHandler:
 
     def update_meta(self, ngio_meta: NgioPlateMeta) -> None:
         """Update the NGIO plate metadata."""
-        _generic_update_meta(
+        update_ngio_meta(
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
@@ -396,7 +396,7 @@ def get_ngio_well_meta(
     Returns:
         NgioWellMeta: The NGIO well metadata.
     """
-    return _generic_get_ngio_meta(
+    return get_ngio_meta(
         group_handler=group_handler,
         meta_type=NgioWellMeta,
         version=version,
@@ -414,7 +414,7 @@ def update_ngio_well_meta(
         ngio_meta (NgioWellMeta): The new NGIO well metadata.
 
     """
-    _generic_update_meta(
+    update_ngio_meta(
         group_handler=group_handler,
         ngio_meta=ngio_meta,
     )
@@ -443,7 +443,7 @@ class WellMetaHandler:
 
     def update_meta(self, ngio_meta: NgioWellMeta) -> None:
         """Update the NGIO well metadata."""
-        _generic_update_meta(
+        update_ngio_meta(
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )

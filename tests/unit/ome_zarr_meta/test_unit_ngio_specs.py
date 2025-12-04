@@ -192,9 +192,9 @@ def test_dataset():
     )
 
     assert ds.path == "0"
-    assert ds.get_scale("x") == 0.5
     assert ds.axes_handler.get_index("x") == 4
-    assert ds.get_translation("x") == 0.0
+    assert ds.scale == tuple(scale)
+    assert ds.translation == tuple(translation)
 
     ps = ds.pixel_size
     assert ps.x == 0.5

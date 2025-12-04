@@ -1,15 +1,17 @@
 """Abstract class for handling OME-NGFF images."""
 
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 import PIL.Image
 from zarr.core.array import CompressorLike
 
+from ngio.common._pyramid import ChunksLike, ShardsLike
 from ngio.common._synt_images_utils import fit_to_shape
 from ngio.images._ome_zarr_container import OmeZarrContainer, create_ome_zarr_from_array
 from ngio.ome_zarr_meta.ngio_specs import (
+    Channel,
     DefaultNgffVersion,
     NgffVersions,
 )
@@ -28,52 +30,45 @@ def create_synthetic_ome_zarr(
     shape: Sequence[int],
     reference_sample: AVAILABLE_SAMPLES | SampleInfo = "Cardiomyocyte",
     levels: int | list[str] = 5,
-    xy_scaling_factor: float = 2,
-    z_scaling_factor: float = 1.0,
-    axes_names: Sequence[str] | None = None,
-    chunks: Sequence[int] | Literal["auto"] = "auto",
-    channel_labels: list[str] | None = None,
-    channel_wavelengths: list[str] | None = None,
-    channel_colors: Sequence[str] | None = None,
-    channel_active: Sequence[bool] | None = None,
     table_backend: TableBackend = DefaultTableBackend,
+    scaling_factors: Sequence[float] | Literal["auto"] = "auto",
+    axes_names: Sequence[str] | None = None,
+    channels_meta: Sequence[str | Channel] | None = None,
+    ngff_version: NgffVersions = DefaultNgffVersion,
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
+    extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
-    """Create an empty OME-Zarr image with the given shape and metadata.
+    """Create a synthetic OME-Zarr image with the given shape and metadata.
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
         shape (Sequence[int]): The shape of the image.
         reference_sample (AVAILABLE_SAMPLES | SampleInfo): The reference sample to use.
-        levels (int | list[str], optional): The number of levels in the pyramid or a
-            list of level names. Defaults to 5.
-        xy_scaling_factor (float, optional): The down-scaling factor in x and y
-            dimensions. Defaults to 2.0.
-        z_scaling_factor (float, optional): The down-scaling factor in z dimension.
-            Defaults to 1.0.
-        axes_names (Sequence[str] | None, optional): The names of the axes.
-            If None the canonical names are used. Defaults to None.
-        chunks (Sequence[int] | Literal["auto"]): The chunk shape. If None the shape
-            is used. Defaults to "auto".
-        channel_labels (list[str] | None, optional): The labels of the channels.
+            Defaults to "Cardiomyocyte".
+        levels (int | list[str]): The number of levels in the pyramid or a list of
+            level names. Defaults to 5.
+        table_backend (TableBackend): Table backend to be used to store tables.
+            Defaults to DefaultTableBackend.
+        scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors
+            for the pyramid levels. Defaults to "auto".
+        axes_names (Sequence[str] | None): The names of the axes. If None the
+            canonical names are used. Defaults to None.
+        channels_meta (Sequence[str | Channel] | None): The channels metadata.
             Defaults to None.
-        channel_wavelengths (list[str] | None, optional): The wavelengths of the
-            channels. Defaults to None.
-        channel_colors (Sequence[str] | None, optional): The colors of the channels.
-            Defaults to None.
-        channel_active (Sequence[bool] | None, optional): Whether the channels are
-            active. Defaults to None.
-        table_backend (TableBackend): Table backend to be used to store tables
-        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+        ngff_version (NgffVersions): The version of the OME-Zarr specification.
+            Defaults to DefaultNgffVersion.
+        chunks (ChunksLike): The chunk shape. Defaults to "auto".
+        shards (ShardsLike | None): The shard shape. Defaults to None.
+        dimension_separator (Literal[".", "/"]): The separator to use for
             dimensions. Defaults to "/".
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
-        overwrite (bool, optional): Whether to overwrite an existing image.
-            Defaults to True.
-        ngff_version (NgffVersion, optional): The version of the OME-Zarr specification.
-            Defaults to DefaultNgffVersion.
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation. Defaults to None.
+        overwrite (bool): Whether to overwrite an existing image. Defaults to False.
     """
     if isinstance(reference_sample, str):
         sample_info = get_sample_info(reference_sample)
@@ -87,21 +82,19 @@ def create_synthetic_ome_zarr(
     ome_zarr = create_ome_zarr_from_array(
         store=store,
         array=raw,
-        xy_pixelsize=sample_info.xy_pixelsize,
+        pixelsize=sample_info.xy_pixelsize,
         z_spacing=sample_info.z_spacing,
         time_spacing=sample_info.time_spacing,
         levels=levels,
-        xy_scaling_factor=xy_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
         space_unit=sample_info.space_unit,
         time_unit=sample_info.time_unit,
         axes_names=axes_names,
-        channel_labels=channel_labels,
-        channel_wavelengths=channel_wavelengths,
-        channel_colors=channel_colors,
-        channel_active=channel_active,
+        channels_meta=channels_meta,
+        scaling_factors=scaling_factors,
+        extra_array_kwargs=extra_array_kwargs,
         name=sample_info.name,
         chunks=chunks,
+        shards=shards,
         overwrite=overwrite,
         dimension_separator=dimension_separator,
         compressors=compressors,

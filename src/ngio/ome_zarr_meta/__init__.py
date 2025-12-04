@@ -7,6 +7,7 @@ from ngio.ome_zarr_meta._meta_handlers import (
     WellMetaHandler,
     update_ngio_image_meta,
     update_ngio_label_meta,
+    update_ngio_meta,
     update_ngio_plate_meta,
     update_ngio_well_meta,
 )
@@ -44,6 +45,7 @@ __all__ = [
     "path_in_well_validation",
     "update_ngio_image_meta",
     "update_ngio_label_meta",
+    "update_ngio_meta",
     "update_ngio_plate_meta",
     "update_ngio_well_meta",
 ]

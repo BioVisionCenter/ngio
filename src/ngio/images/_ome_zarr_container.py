@@ -1,18 +1,24 @@
 """Abstract class for handling OME-NGFF images."""
 
 import warnings
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import numpy as np
 from zarr.core.array import CompressorLike
 
-from ngio.images._create import create_empty_image_container
+from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.images._create_utils import init_image_like
 from ngio.images._image import Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
 from ngio.images._masked_image import MaskedImage, MaskedLabel
-from ngio.ome_zarr_meta import LabelMetaHandler, NgioImageMeta, PixelSize
+from ngio.ome_zarr_meta import (
+    LabelMetaHandler,
+    NgioImageMeta,
+    PixelSize,
+)
 from ngio.ome_zarr_meta.ngio_specs import (
+    Channel,
     DefaultNgffVersion,
     DefaultSpaceUnit,
     DefaultTimeUnit,
@@ -416,61 +422,88 @@ class OmeZarrContainer:
         self,
         store: StoreOrGroup,
         ref_path: str | None = None,
+        # Metadata parameters
         shape: Sequence[int] | None = None,
-        labels: Sequence[str] | None = None,
-        pixel_size: PixelSize | None = None,
-        axes_names: Sequence[str] | None = None,
+        pixelsize: float | tuple[float, float] | None = None,
+        z_spacing: float | None = None,
+        time_spacing: float | None = None,
         name: str | None = None,
-        chunks: Sequence[int] | None = None,
-        dtype: str | None = None,
-        dimension_separator: Literal[".", "/"] | None = None,
-        compressors: CompressorLike | None = None,
+        channels_meta: Sequence[str | Channel] | None = None,
+        ngff_version: NgffVersions | None = None,
+        # Zarr Array parameters
+        chunks: ChunksLike = "auto",
+        shards: ShardsLike | None = None,
+        dtype: str = "uint16",
+        dimension_separator: Literal[".", "/"] = "/",
+        compressors: CompressorLike = "auto",
+        extra_array_kwargs: Mapping[str, Any] | None = None,
+        overwrite: bool = False,
+        # Copy from current image
         copy_labels: bool = False,
         copy_tables: bool = False,
-        ngff_version: NgffVersions | None = None,
-        overwrite: bool = False,
+        # Deprecated arguments
+        labels: Sequence[str] | None = None,
+        pixel_size: PixelSize | None = None,
     ) -> "OmeZarrContainer":
-        """Create an empty OME-Zarr container from an existing image.
+        """Create an empty OME-Zarr image from an existing image.
+
+        If a kwarg is not provided, the value from the reference image will be used.
 
         Args:
             store (StoreOrGroup): The Zarr store or group to create the image in.
-            ref_path (str | None): The path to the reference image in
-                the image container.
+            ref_path (str | None): The path to the reference image in the image
+                container.
             shape (Sequence[int] | None): The shape of the new image.
-            labels (Sequence[str] | None): The labels of the new image.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Sequence[str] | None): The axes names of the new image.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
-            dtype (str | None): The data type of the new image.
+            pixelsize (float | tuple[float, float] | None): The pixel size of the new
+                image.
+            z_spacing (float | None): The z spacing of the new image.
+            time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
-            dimension_separator (DIMENSION_SEPARATOR | None): The dimension
-                separator to use. If None, the dimension separator of the
-                reference image will be used.
-            compressors (CompressorLike | None): The compressors to use. If None,
-                the compressors of the reference image will be used.
-            copy_labels (bool): Whether to copy the labels from the reference image.
-            copy_tables (bool): Whether to copy the tables from the reference image.
-            ngff_version (NgffVersions): The NGFF version to use.
-            overwrite (bool): Whether to overwrite an existing image.
+            channels_meta (Sequence[str | Channel] | None): The channels metadata
+                of the new image.
+            ngff_version (NgffVersions | None): The NGFF version to use.
+            chunks (ChunksLike): The chunk shape of the new image. Defaults to "auto".
+            shards (ShardsLike | None): The shard shape of the new image.
+            dtype (str): The data type of the new image. Defaults to "uint16".
+            dimension_separator (Literal[".", "/"]): The separator to use for
+                dimensions. Defaults to "/".
+            compressors (CompressorLike): The compressors to use. Defaults to "auto".
+            extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+                the zarr array creation.
+            overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+            copy_labels (bool): Whether to copy the labels from the current image.
+                Defaults to False.
+            copy_tables (bool): Whether to copy the tables from the current image.
+                Defaults to False.
+            labels (Sequence[str] | None): The labels of the new image.
+                This argument is deprecated please use channels_meta instead.
+            pixel_size (PixelSize | None): The pixel size of the new image.
+                This argument is deprecated please use pixelsize, z_spacing,
+                and time_spacing instead.
 
         Returns:
-            OmeZarrContainer: The new image container.
+            OmeZarrContainer: The new derived image.
 
         """
         new_container = self._images_container.derive(
             store=store,
             ref_path=ref_path,
             shape=shape,
-            labels=labels,
-            pixel_size=pixel_size,
-            axes_names=axes_names,
+            pixelsize=pixelsize,
+            z_spacing=z_spacing,
+            time_spacing=time_spacing,
             name=name,
+            channels_meta=channels_meta,
+            ngff_version=ngff_version,
             chunks=chunks,
+            shards=shards,
             dtype=dtype,
             dimension_separator=dimension_separator,
             compressors=compressors,
-            ngff_version=ngff_version,
+            extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
+            labels=labels,
+            pixel_size=pixel_size,
         )
 
         new_ome_zarr = OmeZarrContainer(
@@ -701,38 +734,62 @@ class OmeZarrContainer:
         self,
         name: str,
         ref_image: Image | Label | None = None,
+        # Metadata parameters
         shape: Sequence[int] | None = None,
-        pixel_size: PixelSize | None = None,
-        axes_names: Sequence[str] | None = None,
-        chunks: Sequence[int] | None = None,
-        dtype: str = "uint32",
+        pixelsize: float | tuple[float, float] | None = None,
+        z_spacing: float | None = None,
+        time_spacing: float | None = None,
+        channels_policy: Literal["same", "squeeze"] | int = "squeeze",
+        ngff_version: NgffVersions | None = None,
+        # Zarr Array parameters
+        chunks: ChunksLike = "auto",
+        shards: ShardsLike | None = None,
+        dtype: str | None = None,
         dimension_separator: Literal[".", "/"] | None = None,
         compressors: CompressorLike | None = None,
+        extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
+        # Deprecated arguments
+        labels: Sequence[str] | None = None,
+        pixel_size: PixelSize | None = None,
     ) -> "Label":
-        """Create an empty OME-Zarr label from a reference image.
+        """Create an empty OME-Zarr label from an existing image.
 
-        And add the label to the /labels group.
+        If a kwarg is not provided, the value from the reference image will be used.
 
         Args:
-            name (str): The name of the new image.
-            ref_image (Image | Label | None): A reference image that will be used
-                to create the new image.
-            shape (Sequence[int] | None): The shape of the new image.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Sequence[str] | None): The axes names of the new image.
-                For labels, the channel axis is not allowed.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
-            dtype (str): The data type of the new label.
-            dimension_separator (DIMENSION_SEPARATOR | None): The dimension
-                separator to use. If None, the dimension separator of the
-                reference image will be used.
-            compressors (CompressorLike | None): The compressors to use. If None,
-                the compressors of the reference image will be used.
-            overwrite (bool): Whether to overwrite an existing image.
+            name (str): The name of the new label.
+            ref_image (Image | Label | None): The reference image to derive the new
+                label from. If None, the first level image will be used.
+            shape (Sequence[int] | None): The shape of the new label.
+            pixelsize (float | tuple[float, float] | None): The pixel size of the new
+                label.
+            z_spacing (float | None): The z spacing of the new label.
+            time_spacing (float | None): The time spacing of the new label.
+            channels_policy (Literal["same", "squeeze"] | int): Possible policies:
+                - If "squeeze", the channels axis will be removed (no matter its size).
+                - If "same", the channels axis will be kept as is (if it exists).
+                - If an integer is provided, the channels axis will be changed to have
+                    that size.
+                Defaults to "squeeze".
+            ngff_version (NgffVersions | None): The NGFF version to use.
+            chunks (ChunksLike): The chunk shape of the new label. Defaults to "auto".
+            shards (ShardsLike | None): The shard shape of the new label.
+            dtype (str | None): The data type of the new label.
+            dimension_separator (Literal[".", "/"] | None): The separator to use for
+                dimensions.
+            compressors (CompressorLike | None): The compressors to use.
+            extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+                the zarr array creation.
+            overwrite (bool): Whether to overwrite an existing label. Defaults to False.
+            labels (Sequence[str] | None): The labels of the new image.
+                This argument is deprecated please use channels_meta instead.
+            pixel_size (PixelSize | None): The pixel size of the new label.
+                This argument is deprecated please use pixelsize, z_spacing,
+                and time_spacing instead.
 
         Returns:
-            Label: The new label.
+            Label: The new derived label.
 
         """
         if ref_image is None:
@@ -741,13 +798,20 @@ class OmeZarrContainer:
             name=name,
             ref_image=ref_image,
             shape=shape,
-            pixel_size=pixel_size,
-            axes_names=axes_names,
+            pixelsize=pixelsize,
+            z_spacing=z_spacing,
+            time_spacing=time_spacing,
+            channels_policy=channels_policy,
+            ngff_version=ngff_version,
             chunks=chunks,
+            shards=shards,
             dtype=dtype,
             dimension_separator=dimension_separator,
             compressors=compressors,
+            extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
+            labels=labels,
+            pixel_size=pixel_size,
         )
 
 
@@ -841,196 +905,282 @@ def open_label(
 def create_empty_ome_zarr(
     store: StoreOrGroup,
     shape: Sequence[int],
-    xy_pixelsize: float,
+    pixelsize: float | tuple[float, float] | None = None,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
+    scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
-    xy_scaling_factor: float | tuple[float, float] = 2,
-    z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
+    channels_meta: Sequence[str | Channel] | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | Literal["auto"] = "auto",
+    ngff_version: NgffVersions = DefaultNgffVersion,
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
     dtype: str = "uint16",
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
+    extra_array_kwargs: Mapping[str, Any] | None = None,
+    overwrite: bool = False,
+    # Deprecated arguments
+    xy_pixelsize: float | None = None,
+    xy_scaling_factor: float | None = None,
+    z_scaling_factor: float | None = None,
     channel_labels: list[str] | None = None,
     channel_wavelengths: list[str] | None = None,
     channel_colors: Sequence[str] | None = None,
     channel_active: Sequence[bool] | None = None,
-    overwrite: bool = False,
-    ngff_version: NgffVersions = DefaultNgffVersion,
 ) -> OmeZarrContainer:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
         shape (Sequence[int]): The shape of the image.
-        xy_pixelsize (float): The pixel size in x and y dimensions.
-        z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
-        time_spacing (float, optional): The spacing between time points.
-            Defaults to 1.0.
-        levels (int | list[str], optional): The number of levels in the pyramid or a
-            list of level names. Defaults to 5.
-        xy_scaling_factor (float | tuple[float, float], optional): The down-scaling
-            factor in x and y dimensions. Defaults to 2.0.
-        z_scaling_factor (float, optional): The down-scaling factor in z dimension.
-            Defaults to 1.0.
-        space_unit (SpaceUnits, optional): The unit of space. Defaults to
-            DefaultSpaceUnit.
-        time_unit (TimeUnits, optional): The unit of time. Defaults to
-            DefaultTimeUnit.
-        axes_names (Sequence[str] | None, optional): The names of the axes.
-            If None the canonical names are used. Defaults to None.
-        name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
-            is used. Defaults to None.
-        dtype (str, optional): The data type of the image. Defaults to "uint16".
-        dimension_separator (DIMENSION_SEPARATOR): The dimension
-            separator to use. Defaults to "/".
-        compressors (CompressorLike): The compressor to use. Defaults to "auto".
-        channel_labels (list[str] | None, optional): The labels of the channels.
+        pixelsize (float | tuple[float, float] | None): The pixel size in x and y
+            dimensions.
+        z_spacing (float): The spacing between z slices. Defaults to 1.0.
+        time_spacing (float): The spacing between time points. Defaults to 1.0.
+        scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors
+            for the pyramid levels. Defaults to "auto".
+        levels (int | list[str]): The number of levels in the pyramid or a list of
+            level names. Defaults to 5.
+        space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
+        time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
+        axes_names (Sequence[str] | None): The names of the axes. If None the
+            canonical names are used. Defaults to None.
+        channels_meta (Sequence[str | Channel] | None): The channels metadata.
             Defaults to None.
-        channel_wavelengths (list[str] | None, optional): The wavelengths of the
-            channels. Defaults to None.
-        channel_colors (Sequence[str] | None, optional): The colors of the channels.
-            Defaults to None.
-        channel_active (Sequence[bool] | None, optional): Whether the channels are
-            active. Defaults to None.
-        overwrite (bool, optional): Whether to overwrite an existing image.
-            Defaults to True.
-        ngff_version (NgffVersion, optional): The version of the OME-Zarr specification.
+        name (str | None): The name of the image. Defaults to None.
+        ngff_version (NgffVersions): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
+        chunks (ChunksLike): The chunk shape. Defaults to "auto".
+        shards (ShardsLike | None): The shard shape. Defaults to None.
+        dtype (str): The data type of the image. Defaults to "uint16".
+        dimension_separator (Literal[".", "/"]): The dimension separator to use.
+            Defaults to "/".
+        compressors (CompressorLike): The compressor to use. Defaults to "auto".
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation. Defaults to None.
+        overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+        xy_pixelsize (float | None): Deprecated. Use pixelsize instead.
+        xy_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
+        z_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
+        channel_labels (list[str] | None): Deprecated. Use channels_meta instead.
+        channel_wavelengths (list[str] | None): Deprecated. Use channels_meta instead.
+        channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.
+        channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
-    handler = create_empty_image_container(
+    if xy_pixelsize is not None:
+        warnings.warn(
+            "'xy_pixelsize' is deprecated and will be removed in a future "
+            "version. Please use 'pixelsize' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        pixelsize = xy_pixelsize
+    if xy_scaling_factor is not None or z_scaling_factor is not None:
+        warnings.warn(
+            "'xy_scaling_factor' and 'z_scaling_factor' are deprecated and will be "
+            "removed in a future version. Please use 'scaling_factors' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        xy_scaling_factor_ = xy_scaling_factor or 2.0
+        z_scaling_factor_ = z_scaling_factor or 1.0
+        if len(shape) == 2:
+            scaling_factors = (xy_scaling_factor_, xy_scaling_factor_)
+        else:
+            zyx_factors = (z_scaling_factor_, xy_scaling_factor_, xy_scaling_factor_)
+            scaling_factors = (1.0,) * (len(shape) - 3) + zyx_factors
+
+    if channel_labels is not None:
+        warnings.warn(
+            "'channel_labels' is deprecated and will be removed in a future "
+            "version. Please use 'channels_meta' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        channels_meta = channel_labels
+
+    if channel_wavelengths is not None:
+        warnings.warn(
+            "'channel_wavelengths' is deprecated and will be removed in a future "
+            "version. Please use 'channels_meta' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    if channel_colors is not None:
+        warnings.warn(
+            "'channel_colors' is deprecated and will be removed in a future "
+            "version. Please use 'channels_meta' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+    if channel_active is not None:
+        warnings.warn(
+            "'channel_active' is deprecated and will be removed in a future "
+            "version. Please use 'channels_meta' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+
+    if pixelsize is None:
+        raise NgioValueError("pixelsize must be provided.")
+
+    handler = init_image_like(
         store=store,
+        meta_type=NgioImageMeta,
         shape=shape,
-        pixelsize=xy_pixelsize,
+        pixelsize=pixelsize,
         z_spacing=z_spacing,
         time_spacing=time_spacing,
+        scaling_factors=scaling_factors,
         levels=levels,
-        yx_scaling_factor=xy_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,
+        channels_meta=channels_meta,
         name=name,
+        ngff_version=ngff_version,
         chunks=chunks,
+        shards=shards,
         dtype=dtype,
         dimension_separator=dimension_separator,
         compressors=compressors,
+        extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
-        ngff_version=ngff_version,
     )
 
     ome_zarr = OmeZarrContainer(group_handler=handler)
-    ome_zarr.set_channel_meta(
-        labels=channel_labels,
-        wavelength_id=channel_wavelengths,
-        percentiles=None,
-        colors=channel_colors,
-        active=channel_active,
-    )
+    if (
+        channel_wavelengths is not None
+        or channel_colors is not None
+        or channel_active is not None
+    ):
+        channel_names = ome_zarr.channel_labels
+        ome_zarr.set_channel_meta(
+            labels=channel_names,
+            wavelength_id=channel_wavelengths,
+            percentiles=None,
+            colors=channel_colors,
+            active=channel_active,
+        )
+    else:
+        ome_zarr.set_channel_meta(
+            labels=ome_zarr.channel_labels,
+            percentiles=None,
+        )
     return ome_zarr
 
 
 def create_ome_zarr_from_array(
     store: StoreOrGroup,
     array: np.ndarray,
-    xy_pixelsize: float,
+    pixelsize: float | tuple[float, float] | None = None,
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
+    scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
-    xy_scaling_factor: float | tuple[float, float] = 2.0,
-    z_scaling_factor: float = 1.0,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
-    channel_labels: list[str] | None = None,
-    channel_wavelengths: list[str] | None = None,
-    percentiles: tuple[float, float] | None = (0.1, 99.9),
-    channel_colors: Sequence[str] | None = None,
-    channel_active: Sequence[bool] | None = None,
+    channels_meta: Sequence[str | Channel] | None = None,
+    percentiles: tuple[float, float] = (0.1, 99.9),
     name: str | None = None,
-    chunks: Sequence[int] | Literal["auto"] = "auto",
+    ngff_version: NgffVersions = DefaultNgffVersion,
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
     dimension_separator: Literal[".", "/"] = "/",
     compressors: CompressorLike = "auto",
+    extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    ngff_version: NgffVersions = DefaultNgffVersion,
+    # Deprecated arguments
+    xy_pixelsize: float | None = None,
+    xy_scaling_factor: float | None = None,
+    z_scaling_factor: float | None = None,
+    channel_labels: list[str] | None = None,
+    channel_wavelengths: list[str] | None = None,
+    channel_colors: Sequence[str] | None = None,
+    channel_active: Sequence[bool] | None = None,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
         array (np.ndarray): The image data.
-        xy_pixelsize (float): The pixel size in x and y dimensions.
-        z_spacing (float, optional): The spacing between z slices. Defaults to 1.0.
-        time_spacing (float, optional): The spacing between time points.
-            Defaults to 1.0.
-        levels (int | list[str], optional): The number of levels in the pyramid or a
-            list of level names. Defaults to 5.
-        xy_scaling_factor (float, optional): The down-scaling factor in x and y
-            dimensions. Defaults to 2.0.
-        z_scaling_factor (float, optional): The down-scaling factor in z dimension.
-            Defaults to 1.0.
-        space_unit (SpaceUnits, optional): The unit of space. Defaults to
-            DefaultSpaceUnit.
-        time_unit (TimeUnits, optional): The unit of time. Defaults to
-            DefaultTimeUnit.
-        axes_names (Sequence[str] | None, optional): The names of the axes.
-            If None the canonical names are used. Defaults to None.
-        name (str | None, optional): The name of the image. Defaults to None.
-        chunks (Sequence[int] | None, optional): The chunk shape. If None the shape
-            is used. Defaults to None.
-        channel_labels (list[str] | None, optional): The labels of the channels.
+        pixelsize (float | tuple[float, float] | None): The pixel size in x and y
+            dimensions.
+        z_spacing (float): The spacing between z slices. Defaults to 1.0.
+        time_spacing (float): The spacing between time points. Defaults to 1.0.
+        scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors
+            for the pyramid levels. Defaults to "auto".
+        levels (int | list[str]): The number of levels in the pyramid or a list of
+            level names. Defaults to 5.
+        space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
+        time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
+        axes_names (Sequence[str] | None): The names of the axes. If None the
+            canonical names are used. Defaults to None.
+        channels_meta (Sequence[str | Channel] | None): The channels metadata.
             Defaults to None.
-        channel_wavelengths (list[str] | None, optional): The wavelengths of the
-            channels. Defaults to None.
-        percentiles (tuple[float, float] | None, optional): The percentiles of the
-            channels. Defaults to None.
-        channel_colors (Sequence[str] | None, optional): The colors of the channels.
-            Defaults to None.
-        channel_active (Sequence[bool] | None, optional): Whether the channels are
-            active. Defaults to None.
-        dimension_separator (DIMENSION_SEPARATOR): The separator to use for
+        percentiles (tuple[float, float]): The percentiles of the channels for
+            computing display ranges. Defaults to (0.1, 99.9).
+        name (str | None): The name of the image. Defaults to None.
+        ngff_version (NgffVersions): The version of the OME-Zarr specification.
+            Defaults to DefaultNgffVersion.
+        chunks (ChunksLike): The chunk shape. Defaults to "auto".
+        shards (ShardsLike | None): The shard shape. Defaults to None.
+        dimension_separator (Literal[".", "/"]): The separator to use for
             dimensions. Defaults to "/".
         compressors (CompressorLike): The compressors to use. Defaults to "auto".
-        overwrite (bool, optional): Whether to overwrite an existing image.
-            Defaults to True.
-        ngff_version (str, optional): The version of the OME-Zarr specification.
-            Defaults to DefaultNgffVersion.
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation. Defaults to None.
+        overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+        xy_pixelsize (float | None): Deprecated. Use pixelsize instead.
+        xy_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
+        z_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
+        channel_labels (list[str] | None): Deprecated. Use channels_meta instead.
+        channel_wavelengths (list[str] | None): Deprecated. Use channels_meta instead.
+        channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.
+        channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
-    handler = create_empty_image_container(
+    ome_zarr = create_empty_ome_zarr(
         store=store,
         shape=array.shape,
-        pixelsize=xy_pixelsize,
+        pixelsize=pixelsize,
         z_spacing=z_spacing,
         time_spacing=time_spacing,
+        scaling_factors=scaling_factors,
         levels=levels,
-        yx_scaling_factor=xy_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,
+        channels_meta=channels_meta,
         name=name,
+        ngff_version=ngff_version,
         chunks=chunks,
-        dtype=str(array.dtype),
-        overwrite=overwrite,
+        shards=shards,
         dimension_separator=dimension_separator,
         compressors=compressors,
-        ngff_version=ngff_version,
+        extra_array_kwargs=extra_array_kwargs,
+        overwrite=overwrite,
+        xy_pixelsize=xy_pixelsize,
+        xy_scaling_factor=xy_scaling_factor,
+        z_scaling_factor=z_scaling_factor,
+        channel_labels=channel_labels,
+        channel_wavelengths=channel_wavelengths,
+        channel_colors=channel_colors,
+        channel_active=channel_active,
     )
-
-    ome_zarr = OmeZarrContainer(group_handler=handler)
     image = ome_zarr.get_image()
     image.set_array(array)
     image.consolidate()
-    ome_zarr.set_channel_meta(
-        labels=channel_labels,
-        wavelength_id=channel_wavelengths,
-        percentiles=percentiles,
-        colors=channel_colors,
-        active=channel_active,
+    if len(percentiles) != 2:
+        raise NgioValueError(
+            f"'percentiles' must be a tuple of two values. Got {percentiles}"
+        )
+    ome_zarr.set_channel_percentiles(
+        start_percentile=percentiles[0],
+        end_percentile=percentiles[1],
     )
     return ome_zarr

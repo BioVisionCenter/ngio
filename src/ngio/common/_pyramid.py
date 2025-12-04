@@ -1,10 +1,10 @@
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
 import dask.array as da
 import numpy as np
 import zarr
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from ngio.common._zoom import (
     InterpolationOrder,
@@ -204,6 +204,41 @@ ChunksLike = tuple[int, ...] | Literal["auto"]
 ShardsLike = tuple[int, ...] | Literal["auto"]
 
 
+def shapes_from_scaling_factors(
+    base_shape: tuple[int, ...],
+    scaling_factors: tuple[float, ...],
+    num_levels: int,
+) -> list[tuple[int, ...]]:
+    """Compute the shapes of each level in the pyramid from scaling factors.
+
+    Args:
+        base_shape (tuple[int, ...]): The shape of the base level.
+        scaling_factors (tuple[float, ...]): The scaling factors between levels.
+        num_levels (int): The number of levels in the pyramid.
+
+    Returns:
+        list[tuple[int, ...]]: The shapes of each level in the pyramid.
+    """
+    shapes = []
+    current_shape = base_shape
+    for _ in range(num_levels):
+        shapes.append(current_shape)
+        current_shape = tuple(
+            max(1, int(s / f))
+            for s, f in zip(current_shape, scaling_factors, strict=True)
+        )
+    return shapes
+
+
+def _check_order(shapes: Sequence[tuple[int, ...]]):
+    """Check if the shapes are in decreasing order."""
+    num_pixels = [np.prod(shape) for shape in shapes]
+    print(num_pixels)
+    for i in range(1, len(num_pixels)):
+        if num_pixels[i] >= num_pixels[i - 1]:
+            raise NgioValueError("Shapes are not in decreasing order.")
+
+
 class PyramidLevel(BaseModel):
     path: str
     shape: tuple[int, ...]
@@ -219,12 +254,20 @@ class PyramidLevel(BaseModel):
                 "Scale must have the same length as shape "
                 f"({len(self.shape)}), got {len(self.scale)}"
             )
+        if any(isinstance(s, float) and s < 0 for s in self.scale):
+            raise NgioValueError("Scale values must be positive.")
+
         if isinstance(self.chunks, tuple):
             if len(self.chunks) != len(self.shape):
                 raise NgioValueError(
                     "Chunks must have the same length as shape "
                     f"({len(self.shape)}), got {len(self.chunks)}"
                 )
+            normalized_chunks = []
+            for dim_size, chunk_size in zip(self.shape, self.chunks, strict=True):
+                normalized_chunks.append(min(dim_size, chunk_size))
+            self.chunks = tuple(normalized_chunks)
+
         if isinstance(self.shards, tuple):
             if len(self.shards) != len(self.shape):
                 raise NgioValueError(
@@ -236,97 +279,97 @@ class PyramidLevel(BaseModel):
 
 class ImagePyramidBuilder(BaseModel):
     levels: list[PyramidLevel]
-    axes: list[str]
+    axes: tuple[str, ...]
     data_type: str = "uint16"
     dimension_separator: Literal[".", "/"] = "/"
     compressors: Any = "auto"
     zarr_format: Literal[2, 3] = 2
+    other_array_kwargs: Mapping[str, Any] = {}
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
     def from_scaling_factors(
         cls,
-        levels_paths: list[str] | int,
+        levels_paths: tuple[str, ...],
         scaling_factors: tuple[float, ...],
         base_shape: tuple[int, ...],
         base_scale: tuple[float, ...],
-        axes: list[str],
+        axes: tuple[str, ...],
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
         compressors: Any = "auto",
         zarr_format: Literal[2, 3] = 2,
+        other_array_kwargs: Mapping[str, Any] | None = None,
     ) -> "ImagePyramidBuilder":
-        levels = []
-        if isinstance(levels_paths, int):
-            levels_paths = [str(i) for i in range(levels_paths)]
-
-        # Rename for clarity
-        scale = base_scale
-        for path in levels_paths:
-            levels.append(
-                PyramidLevel(
-                    path=path,
-                    shape=base_shape,
-                    scale=scale,
-                    chunks=chunks,
-                    shards=shards,
-                )
-            )
-            base_shape = tuple(
-                max(1, int(s / f))
-                for s, f in zip(base_shape, scaling_factors, strict=True)
-            )
-            scale = tuple(s * f for s, f in zip(scale, scaling_factors, strict=True))
-        return cls(
-            levels=levels,
+        shapes = shapes_from_scaling_factors(
+            base_shape=base_shape,
+            scaling_factors=scaling_factors,
+            num_levels=len(levels_paths),
+        )
+        return cls.from_shapes(
+            shapes=shapes,
+            base_scale=base_scale,
             axes=axes,
+            levels_paths=levels_paths,
+            chunks=chunks,
+            shards=shards,
             data_type=data_type,
             dimension_separator=dimension_separator,
             compressors=compressors,
             zarr_format=zarr_format,
+            other_array_kwargs=other_array_kwargs,
         )
 
     @classmethod
     def from_shapes(
         cls,
-        shapes: list[tuple[int, ...]],
+        shapes: Sequence[tuple[int, ...]],
         base_scale: tuple[float, ...],
-        axes: list[str],
-        levels_paths: list[str] | None = None,
+        axes: tuple[str, ...],
+        levels_paths: Sequence[str] | None = None,
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
         compressors: Any = "auto",
         zarr_format: Literal[2, 3] = 2,
+        other_array_kwargs: Mapping[str, Any] | None = None,
     ) -> "ImagePyramidBuilder":
         levels = []
         if levels_paths is None:
-            levels_paths = [str(i) for i in range(len(shapes))]
-
-        base_scale = base_scale
+            levels_paths = tuple(str(i) for i in range(len(shapes)))
+        _check_order(shapes)
+        scale_ = base_scale
         for i, (path, shape) in enumerate(zip(levels_paths, shapes, strict=True)):
             levels.append(
                 PyramidLevel(
                     path=path,
                     shape=shape,
-                    scale=base_scale,
+                    scale=scale_,
                     chunks=chunks,
                     shards=shards,
                 )
             )
             if i + 1 < len(shapes):
+                # This only works for downsampling pyramids
+                # The _check_order function ensures that
+                # shapes are decreasing
                 next_shape = shapes[i + 1]
-                base_scale = tuple(
-                    s * (s1 / s2)
-                    for s, s1, s2 in zip(
-                        base_scale,
+                scaling_factor = tuple(
+                    s1 / s2
+                    for s1, s2 in zip(
                         shape,
                         next_shape,
                         strict=True,
                     )
                 )
+                scale_ = tuple(
+                    s * f for s, f in zip(scale_, scaling_factor, strict=True)
+                )
+        other_array_kwargs = other_array_kwargs or {}
         return cls(
             levels=levels,
             axes=axes,
@@ -334,6 +377,7 @@ class ImagePyramidBuilder(BaseModel):
             dimension_separator=dimension_separator,
             compressors=compressors,
             zarr_format=zarr_format,
+            other_array_kwargs=other_array_kwargs,
         )
 
     def to_zarr(self, group: zarr.Group) -> None:
@@ -346,6 +390,7 @@ class ImagePyramidBuilder(BaseModel):
             "dtype": self.data_type,
             "overwrite": True,
             "compressors": self.compressors,
+            **self.other_array_kwargs,
         }
 
         if self.zarr_format == 2:

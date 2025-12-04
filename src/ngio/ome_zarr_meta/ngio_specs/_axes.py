@@ -352,6 +352,7 @@ class AxesHandler:
 
     @property
     def axes_names(self) -> tuple[str, ...]:
+        """On disk axes names."""
         return tuple(ax.name for ax in self._axes)
 
     @property

@@ -1,7 +1,7 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
 import dask.array as da
 import numpy as np
@@ -13,8 +13,8 @@ from ngio.common import (
     InterpolationOrder,
     Roi,
 )
-from ngio.images._abstract_image import AbstractImage
-from ngio.images._create import create_empty_image_container
+from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.io_pipes import (
     SlicingInputType,
     TransformProtocol,
@@ -35,11 +35,10 @@ from ngio.ome_zarr_meta.ngio_specs import (
     TimeUnits,
 )
 from ngio.utils import (
-    NgioValidationError,
+    NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
 )
-from ngio.utils._zarr_utils import find_dimension_separator
 
 
 class ChannelSelectionModel(BaseModel):
@@ -88,7 +87,7 @@ def _check_channel_meta(meta: NgioImageMeta, dimension: Dimensions) -> ChannelsM
         return ChannelsMeta.default_init(labels=c_dim)
 
     if len(meta.channels_meta.channels) != c_dim:
-        raise NgioValidationError(
+        raise NgioValueError(
             "The number of channels does not match the image. "
             f"Expected {len(meta.channels_meta.channels)} channels, got {c_dim}."
         )
@@ -96,7 +95,7 @@ def _check_channel_meta(meta: NgioImageMeta, dimension: Dimensions) -> ChannelsM
     return meta.channels_meta
 
 
-class Image(AbstractImage[ImageMetaHandler]):
+class Image(AbstractImage):
     """A class to handle a single image (or level) in an OME-Zarr image.
 
     This class is meant to be subclassed by specific image types.
@@ -123,9 +122,17 @@ class Image(AbstractImage[ImageMetaHandler]):
         )
 
     @property
+    def meta_handler(self) -> ImageMetaHandler:
+        """Return the metadata handler."""
+        assert isinstance(self._meta_handler, ImageMetaHandler)
+        return self._meta_handler
+
+    @property
     def meta(self) -> NgioImageMeta:
         """Return the metadata."""
-        return self._meta_handler.get_meta()
+        meta = self.meta_handler.get_meta()
+        assert isinstance(meta, NgioImageMeta)
+        return meta
 
     @property
     def channels_meta(self) -> ChannelsMeta:
@@ -454,6 +461,15 @@ class ImagesContainer:
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
+    def _set_channel_meta(
+        self,
+        channels_meta: ChannelsMeta,
+    ) -> None:
+        """Set the channels metadata."""
+        meta = self.meta
+        meta.set_channels_meta(channels_meta)
+        self._meta_handler.update_meta(meta)
+
     def set_channel_meta(
         self,
         labels: Sequence[str | None] | int | None = None,
@@ -490,16 +506,12 @@ class ImagesContainer:
         ref_image = self.get(path=low_res_dataset.path)
 
         if start is not None and end is None:
-            raise NgioValidationError(
-                "If start is provided, end must be provided as well."
-            )
+            raise NgioValueError("If start is provided, end must be provided as well.")
         if end is not None and start is None:
-            raise NgioValidationError(
-                "If end is provided, start must be provided as well."
-            )
+            raise NgioValueError("If end is provided, start must be provided as well.")
 
         if start is not None and percentiles is not None:
-            raise NgioValidationError(
+            raise NgioValueError(
                 "If start and end are provided, percentiles must be None."
             )
 
@@ -511,11 +523,11 @@ class ImagesContainer:
             )
         elif start is not None and end is not None:
             if len(start) != len(end):
-                raise NgioValidationError(
+                raise NgioValueError(
                     "The start and end lists must have the same length."
                 )
             if len(start) != self.num_channels:
-                raise NgioValidationError(
+                raise NgioValueError(
                     "The start and end lists must have the same length as "
                     "the number of channels."
                 )
@@ -539,10 +551,7 @@ class ImagesContainer:
             data_type=ref_image.dtype,
             **omero_kwargs,
         )
-
-        meta = self.meta
-        meta.set_channels_meta(channel_meta)
-        self._meta_handler.update_meta(meta)
+        self._set_channel_meta(channel_meta)
 
     def set_channel_percentiles(
         self,
@@ -551,7 +560,7 @@ class ImagesContainer:
     ) -> None:
         """Update the percentiles of the channels."""
         if self.meta._channels_meta is None:
-            raise NgioValidationError("The channels meta is not initialized.")
+            raise NgioValueError("The channels meta is not initialized.")
 
         low_res_dataset = self.meta.get_lowest_resolution_dataset()
         ref_image = self.get(path=low_res_dataset.path)
@@ -597,56 +606,84 @@ class ImagesContainer:
         self,
         store: StoreOrGroup,
         ref_path: str | None = None,
+        # Metadata parameters
         shape: Sequence[int] | None = None,
+        pixelsize: float | tuple[float, float] | None = None,
+        z_spacing: float | None = None,
+        time_spacing: float | None = None,
+        name: str | None = None,
+        channels_meta: Sequence[str | Channel] | None = None,
+        ngff_version: NgffVersions | None = None,
+        # Zarr Array parameters
+        chunks: ChunksLike = "auto",
+        shards: ShardsLike | None = None,
+        dtype: str = "uint16",
+        dimension_separator: Literal[".", "/"] = "/",
+        compressors: CompressorLike = "auto",
+        extra_array_kwargs: Mapping[str, Any] | None = None,
+        overwrite: bool = False,
+        # Deprecated arguments
         labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
-        axes_names: Sequence[str] | None = None,
-        name: str | None = None,
-        chunks: Sequence[int] | None = None,
-        dtype: str | None = None,
-        dimension_separator: Literal[".", "/"] | None = None,
-        compressors: CompressorLike | None = None,
-        ngff_version: NgffVersions | None = None,
-        overwrite: bool = False,
     ) -> "ImagesContainer":
         """Create an empty OME-Zarr image from an existing image.
 
+        If a kwarg is not provided, the value from the reference image will be used.
+
         Args:
+            image_container (ImagesContainer): The image container to derive the new
+                image.
             store (StoreOrGroup): The Zarr store or group to create the image in.
-            ref_path (str | None): The path to the reference image in
-                the image container.
+            ref_path (str | None): The path to the reference image in the image
+                container.
             shape (Sequence[int] | None): The shape of the new image.
-            labels (Sequence[str] | None): The labels of the new image.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Sequence[str] | None): The axes names of the new image.
+            pixelsize (float | tuple[float, float] | None): The pixel size of the new
+                image.
+            z_spacing (float | None): The z spacing of the new image.
+            time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
-            chunks (Sequence[int] | Literal["auto"]): The chunk shape of the new image.
-            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
-                dimensions. If None it will use the same as the reference image.
-            compressors: The compressor to use. If None it will use
-                the same as the reference image.
+            channels_meta (Sequence[str | Channel] | None): The channels metadata
+                of the new image.
+            ngff_version (NgffVersions | None): The NGFF version to use.
+            chunks (Sequence[int] | None): The chunk shape of the new image.
+            shards (ShardsLike | None): The shard shape of the new image.
             dtype (str | None): The data type of the new image.
-            ngff_version (NgffVersions): The NGFF version to use.
+            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+                dimensions.
+            compressors (CompressorLike | None): The compressors to use.
+            extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+                the zarr array creation.
             overwrite (bool): Whether to overwrite an existing image.
+            labels (Sequence[str] | None): The labels of the new image.
+                This argument is deprecated please use channels_meta instead.
+            pixel_size (PixelSize | None): The pixel size of the new image.
+                This argument is deprecated please use pixelsize, z_spacing,
+                and time_spacing instead.
 
         Returns:
-            ImagesContainer: The new image
+            ImagesContainer: The new derived image.
+
         """
         return derive_image_container(
             image_container=self,
             store=store,
             ref_path=ref_path,
             shape=shape,
-            labels=labels,
-            pixel_size=pixel_size,
-            axes_names=axes_names,
+            pixelsize=pixelsize,
+            z_spacing=z_spacing,
+            time_spacing=time_spacing,
             name=name,
+            channels_meta=channels_meta,
+            ngff_version=ngff_version,
             chunks=chunks,
+            shards=shards,
             dtype=dtype,
             dimension_separator=dimension_separator,
             compressors=compressors,
-            ngff_version=ngff_version,
+            extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
+            labels=labels,
+            pixel_size=pixel_size,
         )
 
     def get(
@@ -718,147 +755,92 @@ def compute_image_percentile(
 
 
 def derive_image_container(
+    *,
     image_container: ImagesContainer,
     store: StoreOrGroup,
     ref_path: str | None = None,
+    # Metadata parameters
     shape: Sequence[int] | None = None,
-    labels: Sequence[str] | None = None,
-    pixel_size: PixelSize | None = None,
-    axes_names: Sequence[str] | None = None,
+    pixelsize: float | tuple[float, float] | None = None,
+    z_spacing: float | None = None,
+    time_spacing: float | None = None,
     name: str | None = None,
-    chunks: Sequence[int] | None = None,
+    channels_meta: Sequence[str | Channel] | None = None,
+    ngff_version: NgffVersions | None = None,
+    # Zarr Array parameters
+    chunks: ChunksLike = "auto",
+    shards: ShardsLike | None = None,
     dtype: str | None = None,
     dimension_separator: Literal[".", "/"] | None = None,
     compressors: CompressorLike | None = None,
-    ngff_version: NgffVersions | None = None,
+    extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
+    # Deprecated arguments
+    labels: Sequence[str] | None = None,
+    pixel_size: PixelSize | None = None,
 ) -> ImagesContainer:
     """Create an empty OME-Zarr image from an existing image.
+
+    If a kwarg is not provided, the value from the reference image will be used.
 
     Args:
         image_container (ImagesContainer): The image container to derive the new image.
         store (StoreOrGroup): The Zarr store or group to create the image in.
         ref_path (str | None): The path to the reference image in the image container.
         shape (Sequence[int] | None): The shape of the new image.
-        labels (Sequence[str] | None): The labels of the new image.
-        pixel_size (PixelSize | None): The pixel size of the new image.
+        pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
+        z_spacing (float | None): The z spacing of the new image.
+        time_spacing (float | None): The time spacing of the new image.
+        scaling_factors (Sequence[float] | Literal["auto"] | None): The scaling factors
+            of the new image.
         axes_names (Sequence[str] | None): The axes names of the new image.
         name (str | None): The name of the new image.
+        channels_meta (Sequence[str | Channel] | None): The channels metadata
+            of the new image.
+        ngff_version (NgffVersions | None): The NGFF version to use.
         chunks (Sequence[int] | None): The chunk shape of the new image.
-        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
-            dimensions. If None it will use the same as the reference image.
-        compressors (CompressorLike | None): The compressors to use. If None it will use
-            the same as the reference image.
-        ngff_version (NgffVersions): The NGFF version to use.
+        shards (ShardsLike | None): The shard shape of the new image.
         dtype (str | None): The data type of the new image.
+        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            dimensions.
+        compressors (CompressorLike | None): The compressors to use.
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation.
         overwrite (bool): Whether to overwrite an existing image.
+        labels (Sequence[str] | None): The labels of the new image.
+            This argument is deprecated please use channels_meta instead.
+        pixel_size (PixelSize | None): The pixel size of the new image.
+            This argument is deprecated please use pixelsize, z_spacing,
+            and time_spacing instead.
 
     Returns:
-        ImagesContainer: The new image
+        ImagesContainer: The new derived image.
 
     """
-    if ref_path is None:
-        ref_image = image_container.get()
-    else:
-        ref_image = image_container.get(path=ref_path)
-
-    ref_meta = ref_image.meta
-
-    if shape is None:
-        shape = ref_image.shape
-
-    if pixel_size is None:
-        pixel_size = ref_image.pixel_size
-
-    if axes_names is None:
-        axes_names = ref_meta.axes_handler.axes_names
-
-    if len(axes_names) != len(shape):
-        raise NgioValidationError(
-            "The axes names of the new image does not match the reference image."
-            f"Got {axes_names} for shape {shape}."
-        )
-
-    if chunks is None:
-        chunks = ref_image.chunks
-
-    if len(chunks) != len(shape):
-        raise NgioValidationError(
-            "The chunks of the new image does not match the reference image."
-            f"Got {chunks} for shape {shape}."
-        )
-
-    if name is None:
-        name = ref_meta.name
-
-    if dtype is None:
-        dtype = ref_image.dtype
-
-    if dimension_separator is None:
-        dimension_separator = find_dimension_separator(ref_image.zarr_array)
-
-    if compressors is None:
-        compressors = ref_image.zarr_array.compressors  # type: ignore
-
-    if ngff_version is None:
-        ngff_version = ref_meta.version
-
-    handler = create_empty_image_container(
+    ref_image = image_container.get(path=ref_path)
+    group_handler = abstract_derive(
+        ref_image=ref_image,
+        meta_type=NgioImageMeta,
         store=store,
         shape=shape,
-        pixelsize=pixel_size.x,
-        z_spacing=pixel_size.z,
-        time_spacing=pixel_size.t,
-        levels=ref_meta.paths,
-        yx_scaling_factor=ref_meta.yx_scaling(),
-        z_scaling_factor=ref_meta.z_scaling(),
-        time_unit=pixel_size.time_unit,
-        space_unit=pixel_size.space_unit,
-        axes_names=axes_names,
+        pixelsize=pixelsize,
+        z_spacing=z_spacing,
+        time_spacing=time_spacing,
         name=name,
+        channels_meta=channels_meta,
+        channels_policy="same",
+        ngff_version=ngff_version,
         chunks=chunks,
+        shards=shards,
         dtype=dtype,
         dimension_separator=dimension_separator,
         compressors=compressors,
+        extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
-        ngff_version=ngff_version,
+        labels=labels,
+        pixel_size=pixel_size,
     )
-    image_container = ImagesContainer(handler)
-
-    if ref_image.num_channels == image_container.num_channels:
-        _labels = ref_image.channel_labels
-        wavelength_id = ref_image.wavelength_ids
-
-        channel_meta = ref_image.channels_meta
-        colors = [c.channel_visualisation.color for c in channel_meta.channels]
-        active = [c.channel_visualisation.active for c in channel_meta.channels]
-        start = [c.channel_visualisation.start for c in channel_meta.channels]
-        end = [c.channel_visualisation.end for c in channel_meta.channels]
-    else:
-        _labels = None
-        wavelength_id = None
-        colors = None
-        active = None
-        start = None
-        end = None
-
-    if labels is not None:
-        if len(labels) != image_container.num_channels:
-            raise NgioValidationError(
-                "The number of labels does not match the number of channels."
-            )
-        _labels = labels
-
-    image_container.set_channel_meta(
-        labels=_labels,
-        wavelength_id=wavelength_id,
-        percentiles=None,
-        colors=colors,
-        active=active,
-        start=start,
-        end=end,
-    )
-    return image_container
+    return ImagesContainer(group_handler=group_handler)
 
 
 def _parse_str_or_model(
@@ -867,9 +849,9 @@ def _parse_str_or_model(
     """Parse a string or ChannelSelectionModel to an integer channel index."""
     if isinstance(channel_selection, int):
         if channel_selection < 0:
-            raise NgioValidationError("Channel index must be a non-negative integer.")
+            raise NgioValueError("Channel index must be a non-negative integer.")
         if channel_selection >= image.num_channels:
-            raise NgioValidationError(
+            raise NgioValueError(
                 "Channel index must be less than the number "
                 f"of channels ({image.num_channels})."
             )
@@ -887,7 +869,7 @@ def _parse_str_or_model(
             )
         elif channel_selection.mode == "index":
             return int(channel_selection.identifier)
-    raise NgioValidationError(
+    raise NgioValueError(
         "Invalid channel selection type. "
         f"{channel_selection} is of type {type(channel_selection)} ",
         "supported types are str, ChannelSelectionModel, and int.",
@@ -906,7 +888,7 @@ def _parse_channel_selection(
     elif isinstance(channel_selection, Sequence):
         _sequence = [_parse_str_or_model(image, cs) for cs in channel_selection]
         return {"c": _sequence}
-    raise NgioValidationError(
+    raise NgioValueError(
         f"Invalid channel selection type {type(channel_selection)}. "
         "Supported types are int, str, ChannelSelectionModel, and Sequence."
     )
@@ -920,7 +902,7 @@ def add_channel_selection_to_slicing_dict(
     """Add channel selection information to the slicing dictionary."""
     channel_info = _parse_channel_selection(image, channel_selection)
     if "c" in slicing_dict and channel_info:
-        raise NgioValidationError(
+        raise NgioValueError(
             "Both channel_selection and 'c' in slicing_kwargs are provided. "
             "Which channel selection should be used is ambiguous. "
             "Please provide only one."
