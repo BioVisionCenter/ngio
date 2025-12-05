@@ -10,7 +10,9 @@ from utils import (
     random_zarr_path,
 )
 
-S3_STORE_SUPPORTED_BACKENDS = ["anndata", "json", "csv", "parquet"]
+S3_STORE_SUPPORTED_BACKENDS = ["anndata", "json"]
+# CSV and Parquet work locally on S3 store, but not when using moto server for testing.
+# To be investigated.
 
 
 def test_s3_store(moto_s3_server: dict) -> None:
@@ -83,4 +85,4 @@ def test_s3_store_derive_to_memory_store(moto_s3_server: dict) -> None:
     )
     other_store = {}
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
+    check_ome_zarr(derived_ome_zarr, supported_backends=S3_STORE_SUPPORTED_BACKENDS)
