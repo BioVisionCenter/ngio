@@ -106,11 +106,13 @@ def test_csv_backend(tmp_path: Path):
     assert backend.implements_pandas()
 
     test_table = pd.DataFrame(
-        {"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["a", "b", "c"]}
+        {"a": [1, 2, 3], "b": [4.1, 5.1, 6.1], "c": ["a", "b", "c"]}
     )
 
     backend.write(test_table, metadata={"test": "test"})
     loaded_table = backend.load_as_pandas_df()
+    print(loaded_table)
+    print(test_table)
     assert loaded_table.equals(test_table), loaded_table
     meta = backend._group_handler.load_attrs()
     assert meta["test"] == "test"

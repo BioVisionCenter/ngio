@@ -25,7 +25,7 @@ def test_http_store(http_static_server: dict) -> None:
     )
     http_mapper = get_http_mapper(url, zarr_path)
     ome_zarr = open_ome_zarr_container(store=http_mapper)
-    check_ome_zarr(ome_zarr, supported_backends=["anndata", "json"])
+    check_ome_zarr(ome_zarr, supported_backends=HTTP_STORE_SUPPORTED_BACKENDS)
 
 
 def test_http_store_derive_to_s3_store(
@@ -45,7 +45,7 @@ def test_http_store_derive_to_s3_store(
         zarr_path=random_zarr_path(),
     )
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
+    check_ome_zarr(derived_ome_zarr, supported_backends=HTTP_STORE_SUPPORTED_BACKENDS)
 
 
 def test_http_store_derive_to_local_store(
@@ -62,7 +62,7 @@ def test_http_store_derive_to_local_store(
 
     other_store = tmp_path / "http_local_store_test" / random_zarr_path()
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
+    check_ome_zarr(derived_ome_zarr, supported_backends=HTTP_STORE_SUPPORTED_BACKENDS)
 
 
 def test_http_store_derive_to_memory_store(http_static_server: dict) -> None:

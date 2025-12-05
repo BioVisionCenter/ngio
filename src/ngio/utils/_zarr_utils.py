@@ -522,8 +522,9 @@ def copy_group(src_group: zarr.Group, dest_group: zarr.Group):
         _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
         return
     warnings.warn(
-        "Fsspec copy not possible, falling back to Python copy. "
-        "This may be slower for large datasets.",
+        "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
+        "This will preserve some tabular data non-zarr native (parquet, and csv), "
+        "and it will be slower for large datasets.",
         UserWarning,
         stacklevel=2,
     )

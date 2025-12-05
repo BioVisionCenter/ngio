@@ -8,7 +8,7 @@ from utils import (
     random_zarr_path,
 )
 
-MEMORY_STORE_SUPPORTED_BACKENDS = ["anndata", "json"]
+MEMORY_STORE_SUPPORTED_BACKENDS = ["anndata", "json", "csv", "parquet"]
 
 
 def test_memory_store() -> None:
@@ -17,9 +17,6 @@ def test_memory_store() -> None:
         store=store_path, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS
     )
     check_ome_zarr(ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
-    other_store = {}
-    derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
 
 
 def test_memory_store_derive_to_memory_store() -> None:
@@ -29,7 +26,7 @@ def test_memory_store_derive_to_memory_store() -> None:
     )
     other_store = {}
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
+    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
 
 
 def test_memory_store_derive_to_local_store(tmp_path: Path) -> None:
@@ -39,7 +36,7 @@ def test_memory_store_derive_to_local_store(tmp_path: Path) -> None:
     )
     other_store = tmp_path / "local_store_test" / "derived_test.zarr"
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
+    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
 
 
 def test_memory_store_derive_to_s3_store(moto_s3_server: dict) -> None:
@@ -54,4 +51,4 @@ def test_memory_store_derive_to_s3_store(moto_s3_server: dict) -> None:
         zarr_path=random_zarr_path(),
     )
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
+    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])

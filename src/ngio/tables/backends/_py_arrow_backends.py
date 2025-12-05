@@ -72,16 +72,24 @@ class PyArrowBackend(AbstractTableBackend):
     def _load_from_fsspec_store(self, store: FsspecStore, path: str) -> pa_ds.Dataset:
         """Load the table from an FS store."""
         table_path = f"{store.path}/{path}/{self.table_name}"
-        dataset = pa_ds.dataset(
-            table_path, format=self.table_format, filesystem=store.fs
-        )
+        fs = _make_sync_fs(store.fs)
+        dataset = pa_ds.dataset(table_path, format=self.table_format, filesystem=fs)
         return dataset
 
     def _load_from_in_memory_store(
         self, store: MemoryStore, path: str
     ) -> pa_ds.Dataset:
         """Load the table from an in-memory store."""
-        raise NotImplementedError("In-memory store loading is not implemented yet.")
+        table_path = f"{path}/{self.table_name}"
+        table = store._store_dict.get(table_path, None)
+        if table is None:
+            raise NgioValueError(
+                f"Table {self.table_name} not found in the in-memory store at "
+                f"path {path}."
+            )
+        assert isinstance(table, pa.Table)
+        dataset = pa_ds.dataset(table)
+        return dataset
 
     def _load_from_zip_store(self, store: ZipStore, path: str) -> pa_ds.Dataset:
         """Load the table from a zip store."""
@@ -168,7 +176,8 @@ class PyArrowBackend(AbstractTableBackend):
         self, store: MemoryStore, path: str, table: pa.Table
     ) -> None:
         """Write the table to an in-memory store."""
-        raise NotImplementedError("Writing to in-memory store is not implemented yet.")
+        table_path = f"{path}/{self.table_name}"
+        store._store_dict[table_path] = table
 
     def _write_to_zip_store(self, store: ZipStore, path: str, table: pa.Table) -> None:
         """Write the table to a zip store."""
