@@ -54,14 +54,22 @@ dependencies = [
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 # "extras" (e.g. for `pip install .[test]`)
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "scikit-image"]
+test = [
+    "pytest",
+    "pytest-cov",
+    "scikit-image",
+    "moto[server]",
+    "boto",
+    "pytest_httpserver",
+    "devtools",
+    "s3fs",
+]
 
 dev = [
     "Pympler",
     "napari",
     "pyqt5",
     "matplotlib",
-    "devtools",
     "notebook",
     "mypy",
     "pdbpp",        # https://github.com/pdbpp/pdbpp
@@ -226,6 +234,7 @@ test13 = { features = ["py13", "test"], solve-group = "py13" }
 
 # dev env
 dev = { features = ["dev", "test"], solve-group = "py11" }
+test = { features = ["test"], solve-group = "py11" }
 
 [tool.pixi.tasks]
 serve_docs = "mkdocs serve"

@@ -19,6 +19,7 @@ from ngio.utils._zarr_utils import (
     NgioCache,
     StoreOrGroup,
     ZarrGroupHandler,
+    copy_group,
     open_group_wrapper,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     "NgioValueError",
     "StoreOrGroup",
     "ZarrGroupHandler",
+    "copy_group",
     "download_ome_zarr_dataset",
     "fractal_fsspec_store",
     "list_ome_zarr_datasets",

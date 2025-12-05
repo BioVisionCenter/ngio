@@ -233,7 +233,6 @@ def shapes_from_scaling_factors(
 def _check_order(shapes: Sequence[tuple[int, ...]]):
     """Check if the shapes are in decreasing order."""
     num_pixels = [np.prod(shape) for shape in shapes]
-    print(num_pixels)
     for i in range(1, len(num_pixels)):
         if num_pixels[i] >= num_pixels[i - 1]:
             raise NgioValueError("Shapes are not in decreasing order.")

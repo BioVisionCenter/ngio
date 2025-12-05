@@ -1,3 +1,4 @@
+import zarr
 from anndata import AnnData
 from anndata._settings import settings
 from pandas import DataFrame
@@ -14,7 +15,7 @@ from ngio.tables.backends._utils import (
     convert_polars_to_anndata,
     normalize_anndata,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioValueError, copy_group
 
 
 class AnnDataBackend(AbstractTableBackend):
@@ -70,14 +71,11 @@ class AnnDataBackend(AbstractTableBackend):
         elif isinstance(self._group_handler.store, MemoryStore):
             store = MemoryStore()
             table.write_zarr(store)
-            import zarr
-
-            anndata_group = zarr.open(store, mode="r")
-            zarr.copy_store()
-            path = self._group_handler.group
-            for key in anndata_group:
-                self._group_handler.store._store_dict[f"{path}/{key}"] = store[key]
-            return None
+            anndata_group = zarr.open_group(store, mode="r")
+            copy_group(
+                anndata_group,
+                self._group_handler._group,
+            )
         else:
             raise NgioValueError(
                 f"Ngio does not support writing an AnnData table to a "
