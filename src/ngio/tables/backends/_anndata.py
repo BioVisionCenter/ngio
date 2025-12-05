@@ -52,34 +52,62 @@ class AnnDataBackend(AbstractTableBackend):
         """Load the table as an AnnData object."""
         return self.load_as_anndata()
 
+    def _write_to_local_store(
+        self, store: LocalStore, path: str, table: AnnData
+    ) -> None:
+        """Write the AnnData table to a LocalStore."""
+        store_path = f"{store.root}/{path}"
+        table.write_zarr(store_path)
+
+    def _write_to_fsspec_store(
+        self, store: FsspecStore, path: str, table: AnnData
+    ) -> None:
+        """Write the AnnData table to a FsspecStore."""
+        full_url = f"{store.path}/{path}"
+        fs = store.fs
+        mapper = fs.get_mapper(full_url)
+        table.write_zarr(mapper)
+
+    def _write_to_memory_store(
+        self, store: MemoryStore, path: str, table: AnnData
+    ) -> None:
+        """Write the AnnData table to a MemoryStore."""
+        store = MemoryStore()
+        table.write_zarr(store)
+        anndata_group = zarr.open_group(store, mode="r")
+        copy_group(
+            anndata_group,
+            self._group_handler._group,
+        )
+
     def write_from_anndata(self, table: AnnData) -> None:
         """Serialize the table from an AnnData object."""
         # Make sure to use the correct zarr format
         settings.zarr_write_format = self._group_handler.zarr_format
-
-        if isinstance(self._group_handler.store, LocalStore):
-            store = self._group_handler.full_url
-            assert store is not None
-            table.write_zarr(store)
-        elif isinstance(self._group_handler.store, FsspecStore):
-            full_url = self._group_handler.full_url
-            assert full_url is not None
-            # Remap to fsspec store to the new full URL
-            fs = self._group_handler.store.fs
-            store = fs.get_mapper(full_url)
-            table.write_zarr(store)
-        elif isinstance(self._group_handler.store, MemoryStore):
-            store = MemoryStore()
-            table.write_zarr(store)
-            anndata_group = zarr.open_group(store, mode="r")
-            copy_group(
-                anndata_group,
-                self._group_handler._group,
+        store = self._group_handler.store
+        path = self._group_handler.group.path
+        if isinstance(store, LocalStore):
+            self._write_to_local_store(
+                store,
+                path,
+                table,
+            )
+        elif isinstance(store, FsspecStore):
+            self._write_to_fsspec_store(
+                store,
+                path,
+                table,
+            )
+        elif isinstance(store, MemoryStore):
+            self._write_to_memory_store(
+                store,
+                path,
+                table,
             )
         else:
             raise NgioValueError(
                 f"Ngio does not support writing an AnnData table to a "
-                f"store of type {type(self._group_handler.store)}. "
+                f"store of type {type(store)}. "
                 "Please make sure to use a compatible "
                 "store like a LocalStore, or FsspecStore."
             )
