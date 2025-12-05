@@ -10,6 +10,19 @@ import boto3
 import pytest
 
 
+def _running_on_github_ci() -> bool:
+    return os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("CI") == "true"
+
+
+if sys.platform == "darwin" and _running_on_github_ci():
+    # The store tests require local servers which seem to have issues on macOS CI.
+    # Skip the whole module in this case.
+    pytestmark = pytest.skip(
+        reason="Integration tests (local servers) are skipped on macOS CI",
+        allow_module_level=True,
+    )
+
+
 def _wait_for_port(proc, host, port, timeout=20):
     """Wait until a TCP port starts accepting connections, or the process dies."""
     start = time.time()
