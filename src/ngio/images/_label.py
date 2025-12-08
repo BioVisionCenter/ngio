@@ -178,7 +178,7 @@ class LabelsContainer:
         pixelsize: float | tuple[float, float] | None = None,
         z_spacing: float | None = None,
         time_spacing: float | None = None,
-        channels_policy: Literal["same", "squeeze"] | int = "squeeze",
+        channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
         chunks: ChunksLike = "auto",
@@ -210,9 +210,11 @@ class LabelsContainer:
             name (str | None): The name of the new image.
             channels_meta (Sequence[str | Channel] | None): The channels metadata
                 of the new image.
-            channels_policy (Literal["squeeze", "same"] | int): Possible policies:
+            channels_policy (Literal["squeeze", "same", "singleton"] | int):
+                Possible policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
                 - If "same", the channels axis will be kept as is (if it exists).
+                - If "singleton", the channels axis will be set to size 1.
                 - If an integer is provided, the channels axis will be changed to have
                     that size.
             ngff_version (NgffVersions | None): The NGFF version to use.
@@ -282,7 +284,7 @@ def derive_label(
     z_spacing: float | None = None,
     time_spacing: float | None = None,
     name: str | None = None,
-    channels_policy: Literal["same", "squeeze"] | int = "squeeze",
+    channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
     chunks: ChunksLike = "auto",
@@ -308,9 +310,11 @@ def derive_label(
         z_spacing (float | None): The z spacing of the new label.
         time_spacing (float | None): The time spacing of the new label.
         name (str | None): The name of the new label.
-        channels_policy (Literal["squeeze", "same"] | int): Possible policies:
+        channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
+            policies:
             - If "squeeze", the channels axis will be removed (no matter its size).
             - If "same", the channels axis will be kept as is (if it exists).
+            - If "singleton", the channels axis will be set to size 1.
             - If an integer is provided, the channels axis will be changed to have that
                 size.
         ngff_version (NgffVersions | None): The NGFF version to use.

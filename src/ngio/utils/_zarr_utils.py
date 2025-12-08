@@ -504,7 +504,9 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
         _zarr_python_copy(subgroup, dest_subgroup)
 
 
-def copy_group(src_group: zarr.Group, dest_group: zarr.Group):
+def copy_group(
+    src_group: zarr.Group, dest_group: zarr.Group, suppress_warnings: bool = False
+):
     if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
         raise NgioValueError(
             "Different Zarr format versions between source and destination, "
@@ -521,11 +523,12 @@ def copy_group(src_group: zarr.Group, dest_group: zarr.Group):
     ):
         _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
         return
-    warnings.warn(
-        "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
-        "This will preserve some tabular data non-zarr native (parquet, and csv), "
-        "and it will be slower for large datasets.",
-        UserWarning,
-        stacklevel=2,
-    )
+    if not suppress_warnings:
+        warnings.warn(
+            "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
+            "This will preserve some tabular data non-zarr native (parquet, and csv), "
+            "and it will be slower for large datasets.",
+            UserWarning,
+            stacklevel=2,
+        )
     _zarr_python_copy(src_group, dest_group)

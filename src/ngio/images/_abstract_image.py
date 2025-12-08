@@ -681,7 +681,7 @@ def _check_chunks_and_shards_compatibility(
 
 def _apply_channel_policy(
     ref_image: AbstractImage,
-    channels_policy: Literal["squeeze", "same"] | int,
+    channels_policy: Literal["squeeze", "same", "singleton"] | int,
     shapes: list[tuple[int, ...]],
     axes: tuple[str, ...],
     chunks: ChunksLike,
@@ -702,6 +702,10 @@ def _apply_channel_policy(
     """
     if channels_policy == "same":
         return shapes, axes, chunks, shards
+
+    if channels_policy == "singleton":
+        # Treat 'singleton' as setting channel size to 1
+        channels_policy = 1
 
     channel_index = ref_image.axes_handler.get_index("c")
     if channel_index is None:
@@ -729,11 +733,6 @@ def _apply_channel_policy(
     elif isinstance(channels_policy, int):
         new_shapes = []
         for shape in shapes:
-            if shape[channel_index] != channels_policy:
-                raise NgioValueError(
-                    f"Cannot apply channel policy {channels_policy=} to an image "
-                    f"with {shape[channel_index]} channels."
-                )
             new_shape = (
                 *shape[:channel_index],
                 channels_policy,
@@ -797,7 +796,7 @@ def abstract_derive(
     z_spacing: float | None = None,
     time_spacing: float | None = None,
     name: str | None = None,
-    channels_policy: Literal["squeeze", "same"] | int = "same",
+    channels_policy: Literal["squeeze", "same", "singleton"] | int = "same",
     channels_meta: Sequence[str | Channel] | None = None,
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
@@ -826,9 +825,11 @@ def abstract_derive(
         time_spacing (float | None): The time spacing of the new image.
         axes_names (Sequence[str] | None): The axes names of the new image.
         name (str | None): The name of the new image.
-        channels_policy (Literal["squeeze", "same"] | int): Possible policies:
+        channels_policy (Literal["squeeze", "same", "singleton"] | int):
+            Possible policies:
             - If "squeeze", the channels axis will be removed (no matter its size).
             - If "same", the channels axis will be kept as is (if it exists).
+            - If "singleton", the channels axis will be set to size 1.
             - If an integer is provided, the channels axis will be changed to have that
                 size.
         channels_meta (Sequence[str | Channel] | None): The channels metadata

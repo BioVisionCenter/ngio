@@ -3,12 +3,16 @@ from pathlib import Path
 import numpy as np
 import pytest
 from pydantic import ValidationError
+from zarr.storage import MemoryStore
 
 from ngio import (
+    OmeZarrContainer,
     create_empty_ome_zarr,
     create_ome_zarr_from_array,
     create_synthetic_ome_zarr,
 )
+from ngio.images._create_utils import init_image_like_from_shapes
+from ngio.ome_zarr_meta import NgioImageMeta
 from ngio.utils import NgioValueError
 
 
@@ -139,3 +143,53 @@ def test_create_fail(tmp_path: Path):
             chunks=(1, 64, 64, 64),  # should fail expected 3 axes
             overwrite=True,
         )
+
+
+def test_derive_label_channels_policy():
+    store = MemoryStore()
+    ome_zarr = create_synthetic_ome_zarr(store, shape=(3, 1, 64, 65))
+
+    label = ome_zarr.derive_label("test-label-singleton", channels_policy="singleton")
+    assert label.dimensions.get("c") == 1
+    label = ome_zarr.derive_label("test-label-same", channels_policy="same")
+    assert label.dimensions.get("c") == 3
+    label = ome_zarr.derive_label("test-label-squeeze", channels_policy="squeeze")
+    assert "c" not in label.axes
+    assert label.dimensions.get("c") is None
+    label = ome_zarr.derive_label("test-label-int", channels_policy=2)
+    assert label.dimensions.get("c") == 2
+
+
+def test_derive_from_non_dishogeneus_shapes():
+    # Yes those shapes are intentionally weird
+    shapes = [
+        (4, 3, 64, 65),
+        (4, 3, 64, 50),
+        (4, 3, 32, 25),
+    ]
+    store = MemoryStore()
+    image_handler = init_image_like_from_shapes(
+        store=store,
+        meta_type=NgioImageMeta,
+        shapes=shapes,
+        pixelsize=0.5,
+    )
+    ome_zarr = OmeZarrContainer(group_handler=image_handler)
+    ome_zarr.derive_label("test-label-same", channels_policy="same")
+    for path in ome_zarr.levels_paths:
+        img = ome_zarr.get_image(path=path)
+        lbl = ome_zarr.get_label(name="test-label-same", path=path)
+        assert img.shape == lbl.shape
+
+    image = ome_zarr.get_image(path="1")
+    ome_zarr.derive_label("test-label-level-1", ref_image=image, channels_policy="same")
+
+    for path_img, path_lbl in zip(["1", "2"], ["0", "1"], strict=True):
+        img = ome_zarr.get_image(path=path_img)
+        lbl = ome_zarr.get_label(name="test-label-level-1", path=path_lbl)
+        assert img.shape == lbl.shape
+
+    lbl = ome_zarr.get_label(name="test-label-level-1", path="2")
+    scaling_factor = tuple(s1 / s2 for s1, s2 in zip(shapes[0], shapes[1], strict=True))
+    assert image.meta.scaling_factor() == scaling_factor
+    assert lbl.shape == (4, 3, 32, 19)

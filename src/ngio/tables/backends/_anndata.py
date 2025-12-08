@@ -78,6 +78,7 @@ class AnnDataBackend(AbstractTableBackend):
         copy_group(
             anndata_group,
             self._group_handler._group,
+            suppress_warnings=True,
         )
 
     def write_from_anndata(self, table: AnnData) -> None:
