@@ -193,3 +193,40 @@ def test_derive_from_non_dishogeneus_shapes():
     scaling_factor = tuple(s1 / s2 for s1, s2 in zip(shapes[0], shapes[1], strict=True))
     assert image.meta.scaling_factor() == scaling_factor
     assert lbl.shape == (4, 3, 32, 19)
+
+
+def test_fail_derive_singleton():
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(store=store, shape=(1, 1, 64, 4), pixelsize=0.5)
+    expected_shapes = [
+        (1, 1, 64, 4),
+        (1, 1, 32, 2),
+        (1, 1, 16, 1),
+        (1, 1, 8, 1),
+        (1, 1, 4, 1),
+    ]
+    expected_pixel_size_x = [0.5, 1.0, 2.0, 2.0, 2.0]
+    for path, shape, px_x in zip(
+        ome_zarr.levels_paths, expected_shapes, expected_pixel_size_x, strict=True
+    ):
+        img = ome_zarr.get_image(path=path)
+        assert img.shape == shape
+        assert img.pixel_size.x == px_x
+
+
+def test_fail_create_from_non_decreasing_shapes():
+    # Yes those shapes are intentionally weird
+    shapes = [
+        (4, 3, 64, 64),
+        (4, 3, 128, 128),
+        (4, 3, 256, 256),
+    ]
+    store = MemoryStore()
+
+    with pytest.raises(NgioValueError):
+        _ = init_image_like_from_shapes(
+            store=store,
+            meta_type=NgioImageMeta,
+            shapes=shapes,
+            pixelsize=0.5,
+        )
