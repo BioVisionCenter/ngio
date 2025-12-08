@@ -19,7 +19,9 @@ from ome_zarr_models.v05.coordinate_transformations import (
 )
 from ome_zarr_models.v05.hcs import HCSAttrs as HCSAttrsV05
 from ome_zarr_models.v05.image import ImageAttrs as ImageAttrsV05
-from ome_zarr_models.v05.image_label import ImageLabelAttrs as LabelAttrsV05
+from ome_zarr_models.v05.image_label import ImageLabelAttrs as ImageLabelAttrsV05
+from ome_zarr_models.v05.labels import Labels as Labels
+from ome_zarr_models.v05.labels import LabelsAttrs as LabelsAttrsV05
 from ome_zarr_models.v05.multiscales import Dataset as DatasetV05
 from ome_zarr_models.v05.multiscales import Multiscale as MultiscaleV05
 from ome_zarr_models.v05.multiscales import ValidTransform as ValidTransformV05
@@ -37,6 +39,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ImageLabelSource,
     NgioImageMeta,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
     NgioPlateMeta,
     NgioWellMeta,
     default_channel_name,
@@ -53,7 +56,7 @@ class ImageV05WithOmero(BaseModel):
 
 
 class ImageLabelV05(BaseModel):
-    ome: LabelAttrsV05
+    ome: ImageLabelAttrsV05
 
 
 def _v05_omero_to_channels(v05_omero: OmeroV05 | None) -> ChannelsMeta | None:
@@ -401,7 +404,7 @@ def ngio_to_v05_label_meta(metadata: NgioLabelMeta) -> dict:
         "multiscales": [v05_muliscale],
         "image-label": metadata.image_label.model_dump(),
     }
-    v05_label = LabelAttrsV05(**labels_meta, version="0.5")
+    v05_label = ImageLabelAttrsV05(**labels_meta, version="0.5")
     v05_label = ImageLabelV05(
         ome=v05_label,
     )
@@ -473,3 +476,36 @@ def ngio_to_v05_plate_meta(metadata: NgioPlateMeta) -> dict:
     v05_plate = HCSAttrsV05(**metadata.model_dump())
     v05_plate = HCSV05(ome=v05_plate)
     return v05_plate.model_dump(exclude_none=True, by_alias=True)
+
+
+class LabelsV05(BaseModel):
+    ome: LabelsAttrsV05
+
+
+def v05_to_ngio_labels_group_meta(
+    metadata: dict,
+) -> NgioLabelsGroupMeta:
+    """Convert a v04 label group metadata to a ngio label group metadata.
+
+    Args:
+        metadata (dict): The v04 label group metadata.
+
+    Returns:
+        NgioLabelGroupMeta: The ngio label group metadata.
+    """
+    v05_label_group = LabelsV05(**metadata)
+    return NgioLabelsGroupMeta(labels=v05_label_group.ome.labels, version="0.5")
+
+
+def ngio_to_v05_labels_group_meta(metadata: NgioLabelsGroupMeta) -> dict:
+    """Convert a ngio label group metadata to a v05 label group metadata.
+
+    Args:
+        metadata (NgioLabelsGroupMeta): The ngio label group metadata.
+
+    Returns:
+        dict: The v05 label group metadata.
+    """
+    v05_labels_attrs = LabelsAttrsV05(labels=metadata.labels, version="0.5")
+    v05_labels_group = LabelsV05(ome=v05_labels_attrs)
+    return v05_labels_group.model_dump(exclude_none=True, by_alias=True)

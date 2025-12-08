@@ -16,7 +16,8 @@ from ome_zarr_models.v04.coordinate_transformations import (
 )
 from ome_zarr_models.v04.hcs import HCSAttrs as HCSAttrsV04
 from ome_zarr_models.v04.image import ImageAttrs as ImageAttrsV04
-from ome_zarr_models.v04.image_label import ImageLabelAttrs as LabelAttrsV04
+from ome_zarr_models.v04.image_label import ImageLabelAttrs as ImageLabelAttrsV04
+from ome_zarr_models.v04.labels import LabelsAttrs as LabelsAttrsV04
 from ome_zarr_models.v04.multiscales import Dataset as DatasetV04
 from ome_zarr_models.v04.multiscales import Multiscale as MultiscaleV04
 from ome_zarr_models.v04.multiscales import ValidTransform as ValidTransformV04
@@ -36,6 +37,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ImageLabelSource,
     NgioImageMeta,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
     NgioPlateMeta,
     NgioWellMeta,
     default_channel_name,
@@ -231,7 +233,7 @@ def v04_to_ngio_label_meta(
     Returns:
         NgioImageMeta: The ngio image metadata.
     """
-    v04_label = LabelAttrsV04(**metadata)
+    v04_label = ImageLabelAttrsV04(**metadata)
 
     if len(v04_label.multiscales) > 1:
         raise NotImplementedError(
@@ -381,8 +383,24 @@ def ngio_to_v04_label_meta(metadata: NgioLabelMeta) -> dict:
         "multiscales": [v04_muliscale],
         "image-label": metadata.image_label.model_dump(),
     }
-    v04_label = LabelAttrsV04(**labels_meta)
+    v04_label = ImageLabelAttrsV04(**labels_meta)
     return v04_label.model_dump(exclude_none=True, by_alias=True)
+
+
+def v04_to_ngio_labels_group_meta(
+    metadata: dict,
+) -> NgioLabelsGroupMeta:
+    """Convert a v04 label group metadata to a ngio label group metadata.
+
+    Args:
+        metadata (dict): The v04 label group metadata.
+
+    Returns:
+        NgioLabelGroupMeta: The ngio label group metadata.
+    """
+    v04_label_group = LabelsAttrsV04(**metadata).model_dump()
+    labels = v04_label_group.get("labels", [])
+    return NgioLabelsGroupMeta(labels=labels, version="0.4")
 
 
 def v04_to_ngio_well_meta(
@@ -440,3 +458,16 @@ def ngio_to_v04_plate_meta(metadata: NgioPlateMeta) -> dict:
     """
     v04_plate = HCSAttrsV04(**metadata.model_dump())
     return v04_plate.model_dump(exclude_none=True, by_alias=True)
+
+
+def ngio_to_v04_labels_group_meta(metadata: NgioLabelsGroupMeta) -> dict:
+    """Convert a ngio label group metadata to a v04 label group metadata.
+
+    Args:
+        metadata (NgioLabelsGroupMeta): The ngio label group metadata.
+
+    Returns:
+        dict: The v04 label group metadata.
+    """
+    v04_label_group = LabelsAttrsV04(labels=metadata.labels)
+    return v04_label_group.model_dump(exclude_none=True, by_alias=True)

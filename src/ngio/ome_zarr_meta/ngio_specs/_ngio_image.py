@@ -41,6 +41,13 @@ class ImageLabelSource(BaseModel):
         return cls(version=version, source={"image": "../../"})
 
 
+class NgioLabelsGroupMeta(BaseModel):
+    """Metadata model for the /labels group in OME-NGFF."""
+
+    version: NgffVersions
+    labels: list[str]
+
+
 class AbstractNgioImageMeta:
     """Base class for ImageMeta and LabelMeta."""
 

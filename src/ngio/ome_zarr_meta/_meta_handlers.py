@@ -7,26 +7,32 @@ from ngio.ome_zarr_meta.ngio_specs import (
     AxesSetup,
     NgioImageMeta,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
     NgioPlateMeta,
     NgioWellMeta,
 )
+from ngio.ome_zarr_meta.ngio_specs._ngio_image import NgffVersions
 from ngio.ome_zarr_meta.v04 import (
     ngio_to_v04_image_meta,
     ngio_to_v04_label_meta,
+    ngio_to_v04_labels_group_meta,
     ngio_to_v04_plate_meta,
     ngio_to_v04_well_meta,
     v04_to_ngio_image_meta,
     v04_to_ngio_label_meta,
+    v04_to_ngio_labels_group_meta,
     v04_to_ngio_plate_meta,
     v04_to_ngio_well_meta,
 )
 from ngio.ome_zarr_meta.v05 import (
     ngio_to_v05_image_meta,
     ngio_to_v05_label_meta,
+    ngio_to_v05_labels_group_meta,
     ngio_to_v05_plate_meta,
     ngio_to_v05_well_meta,
     v05_to_ngio_image_meta,
     v05_to_ngio_label_meta,
+    v05_to_ngio_labels_group_meta,
     v05_to_ngio_plate_meta,
     v05_to_ngio_well_meta,
 )
@@ -45,9 +51,22 @@ _plate_encoder_registry = {"0.4": ngio_to_v04_plate_meta, "0.5": ngio_to_v05_pla
 _plate_decoder_registry = {"0.4": v04_to_ngio_plate_meta, "0.5": v05_to_ngio_plate_meta}
 _well_encoder_registry = {"0.4": ngio_to_v04_well_meta, "0.5": ngio_to_v05_well_meta}
 _well_decoder_registry = {"0.4": v04_to_ngio_well_meta, "0.5": v05_to_ngio_well_meta}
+_labels_group_encoder_registry = {
+    "0.4": ngio_to_v04_labels_group_meta,
+    "0.5": ngio_to_v05_labels_group_meta,
+}
+_labels_group_decoder_registry = {
+    "0.4": v04_to_ngio_labels_group_meta,
+    "0.5": v05_to_ngio_labels_group_meta,
+}
 
 _meta_type = TypeVar(
-    "_meta_type", NgioImageMeta, NgioLabelMeta, NgioPlateMeta, NgioWellMeta
+    "_meta_type",
+    NgioImageMeta,
+    NgioLabelMeta,
+    NgioLabelsGroupMeta,
+    NgioPlateMeta,
+    NgioWellMeta,
 )
 
 
@@ -62,6 +81,8 @@ def _find_encoder_registry(
         return _plate_encoder_registry
     elif isinstance(ngio_meta, NgioWellMeta):
         return _well_encoder_registry
+    elif isinstance(ngio_meta, NgioLabelsGroupMeta):
+        return _labels_group_encoder_registry
     else:
         raise NgioValueError(f"Unsupported NGIO metadata type: {type(ngio_meta)}")
 
@@ -97,6 +118,8 @@ def _find_decoder_registry(
         return _plate_decoder_registry
     elif meta_type is NgioWellMeta:
         return _well_decoder_registry
+    elif meta_type is NgioLabelsGroupMeta:
+        return _labels_group_decoder_registry
     else:
         raise NgioValueError(f"Unsupported NGIO metadata type: {meta_type}")
 
@@ -444,6 +467,70 @@ class WellMetaHandler:
     def update_meta(self, ngio_meta: NgioWellMeta) -> None:
         """Update the NGIO well metadata."""
         update_ngio_meta(
+            group_handler=self._group_handler,
+            ngio_meta=ngio_meta,
+        )
+
+
+def get_ngio_labels_group_meta(
+    group_handler: ZarrGroupHandler,
+    version: str | None = None,
+) -> NgioLabelsGroupMeta:
+    """Retrieve the NGIO labels group metadata from the Zarr group.
+
+    Args:
+        group_handler (ZarrGroupHandler): The Zarr group handler.
+        version (str | None): Optional NGFF version to use for decoding.
+
+    Returns:
+        NgioLabelsGroupMeta: The NGIO labels group metadata.
+    """
+    return get_ngio_meta(
+        group_handler=group_handler,
+        meta_type=NgioLabelsGroupMeta,
+        version=version,
+    )
+
+
+def update_ngio_labels_group_meta(
+    group_handler: ZarrGroupHandler,
+    ngio_meta: NgioLabelsGroupMeta,
+) -> None:
+    """Update the NGIO labels group metadata in the Zarr group.
+
+    Args:
+        group_handler (ZarrGroupHandler): The Zarr group handler.
+        ngio_meta (NgioLabelsGroupMeta): The new NGIO labels group metadata.
+
+    """
+    update_ngio_meta(
+        group_handler=group_handler,
+        ngio_meta=ngio_meta,
+    )
+
+
+class LabelsGroupMetaHandler:
+    def __init__(
+        self,
+        group_handler: ZarrGroupHandler,
+        version: NgffVersions | None = None,
+    ):
+        self._group_handler = group_handler
+        self._version = version
+
+        meta = self.get_meta()
+        self._version = meta.version
+
+    def get_meta(self) -> NgioLabelsGroupMeta:
+        """Retrieve the NGIO labels group metadata."""
+        return get_ngio_labels_group_meta(
+            group_handler=self._group_handler,
+            version=self._version,
+        )
+
+    def update_meta(self, ngio_meta: NgioLabelsGroupMeta) -> None:
+        """Update the NGIO labels group metadata."""
+        update_ngio_labels_group_meta(
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )

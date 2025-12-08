@@ -61,13 +61,13 @@ def _try_get_table_container(
 
 
 def _try_get_label_container(
-    handler: ZarrGroupHandler, create_mode: bool = True
+    handler: ZarrGroupHandler, ngff_version: NgffVersions, create_mode: bool = True
 ) -> LabelsContainer | None:
     """Return a default label container."""
     try:
         label_handler = handler.get_handler("labels", create_mode=create_mode)
-        return LabelsContainer(label_handler)
-    except NgioError:
+        return LabelsContainer(label_handler, ngff_version=ngff_version)
+    except FileNotFoundError:
         return None
 
 
@@ -149,7 +149,9 @@ class OmeZarrContainer:
             return self._labels_container
 
         _labels_container = _try_get_label_container(
-            self._group_handler, create_mode=create_mode
+            self._group_handler,
+            create_mode=create_mode,
+            ngff_version=self.image_meta.version,
         )
         self._labels_container = _labels_container
         return self._labels_container

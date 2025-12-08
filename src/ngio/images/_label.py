@@ -11,8 +11,11 @@ from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
     LabelMetaHandler,
+    LabelsGroupMetaHandler,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
     PixelSize,
+    update_ngio_labels_group_meta,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     DefaultSpaceUnit,
@@ -112,29 +115,39 @@ class Label(AbstractImage):
 class LabelsContainer:
     """A class to handle the /labels group in an OME-NGFF file."""
 
-    def __init__(self, group_handler: ZarrGroupHandler) -> None:
+    def __init__(
+        self,
+        group_handler: ZarrGroupHandler,
+        ngff_version: NgffVersions | None = None,
+    ) -> None:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
-        # Validate the group
-        # Either contains a labels attribute or is empty
-        attrs = self._group_handler.load_attrs()
-        if len(attrs) == 0:
-            # It's an empty group
-            pass
-        elif "labels" in attrs and isinstance(attrs["labels"], list):
-            # It's a valid group
-            pass
-        else:
-            raise NgioValidationError(
-                f"Invalid /labels group. "
-                f"Expected a single labels attribute with a list of label names. "
-                f"Found: {attrs}"
+        # If the group is empty, initialize the metadata
+        try:
+            self._meta_handler = LabelsGroupMetaHandler(group_handler)
+        except NgioValidationError:
+            if ngff_version is None:
+                raise NgioValueError(
+                    "The /labels group is missing metadata. "
+                    "Please provide the ngff_version to initialize it."
+                ) from None
+            meta = NgioLabelsGroupMeta(labels=[], version=ngff_version)
+            update_ngio_labels_group_meta(
+                group_handler=group_handler,
+                ngio_meta=meta,
             )
+            self._group_handler = self._group_handler.reopen_handler()
+            self._meta_handler = LabelsGroupMetaHandler(group_handler)
+
+    @property
+    def meta(self) -> NgioLabelsGroupMeta:
+        """Return the metadata."""
+        meta = self._meta_handler.get_meta()
+        return meta
 
     def list(self) -> list[str]:
         """Create the /labels group if it doesn't exist."""
-        attrs = self._group_handler.load_attrs()
-        return attrs.get("labels", [])
+        return self.meta.labels
 
     def get(
         self,
@@ -269,8 +282,11 @@ class LabelsContainer:
 
         if name not in existing_labels:
             existing_labels.append(name)
-            self._group_handler.write_attrs({"labels": existing_labels})
 
+        update_meta = NgioLabelsGroupMeta(
+            labels=existing_labels, version=self.meta.version
+        )
+        self._meta_handler.update_meta(update_meta)
         return self.get(name)
 
 
