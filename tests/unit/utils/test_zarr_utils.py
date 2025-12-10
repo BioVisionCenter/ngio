@@ -65,6 +65,29 @@ def test_group_handler_from_group(tmp_path: Path):
     assert handler.group == group
 
 
+def test_group_handler_delete(tmp_path: Path):
+    store = tmp_path / "test_group_handler_from_group.zarr"
+    group = zarr.group(store=store, overwrite=True)
+    group.create_group("to_be_deleted")
+    handler = ZarrGroupHandler(store=group, cache=True, mode="a")
+    assert isinstance(handler.get_group("to_be_deleted"), zarr.Group)
+    handler.delete_group("to_be_deleted")
+    with pytest.raises(NgioFileNotFoundError):
+        handler.get_group("to_be_deleted")
+    assert store.exists()
+    handler.delete_self()
+    assert not store.exists()
+
+    store = tmp_path / "test_group_handler_from_group.zarr"
+    group = zarr.group(store=store, overwrite=True)
+    group.create_group("to_be_deleted")
+    handler = ZarrGroupHandler(store=group, cache=True, mode="r")
+    with pytest.raises(NgioValueError):
+        handler.delete_group("to_be_deleted")
+    with pytest.raises(NgioValueError):
+        handler.delete_self()
+
+
 def test_group_handler_read(tmp_path: Path):
     store = tmp_path / "test_group_handler_read.zarr"
 
