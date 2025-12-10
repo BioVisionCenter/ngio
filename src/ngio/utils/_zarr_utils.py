@@ -392,6 +392,12 @@ class ZarrGroupHandler:
         self._group_cache._cache.pop(path, None)
         self._handlers_cache._cache.pop(path, None)
 
+    def delete_self(self) -> None:
+        """Delete the current group."""
+        if self.group.read_only:
+            raise NgioValueError("Cannot delete a group in read only mode.")
+        self.group.__delitem__("/")
+
     def copy_group(self, dest_group: zarr.Group):
         """Copy the group to a new store."""
         copy_group(self.group, dest_group)

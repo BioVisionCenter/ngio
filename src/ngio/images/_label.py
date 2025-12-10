@@ -182,6 +182,30 @@ class LabelsContainer:
         )
         return Label(group_handler, path, label_meta_handler)
 
+    def delete(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a label from the group.
+
+        Args:
+            name (str): The name of the label to delete.
+            missing_ok (bool): If True, do not raise an error if the label does not
+                exist.
+
+        """
+        if not missing_ok and name not in self.list():
+            raise NgioValueError(
+                f"Label '{name}' not found in the Labels group. "
+                f"Available labels: {self.list()}"
+            )
+
+        self._group_handler.delete_group(name)
+
+        existing_labels = self.list()
+        existing_labels.remove(name)
+        update_meta = NgioLabelsGroupMeta(
+            labels=existing_labels, version=self.meta.version
+        )
+        self._meta_handler.update_meta(update_meta)
+
     def derive(
         self,
         name: str,

@@ -674,6 +674,25 @@ class OmeZarrContainer:
             name=name, table=table, backend=backend, overwrite=overwrite
         )
 
+    def delete_table(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a table from the group.
+
+        Args:
+            name (str): The name of the table to delete.
+            missing_ok (bool): If True, do not raise an error if the table does not
+                exist.
+
+        """
+        table_container = self._get_tables_container(create_mode=False)
+        if table_container is None and missing_ok:
+            return
+        if table_container is None:
+            raise NgioValueError(
+                f"No tables found in the image, cannot delete {name}. "
+                "Set missing_ok=True to ignore this error."
+            )
+        table_container.delete(name=name, missing_ok=missing_ok)
+
     def list_labels(self) -> list[str]:
         """List all labels in the image."""
         label_container = self._get_labels_container(create_mode=False)
@@ -738,6 +757,25 @@ class OmeZarrContainer:
             label=masking_label,
             masking_roi_table=masking_table,
         )
+
+    def delete_label(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a label from the group.
+
+        Args:
+            name (str): The name of the label to delete.
+            missing_ok (bool): If True, do not raise an error if the label does not
+                exist.
+
+        """
+        label_container = self._get_labels_container(create_mode=False)
+        if label_container is None and missing_ok:
+            return
+        if label_container is None:
+            raise NgioValueError(
+                f"No labels found in the image, cannot delete {name}. "
+                "Set missing_ok=True to ignore this error."
+            )
+        label_container.delete(name=name, missing_ok=missing_ok)
 
     def derive_label(
         self,

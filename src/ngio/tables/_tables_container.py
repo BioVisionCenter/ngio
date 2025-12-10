@@ -311,6 +311,25 @@ class TablesContainer:
             backend=backend,
         )  # type: ignore[return-value]
 
+    def delete(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a table from the group.
+
+        Args:
+            name (str): The name of the table to delete.
+            missing_ok (bool): If True, do not raise an error if
+                the table does not exist.
+        """
+        existing_tables = self._get_tables_list()
+        if not missing_ok and name not in existing_tables:
+            raise NgioValueError(
+                f"Label '{name}' not found in the Labels group. "
+                f"Available labels: {existing_tables}"
+            )
+
+        self._group_handler.delete_group(name)
+        existing_tables.remove(name)
+        self._group_handler.write_attrs({"tables": existing_tables})
+
     def add(
         self,
         name: str,

@@ -955,6 +955,25 @@ class OmeZarrPlate:
             name=name, table=table, backend=backend, overwrite=overwrite
         )
 
+    def delete_table(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a table from the group.
+
+        Args:
+            name (str): The name of the table to delete.
+            missing_ok (bool): If True, do not raise an error if the table does not
+                exist.
+
+        """
+        table_container = self._get_tables_container(create_mode=False)
+        if table_container is None and missing_ok:
+            return
+        if table_container is None:
+            raise NgioValueError(
+                f"No tables found in the image, cannot delete {name}. "
+                "Set missing_ok=True to ignore this error."
+            )
+        table_container.delete(name=name, missing_ok=missing_ok)
+
     def list_image_tables(
         self,
         acquisition: int | None = None,
