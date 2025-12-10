@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from typing import Literal
 
 import pandas.testing as pdt
 import pytest
@@ -59,8 +60,11 @@ def test_open_real_ome_zarr_plate(cardiomyocyte_tiny_path: Path):
     assert well.get_image_acquisition_id("0") is None
 
 
-def test_create_and_edit_plate(tmp_path: Path):
-    test_plate = create_empty_plate(tmp_path / "test_plate.zarr", name="test_plate")
+@pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
+def test_create_and_edit_plate(tmp_path: Path, ngff_version: Literal["0.4", "0.5"]):
+    test_plate = create_empty_plate(
+        tmp_path / "test_plate.zarr", name="test_plate", ngff_version=ngff_version
+    )
     assert test_plate.columns == []
     assert test_plate.rows == []
     assert test_plate.acquisition_ids == []

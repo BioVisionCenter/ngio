@@ -62,9 +62,9 @@ class NgioWellMeta(BaseModel):
     @classmethod
     def default_init(
         cls,
-        version: NgffVersions = DefaultNgffVersion,
+        ngff_version: NgffVersions = DefaultNgffVersion,
     ) -> "NgioWellMeta":
-        well = cls(images=[], version=version)
+        well = cls(images=[], version=ngff_version)
         return well
 
     @property
@@ -217,7 +217,7 @@ class NgioPlateMeta(BaseModel):
         cls,
         images: list[ImageInWellPath] | None = None,
         name: str | None = None,
-        version: NgffVersions = DefaultNgffVersion,
+        ngff_version: NgffVersions = DefaultNgffVersion,
     ) -> "NgioPlateMeta":
         plate = cls(
             plate=PlateWithVersion(
@@ -227,9 +227,9 @@ class NgioPlateMeta(BaseModel):
                 wells=[],
                 field_count=None,
                 name=name,
-                version=version,
+                version=ngff_version,
             ),
-            version=version,
+            version=ngff_version,
         )
 
         if images is None:
@@ -503,14 +503,14 @@ class NgioPlateMeta(BaseModel):
     def derive(
         self,
         name: str | None = None,
-        version: NgffVersions | None = None,
+        ngff_version: NgffVersions | None = None,
         keep_acquisitions: bool = False,
     ) -> "NgioPlateMeta":
         """Derive the plate metadata.
 
         Args:
             name (str): The name of the derived plate.
-            version (NgffVersion | None): The version of the derived plate.
+            ngff_version (NgffVersion | None): The version of the derived plate.
                 If None, use the version of the original plate.
             keep_acquisitions (bool): If True, keep the acquisitions in the plate.
         """
@@ -522,8 +522,8 @@ class NgioPlateMeta(BaseModel):
         else:
             acquisitions = None
 
-        if version is None:
-            version = self.version
+        if ngff_version is None:
+            ngff_version = self.version
 
         return NgioPlateMeta(
             plate=PlateWithVersion(
@@ -533,7 +533,7 @@ class NgioPlateMeta(BaseModel):
                 wells=[],
                 field_count=self.plate.field_count,
                 name=name,
-                version=version,
+                version=ngff_version,
             ),
-            version=version,
+            version=ngff_version,
         )
