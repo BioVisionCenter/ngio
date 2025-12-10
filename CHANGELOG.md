@@ -5,6 +5,7 @@
 ### Features
 - Add support for OME-NGFF v0.5
 - Move to zarr-python v3
+- API to delete labels and tables from OME-Zarr containers and HCS plates.
 
 ### API Breaking Changes
 
