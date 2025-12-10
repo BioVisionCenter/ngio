@@ -12,7 +12,7 @@ from ngio import (
 from ngio.images._image import ChannelSelectionModel
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
-from ngio.utils import fractal_fsspec_store
+from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
 class IdentityTransform:
@@ -340,3 +340,39 @@ def test_derive_copy_labels_and_tables(tmp_path: Path):
     )
     assert ome_zarr.list_labels() == derived_ome_zarr.list_labels()
     assert ome_zarr.list_tables() == derived_ome_zarr.list_tables()
+
+
+def test_delete_label_and_table(tmp_path: Path):
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_synthetic_ome_zarr(
+        store,
+        shape=(3, 20, 30),
+        levels=1,
+        axes_names=["c", "y", "x"],
+    )
+    ome_zarr.derive_label("label_to_delete")
+    assert "label_to_delete" in ome_zarr.list_labels()
+    ome_zarr.delete_label("label_to_delete")
+    assert "label_to_delete" not in ome_zarr.list_labels()
+    ome_zarr.delete_label("label_to_delete", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_label("label_to_delete", missing_ok=False)
+
+    new_table = ome_zarr.build_image_roi_table()
+    ome_zarr.add_table("table_to_delete", new_table)
+    assert "table_to_delete" in ome_zarr.list_tables()
+    ome_zarr.delete_table("table_to_delete")
+    assert "table_to_delete" not in ome_zarr.list_tables()
+    ome_zarr.delete_table("table_to_delete", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_table("table_to_delete", missing_ok=False)
+
+    ome_zarr = create_empty_ome_zarr(
+        store, shape=(3, 20, 30), pixelsize=0.5, overwrite=True
+    )
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_label("non_existing_label")
+    ome_zarr.delete_label("non_existing_label", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_table("non_existing_table")
+    ome_zarr.delete_table("non_existing_table", missing_ok=True)

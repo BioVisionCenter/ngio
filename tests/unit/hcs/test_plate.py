@@ -183,6 +183,18 @@ def test_tables_api(tmp_path: Path):
         test_df,
         check_names=False,
     )
+    test_plate.delete_table("test_table")
+    assert "test_table" not in test_plate.list_tables()
+    test_plate.delete_table("test_table", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        test_plate.delete_table("test_table", missing_ok=False)
+
+    test_plate = create_empty_plate(
+        tmp_path / "test_plate.zarr", name="test_plate", overwrite=True
+    )
+    with pytest.raises(NgioValueError):
+        test_plate.delete_table("non_existing_table")
+    test_plate.delete_table("non_existing_table", missing_ok=True)
 
 
 @pytest.mark.filterwarnings("ignore::anndata._warnings.ImplicitModificationWarning")

@@ -320,10 +320,12 @@ class TablesContainer:
                 the table does not exist.
         """
         existing_tables = self._get_tables_list()
-        if not missing_ok and name not in existing_tables:
+        if name not in existing_tables:
+            if missing_ok:
+                return
             raise NgioValueError(
-                f"Label '{name}' not found in the Labels group. "
-                f"Available labels: {existing_tables}"
+                f"Table '{name}' not found in the Tables group. "
+                f"Available tables: {existing_tables}"
             )
 
         self._group_handler.delete_group(name)

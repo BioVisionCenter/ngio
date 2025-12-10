@@ -191,15 +191,16 @@ class LabelsContainer:
                 exist.
 
         """
-        if not missing_ok and name not in self.list():
+        existing_labels = self.list()
+        if name not in existing_labels:
+            if missing_ok:
+                return
             raise NgioValueError(
                 f"Label '{name}' not found in the Labels group. "
-                f"Available labels: {self.list()}"
+                f"Available labels: {existing_labels}"
             )
 
         self._group_handler.delete_group(name)
-
-        existing_labels = self.list()
         existing_labels.remove(name)
         update_meta = NgioLabelsGroupMeta(
             labels=existing_labels, version=self.meta.version
