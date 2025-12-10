@@ -17,6 +17,7 @@ from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     NgioCache,
+    NgioSupportedStore,
     StoreOrGroup,
     ZarrGroupHandler,
     copy_group,
@@ -29,6 +30,7 @@ __all__ = [
     "NgioError",
     "NgioFileExistsError",
     "NgioFileNotFoundError",
+    "NgioSupportedStore",
     "NgioTableValidationError",
     "NgioValidationError",
     "NgioValueError",

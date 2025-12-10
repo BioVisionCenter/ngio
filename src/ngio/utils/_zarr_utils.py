@@ -3,7 +3,7 @@
 import json
 import warnings
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeAlias
 
 import dask.array as da
 import fsspec
@@ -26,17 +26,11 @@ AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # StoreLike is more restrictive than it could be
 # but to make sure we can handle the store correctly
 # we need to be more restrictive
-NgioSupportedStore = (
-    str
-    | Path
-    | fsspec.mapping.FSMap
-    | FsspecStore
-    | MemoryStore
-    | LocalStore
-    | ZipStore
+NgioSupportedStore: TypeAlias = (
+    str | Path | fsspec.mapping.FSMap | FsspecStore | MemoryStore | dict | LocalStore
 )
-GenericStore = Store | NgioSupportedStore
-StoreOrGroup = GenericStore | zarr.Group
+GenericStore: TypeAlias = NgioSupportedStore | Store
+StoreOrGroup: TypeAlias = NgioSupportedStore | zarr.Group
 
 
 def _check_store(store) -> NgioSupportedStore:

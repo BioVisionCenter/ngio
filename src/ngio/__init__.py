@@ -37,6 +37,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     NgffVersions,
     PixelSize,
 )
+from ngio.utils import NgioSupportedStore, StoreOrGroup
 
 __all__ = [
     "AxesSetup",
@@ -47,12 +48,14 @@ __all__ = [
     "ImageInWellPath",
     "Label",
     "NgffVersions",
+    "NgioSupportedStore",
     "OmeZarrContainer",
     "OmeZarrPlate",
     "OmeZarrWell",
     "PixelSize",
     "Roi",
     "RoiSlice",
+    "StoreOrGroup",
     "create_empty_ome_zarr",
     "create_empty_plate",
     "create_empty_well",
