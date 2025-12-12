@@ -195,6 +195,32 @@ def test_derive_from_non_dishogeneus_shapes():
     assert lbl.shape == (4, 3, 32, 19)
 
 
+def test_create_with_sharding(tmp_path: Path):
+    store = tmp_path / "test_image_sharded.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store=store,
+        shape=(4, 3, 64, 64),
+        pixelsize=0.5,
+        chunks=(2, 1, 32, 32),
+        shards=(4, 3, 64, 64),
+        dtype="uint8",
+        levels=3,
+        overwrite=True,
+        ngff_version="0.5",
+    )
+    ome_zarr.derive_label("label_sharded")
+    img = ome_zarr.get_image(path="0")
+    assert img.zarr_array.shards is not None
+    assert img.zarr_array.chunks == (2, 1, 32, 32)
+    assert img.zarr_array.shards == (4, 3, 64, 64)
+
+    img = ome_zarr.get_image(path="2")
+    assert img.zarr_array.shards is not None
+    # Check clipping of chunks/shards at the smallest level
+    assert img.zarr_array.chunks == (2, 1, 16, 16)
+    assert img.zarr_array.shards == (4, 3, 16, 16)
+
+
 def test_fail_derive_singleton():
     store = MemoryStore()
     ome_zarr = create_empty_ome_zarr(store=store, shape=(1, 1, 64, 4), pixelsize=0.5)
