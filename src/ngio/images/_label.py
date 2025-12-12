@@ -219,7 +219,7 @@ class LabelsContainer:
         channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
-        chunks: ChunksLike = "auto",
+        chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
         dtype: str | None = None,
         dimension_separator: Literal[".", "/"] | None = None,
@@ -256,7 +256,7 @@ class LabelsContainer:
                 - If an integer is provided, the channels axis will be changed to have
                     that size.
             ngff_version (NgffVersions | None): The NGFF version to use.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
+            chunks (ChunksLike | None): The chunk shape of the new image.
             shards (ShardsLike | None): The shard shape of the new image.
             dtype (str | None): The data type of the new image.
             dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
@@ -328,7 +328,7 @@ def derive_label(
     channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
-    chunks: ChunksLike = "auto",
+    chunks: ChunksLike | None = None,
     shards: ShardsLike | None = None,
     dtype: str | None = None,
     dimension_separator: Literal[".", "/"] | None = None,
@@ -359,7 +359,7 @@ def derive_label(
             - If an integer is provided, the channels axis will be changed to have that
                 size.
         ngff_version (NgffVersions | None): The NGFF version to use.
-        chunks (ChunksLike): The chunk shape of the new label. Defaults to "auto".
+        chunks (ChunksLike | None): The chunk shape of the new label.
         shards (ShardsLike | None): The shard shape of the new label.
         dtype (str | None): The data type of the new label.
         dimension_separator (Literal[".", "/"] | None): The separator to use for

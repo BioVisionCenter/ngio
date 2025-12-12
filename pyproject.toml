@@ -66,6 +66,7 @@ test = [
 ]
 
 dev = [
+    "zarrs",
     "Pympler",
     "napari",
     "pyqt5",

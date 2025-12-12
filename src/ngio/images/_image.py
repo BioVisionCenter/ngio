@@ -613,9 +613,10 @@ class ImagesContainer:
         time_spacing: float | None = None,
         name: str | None = None,
         channels_meta: Sequence[str | Channel] | None = None,
+        channels_policy: Literal["same", "squeeze", "singleton"] | int = "same",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
-        chunks: ChunksLike = "auto",
+        chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
         dtype: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
@@ -644,8 +645,15 @@ class ImagesContainer:
             name (str | None): The name of the new image.
             channels_meta (Sequence[str | Channel] | None): The channels metadata
                 of the new image.
+            channels_policy (Literal["same", "squeeze", "singleton"] | int):
+                Possible policies:
+                - If "squeeze", the channels axis will be removed (no matter its size).
+                - If "same", the channels axis will be kept as is (if it exists).
+                - If "singleton", the channels axis will be set to size 1.
+                - If an integer is provided, the channels axis will be changed to have
+                    that size.
             ngff_version (NgffVersions | None): The NGFF version to use.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
+            chunks (ChunksLike | None): The chunk shape of the new image.
             shards (ShardsLike | None): The shard shape of the new image.
             dtype (str | None): The data type of the new image.
             dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
@@ -674,6 +682,7 @@ class ImagesContainer:
             time_spacing=time_spacing,
             name=name,
             channels_meta=channels_meta,
+            channels_policy=channels_policy,
             ngff_version=ngff_version,
             chunks=chunks,
             shards=shards,
@@ -769,7 +778,7 @@ def derive_image_container(
     channels_meta: Sequence[str | Channel] | None = None,
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
-    chunks: ChunksLike = "auto",
+    chunks: ChunksLike | None = None,
     shards: ShardsLike | None = None,
     dtype: str | None = None,
     dimension_separator: Literal[".", "/"] | None = None,
@@ -804,7 +813,7 @@ def derive_image_container(
         channels_meta (Sequence[str | Channel] | None): The channels metadata
             of the new image.
         ngff_version (NgffVersions | None): The NGFF version to use.
-        chunks (ChunksLike): The chunk shape of the new image. Defaults to "auto".
+        chunks (ChunksLike | None): The chunk shape of the new image.
         shards (ShardsLike | None): The shard shape of the new image.
         dtype (str | None): The data type of the new image.
         dimension_separator (Literal[".", "/"] | None): The separator to use for

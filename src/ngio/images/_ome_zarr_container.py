@@ -434,7 +434,7 @@ class OmeZarrContainer:
         channels_meta: Sequence[str | Channel] | None = None,
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
-        chunks: ChunksLike = "auto",
+        chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
         dtype: str = "uint16",
         dimension_separator: Literal[".", "/"] = "/",
@@ -471,7 +471,7 @@ class OmeZarrContainer:
             channels_meta (Sequence[str | Channel] | None): The channels metadata
                 of the new image.
             ngff_version (NgffVersions | None): The NGFF version to use.
-            chunks (ChunksLike): The chunk shape of the new image. Defaults to "auto".
+            chunks (ChunksLike | None): The chunk shape of the new image.
             shards (ShardsLike | None): The shard shape of the new image.
             dtype (str): The data type of the new image. Defaults to "uint16".
             dimension_separator (Literal[".", "/"]): The separator to use for
@@ -503,6 +503,7 @@ class OmeZarrContainer:
             time_spacing=time_spacing,
             name=name,
             channels_meta=channels_meta,
+            channels_policy=channels_policy,
             ngff_version=ngff_version,
             chunks=chunks,
             shards=shards,
@@ -789,7 +790,7 @@ class OmeZarrContainer:
         channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
-        chunks: ChunksLike = "auto",
+        chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
         dtype: str | None = None,
         dimension_separator: Literal[".", "/"] | None = None,
@@ -821,7 +822,7 @@ class OmeZarrContainer:
                     that size.
                 Defaults to "squeeze".
             ngff_version (NgffVersions | None): The NGFF version to use.
-            chunks (ChunksLike): The chunk shape of the new label. Defaults to "auto".
+            chunks (ChunksLike | None): The chunk shape of the new label.
             shards (ShardsLike | None): The shard shape of the new label.
             dtype (str | None): The data type of the new label.
             dimension_separator (Literal[".", "/"] | None): The separator to use for

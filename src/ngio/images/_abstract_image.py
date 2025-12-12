@@ -800,7 +800,7 @@ def abstract_derive(
     channels_meta: Sequence[str | Channel] | None = None,
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
-    chunks: ChunksLike = "auto",
+    chunks: ChunksLike | None = None,
     shards: ShardsLike | None = None,
     dtype: str | None = None,
     dimension_separator: Literal[".", "/"] | None = None,
@@ -835,7 +835,7 @@ def abstract_derive(
         channels_meta (Sequence[str | Channel] | None): The channels metadata
             of the new image.
         ngff_version (NgffVersions | None): The NGFF version to use.
-        chunks (Sequence[int] | None): The chunk shape of the new image.
+        chunks (ChunksLike | None): The chunk shape of the new image.
         shards (ShardsLike | None): The shard shape of the new image.
         dtype (str | None): The data type of the new image.
         dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
@@ -918,7 +918,7 @@ def abstract_derive(
 
     if chunks is None:
         chunks = ref_image.zarr_array.chunks
-
+    print(chunks)
     if shards is None:
         shards = ref_image.zarr_array.shards
 

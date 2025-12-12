@@ -273,6 +273,10 @@ class PyramidLevel(BaseModel):
                     "Shards must have the same length as shape "
                     f"({len(self.shape)}), got {len(self.shards)}"
                 )
+            normalized_shards = []
+            for dim_size, shard_size in zip(self.shape, self.shards, strict=True):
+                normalized_shards.append(min(dim_size, shard_size))
+            self.shards = tuple(normalized_shards)
         return self
 
 
