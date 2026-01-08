@@ -19,6 +19,9 @@
 - Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
 - Remove `ngio_logger` in favor of standard warnings module.
 
+### Bug Fixes
+- Fix bug in `consolidate` function when using corsening mode with non power-of-two shapes.
+
 ## [v0.4.7]
 
 ### Bug Fixes
