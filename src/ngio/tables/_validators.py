@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from typing import Protocol
+from warnings import warn
 
 import pandas as pd
 
@@ -78,8 +79,9 @@ def validate_columns(
     table_header = table_df.columns
     for column in required_columns:
         if column not in table_header:
-            raise NgioTableValidationError(
-                f"Could not find required column: {column} in the table"
+            warn(
+                f"Could not find required column: {column} in the table",
+                stacklevel=2,
             )
 
     if optional_columns is None:
@@ -88,9 +90,10 @@ def validate_columns(
     possible_columns = [*required_columns, *optional_columns]
     for column in table_header:
         if column not in possible_columns:
-            raise NgioTableValidationError(
-                f"Could not find column: {column} in the list of possible columns. ",
+            warn(
+                f"Could not find column: {column} in the list of possible columns. "
                 f"Possible columns are: {possible_columns}",
+                stacklevel=2,
             )
 
     return table_df
