@@ -10,29 +10,31 @@
       
       
       
-        <link rel="canonical" href="https://github.com/fractal-analytics-platform/ngio.git/dev/">
+        <link rel="canonical" href="https://github.com/fractal-analytics-platform/ngio.git/dev/api/common/">
       
       
+        <link rel="prev" href="../utils/">
       
-        <link rel="next" href="getting_started/0_quickstart/">
+      
+        <link rel="next" href="../../contributing/">
       
       
         
       
       
-      <link rel="icon" href="images/favicon.ico">
+      <link rel="icon" href="../../images/favicon.ico">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
     
     
       
-        <title>NGIO: Next Generation File Format I/O</title>
+        <title>ngio.common - NGIO: Next Generation File Format I/O</title>
       
     
     
-      <link rel="stylesheet" href="assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
       
         
-        <link rel="stylesheet" href="assets/stylesheets/palette.ab4e12ef.min.css">
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
       
       
 
@@ -51,13 +53,13 @@
       
     
     
-      <link rel="stylesheet" href="assets/_markdown_exec_pyodide.css">
+      <link rel="stylesheet" href="../../assets/_markdown_exec_pyodide.css">
     
-      <link rel="stylesheet" href="assets/_markdown_exec_ansi.css">
+      <link rel="stylesheet" href="../../assets/_markdown_exec_ansi.css">
     
-      <link rel="stylesheet" href="assets/_mkdocstrings.css">
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
     
-    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
 
@@ -82,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#what-is-ngio" class="md-skip">
+        <a href="#ngiocommon-api-documentation" class="md-skip">
           Skip to content
         </a>
       
@@ -102,7 +104,7 @@
 
 <header class="md-header md-header--shadow" data-md-component="header">
   <nav class="md-header__inner md-grid" aria-label="Header">
-    <a href="." title="NGIO: Next Generation File Format I/O" class="md-header__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
+    <a href="../.." title="NGIO: Next Generation File Format I/O" class="md-header__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -122,7 +124,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              NGIO: Streamlined OME-Zarr Image Analysis
+              ngio.common
             
           </span>
         </div>
@@ -245,7 +247,7 @@
 
 <nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
   <label class="md-nav__title" for="__drawer">
-    <a href="." title="NGIO: Next Generation File Format I/O" class="md-nav__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
+    <a href="../.." title="NGIO: Next Generation File Format I/O" class="md-nav__button md-logo" aria-label="NGIO: Next Generation File Format I/O" data-md-component="logo">
       
   
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
@@ -272,35 +274,10 @@
       
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    NGIO: Streamlined OME-Zarr Image Analysis
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="." class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
         
   
   
@@ -316,179 +293,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-ngio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is Ngio?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#simple-object-based-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📊 Simple Object-Based API
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rich-tables-and-regions-of-interest-roi-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔍 Rich Tables and Regions of Interest (ROI) Support
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scalable-data-processing-coming-soon" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔄 Scalable Data Processing (Coming Soon)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-ome-zarr-versions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported OME-Zarr versions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Status
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development Status">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#available-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#upcoming-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upcoming Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contributors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contributors
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -566,7 +370,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/0_quickstart/" class="md-nav__link">
+      <a href="../../getting_started/0_quickstart/" class="md-nav__link">
         
   
   
@@ -594,7 +398,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/1_ome_zarr_containers/" class="md-nav__link">
+      <a href="../../getting_started/1_ome_zarr_containers/" class="md-nav__link">
         
   
   
@@ -622,7 +426,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/2_images/" class="md-nav__link">
+      <a href="../../getting_started/2_images/" class="md-nav__link">
         
   
   
@@ -650,7 +454,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/3_tables/" class="md-nav__link">
+      <a href="../../getting_started/3_tables/" class="md-nav__link">
         
   
   
@@ -678,7 +482,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/4_masked_images/" class="md-nav__link">
+      <a href="../../getting_started/4_masked_images/" class="md-nav__link">
         
   
   
@@ -706,7 +510,7 @@
   
   
     <li class="md-nav__item">
-      <a href="getting_started/5_hcs/" class="md-nav__link">
+      <a href="../../getting_started/5_hcs/" class="md-nav__link">
         
   
   
@@ -803,7 +607,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/image_processing/" class="md-nav__link">
+      <a href="../../tutorials/image_processing/" class="md-nav__link">
         
   
   
@@ -831,7 +635,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/image_segmentation/" class="md-nav__link">
+      <a href="../../tutorials/image_segmentation/" class="md-nav__link">
         
   
   
@@ -859,7 +663,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/feature_extraction/" class="md-nav__link">
+      <a href="../../tutorials/feature_extraction/" class="md-nav__link">
         
   
   
@@ -887,7 +691,7 @@
   
   
     <li class="md-nav__item">
-      <a href="tutorials/hcs_processing/" class="md-nav__link">
+      <a href="../../tutorials/hcs_processing/" class="md-nav__link">
         
   
   
@@ -919,8 +723,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -945,11 +751,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -970,7 +776,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -988,7 +794,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/ngio/" class="md-nav__link">
+      <a href="../ngio/" class="md-nav__link">
         
   
   
@@ -1016,7 +822,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/images/" class="md-nav__link">
+      <a href="../images/" class="md-nav__link">
         
   
   
@@ -1044,7 +850,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/tables/" class="md-nav__link">
+      <a href="../tables/" class="md-nav__link">
         
   
   
@@ -1072,7 +878,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/hcs/" class="md-nav__link">
+      <a href="../hcs/" class="md-nav__link">
         
   
   
@@ -1100,7 +906,7 @@
   
   
     <li class="md-nav__item">
-      <a href="api/utils/" class="md-nav__link">
+      <a href="../utils/" class="md-nav__link">
         
   
   
@@ -1125,10 +931,19 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="api/common/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -1144,6 +959,7 @@
   
 
       </a>
+      
     </li>
   
 
@@ -1221,7 +1037,7 @@
   
   
     <li class="md-nav__item">
-      <a href="contributing/" class="md-nav__link">
+      <a href="../../contributing/" class="md-nav__link">
         
   
   
@@ -1249,7 +1065,7 @@
   
   
     <li class="md-nav__item">
-      <a href="code_of_conduct/" class="md-nav__link">
+      <a href="../../code_of_conduct/" class="md-nav__link">
         
   
   
@@ -1294,169 +1110,8 @@
   
   
   
+    
   
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#what-is-ngio" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        What is Ngio?
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#key-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Key Features
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Key Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#simple-object-based-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        📊 Simple Object-Based API
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rich-tables-and-regions-of-interest-roi-support" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔍 Rich Tables and Regions of Interest (ROI) Support
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#scalable-data-processing-coming-soon" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        🔄 Scalable Data Processing (Coming Soon)
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Getting Started
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#supported-ome-zarr-versions" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Supported OME-Zarr versions
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#development-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Development Status
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Development Status">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#available-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Available Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#upcoming-features" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Upcoming Features
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#contributors" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Contributors
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#license" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        License
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#repository" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Repository
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
   
 </nav>
                   </div>
@@ -1474,6 +1129,46 @@
   
 
 
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    NGIO: Streamlined OME-Zarr Image Analysis
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../ngio/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    API Reference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
               
               <article class="md-content__inner md-typeset">
                 
@@ -1484,58 +1179,13 @@
   
 
 
-  <h1>NGIO: Streamlined OME-Zarr Image Analysis</h1>
-
-<p>ngio is a Python library designed to simplify bioimage analysis workflows, offering an intuitive interface for working with OME-Zarr files.</p>
-<h2 id="what-is-ngio">What is Ngio?</h2>
-<p>Ngio is built for the <a href="https://ngff.openmicroscopy.org/">OME-Zarr</a> file format, a modern, cloud-optimized format for biological imaging data. OME-Zarr stores large, multi-dimensional microscopy images and metadata in an efficient and scalable way.</p>
-<p>Ngio's mission is to streamline working with OME-Zarr files by providing a simple, object-based API for opening, exploring, and manipulating OME-Zarr images and high-content screening (HCS) plates. It also offers comprehensive support for labels, tables and regions of interest (ROIs), making it easy to extract and analyze specific regions in your data.</p>
-<h2 id="key-features">Key Features</h2>
-<h3 id="simple-object-based-api">📊 Simple Object-Based API</h3>
-<ul>
-<li>Easily open, explore, and manipulate OME-Zarr images and HCS plates</li>
-<li>Create and derive new images and labels with minimal boilerplate code</li>
-</ul>
-<h3 id="rich-tables-and-regions-of-interest-roi-support">🔍 Rich Tables and Regions of Interest (ROI) Support</h3>
-<ul>
-<li>Extract and analyze specific regions of interest</li>
-<li>Tight integration with <a href="https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/">Fractal's table framework</a></li>
-</ul>
-<h3 id="scalable-data-processing-coming-soon">🔄 Scalable Data Processing (Coming Soon)</h3>
-<ul>
-<li>Powerful iterators for processing data at scale</li>
-<li>Efficient memory management for large datasets</li>
-</ul>
-<h2 id="getting-started">Getting Started</h2>
-<p>Refer to the <a href="getting_started/0_quickstart/">Getting Started</a> guide to integrate ngio into your workflows. We also provide a collection of <a href="tutorials/image_processing/">Tutorials</a> to help you get up and running quickly.
-For more advanced usage and API documentation, see our <a href="api/ngio/">API Reference</a>.</p>
-<h2 id="supported-ome-zarr-versions">Supported OME-Zarr versions</h2>
-<p>Currently, ngio only supports OME-Zarr v0.4. Support for version 0.5 and higher is planned for future releases.</p>
-<h2 id="development-status">Development Status</h2>
+<h1 id="ngiocommon-api-documentation">ngio.common API documentation</h1>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
-<p>Ngio is under active development and is not yet stable. The API is subject to change, and bugs and breaking changes are expected.</p>
+<p>Coming soon, ngio API documentation is not yet available.
+If you have any questions please reach out to us on GitHub or via email.
+We are happy to help you with any questions or issues you may have.</p>
 </div>
-<h3 id="available-features">Available Features</h3>
-<ul>
-<li>✅ OME-Zarr metadata handling and validation</li>
-<li>✅ Image and label access across pyramid levels</li>
-<li>✅ ROI and table support</li>
-<li>✅ Streaming from remote sources</li>
-<li>✅ Documentation and examples</li>
-</ul>
-<h3 id="upcoming-features">Upcoming Features</h3>
-<ul>
-<li>Advanced image processing iterators</li>
-<li>Parallel processing capabilities</li>
-<li>Support for OME-Zarr v0.5 and Zarr v3</li>
-</ul>
-<h2 id="contributors">Contributors</h2>
-<p>Ngio is developed at the <a href="https://www.biovisioncenter.uzh.ch/en.html">BioVisionCenter</a>, University of Zurich, by <a href="https://github.com/lorenzocerrone">@lorenzocerrone</a> and <a href="https://github.com/jluethi">@jluethi</a>.</p>
-<h2 id="license">License</h2>
-<p>Ngio is released under the BSD-3-Clause License. See <a href="https://github.com/fractal-analytics-platform/ngio/blob/main/LICENSE">LICENSE</a> for details.</p>
-<h2 id="repository">Repository</h2>
-<p>Visit our <a href="https://github.com/fractal-analytics-platform/ngio">GitHub repository</a> for the latest code, issues, and contributions.</p>
 
 
 
@@ -1558,7 +1208,7 @@ For more advanced usage and API documentation, see our <a href="api/ngio/">API R
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 31, 2025 16:17:59 UTC">March 31, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 28, 2025 15:29:17 UTC">March 28, 2025</span>
   </span>
 
     
@@ -1568,7 +1218,7 @@ For more advanced usage and API documentation, see our <a href="api/ngio/">API R
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 8, 2024 08:17:16 UTC">July 8, 2024</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 28, 2025 15:29:17 UTC">March 28, 2025</span>
   </span>
 
     
@@ -1594,11 +1244,6 @@ For more advanced usage and API documentation, see our <a href="api/ngio/">API R
         <a href="https://github.com/web-flow" class="md-author" title="@web-flow">
           
           <img src="https://avatars.githubusercontent.com/u/19864447?v=4&size=72" alt="web-flow">
-        </a>
-      
-        <a href="https://github.com/jluethi" class="md-author" title="@jluethi">
-          
-          <img src="https://avatars.githubusercontent.com/u/18033446?v=4&size=72" alt="jluethi">
         </a>
       
       
@@ -1631,15 +1276,31 @@ For more advanced usage and API documentation, see our <a href="api/ngio/">API R
       
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
+          
+          <a href="../utils/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ngio.utils">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                ngio.utils
+              </div>
+            </div>
+          </a>
+        
         
           
-          <a href="getting_started/0_quickstart/" class="md-footer__link md-footer__link--next" aria-label="Next: Quickstart">
+          <a href="../../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: Contributing Guide">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Quickstart
+                Contributing Guide
               </div>
             </div>
             <div class="md-footer__button md-icon">
@@ -1695,12 +1356,12 @@ For more advanced usage and API documentation, see our <a href="api/ngio/">API R
     
       
       
-      <script id="__config" type="application/json">{"annotate": null, "base": ".", "features": ["content.tooltips", "content.tabs.link", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.footer", "toc.follow", "search.suggest", "search.share"], "search": "assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.tooltips", "content.tabs.link", "content.code.annotate", "navigation.instant", "navigation.instant.progress", "navigation.sections", "navigation.path", "navigation.indexes", "navigation.footer", "toc.follow", "search.suggest", "search.share"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
     
     
-      <script src="assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
       
-        <script src="assets/_markdown_exec_pyodide.js"></script>
+        <script src="../../assets/_markdown_exec_pyodide.js"></script>
       
     
   </body>
