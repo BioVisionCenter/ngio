@@ -6,6 +6,7 @@
 - Add support for OME-NGFF v0.5
 - Move to zarr-python v3
 - API to delete labels and tables from OME-Zarr containers and HCS plates.
+- Allow to explicitly set axes order when building masking roi tables.
 
 ### API Breaking Changes
 
@@ -18,7 +19,10 @@
 - Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
 - Remove `ngio_logger` in favor of standard warnings module.
 
-## [v0.4.6]
+## [v0.4.7]
+
+### Bug Fixes
+- Fix bug adding time axis to masking roi tables.
 
 ### Bug Fixes
 - Fix channel selection from `wavelength_id`

@@ -1,6 +1,7 @@
 """Utilities to build masking regions of interest (ROIs)."""
 
 import itertools
+from collections.abc import Sequence
 
 import dask.array as da
 import numpy as np
@@ -115,7 +116,9 @@ def lazy_compute_slices(segmentation: da.Array) -> dict[int, tuple[slice, ...]]:
 
 
 def compute_masking_roi(
-    segmentation: np.ndarray | da.Array, pixel_size: PixelSize
+    segmentation: np.ndarray | da.Array,
+    pixel_size: PixelSize,
+    axes_order: Sequence[str] | None = None,
 ) -> list[Roi]:
     """Compute a ROIs for each label in a segmentation.
 
@@ -127,6 +130,10 @@ def compute_masking_roi(
     if segmentation.ndim not in [2, 3, 4]:
         raise NgioValueError("Only 2D, 3D, and 4D segmentations are supported.")
 
+    if axes_order is None:
+        _axes = ["t", "z", "y", "x"]
+        axes_order = _axes[-segmentation.ndim :]
+
     if isinstance(segmentation, da.Array):
         slices = lazy_compute_slices(segmentation)
     else:
@@ -134,24 +141,11 @@ def compute_masking_roi(
 
     rois = []
     for label, slice_ in slices.items():
-        if len(slice_) == 2:
-            slices = {"y": slice_[0], "x": slice_[1]}
-        elif len(slice_) == 3:
-            slices = {"z": slice_[0], "y": slice_[1], "x": slice_[2]}
-        elif len(slice_) == 4:
-            slices = {
-                "t": slice_[0],
-                "z": slice_[1],
-                "y": slice_[2],
-                "x": slice_[3],
-            }
-        else:
-            raise ValueError("Invalid slice length.")
-
+        assert len(slice_) == len(axes_order)
+        slices = dict(zip(axes_order, slice_, strict=True))
         roi = Roi.from_values(
             name=str(label), slices=slices, label=label, space="pixel"
         )
-
         roi = roi.to_world(pixel_size=pixel_size)
         rois.append(roi)
     return rois

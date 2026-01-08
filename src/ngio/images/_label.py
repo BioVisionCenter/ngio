@@ -97,9 +97,11 @@ class Label(AbstractImage):
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
         self.meta_handler.update_meta(meta)
 
-    def build_masking_roi_table(self) -> MaskingRoiTable:
+    def build_masking_roi_table(
+        self, axes_order: Sequence[str] | None = None
+    ) -> MaskingRoiTable:
         """Compute the masking ROI table."""
-        return build_masking_roi_table(self)
+        return build_masking_roi_table(self, axes_order=axes_order)
 
     def consolidate(
         self,
@@ -405,8 +407,10 @@ def derive_label(
     return group_handler
 
 
-def build_masking_roi_table(label: Label) -> MaskingRoiTable:
+def build_masking_roi_table(
+    label: Label, axes_order: Sequence[str] | None = None
+) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
-    array = label.get_as_dask(axes_order=["t", "z", "y", "x"])
-    rois = compute_masking_roi(array, label.pixel_size)
+    array = label.get_as_dask(axes_order=axes_order)
+    rois = compute_masking_roi(array, label.pixel_size, axes_order=axes_order)
     return MaskingRoiTable(rois, reference_label=label.meta.name)

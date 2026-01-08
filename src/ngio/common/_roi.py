@@ -4,7 +4,7 @@ These are the interfaces bwteen the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -183,7 +183,7 @@ class Roi(BaseModel):
     @classmethod
     def from_values(
         cls,
-        slices: dict[str, float | tuple[float | None, float | None] | slice],
+        slices: Mapping[str, float | tuple[float | None, float | None] | slice],
         name: str | None,
         label: int | None = None,
         space: Literal["world", "pixel"] = "world",
