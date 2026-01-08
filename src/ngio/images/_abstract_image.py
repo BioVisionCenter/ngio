@@ -615,7 +615,6 @@ def _shapes_from_ref_image(
     if len(shapes) == len(paths):
         return shapes
     missing_levels = len(paths) - len(shapes)
-    print(ref_image.meta.scaling_factor())
     extended_shapes = shapes_from_scaling_factors(
         base_shape=shapes[-1],
         scaling_factors=ref_image.meta.scaling_factor(),
@@ -918,7 +917,6 @@ def abstract_derive(
 
     if chunks is None:
         chunks = ref_image.zarr_array.chunks
-    print(chunks)
     if shards is None:
         shards = ref_image.zarr_array.shards
 

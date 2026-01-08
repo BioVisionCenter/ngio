@@ -111,8 +111,6 @@ def test_csv_backend(tmp_path: Path):
 
     backend.write(test_table, metadata={"test": "test"})
     loaded_table = backend.load_as_pandas_df()
-    print(loaded_table)
-    print(test_table)
     assert loaded_table.equals(test_table), loaded_table
     meta = backend._group_handler.load_attrs()
     assert meta["test"] == "test"
