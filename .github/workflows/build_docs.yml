@@ -3,7 +3,7 @@ name: Build Docs
 on:
   push:
     branches:
-      - dev
+      - hotfix/*
       - main
     tags:
       - "v*"
@@ -38,7 +38,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-        
+
       - name: Restore shared data cache
         id: cache-data
         uses: actions/cache@v4
@@ -47,7 +47,7 @@ jobs:
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
           restore-keys: |
             "${{ runner.os }}-data-"
-            
+
       - name: Deploy docs
         run: |
           VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///' | sed 's/refs\/heads\///')
