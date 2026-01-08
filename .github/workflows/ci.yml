@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - hotfix/*
     tags:
       - "v*"
   pull_request:
@@ -26,7 +27,6 @@ jobs:
       - uses: actions/checkout@v4
       - run: pipx run check-manifest
 
-  
   download-test-ome-zarr:
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,6 @@ jobs:
         with:
           name: data
           path: data
-
 
   test:
     name: ${{ matrix.platform }} (${{ matrix.python-version }})
@@ -140,4 +139,4 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
-          files: './dist/*'
+          files: "./dist/*"
