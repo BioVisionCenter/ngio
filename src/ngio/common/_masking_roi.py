@@ -118,7 +118,7 @@ def lazy_compute_slices(segmentation: da.Array) -> dict[int, tuple[slice, ...]]:
 def compute_masking_roi(
     segmentation: np.ndarray | da.Array,
     pixel_size: PixelSize,
-    axes_order: Sequence[str] | None = None,
+    axes_order: Sequence[str],
 ) -> list[Roi]:
     """Compute a ROIs for each label in a segmentation.
 
@@ -130,9 +130,11 @@ def compute_masking_roi(
     if segmentation.ndim not in [2, 3, 4]:
         raise NgioValueError("Only 2D, 3D, and 4D segmentations are supported.")
 
-    if axes_order is None:
-        _axes = ["t", "z", "y", "x"]
-        axes_order = _axes[-segmentation.ndim :]
+    if len(axes_order) != segmentation.ndim:
+        raise NgioValueError(
+            "The length of axes_order must match the number of dimensions "
+            "of the segmentation."
+        )
 
     if isinstance(segmentation, da.Array):
         slices = lazy_compute_slices(segmentation)

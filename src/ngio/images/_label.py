@@ -411,6 +411,7 @@ def build_masking_roi_table(
     label: Label, axes_order: Sequence[str] | None = None
 ) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
+    axes_order = axes_order or label.axes
     array = label.get_as_dask(axes_order=axes_order)
     rois = compute_masking_roi(array, label.pixel_size, axes_order=axes_order)
     return MaskingRoiTable(rois, reference_label=label.meta.name)
