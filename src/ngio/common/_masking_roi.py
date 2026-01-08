@@ -168,7 +168,6 @@ def compute_masking_roi(
             z_length = None
         else:
             z_length = max_z - min_z
-
         roi = RoiPixels(
             name=str(label),
             x_length=max_x - min_x,
@@ -178,6 +177,7 @@ def compute_masking_roi(
             x=min_x,
             y=min_y,
             z=min_z,
+            t=min_t,
             label=label,
         )
 

@@ -337,6 +337,6 @@ def derive_label(
 
 def build_masking_roi_table(label: Label) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
-    array = label.get_as_dask(axes_order=["t", "z", "y", "x"])
+    array = label.get_as_dask()
     rois = compute_masking_roi(array, label.pixel_size)
     return MaskingRoiTable(rois, reference_label=label.meta.name)
