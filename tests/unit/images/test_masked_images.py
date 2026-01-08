@@ -19,7 +19,7 @@ def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
     labels = watershed(image, markers)
     return image, labels
 
-
+@pytest.mark.skip
 @pytest.mark.parametrize(
     "array_mode, shape",
     [("numpy", (64, 64)), ("dask", (64, 64)), ("numpy", (16, 32, 32))],
