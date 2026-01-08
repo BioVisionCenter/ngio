@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from zarr.storage import MemoryStore
 
 from ngio import Image, create_empty_ome_zarr, open_image
 from ngio.transforms import ZoomTransform
@@ -250,3 +251,37 @@ def test_derive_image_consistency(
 
     label = ome_zarr.derive_label("derived_label")
     assert label.path == "s0"
+
+
+@pytest.mark.parametrize(
+    ("shape", "factors"),
+    [
+        ((1, 1111, 1111), (1, 2, 2)),
+        ((1, 1111, 1111), (1, 4, 4)),
+        ((1, 1111, 1111), (1, 3, 3)),
+    ],
+)
+def test_consolidate_consistency(shape, factors):
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=shape,
+        axes_names="zyx",
+        xy_pixelsize=1.0,
+        scaling_factors=factors,
+        levels=3,
+    )
+    image = ome_zarr.get_image()
+    image.consolidate()
+
+    derived_store = MemoryStore()
+    derived_ome_zarr = ome_zarr.derive_image(derived_store)
+    derived_image = derived_ome_zarr.get_image()
+    derived_image.consolidate()
+
+    for level_path in ome_zarr.levels_paths:
+        img1 = ome_zarr.get_image(path=level_path)
+        img2 = derived_ome_zarr.get_image(path=level_path)
+        assert img1.shape == img2.shape, (
+            f"Shapes do not match at level {level_path}: {img1.shape} vs {img2.shape}"
+        )

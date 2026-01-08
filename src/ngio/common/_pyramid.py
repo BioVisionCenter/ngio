@@ -92,16 +92,7 @@ def _on_disk_coarsen(
 
     coarsening_setup = {}
     for i, s in enumerate(_scale):
-        factor = 1 / s
-        # This check is very strict, but it is necessary to avoid
-        # a few pixels shift in the coarsening
-        # We could add a tolerance
-        if factor.is_integer():
-            coarsening_setup[i] = int(factor)
-        else:
-            raise NgioValueError(
-                f"Coarsening factor must be an integer, got {factor} on axis {i}"
-            )
+        coarsening_setup[i] = int(np.round(1 / s))
 
     out_target = da.coarsen(
         aggregation_function, source_array, coarsening_setup, trim_excess=True
