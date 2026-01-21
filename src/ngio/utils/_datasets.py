@@ -155,5 +155,11 @@ def download_ome_zarr_dataset(
         path=download_dir,
         processor=processor,
         progressbar=progressbar,
+        # Add User-Agent to avoid 403 errors from Zenodo
+        downloader=pooch.HTTPDownloader(
+            headers={
+                "User-Agent": f"pooch/{pooch.__version__} (https://github.com/BioVisionCenter/ngio)"
+            }
+        ),
     )
     return processor.output_file()
