@@ -15,6 +15,9 @@ from ngio.ome_zarr_meta._meta_handlers import (
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesHandler,
+    Channel,
+    ChannelsMeta,
+    ChannelVisualisation,
     Dataset,
     DefaultNgffVersion,
     ImageInWellPath,
@@ -31,6 +34,9 @@ from ngio.ome_zarr_meta.ngio_specs import (
 
 __all__ = [
     "AxesHandler",
+    "Channel",
+    "ChannelVisualisation",
+    "ChannelsMeta",
     "Dataset",
     "DefaultNgffVersion",
     "ImageInWellPath",
