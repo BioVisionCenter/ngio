@@ -822,7 +822,6 @@ def abstract_derive(
         pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
-        axes_names (Sequence[str] | None): The axes names of the new image.
         name (str | None): The name of the new image.
         channels_policy (Literal["squeeze", "same", "singleton"] | int):
             Possible policies:
@@ -837,7 +836,7 @@ def abstract_derive(
         chunks (ChunksLike | None): The chunk shape of the new image.
         shards (ShardsLike | None): The shard shape of the new image.
         dtype (str | None): The data type of the new image.
-        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+        dimension_separator (Literal[".", "/"] | None): The separator to use for
             dimensions.
         compressors (CompressorLike | None): The compressors to use.
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to

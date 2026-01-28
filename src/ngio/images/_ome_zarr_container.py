@@ -266,8 +266,8 @@ class OmeZarrContainer:
 
     def set_channel_meta(
         self,
-        labels: Sequence[str] | int | None = None,
-        wavelength_id: Sequence[str] | None = None,
+        labels: Sequence[str | None] | int | None = None,
+        wavelength_id: Sequence[str | None] | None = None,
         percentiles: tuple[float, float] | None = None,
         colors: Sequence[str] | None = None,
         active: Sequence[bool] | None = None,
@@ -462,7 +462,8 @@ class OmeZarrContainer:
             z_spacing (float | None): The z spacing of the new image.
             time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
-            channels_policy (Literal["squeeze", "same"] | int): Possible policies:
+            channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
+                policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
                 - If "same", the channels axis will be kept as is (if it exists).
                 - If "singleton", the channels axis will be set to size 1.
@@ -814,7 +815,8 @@ class OmeZarrContainer:
                 label.
             z_spacing (float | None): The z spacing of the new label.
             time_spacing (float | None): The time spacing of the new label.
-            channels_policy (Literal["same", "squeeze"] | int): Possible policies:
+            channels_policy (Literal["same", "squeeze", "singleton"] | int): Possible
+                policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
                 - If "same", the channels axis will be kept as is (if it exists).
                 - If "singleton", the channels axis will be set to size 1.

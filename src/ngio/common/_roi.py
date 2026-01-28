@@ -1,6 +1,6 @@
 """Region of interest (ROI) metadata.
 
-These are the interfaces bwteen the ROI tables / masking ROI tables and
+These are the interfaces between the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 

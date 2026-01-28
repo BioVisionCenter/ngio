@@ -232,24 +232,18 @@ class LabelsContainer:
         labels: Sequence[str] | None = None,
         pixel_size: PixelSize | None = None,
     ) -> "Label":
-        """Create an empty OME-Zarr image from an existing image.
+        """Create an empty OME-Zarr label from an existing image or label.
 
         If a kwarg is not provided, the value from the reference image will be used.
 
         Args:
-            store (StoreOrGroup): The Zarr store or group to create the image in.
-            ref_image (Image | Label): The reference image to derive the new image from.
-            shape (Sequence[int] | None): The shape of the new image.
+            name (str): The name of the new label.
+            ref_image (Image | Label): The reference image to derive the new label from.
+            shape (Sequence[int] | None): The shape of the new label.
             pixelsize (float | tuple[float, float] | None): The pixel size of the new
-                image.
-            z_spacing (float | None): The z spacing of the new image.
-            time_spacing (float | None): The time spacing of the new image.
-            scaling_factors (Sequence[float] | Literal["auto"] | None): The scaling
-                factors of the new image.
-            axes_names (Sequence[str] | None): The axes names of the new image.
-            name (str | None): The name of the new image.
-            channels_meta (Sequence[str | Channel] | None): The channels metadata
-                of the new image.
+                label.
+            z_spacing (float | None): The z spacing of the new label.
+            time_spacing (float | None): The time spacing of the new label.
             channels_policy (Literal["squeeze", "same", "singleton"] | int):
                 Possible policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
@@ -258,19 +252,19 @@ class LabelsContainer:
                 - If an integer is provided, the channels axis will be changed to have
                     that size.
             ngff_version (NgffVersions | None): The NGFF version to use.
-            chunks (ChunksLike | None): The chunk shape of the new image.
-            shards (ShardsLike | None): The shard shape of the new image.
-            dtype (str | None): The data type of the new image.
-            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            chunks (ChunksLike | None): The chunk shape of the new label.
+            shards (ShardsLike | None): The shard shape of the new label.
+            dtype (str | None): The data type of the new label.
+            dimension_separator (Literal[".", "/"] | None): The separator to use for
                 dimensions.
             compressors (CompressorLike | None): The compressors to use.
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
-            overwrite (bool): Whether to overwrite an existing image.
-            labels (Sequence[str] | None): The labels of the new image.
-                This argument is deprecated please use channels_meta instead.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-                This argument is deprecated please use pixelsize, z_spacing,
+            overwrite (bool): Whether to overwrite an existing label.
+            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+                please use channels_meta instead.
+            pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
+                This argument is deprecated, please use pixelsize, z_spacing,
                 and time_spacing instead.
 
         Returns:

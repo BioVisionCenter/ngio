@@ -656,7 +656,7 @@ class ImagesContainer:
             chunks (ChunksLike | None): The chunk shape of the new image.
             shards (ShardsLike | None): The shard shape of the new image.
             dtype (str | None): The data type of the new image.
-            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
+            dimension_separator (Literal[".", "/"] | None): The separator to use for
                 dimensions.
             compressors (CompressorLike | None): The compressors to use.
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
