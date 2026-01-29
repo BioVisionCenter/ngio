@@ -654,10 +654,11 @@ def _compute_pyramid_shapes(
     return _shapes_from_new_shape(ref_image=ref_image, shape=shape)
 
 
-def _check_chunks_and_shards_compatibility(
+def _check_len_compatibility(
     ref_shape: tuple[int, ...],
     chunks: ChunksLike,
     shards: ShardsLike | None,
+    translation: Sequence[float] | None = None,
 ) -> None:
     """Check if the chunks and shards are compatible with the reference shape.
 
@@ -665,6 +666,7 @@ def _check_chunks_and_shards_compatibility(
         ref_shape: The reference shape.
         chunks: The chunks to check.
         shards: The shards to check.
+        translation: The translation to check.
     """
     if chunks != "auto":
         if len(chunks) != len(ref_shape):
@@ -675,6 +677,12 @@ def _check_chunks_and_shards_compatibility(
         if len(shards) != len(ref_shape):
             raise NgioValueError(
                 "The length of the shards must be the same as the number of dimensions."
+            )
+    if translation is not None:
+        if len(translation) != len(ref_shape):
+            raise NgioValueError(
+                "The length of the translation must be the same as the number of "
+                "dimensions."
             )
 
 
@@ -795,6 +803,7 @@ def abstract_derive(
     z_spacing: float | None = None,
     time_spacing: float | None = None,
     name: str | None = None,
+    translation: Sequence[float] | None = None,
     channels_policy: Literal["squeeze", "same", "singleton"] | int = "same",
     channels_meta: Sequence[str | Channel] | None = None,
     ngff_version: NgffVersions | None = None,
@@ -823,6 +832,8 @@ def abstract_derive(
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
         name (str | None): The name of the new image.
+        translation (Sequence[float] | None): The translation for each axis
+            at the highest resolution level. Defaults to None.
         channels_policy (Literal["squeeze", "same", "singleton"] | int):
             Possible policies:
             - If "squeeze", the channels axis will be removed (no matter its size).
@@ -914,15 +925,19 @@ def abstract_derive(
     if compressors is None:
         compressors = ref_image.zarr_array.compressors  # type: ignore
 
+    if translation is None:
+        translation = ref_image.dataset.translation
+
     if chunks is None:
         chunks = ref_image.zarr_array.chunks
     if shards is None:
         shards = ref_image.zarr_array.shards
 
-    _check_chunks_and_shards_compatibility(
+    _check_len_compatibility(
         ref_shape=ref_shape,
         chunks=chunks,
         shards=shards,
+        translation=translation,
     )
 
     if ngff_version is None:
@@ -950,6 +965,7 @@ def abstract_derive(
         z_spacing=z_spacing_,
         time_spacing=time_spacing_,
         levels=ref_meta.paths,
+        translation=translation,
         time_unit=ref_image.time_unit,
         space_unit=ref_image.space_unit,
         axes_names=axes,

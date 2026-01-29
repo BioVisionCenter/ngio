@@ -218,6 +218,7 @@ class LabelsContainer:
         pixelsize: float | tuple[float, float] | None = None,
         z_spacing: float | None = None,
         time_spacing: float | None = None,
+        translation: Sequence[float] | None = None,
         channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
@@ -244,6 +245,8 @@ class LabelsContainer:
                 label.
             z_spacing (float | None): The z spacing of the new label.
             time_spacing (float | None): The time spacing of the new label.
+            translation (Sequence[float] | None): The translation for each axis
+                at the highest resolution level. Defaults to None.
             channels_policy (Literal["squeeze", "same", "singleton"] | int):
                 Possible policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
@@ -288,6 +291,7 @@ class LabelsContainer:
             z_spacing=z_spacing,
             time_spacing=time_spacing,
             name=name,
+            translation=translation,
             channels_policy=channels_policy,
             ngff_version=ngff_version,
             chunks=chunks,
@@ -321,6 +325,7 @@ def derive_label(
     z_spacing: float | None = None,
     time_spacing: float | None = None,
     name: str | None = None,
+    translation: Sequence[float] | None = None,
     channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
     ngff_version: NgffVersions | None = None,
     # Zarr Array parameters
@@ -347,6 +352,8 @@ def derive_label(
         z_spacing (float | None): The z spacing of the new label.
         time_spacing (float | None): The time spacing of the new label.
         name (str | None): The name of the new label.
+        translation (Sequence[float] | None): The translation for each axis
+            at the highest resolution level. Defaults to None.
         channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
             policies:
             - If "squeeze", the channels axis will be removed (no matter its size).
@@ -385,6 +392,7 @@ def derive_label(
         z_spacing=z_spacing,
         time_spacing=time_spacing,
         name=name,
+        translation=translation,
         channels_meta=None,
         channels_policy=channels_policy,
         ngff_version=ngff_version,

@@ -384,7 +384,9 @@ class ImagePyramidBuilder(BaseModel):
                     s * f for s, f in zip(scale_, _scaling_factor, strict=True)
                 )
                 # TBD: How to update translation
-                # For now, we keep it constant
+                # For now, we keep it constant but we should probably change it
+                # to reflect the shift introduced by downsampling
+                # translation_ = translation_ + _scaling_factor
         other_array_kwargs = other_array_kwargs or {}
         return cls(
             levels=levels,

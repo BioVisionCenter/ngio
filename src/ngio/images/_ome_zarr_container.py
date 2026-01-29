@@ -430,6 +430,7 @@ class OmeZarrContainer:
         z_spacing: float | None = None,
         time_spacing: float | None = None,
         name: str | None = None,
+        translation: Sequence[float] | None = None,
         channels_policy: Literal["squeeze", "same", "singleton"] | int = "same",
         channels_meta: Sequence[str | Channel] | None = None,
         ngff_version: NgffVersions | None = None,
@@ -462,6 +463,8 @@ class OmeZarrContainer:
             z_spacing (float | None): The z spacing of the new image.
             time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
+            translation (Sequence[float] | None): The translation for each axis
+                at the highest resolution level. Defaults to None.
             channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
                 policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
@@ -503,6 +506,7 @@ class OmeZarrContainer:
             z_spacing=z_spacing,
             time_spacing=time_spacing,
             name=name,
+            translation=translation,
             channels_meta=channels_meta,
             channels_policy=channels_policy,
             ngff_version=ngff_version,
@@ -788,6 +792,7 @@ class OmeZarrContainer:
         pixelsize: float | tuple[float, float] | None = None,
         z_spacing: float | None = None,
         time_spacing: float | None = None,
+        translation: Sequence[float] | None = None,
         channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
         ngff_version: NgffVersions | None = None,
         # Zarr Array parameters
@@ -815,6 +820,8 @@ class OmeZarrContainer:
                 label.
             z_spacing (float | None): The z spacing of the new label.
             time_spacing (float | None): The time spacing of the new label.
+            translation (Sequence[float] | None): The translation for each axis
+                at the highest resolution level. Defaults to None.
             channels_policy (Literal["same", "squeeze", "singleton"] | int): Possible
                 policies:
                 - If "squeeze", the channels axis will be removed (no matter its size).
@@ -852,6 +859,7 @@ class OmeZarrContainer:
             pixelsize=pixelsize,
             z_spacing=z_spacing,
             time_spacing=time_spacing,
+            translation=translation,
             channels_policy=channels_policy,
             ngff_version=ngff_version,
             chunks=chunks,
@@ -961,7 +969,7 @@ def create_empty_ome_zarr(
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
-    translations: Sequence[float] | None = None,
+    translation: Sequence[float] | None = None,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
@@ -997,7 +1005,7 @@ def create_empty_ome_zarr(
             for the pyramid levels. Defaults to "auto".
         levels (int | list[str]): The number of levels in the pyramid or a list of
             level names. Defaults to 5.
-        translations (Sequence[float] | None): The translations for each axis.
+        translation (Sequence[float] | None): The translation for each axis.
             at the highest resolution level. Defaults to None.
         space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
         time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
@@ -1091,7 +1099,7 @@ def create_empty_ome_zarr(
         time_spacing=time_spacing,
         scaling_factors=scaling_factors,
         levels=levels,
-        translations=translations,
+        translation=translation,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,
@@ -1137,7 +1145,7 @@ def create_ome_zarr_from_array(
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
-    translations: Sequence[float] | None = None,
+    translation: Sequence[float] | None = None,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
@@ -1173,7 +1181,7 @@ def create_ome_zarr_from_array(
             for the pyramid levels. Defaults to "auto".
         levels (int | list[str]): The number of levels in the pyramid or a list of
             level names. Defaults to 5.
-        translations (Sequence[float] | None): The translations for each axis.
+        translation (Sequence[float] | None): The translation for each axis.
             at the highest resolution level. Defaults to None.
         space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
         time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
@@ -1210,7 +1218,7 @@ def create_ome_zarr_from_array(
         time_spacing=time_spacing,
         scaling_factors=scaling_factors,
         levels=levels,
-        translations=translations,
+        translation=translation,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,

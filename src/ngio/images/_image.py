@@ -612,6 +612,7 @@ class ImagesContainer:
         z_spacing: float | None = None,
         time_spacing: float | None = None,
         name: str | None = None,
+        translation: Sequence[float] | None = None,
         channels_meta: Sequence[str | Channel] | None = None,
         channels_policy: Literal["same", "squeeze", "singleton"] | int = "same",
         ngff_version: NgffVersions | None = None,
@@ -643,6 +644,8 @@ class ImagesContainer:
             z_spacing (float | None): The z spacing of the new image.
             time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
+            translation (Sequence[float] | None): The translation for each axis
+                at the highest resolution level. Defaults to None.
             channels_meta (Sequence[str | Channel] | None): The channels metadata
                 of the new image.
             channels_policy (Literal["same", "squeeze", "singleton"] | int):
@@ -681,6 +684,7 @@ class ImagesContainer:
             z_spacing=z_spacing,
             time_spacing=time_spacing,
             name=name,
+            translation=translation,
             channels_meta=channels_meta,
             channels_policy=channels_policy,
             ngff_version=ngff_version,
@@ -774,6 +778,7 @@ def derive_image_container(
     z_spacing: float | None = None,
     time_spacing: float | None = None,
     name: str | None = None,
+    translation: Sequence[float] | None = None,
     channels_policy: Literal["same", "squeeze", "singleton"] | int = "same",
     channels_meta: Sequence[str | Channel] | None = None,
     ngff_version: NgffVersions | None = None,
@@ -803,6 +808,8 @@ def derive_image_container(
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
         name (str | None): The name of the new image.
+        translation (Sequence[float] | None): The translation for each axis
+            at the highest resolution level. Defaults to None.
         channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
             policies:
             - If "squeeze", the channels axis will be removed (no matter its size).
@@ -842,6 +849,7 @@ def derive_image_container(
         z_spacing=z_spacing,
         time_spacing=time_spacing,
         name=name,
+        translation=translation,
         channels_meta=channels_meta,
         channels_policy=channels_policy,
         ngff_version=ngff_version,

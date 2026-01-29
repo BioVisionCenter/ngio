@@ -9,6 +9,9 @@ For Images and Labels implements the following functionalities:
 - A function to convert a ngio image metadata to a v05 image metadata.
 """
 
+from ome_zarr_models.common.coordinate_transformations import (
+    ValidTransform as ValidTransformV05,
+)
 from ome_zarr_models.common.omero import Channel as ChannelV05
 from ome_zarr_models.common.omero import Omero as OmeroV05
 from ome_zarr_models.common.omero import Window as WindowV05
@@ -24,7 +27,6 @@ from ome_zarr_models.v05.labels import Labels as Labels
 from ome_zarr_models.v05.labels import LabelsAttrs as LabelsAttrsV05
 from ome_zarr_models.v05.multiscales import Dataset as DatasetV05
 from ome_zarr_models.v05.multiscales import Multiscale as MultiscaleV05
-from ome_zarr_models.v05.multiscales import ValidTransform as ValidTransformV05
 from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs import (
