@@ -693,7 +693,14 @@ def _apply_channel_policy(
     axes: tuple[str, ...],
     chunks: ChunksLike,
     shards: ShardsLike | None,
-) -> tuple[list[tuple[int, ...]], tuple[str, ...], ChunksLike, ShardsLike | None]:
+    translation: Sequence[float],
+) -> tuple[
+    list[tuple[int, ...]],
+    tuple[str, ...],
+    ChunksLike,
+    ShardsLike | None,
+    tuple[float, ...],
+]:
     """Apply the channel policy to the shapes and axes.
 
     Args:
@@ -703,12 +710,14 @@ def _apply_channel_policy(
         axes: The axes of the image.
         chunks: The chunks of the image.
         shards: The shards of the image.
+        translation: The translation of the image.
 
     Returns:
         The new shapes and axes after applying the channel policy.
     """
+    translation = tuple(translation)
     if channels_policy == "same":
-        return shapes, axes, chunks, shards
+        return shapes, axes, chunks, shards, translation
 
     if channels_policy == "singleton":
         # Treat 'singleton' as setting channel size to 1
@@ -717,7 +726,7 @@ def _apply_channel_policy(
     channel_index = ref_image.axes_handler.get_index("c")
     if channel_index is None:
         if channels_policy == "squeeze":
-            return shapes, axes, chunks, shards
+            return shapes, axes, chunks, shards, translation
         raise NgioValueError(
             f"Cannot apply channel policy {channels_policy=} to an image "
             "without channels axis."
@@ -736,7 +745,9 @@ def _apply_channel_policy(
             new_shards: ShardsLike | None = shards
         else:
             new_shards = shards[:channel_index] + shards[channel_index + 1 :]
-        return new_shapes, new_axes, new_chunks, new_shards
+
+        translation = translation[:channel_index] + translation[channel_index + 1 :]
+        return new_shapes, new_axes, new_chunks, new_shards, translation
     elif isinstance(channels_policy, int):
         new_shapes = []
         for shape in shapes:
@@ -746,7 +757,7 @@ def _apply_channel_policy(
                 *shape[channel_index + 1 :],
             )
             new_shapes.append(new_shape)
-        return new_shapes, axes, chunks, shards
+        return new_shapes, axes, chunks, shards, translation
     else:
         raise NgioValueError(
             f"Invalid channels policy: {channels_policy}. "
@@ -943,13 +954,14 @@ def abstract_derive(
     if ngff_version is None:
         ngff_version = ref_meta.version
 
-    shapes, axes, chunks, shards = _apply_channel_policy(
+    shapes, axes, chunks, shards, translation = _apply_channel_policy(
         ref_image=ref_image,
         channels_policy=channels_policy,
         shapes=shapes,
         axes=ref_image.axes,
         chunks=chunks,
         shards=shards,
+        translation=translation,
     )
     channels_meta_ = _check_channels_meta_compatibility(
         meta_type=meta_type,
