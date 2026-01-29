@@ -1,3 +1,5 @@
+import itertools
+import math
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, Literal
 
@@ -195,7 +197,7 @@ ChunksLike = tuple[int, ...] | Literal["auto"]
 ShardsLike = tuple[int, ...] | Literal["auto"]
 
 
-def shapes_from_scaling_factors(
+def compute_shapes_from_scaling_factors(
     base_shape: tuple[int, ...],
     scaling_factors: tuple[float, ...],
     num_levels: int,
@@ -215,7 +217,7 @@ def shapes_from_scaling_factors(
     for _ in range(num_levels):
         shapes.append(current_shape)
         current_shape = tuple(
-            max(1, int(s / f))
+            max(1, math.floor(s / f))
             for s, f in zip(current_shape, scaling_factors, strict=True)
         )
     return shapes
@@ -278,6 +280,63 @@ class PyramidLevel(BaseModel):
         return self
 
 
+def compute_scales_from_shapes(
+    shapes: Sequence[tuple[int, ...]],
+    base_scale: tuple[float, ...],
+) -> list[tuple[float, ...]]:
+    scales = [base_scale]
+    scale_ = base_scale
+    for current_shape, next_shape in itertools.pairwise(shapes):
+        # This only works for downsampling pyramids
+        # The _check_order function (called before) ensures that the
+        # shapes are decreasing
+        _scaling_factor = tuple(
+            s1 / s2
+            for s1, s2 in zip(
+                current_shape,
+                next_shape,
+                strict=True,
+            )
+        )
+        scale_ = tuple(s * f for s, f in zip(scale_, _scaling_factor, strict=True))
+        scales.append(scale_)
+    return scales
+
+
+def _compute_translations_from_shapes(
+    scales: Sequence[tuple[float, ...]],
+    base_translation: Sequence[float] | None,
+) -> list[tuple[float, ...]]:
+    translations = []
+    if base_translation is None:
+        n_dim = len(scales[0])
+        base_translation = tuple(0.0 for _ in range(n_dim))
+    else:
+        base_translation = tuple(base_translation)
+
+    translation_ = base_translation
+    for _ in scales:
+        # TBD: How to update translation
+        # For now, we keep it constant but we should probably change it
+        # to reflect the shift introduced by downsampling
+        # translation_ = translation_ + _scaling_factor
+        translations.append(translation_)
+    return translations
+
+
+def _compute_scales_from_factors(
+    base_scale: tuple[float, ...], scaling_factors: tuple[float, ...], num_levels: int
+) -> list[tuple[float, ...]]:
+    precision_scales = []
+    current_scale = base_scale
+    for _ in range(num_levels):
+        precision_scales.append(current_scale)
+        current_scale = tuple(
+            s * f for s, f in zip(current_scale, scaling_factors, strict=True)
+        )
+    return precision_scales
+
+
 class ImagePyramidBuilder(BaseModel):
     levels: list[PyramidLevel]
     axes: tuple[str, ...]
@@ -305,19 +364,37 @@ class ImagePyramidBuilder(BaseModel):
         compressors: Any = "auto",
         zarr_format: Literal[2, 3] = 2,
         other_array_kwargs: Mapping[str, Any] | None = None,
+        precision_scale: bool = True,
     ) -> "ImagePyramidBuilder":
         # Since shapes needs to be rounded to integers, we compute them here
         # and then pass them to from_shapes
         # This ensures that the shapes and scaling factors are consistent
         # and avoids accumulation of rounding errors
-        shapes = shapes_from_scaling_factors(
+        shapes = compute_shapes_from_scaling_factors(
             base_shape=base_shape,
             scaling_factors=scaling_factors,
             num_levels=len(levels_paths),
         )
+
+        if precision_scale:
+            # Compute precise scales from shapes
+            # Since shapes are rounded to integers, the scaling factors
+            # may not be exactly the same as the input scaling factors
+            # Thus, we compute the scales from the shapes to ensure consistency
+            base_scale_ = compute_scales_from_shapes(
+                shapes=shapes,
+                base_scale=base_scale,
+            )
+        else:
+            base_scale_ = _compute_scales_from_factors(
+                base_scale=base_scale,
+                scaling_factors=scaling_factors,
+                num_levels=len(levels_paths),
+            )
+
         return cls.from_shapes(
             shapes=shapes,
-            base_scale=base_scale,
+            base_scale=base_scale_,
             axes=axes,
             base_translation=base_translation,
             levels_paths=levels_paths,
@@ -334,7 +411,7 @@ class ImagePyramidBuilder(BaseModel):
     def from_shapes(
         cls,
         shapes: Sequence[tuple[int, ...]],
-        base_scale: tuple[float, ...],
+        base_scale: tuple[float, ...] | list[tuple[float, ...]],
         axes: tuple[str, ...],
         base_translation: Sequence[float] | None = None,
         levels_paths: Sequence[str] | None = None,
@@ -349,44 +426,42 @@ class ImagePyramidBuilder(BaseModel):
         levels = []
         if levels_paths is None:
             levels_paths = tuple(str(i) for i in range(len(shapes)))
+
         _check_order(shapes)
-        scale_ = base_scale
-        if base_translation is None:
-            base_translation = tuple(0.0 for _ in range(len(shapes[0])))
+        if isinstance(base_scale, tuple) and all(
+            isinstance(s, float) for s in base_scale
+        ):
+            scales = compute_scales_from_shapes(shapes, base_scale)
+        elif isinstance(base_scale, list):
+            scales = base_scale
+            if len(scales) != len(shapes):
+                raise NgioValueError(
+                    "Scales must have the same length as shapes "
+                    f"({len(shapes)}), got {len(scales)}"
+                )
         else:
-            base_translation = tuple(base_translation)
-        translation_ = base_translation
-        for i, (path, shape) in enumerate(zip(levels_paths, shapes, strict=True)):
-            levels.append(
-                PyramidLevel(
-                    path=path,
-                    shape=shape,
-                    scale=scale_,
-                    translation=translation_,
-                    chunks=chunks,
-                    shards=shards,
-                )
+            raise NgioValueError(
+                "base_scale must be either a tuple of floats or a list of tuples "
+                " of floats."
             )
-            if i + 1 < len(shapes):
-                # This only works for downsampling pyramids
-                # The _check_order function ensures that
-                # shapes are decreasing
-                next_shape = shapes[i + 1]
-                _scaling_factor = tuple(
-                    s1 / s2
-                    for s1, s2 in zip(
-                        shape,
-                        next_shape,
-                        strict=True,
-                    )
-                )
-                scale_ = tuple(
-                    s * f for s, f in zip(scale_, _scaling_factor, strict=True)
-                )
-                # TBD: How to update translation
-                # For now, we keep it constant but we should probably change it
-                # to reflect the shift introduced by downsampling
-                # translation_ = translation_ + _scaling_factor
+
+        translations = _compute_translations_from_shapes(scales, base_translation)
+        for level_path, shape, scale, translation in zip(
+            levels_paths,
+            shapes,
+            scales,
+            translations,
+            strict=True,
+        ):
+            level = PyramidLevel(
+                path=level_path,
+                shape=shape,
+                scale=scale,
+                translation=translation,
+                chunks=chunks,
+                shards=shards,
+            )
+            levels.append(level)
         other_array_kwargs = other_array_kwargs or {}
         return cls(
             levels=levels,

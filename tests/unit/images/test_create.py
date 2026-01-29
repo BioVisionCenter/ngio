@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import numpy as np
@@ -172,7 +173,7 @@ def test_derive_from_non_dishogeneus_shapes():
         store=store,
         meta_type=NgioImageMeta,
         shapes=shapes,
-        pixelsize=0.5,
+        base_scale=(1.0, 1.0, 2.0, 2.0),
     )
     ome_zarr = OmeZarrContainer(group_handler=image_handler)
     ome_zarr.derive_label("test-label-same", channels_policy="same")
@@ -254,5 +255,42 @@ def test_fail_create_from_non_decreasing_shapes():
             store=store,
             meta_type=NgioImageMeta,
             shapes=shapes,
-            pixelsize=0.5,
+            base_scale=(1.0, 1.0, 2.0, 2.0),
         )
+
+
+def derive_from_legacy_images(tmp_path: Path):
+    store = tmp_path / "test_image_legacy.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store=store, shape=(4, 3, 127, 128), pixelsize=1.0, overwrite=True
+    )
+
+    # Simulate legacy multiscale were the scaling factors did not
+    # take into account rounding issues when downsampling
+    attrs_path = tmp_path / "test_image_legacy.zarr" / "zarr.json"
+    with open(attrs_path) as f:
+        json_dict = json.load(f)
+    datasets = json_dict["attributes"]["ome"]["multiscales"][0]["datasets"]
+    scale_0 = [1.0, 1.0, 1.0, 1.0]
+    for i in range(len(datasets)):
+        datasets[i]["coordinateTransformations"][0]["scale"] = scale_0
+        scale_0 = [1.0, 1.0, scale_0[2] * 2, scale_0[3] * 2]
+    json_dict["attributes"]["ome"]["multiscales"][0]["datasets"] = datasets
+    with open(attrs_path, "w") as f:
+        json.dump(json_dict, f, indent=4)
+
+    # Tes1 plain derive label
+    ome_zarr.derive_label(name="my_label")
+    for level in ome_zarr.levels_paths:
+        scale_yx = ome_zarr.get_image(path=level).dataset.scale[-2:]
+        label = ome_zarr.get_label(name="my_label", path=level)
+        label_scale_yx = label.dataset.scale[-2:]
+        assert scale_yx == label_scale_yx
+
+    # Test 2 derive label from level 1
+    image_1 = ome_zarr.get_image(path="1")
+    ome_zarr.derive_label(name="my_label_level_1", ref_image=image_1)
+    for path_img, path_lbl in zip(["0", "1", "2"], ["1", "2", "3"], strict=True):
+        img = ome_zarr.get_image(path=path_img)
+        lbl = ome_zarr.get_label(name="my_label_level_1", path=path_lbl)
+        assert img.shape == lbl.shape

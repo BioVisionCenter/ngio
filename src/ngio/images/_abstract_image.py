@@ -16,9 +16,15 @@ from ngio.common import (
     Roi,
     consolidate_pyramid,
 )
-from ngio.common._pyramid import ChunksLike, ShardsLike, shapes_from_scaling_factors
+from ngio.common._pyramid import (
+    ChunksLike,
+    ShardsLike,
+    compute_scales_from_shapes,
+    compute_shapes_from_scaling_factors,
+)
 from ngio.images._create_utils import (
     _image_or_label_meta,
+    compute_base_scale,
     init_image_like_from_shapes,
 )
 from ngio.io_pipes import (
@@ -602,32 +608,39 @@ def consolidate_image(
 
 def _shapes_from_ref_image(
     ref_image: AbstractImage,
-) -> list[tuple[int, ...]]:
+) -> tuple[list[tuple[int, ...]], list[tuple[float, ...]]]:
     """Rebuild base shape based on a new shape."""
-    paths = ref_image.meta.paths
+    meta = ref_image.meta
+    paths = meta.paths
     index_path = paths.index(ref_image.path)
     sub_paths = paths[index_path:]
     group_handler = ref_image._group_handler
-    shapes = []
+    shapes, scales = [], []
     for path in sub_paths:
         zarr_array = group_handler.get_array(path)
         shapes.append(zarr_array.shape)
+        scales.append(meta.get_dataset(path=path).scale)
     if len(shapes) == len(paths):
-        return shapes
+        return shapes, scales
     missing_levels = len(paths) - len(shapes)
-    extended_shapes = shapes_from_scaling_factors(
+    extended_shapes = compute_shapes_from_scaling_factors(
         base_shape=shapes[-1],
         scaling_factors=ref_image.meta.scaling_factor(),
         num_levels=missing_levels + 1,
     )
     shapes.extend(extended_shapes[1:])
-    return shapes
+    extended_scales = compute_scales_from_shapes(
+        shapes=extended_shapes,
+        base_scale=scales[-1],
+    )
+    scales.extend(extended_scales[1:])
+    return shapes, scales
 
 
 def _shapes_from_new_shape(
     ref_image: AbstractImage,
     shape: Sequence[int],
-) -> list[tuple[int, ...]]:
+) -> tuple[list[tuple[int, ...]], list[tuple[float, ...]]]:
     """Rebuild pyramid shapes based on a new base shape."""
     if len(shape) != len(ref_image.shape):
         raise NgioValueError(
@@ -637,17 +650,22 @@ def _shapes_from_new_shape(
     base_shape = tuple(shape)
     scaling_factors = ref_image.meta.scaling_factor()
     num_levels = len(ref_image.meta.paths)
-    return shapes_from_scaling_factors(
+    shapes = compute_shapes_from_scaling_factors(
         base_shape=base_shape,
         scaling_factors=scaling_factors,
         num_levels=num_levels,
     )
+    scales = compute_scales_from_shapes(
+        shapes=shapes,
+        base_scale=ref_image.dataset.scale,
+    )
+    return shapes, scales
 
 
 def _compute_pyramid_shapes(
     ref_image: AbstractImage,
     shape: Sequence[int] | None,
-) -> list[tuple[int, ...]]:
+) -> tuple[list[tuple[int, ...]], list[tuple[float, ...]]]:
     """Rebuild pyramid shapes based on a new base shape."""
     if shape is None:
         return _shapes_from_ref_image(ref_image=ref_image)
@@ -694,12 +712,14 @@ def _apply_channel_policy(
     chunks: ChunksLike,
     shards: ShardsLike | None,
     translation: Sequence[float],
+    scales: list[tuple[float, ...]] | tuple[float, ...],
 ) -> tuple[
     list[tuple[int, ...]],
     tuple[str, ...],
     ChunksLike,
     ShardsLike | None,
     tuple[float, ...],
+    list[tuple[float, ...]] | tuple[float, ...],
 ]:
     """Apply the channel policy to the shapes and axes.
 
@@ -711,13 +731,14 @@ def _apply_channel_policy(
         chunks: The chunks of the image.
         shards: The shards of the image.
         translation: The translation of the image.
+        scales: The scales of the image.
 
     Returns:
         The new shapes and axes after applying the channel policy.
     """
     translation = tuple(translation)
     if channels_policy == "same":
-        return shapes, axes, chunks, shards, translation
+        return shapes, axes, chunks, shards, translation, scales
 
     if channels_policy == "singleton":
         # Treat 'singleton' as setting channel size to 1
@@ -726,7 +747,7 @@ def _apply_channel_policy(
     channel_index = ref_image.axes_handler.get_index("c")
     if channel_index is None:
         if channels_policy == "squeeze":
-            return shapes, axes, chunks, shards, translation
+            return shapes, axes, chunks, shards, translation, scales
         raise NgioValueError(
             f"Cannot apply channel policy {channels_policy=} to an image "
             "without channels axis."
@@ -736,6 +757,15 @@ def _apply_channel_policy(
         for shape in shapes:
             new_shape = shape[:channel_index] + shape[channel_index + 1 :]
             new_shapes.append(new_shape)
+
+        if isinstance(scales, tuple):
+            new_scales = scales[:channel_index] + scales[channel_index + 1 :]
+        else:
+            new_scales = []
+            for scale in scales:
+                new_scale = scale[:channel_index] + scale[channel_index + 1 :]
+                new_scales.append(new_scale)
+
         new_axes = axes[:channel_index] + axes[channel_index + 1 :]
         if chunks == "auto":
             new_chunks: ChunksLike = "auto"
@@ -747,7 +777,7 @@ def _apply_channel_policy(
             new_shards = shards[:channel_index] + shards[channel_index + 1 :]
 
         translation = translation[:channel_index] + translation[channel_index + 1 :]
-        return new_shapes, new_axes, new_chunks, new_shards, translation
+        return new_shapes, new_axes, new_chunks, new_shards, translation, new_scales
     elif isinstance(channels_policy, int):
         new_shapes = []
         for shape in shapes:
@@ -757,7 +787,7 @@ def _apply_channel_policy(
                 *shape[channel_index + 1 :],
             )
             new_shapes.append(new_shape)
-        return new_shapes, axes, chunks, shards, translation
+        return new_shapes, axes, chunks, shards, translation, scales
     else:
         raise NgioValueError(
             f"Invalid channels policy: {channels_policy}. "
@@ -800,6 +830,35 @@ def _check_channels_meta_compatibility(
     # Reset to None if number of channels do not match
     channels_meta_ = channels_ if ref_num_channels == len(channels_) else None
     return channels_meta_
+
+
+def adapt_scales(
+    scales: list[tuple[float, ...]],
+    pixelsize: float | tuple[float, float] | None,
+    z_spacing: float | None,
+    time_spacing: float | None,
+    ref_image: AbstractImage,
+) -> list[tuple[float, ...]] | tuple[float, ...]:
+    if pixelsize is None and z_spacing is None and time_spacing is None:
+        return scales
+    pixel_size = ref_image.pixel_size
+    if pixelsize is None:
+        pixelsize = (pixel_size.y, pixel_size.x)
+    if z_spacing is None:
+        z_spacing = pixel_size.z
+    else:
+        z_spacing = z_spacing
+    if time_spacing is None:
+        time_spacing = pixel_size.t
+    else:
+        time_spacing = time_spacing
+    base_scale = compute_base_scale(
+        pixelsize=pixelsize,
+        z_spacing=z_spacing,
+        time_spacing=time_spacing,
+        axes_handler=ref_image.axes_handler,
+    )
+    return base_scale
 
 
 def abstract_derive(
@@ -889,40 +948,23 @@ def abstract_derive(
             DeprecationWarning,
             stacklevel=2,
         )
-        pixelsize_ = (pixel_size.y, pixel_size.x)
-        z_spacing_ = pixel_size.z
-        time_spacing_ = pixel_size.t
-    else:
-        if pixelsize is None:
-            pixelsize_ = (ref_image.pixel_size.y, ref_image.pixel_size.x)
-        else:
-            pixelsize_ = pixelsize
-
-        if z_spacing is None:
-            z_spacing_ = ref_image.pixel_size.z
-        else:
-            z_spacing_ = z_spacing
-
-        if time_spacing is None:
-            time_spacing_ = ref_image.pixel_size.t
-        else:
-            time_spacing_ = time_spacing
+        pixelsize = (pixel_size.y, pixel_size.x)
+    # End of deprecated arguments handling
     ref_meta = ref_image.meta
 
-    shapes = _compute_pyramid_shapes(
+    shapes, scales = _compute_pyramid_shapes(
         shape=shape,
         ref_image=ref_image,
     )
     ref_shape = next(iter(shapes))
 
-    if pixelsize is None:
-        pixelsize = (ref_image.pixel_size.y, ref_image.pixel_size.x)
-
-    if z_spacing is None:
-        z_spacing = ref_image.pixel_size.z
-
-    if time_spacing is None:
-        time_spacing = ref_image.pixel_size.t
+    scales = adapt_scales(
+        scales=scales,
+        pixelsize=pixelsize,
+        z_spacing=z_spacing,
+        time_spacing=time_spacing,
+        ref_image=ref_image,
+    )
 
     if name is None:
         name = ref_meta.name
@@ -954,7 +996,7 @@ def abstract_derive(
     if ngff_version is None:
         ngff_version = ref_meta.version
 
-    shapes, axes, chunks, shards, translation = _apply_channel_policy(
+    shapes, axes, chunks, shards, translation, scales = _apply_channel_policy(
         ref_image=ref_image,
         channels_policy=channels_policy,
         shapes=shapes,
@@ -962,6 +1004,7 @@ def abstract_derive(
         chunks=chunks,
         shards=shards,
         translation=translation,
+        scales=scales,
     )
     channels_meta_ = _check_channels_meta_compatibility(
         meta_type=meta_type,
@@ -973,9 +1016,7 @@ def abstract_derive(
         store=store,
         meta_type=meta_type,
         shapes=shapes,
-        pixelsize=pixelsize_,
-        z_spacing=z_spacing_,
-        time_spacing=time_spacing_,
+        base_scale=scales,
         levels=ref_meta.paths,
         translation=translation,
         time_unit=ref_image.time_unit,

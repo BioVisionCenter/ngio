@@ -149,7 +149,7 @@ def _compute_scaling_factors(
     return tuple(scaling_factors)
 
 
-def _compute_base_scale(
+def compute_base_scale(
     *,
     pixelsize: float | tuple[float, float],
     z_spacing: float,
@@ -284,7 +284,7 @@ def init_image_like(
         allow_non_canonical_axes=allow_non_canonical_axes,
         strict_canonical_order=strict_canonical_order,
     )
-    base_scale = _compute_base_scale(
+    base_scale = compute_base_scale(
         pixelsize=pixelsize,
         z_spacing=z_spacing,
         time_spacing=time_spacing,
@@ -342,9 +342,7 @@ def init_image_like_from_shapes(
     # Ngff image parameters
     meta_type: type[_image_or_label_meta],
     shapes: Sequence[tuple[int, ...]],
-    pixelsize: float | tuple[float, float],
-    z_spacing: float = 1.0,
-    time_spacing: float = 1.0,
+    base_scale: tuple[float, ...] | list[tuple[float, ...]],
     levels: list[str] | None = None,
     translation: Sequence[float] | None = None,
     space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
@@ -383,12 +381,6 @@ def init_image_like_from_shapes(
         axes_setup=axes_setup,
         allow_non_canonical_axes=allow_non_canonical_axes,
         strict_canonical_order=strict_canonical_order,
-    )
-    base_scale = _compute_base_scale(
-        pixelsize=pixelsize,
-        z_spacing=z_spacing,
-        time_spacing=time_spacing,
-        axes_handler=axes_handler,
     )
     if levels is None:
         levels_paths = tuple(str(i) for i in range(len(shapes)))
