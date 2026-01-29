@@ -233,6 +233,7 @@ class PyramidLevel(BaseModel):
     path: str
     shape: tuple[int, ...]
     scale: tuple[float, ...]
+    translation: tuple[float, ...]
     chunks: ChunksLike = "auto"
     shards: ShardsLike | None = None
 
@@ -246,6 +247,12 @@ class PyramidLevel(BaseModel):
             )
         if any(isinstance(s, float) and s < 0 for s in self.scale):
             raise NgioValueError("Scale values must be positive.")
+
+        if len(self.translation) != len(self.shape):
+            raise NgioValueError(
+                "Translation must have the same length as shape "
+                f"({len(self.shape)}), got {len(self.translation)}"
+            )
 
         if isinstance(self.chunks, tuple):
             if len(self.chunks) != len(self.shape):
@@ -290,6 +297,7 @@ class ImagePyramidBuilder(BaseModel):
         base_shape: tuple[int, ...],
         base_scale: tuple[float, ...],
         axes: tuple[str, ...],
+        base_translation: Sequence[float] | None = None,
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
@@ -298,6 +306,10 @@ class ImagePyramidBuilder(BaseModel):
         zarr_format: Literal[2, 3] = 2,
         other_array_kwargs: Mapping[str, Any] | None = None,
     ) -> "ImagePyramidBuilder":
+        # Since shapes needs to be rounded to integers, we compute them here
+        # and then pass them to from_shapes
+        # This ensures that the shapes and scaling factors are consistent
+        # and avoids accumulation of rounding errors
         shapes = shapes_from_scaling_factors(
             base_shape=base_shape,
             scaling_factors=scaling_factors,
@@ -307,6 +319,7 @@ class ImagePyramidBuilder(BaseModel):
             shapes=shapes,
             base_scale=base_scale,
             axes=axes,
+            base_translation=base_translation,
             levels_paths=levels_paths,
             chunks=chunks,
             shards=shards,
@@ -323,6 +336,7 @@ class ImagePyramidBuilder(BaseModel):
         shapes: Sequence[tuple[int, ...]],
         base_scale: tuple[float, ...],
         axes: tuple[str, ...],
+        base_translation: Sequence[float] | None = None,
         levels_paths: Sequence[str] | None = None,
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
@@ -337,12 +351,18 @@ class ImagePyramidBuilder(BaseModel):
             levels_paths = tuple(str(i) for i in range(len(shapes)))
         _check_order(shapes)
         scale_ = base_scale
+        if base_translation is None:
+            base_translation = tuple(0.0 for _ in range(len(shapes[0])))
+        else:
+            base_translation = tuple(base_translation)
+        translation_ = base_translation
         for i, (path, shape) in enumerate(zip(levels_paths, shapes, strict=True)):
             levels.append(
                 PyramidLevel(
                     path=path,
                     shape=shape,
                     scale=scale_,
+                    translation=translation_,
                     chunks=chunks,
                     shards=shards,
                 )
@@ -352,7 +372,7 @@ class ImagePyramidBuilder(BaseModel):
                 # The _check_order function ensures that
                 # shapes are decreasing
                 next_shape = shapes[i + 1]
-                scaling_factor = tuple(
+                _scaling_factor = tuple(
                     s1 / s2
                     for s1, s2 in zip(
                         shape,
@@ -361,8 +381,10 @@ class ImagePyramidBuilder(BaseModel):
                     )
                 )
                 scale_ = tuple(
-                    s * f for s, f in zip(scale_, scaling_factor, strict=True)
+                    s * f for s, f in zip(scale_, _scaling_factor, strict=True)
                 )
+                # TBD: How to update translation
+                # For now, we keep it constant
         other_array_kwargs = other_array_kwargs or {}
         return cls(
             levels=levels,

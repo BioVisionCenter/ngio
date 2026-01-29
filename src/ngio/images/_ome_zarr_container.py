@@ -961,6 +961,7 @@ def create_empty_ome_zarr(
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
+    translations: Sequence[float] | None = None,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
@@ -996,6 +997,8 @@ def create_empty_ome_zarr(
             for the pyramid levels. Defaults to "auto".
         levels (int | list[str]): The number of levels in the pyramid or a list of
             level names. Defaults to 5.
+        translations (Sequence[float] | None): The translations for each axis.
+            at the highest resolution level. Defaults to None.
         space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
         time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
         axes_names (Sequence[str] | None): The names of the axes. If None the
@@ -1088,6 +1091,7 @@ def create_empty_ome_zarr(
         time_spacing=time_spacing,
         scaling_factors=scaling_factors,
         levels=levels,
+        translations=translations,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,
@@ -1133,6 +1137,7 @@ def create_ome_zarr_from_array(
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     levels: int | list[str] = 5,
+    translations: Sequence[float] | None = None,
     space_unit: SpaceUnits = DefaultSpaceUnit,
     time_unit: TimeUnits = DefaultTimeUnit,
     axes_names: Sequence[str] | None = None,
@@ -1168,6 +1173,8 @@ def create_ome_zarr_from_array(
             for the pyramid levels. Defaults to "auto".
         levels (int | list[str]): The number of levels in the pyramid or a list of
             level names. Defaults to 5.
+        translations (Sequence[float] | None): The translations for each axis.
+            at the highest resolution level. Defaults to None.
         space_unit (SpaceUnits): The unit of space. Defaults to DefaultSpaceUnit.
         time_unit (TimeUnits): The unit of time. Defaults to DefaultTimeUnit.
         axes_names (Sequence[str] | None): The names of the axes. If None the
@@ -1203,6 +1210,7 @@ def create_ome_zarr_from_array(
         time_spacing=time_spacing,
         scaling_factors=scaling_factors,
         levels=levels,
+        translations=translations,
         space_unit=space_unit,
         time_unit=time_unit,
         axes_names=axes_names,

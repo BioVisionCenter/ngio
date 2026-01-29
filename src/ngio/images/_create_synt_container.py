@@ -30,6 +30,7 @@ def create_synthetic_ome_zarr(
     shape: Sequence[int],
     reference_sample: AVAILABLE_SAMPLES | SampleInfo = "Cardiomyocyte",
     levels: int | list[str] = 5,
+    translations: Sequence[float] | None = None,
     table_backend: TableBackend = DefaultTableBackend,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
     axes_names: Sequence[str] | None = None,
@@ -51,6 +52,8 @@ def create_synthetic_ome_zarr(
             Defaults to "Cardiomyocyte".
         levels (int | list[str]): The number of levels in the pyramid or a list of
             level names. Defaults to 5.
+        translations (Sequence[float] | None): The translations for each axis
+            at the highest resolution level. Defaults to None.
         table_backend (TableBackend): Table backend to be used to store tables.
             Defaults to DefaultTableBackend.
         scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors
@@ -86,6 +89,7 @@ def create_synthetic_ome_zarr(
         z_spacing=sample_info.z_spacing,
         time_spacing=sample_info.time_spacing,
         levels=levels,
+        translations=translations,
         space_unit=sample_info.space_unit,
         time_unit=sample_info.time_unit,
         axes_names=axes_names,
