@@ -18,11 +18,7 @@ from ngio.ome_zarr_meta import (
     update_ngio_labels_group_meta,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
     NgffVersions,
-    SpaceUnits,
-    TimeUnits,
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.tables import MaskingRoiTable
@@ -80,29 +76,6 @@ class Label(AbstractImage):
         meta = self.meta_handler.get_meta()
         assert isinstance(meta, NgioLabelMeta)
         return meta
-
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Set the axes unit of the image.
-
-        Args:
-            space_unit (SpaceUnits): The space unit of the image.
-            time_unit (TimeUnits): The time unit of the image.
-        """
-        meta = self.meta
-        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self.meta_handler.update_meta(meta)
-
-    def set_axes_names(self, axes_names: Sequence[str]) -> None:
-        """Set the axes names of the label.
-
-        Args:
-            axes_names (Sequence[str]): The axes names to set.
-        """
-        raise NotImplementedError("Setting axes names is not implemented yet.")
 
     def build_masking_roi_table(
         self, axes_order: Sequence[str] | None = None

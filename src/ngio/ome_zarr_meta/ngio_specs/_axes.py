@@ -451,6 +451,48 @@ class AxesHandler:
             axes_setup=self.axes_setup,
         )
 
+    def rename_axes(self, axes_names: Sequence[str]) -> "AxesHandler":
+        """Rename the axes.
+
+        Args:
+            axes_names (Sequence[str]): The new axes names.
+        """
+        if len(axes_names) != len(self.axes):
+            raise NgioValueError(
+                f"Cannot rename axes. "
+                f"Expected {len(self.axes)} axes, but got {len(axes_names)}."
+            )
+        new_axes = []
+        axes_setup = self.axes_setup
+        for ax, new_name in zip(self.axes, axes_names, strict=True):
+            if ax.name == new_name:
+                new_axes.append(ax)
+                continue
+            new_ax = Axis(name=new_name, axis_type=ax.axis_type, unit=ax.unit)
+            match ax.name:
+                case axes_setup.x:
+                    axes_setup = axes_setup.model_copy(update={"x": new_name})
+                case axes_setup.y:
+                    axes_setup = axes_setup.model_copy(update={"y": new_name})
+                case axes_setup.z:
+                    axes_setup = axes_setup.model_copy(update={"z": new_name})
+                case axes_setup.c:
+                    axes_setup = axes_setup.model_copy(update={"c": new_name})
+                case axes_setup.t:
+                    axes_setup = axes_setup.model_copy(update={"t": new_name})
+                case _:
+                    if ax.name in axes_setup.others:
+                        others = axes_setup.others.copy()
+                        others.remove(ax.name)
+                        others.append(new_name)
+                        axes_setup = axes_setup.model_copy(update={"others": others})
+            new_axes.append(new_ax)
+            # Update the axes setup
+        return AxesHandler(
+            axes=new_axes,
+            axes_setup=axes_setup,
+        )
+
     def get_index(self, name: str) -> int | None:
         """Get the index of the axis by name."""
         return self._index_mapping.get(name, None)

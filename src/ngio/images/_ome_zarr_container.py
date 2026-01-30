@@ -438,12 +438,11 @@ class OmeZarrContainer:
             time_unit (TimeUnits): The unit of time.
             set_labels (bool): Whether to set the units for the labels as well.
         """
+        if set_labels:
+            for label_name in self.list_labels():
+                label = self.get_label(label_name)
+                label.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
         self._images_container.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
-        if not set_labels:
-            return
-        for label_name in self.list_labels():
-            label = self.get_label(label_name)
-            label.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(
         self,
@@ -456,11 +455,11 @@ class OmeZarrContainer:
             axes_names (Sequence[str]): The axes names of the image.
             set_labels (bool): Whether to set the axes names for the labels as well.
         """
-        self._images_container.set_axes_names(axes_names=axes_names)
         if set_labels:
             for label_name in self.list_labels():
                 label = self.get_label(label_name)
                 label.set_axes_names(axes_names=axes_names)
+        self._images_container.set_axes_names(axes_names=axes_names)
 
     def get_image(
         self,

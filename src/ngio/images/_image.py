@@ -822,9 +822,7 @@ class ImagesContainer:
             space_unit (SpaceUnits): The space unit of the image.
             time_unit (TimeUnits): The time unit of the image.
         """
-        meta = self.meta
-        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.update_meta(meta)
+        self.get().set_axes_unit(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(
         self,
@@ -835,7 +833,9 @@ class ImagesContainer:
         Args:
             axes_names (Sequence[str]): The axes names of the image.
         """
-        raise NotImplementedError("Setting axes names is not implemented yet.")
+        image = self.get()
+        image.set_axes_names(axes_names=axes_names)
+        self._meta_handler._axes_setup = image.meta.axes_handler.axes_setup
 
     def derive(
         self,

@@ -129,6 +129,30 @@ class AbstractNgioImageMeta:
             datasets=new_datasets,
         )
 
+    def rename_axes(self, axes_names: Sequence[str]):
+        """Rename axes in the metadata.
+
+        Args:
+            axes_names(Sequence[str]): The new axes names in the order of the current
+                axes.
+        """
+        new_axes_handler = self.axes_handler.rename_axes(axes_names=axes_names)
+        new_datasets = []
+        for dataset in self.datasets:
+            new_dataset = Dataset(
+                path=dataset.path,
+                axes_handler=new_axes_handler,
+                scale=dataset.scale,
+                translation=dataset.translation,
+            )
+            new_datasets.append(new_dataset)
+
+        return type(self)(
+            version=self.version,
+            name=self.name,
+            datasets=new_datasets,
+        )
+
     @property
     def version(self) -> NgffVersions:
         """Version of the OME-NFF metadata used to build the object."""
