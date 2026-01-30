@@ -58,7 +58,7 @@ def _check_deprecated_scaling_factors(
     if yx_scaling_factor is not None or z_scaling_factor is not None:
         warnings.warn(
             "The 'yx_scaling_factor' and 'z_scaling_factor' arguments are deprecated "
-            "and will be removed in future versions. Please use the 'scaling_factors' "
+            "and will be removed in ngio=0.6. Please use the 'scaling_factors' "
             "argument instead.",
             DeprecationWarning,
             stacklevel=2,

@@ -989,7 +989,7 @@ def abstract_derive(
     if labels is not None:
         warnings.warn(
             "The 'labels' argument is deprecated and will be removed in "
-            "a future release.",
+            "ngio=0.6. Please use 'channels_meta' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -997,7 +997,8 @@ def abstract_derive(
     if pixel_size is not None:
         warnings.warn(
             "The 'pixel_size' argument is deprecated and will be removed in "
-            "a future release.",
+            "ngio=0.6. Please use 'pixelsize', 'z_spacing', and 'time_spacing'"
+            "instead.",
             DeprecationWarning,
             stacklevel=2,
         )

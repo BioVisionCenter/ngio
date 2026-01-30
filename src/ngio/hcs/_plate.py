@@ -919,8 +919,8 @@ class OmeZarrPlate:
         """
         if check_type is not None:
             warnings.warn(
-                "The 'check_type' argument is deprecated, and will be removed in "
-                "ngio=0.3. Use 'get_table_as' instead or one of the "
+                "The 'check_type' argument is deprecated and will be removed in "
+                "ngio=0.6. Please use 'get_table_as' instead or one of the "
                 "type specific get_*table() methods.",
                 DeprecationWarning,
                 stacklevel=2,
@@ -1212,7 +1212,7 @@ def create_empty_plate(
     """
     if version is not None:
         warnings.warn(
-            "The 'version' argument is deprecated, and will be removed in ngio=0.3. "
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
             "Please use 'ngff_version' instead.",
             DeprecationWarning,
             stacklevel=2,
@@ -1269,7 +1269,7 @@ def derive_ome_zarr_plate(
     """
     if version is not None:
         warnings.warn(
-            "The 'version' argument is deprecated, and will be removed in ngio=0.3. "
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
             "Please use 'ngff_version' instead.",
             DeprecationWarning,
             stacklevel=2,
@@ -1334,7 +1334,7 @@ def create_empty_well(
     """
     if version is not None:
         warnings.warn(
-            "The 'version' argument is deprecated, and will be removed in ngio=0.3. "
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
             "Please use 'ngff_version' instead.",
             DeprecationWarning,
             stacklevel=2,

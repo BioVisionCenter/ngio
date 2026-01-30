@@ -785,8 +785,8 @@ class OmeZarrContainer:
         """
         if check_type is not None:
             warnings.warn(
-                "The 'check_type' argument is deprecated, and will be removed in "
-                "ngio=0.3. Use 'get_table_as' instead or one of the "
+                "The 'check_type' argument is deprecated and will be removed in "
+                "ngio=0.6. Please use 'get_table_as' instead or one of the "
                 "type specific get_*table() methods.",
                 DeprecationWarning,
                 stacklevel=2,
@@ -1199,8 +1199,8 @@ def create_empty_ome_zarr(
     """
     if xy_pixelsize is not None:
         warnings.warn(
-            "'xy_pixelsize' is deprecated and will be removed in a future "
-            "version. Please use 'pixelsize' instead.",
+            "'xy_pixelsize' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'pixelsize' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1208,7 +1208,7 @@ def create_empty_ome_zarr(
     if xy_scaling_factor is not None or z_scaling_factor is not None:
         warnings.warn(
             "'xy_scaling_factor' and 'z_scaling_factor' are deprecated and will be "
-            "removed in a future version. Please use 'scaling_factors' instead.",
+            "removed in ngio=0.6. Please use 'scaling_factors' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1222,8 +1222,8 @@ def create_empty_ome_zarr(
 
     if channel_labels is not None:
         warnings.warn(
-            "'channel_labels' is deprecated and will be removed in a future "
-            "version. Please use 'channels_meta' instead.",
+            "'channel_labels' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'channels_meta' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -1231,22 +1231,22 @@ def create_empty_ome_zarr(
 
     if channel_wavelengths is not None:
         warnings.warn(
-            "'channel_wavelengths' is deprecated and will be removed in a future "
-            "version. Please use 'channels_meta' instead.",
+            "'channel_wavelengths' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'channels_meta' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
     if channel_colors is not None:
         warnings.warn(
-            "'channel_colors' is deprecated and will be removed in a future "
-            "version. Please use 'channels_meta' instead.",
+            "'channel_colors' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'channels_meta' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
     if channel_active is not None:
         warnings.warn(
-            "'channel_active' is deprecated and will be removed in a future "
-            "version. Please use 'channels_meta' instead.",
+            "'channel_active' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'channels_meta' instead.",
             DeprecationWarning,
             stacklevel=2,
         )

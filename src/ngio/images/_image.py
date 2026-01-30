@@ -658,10 +658,10 @@ class ImagesContainer:
         )
         if _is_legacy:
             warnings.warn(
-                "The following parameters are deprecated and will be removed in the "
-                "ngio=0.6.0 release: labels, wavelength_id, start, end, percentiles, "
+                "The following parameters are deprecated and will be removed in "
+                "ngio=0.6: labels, wavelength_id, start, end, percentiles, "
                 "colors, active, omero_kwargs. Please use the "
-                "channel_meta parameter instead.",
+                "'channel_meta' parameter instead.",
                 DeprecationWarning,
                 stacklevel=2,
             )
@@ -735,9 +735,8 @@ class ImagesContainer:
             end_percentile (float): The end percentile.
         """
         warnings.warn(
-            "The set_channel_percentiles method is deprecated and will be removed in "
-            "the ngio=0.6.0 release. "
-            "Please use set_channel_windows_with_percentiles instead.",
+            "The 'set_channel_percentiles' method is deprecated and will be removed in "
+            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
