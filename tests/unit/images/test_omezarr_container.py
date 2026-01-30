@@ -394,3 +394,22 @@ def test_delete_label_and_table(tmp_path: Path):
     with pytest.raises(NgioValueError):
         ome_zarr.delete_table("non_existing_table")
     ome_zarr.delete_table("non_existing_table", missing_ok=True)
+
+
+def test_rename_axes():
+    ome_zarr = create_empty_ome_zarr(
+        store={},
+        shape=(3, 127, 128),
+        pixelsize=1.0,
+        translation=(0.0, 1.0, 1.0),
+        ngff_version="0.5",
+        axes_names=["c", "y", "XX"],
+        overwrite=True,
+    )
+
+    ome_zarr.derive_label("label_1")
+    assert ome_zarr.get_image().axes == ("c", "y", "XX")
+    label = ome_zarr.get_label("label_1")
+    assert label.axes == ("y", "XX")
+    ome_zarr.set_axes_names(axes_names=["c", "y", "x"])
+    assert ome_zarr.get_image().axes == ("c", "y", "x")

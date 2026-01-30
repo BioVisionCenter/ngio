@@ -447,18 +447,12 @@ class OmeZarrContainer:
     def set_axes_names(
         self,
         axes_names: Sequence[str],
-        set_labels: bool = True,
     ) -> None:
         """Set the axes names of the image.
 
         Args:
             axes_names (Sequence[str]): The axes names of the image.
-            set_labels (bool): Whether to set the axes names for the labels as well.
         """
-        if set_labels:
-            for label_name in self.list_labels():
-                label = self.get_label(label_name)
-                label.set_axes_names(axes_names=axes_names)
         self._images_container.set_axes_names(axes_names=axes_names)
 
     def get_image(
