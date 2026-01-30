@@ -199,6 +199,11 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     ome_zarr.set_name("test_image")
     assert ome_zarr.meta.name == "test_image"
 
+    ome_zarr.set_channel_colors(colors=["00FF00"])
+    channels_meta = ome_zarr.meta.channels_meta
+    assert channels_meta is not None
+    assert channels_meta.channels[0].channel_visualisation.color == "00FF00"
+
     ome_zarr.set_channel_percentiles()
     ome_zarr.set_channel_windows_with_percentiles()
     ome_zarr.set_channel_windows(starts_ends=[(10, 200)], min_max=[(0, 255)])
