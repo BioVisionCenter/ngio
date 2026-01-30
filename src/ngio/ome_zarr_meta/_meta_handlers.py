@@ -176,8 +176,6 @@ def get_ngio_image_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
     axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = True,
 ) -> NgioImageMeta:
     """Retrieve the NGIO image metadata from the Zarr group.
 
@@ -185,19 +183,16 @@ def get_ngio_image_meta(
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
         axes_setup (AxesSetup | None): Optional axes setup for validation.
-        allow_non_canonical_axes (bool): Whether to allow non-canonical axes.
-        strict_canonical_order (bool): Whether to enforce strict canonical order.
 
     Returns:
         NgioImageMeta: The NGIO image metadata.
     """
+    # axes_setup = axes_setup or AxesSetup(x="XX")
     return get_ngio_meta(
         group_handler=group_handler,
         meta_type=NgioImageMeta,
         version=version,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
 
 
@@ -224,15 +219,10 @@ class ImageMetaHandler:
         group_handler: ZarrGroupHandler,
         version: str | None = None,
         axes_setup: AxesSetup | None = None,
-        allow_non_canonical_axes: bool = False,
-        strict_canonical_order: bool = True,
     ):
         self._group_handler = group_handler
         self._version = version
         self._axes_setup = axes_setup
-        self._allow_non_canonical_axes = allow_non_canonical_axes
-        self._strict_canonical_order = strict_canonical_order
-
         # Validate metadata
         meta = self.get_meta()
         # Store the resolved version
@@ -244,8 +234,6 @@ class ImageMetaHandler:
             group_handler=self._group_handler,
             version=self._version,
             axes_setup=self._axes_setup,
-            allow_non_canonical_axes=self._allow_non_canonical_axes,
-            strict_canonical_order=self._strict_canonical_order,
         )
 
     def update_meta(self, ngio_meta: NgioImageMeta) -> None:
@@ -260,8 +248,6 @@ def get_ngio_label_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
     axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = True,
 ) -> NgioLabelMeta:
     """Retrieve the NGIO label metadata from the Zarr group.
 
@@ -269,8 +255,6 @@ def get_ngio_label_meta(
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
         axes_setup (AxesSetup | None): Optional axes setup for validation.
-        allow_non_canonical_axes (bool): Whether to allow non-canonical axes.
-        strict_canonical_order (bool): Whether to enforce strict canonical order.
 
     Returns:
         NgioLabelMeta: The NGIO label metadata.
@@ -280,8 +264,6 @@ def get_ngio_label_meta(
         meta_type=NgioLabelMeta,
         version=version,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
 
 
@@ -306,16 +288,12 @@ class LabelMetaHandler:
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
-        version: str | None = None,
         axes_setup: AxesSetup | None = None,
-        allow_non_canonical_axes: bool = False,
-        strict_canonical_order: bool = True,
+        version: str | None = None,
     ):
         self._group_handler = group_handler
         self._version = version
         self._axes_setup = axes_setup
-        self._allow_non_canonical_axes = allow_non_canonical_axes
-        self._strict_canonical_order = strict_canonical_order
 
         # Validate metadata
         meta = self.get_meta()
@@ -328,8 +306,6 @@ class LabelMetaHandler:
             group_handler=self._group_handler,
             version=self._version,
             axes_setup=self._axes_setup,
-            allow_non_canonical_axes=self._allow_non_canonical_axes,
-            strict_canonical_order=self._strict_canonical_order,
         )
 
     def update_meta(self, ngio_meta: NgioLabelMeta) -> None:

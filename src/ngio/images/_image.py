@@ -34,6 +34,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     SpaceUnits,
     TimeUnits,
 )
+from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
@@ -105,7 +106,7 @@ class Image(AbstractImage):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: ImageMetaHandler | None,
+        meta_handler: ImageMetaHandler,
     ) -> None:
         """Initialize the Image at a single level.
 
@@ -115,8 +116,6 @@ class Image(AbstractImage):
             meta_handler: The image metadata handler.
 
         """
-        if meta_handler is None:
-            meta_handler = ImageMetaHandler(group_handler)
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
@@ -401,14 +400,20 @@ class Image(AbstractImage):
 
 
 class ImagesContainer:
-    """A class to handle the /labels group in an OME-NGFF file."""
+    """A class to handle the /images group in an OME-NGFF file."""
 
     def __init__(
-        self, group_handler: ZarrGroupHandler, validate_paths: bool = False
+        self,
+        group_handler: ZarrGroupHandler,
+        axes_setup: AxesSetup | None,
+        version: NgffVersions | None = None,
+        validate_paths: bool = True,
     ) -> None:
-        """Initialize the LabelGroupHandler."""
+        """Initialize the ImagesContainer."""
         self._group_handler = group_handler
-        self._meta_handler = ImageMetaHandler(group_handler)
+        self._meta_handler = ImageMetaHandler(
+            group_handler=group_handler, axes_setup=axes_setup, version=version
+        )
         if validate_paths:
             for level_path in self._meta_handler.get_meta().paths:
                 self.get(path=level_path)
@@ -422,6 +427,11 @@ class ImagesContainer:
     def channels_meta(self) -> ChannelsMeta:
         """Return the channels metadata."""
         return self.get().channels_meta
+
+    @property
+    def axes_setup(self) -> AxesSetup:
+        """Return the axes setup."""
+        return self.meta.axes_handler.axes_setup
 
     @property
     def level_paths(self) -> list[str]:
@@ -1083,7 +1093,7 @@ def derive_image_container(
 
     """
     ref_image = image_container.get(path=ref_path)
-    group_handler = abstract_derive(
+    group_handler, axes_setup = abstract_derive(
         ref_image=ref_image,
         meta_type=NgioImageMeta,
         store=store,
@@ -1106,7 +1116,7 @@ def derive_image_container(
         labels=labels,
         pixel_size=pixel_size,
     )
-    return ImagesContainer(group_handler=group_handler)
+    return ImagesContainer(group_handler=group_handler, axes_setup=axes_setup)
 
 
 def _parse_str_or_model(

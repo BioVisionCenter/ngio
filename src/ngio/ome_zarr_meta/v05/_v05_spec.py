@@ -133,8 +133,6 @@ def _compute_scale_translation(
 def _v05_to_ngio_datasets(
     v05_multiscale: MultiscaleV05,
     axes_setup: AxesSetup,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = True,
 ) -> list[Dataset]:
     """Convert a v05 multiscale to a list of ngio datasets."""
     datasets = []
@@ -165,8 +163,6 @@ def _v05_to_ngio_datasets(
     axes_handler = AxesHandler(
         axes=axes,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
 
     for v05_dataset in v05_multiscale.datasets:
@@ -186,18 +182,14 @@ def _v05_to_ngio_datasets(
 
 def v05_to_ngio_image_meta(
     metadata: dict,
-    axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = True,
+    axes_setup: AxesSetup,
 ) -> NgioImageMeta:
     """Convert a v05 image metadata to a ngio image metadata.
 
     Args:
         metadata (dict): The v05 image metadata.
-        axes_setup (AxesSetup, optional): The axes setup. This is
+        axes_setup (AxesSetup): The axes setup. This is
             required to convert image with non-canonical axes names.
-        allow_non_canonical_axes (bool, optional): Allow non-canonical axes.
-        strict_canonical_order (bool, optional): Strict canonical order.
 
     Returns:
         NgioImageMeta: The ngio image metadata.
@@ -212,12 +204,9 @@ def v05_to_ngio_image_meta(
     v05_multiscale = v05_image.multiscales[0]
 
     channels_meta = _v05_omero_to_channels(v05_image.omero)
-    axes_setup = axes_setup if axes_setup is not None else AxesSetup()
     datasets = _v05_to_ngio_datasets(
         v05_multiscale,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
 
     name = v05_multiscale.name
@@ -233,18 +222,14 @@ def v05_to_ngio_image_meta(
 
 def v05_to_ngio_label_meta(
     metadata: dict,
-    axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = True,
+    axes_setup: AxesSetup,
 ) -> NgioLabelMeta:
     """Convert a v05 image metadata to a ngio image metadata.
 
     Args:
         metadata (dict): The v05 image metadata.
-        axes_setup (AxesSetup, optional): The axes setup. This is
+        axes_setup (AxesSetup): The axes setup. This is
             required to convert image with non-canonical axes names.
-        allow_non_canonical_axes (bool, optional): Allow non-canonical axes.
-        strict_canonical_order (bool, optional): Strict canonical order.
 
     Returns:
         NgioLabelMeta: The ngio label metadata.
@@ -259,12 +244,9 @@ def v05_to_ngio_label_meta(
 
     v05_multiscale = v05_label.multiscales[0]
 
-    axes_setup = axes_setup if axes_setup is not None else AxesSetup()
     datasets = _v05_to_ngio_datasets(
         v05_multiscale,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
 
     if v05_label.image_label is not None:

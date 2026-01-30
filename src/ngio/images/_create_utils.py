@@ -22,6 +22,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     NgffVersions,
     SpaceUnits,
     TimeUnits,
+    build_axes_handler,
     build_canonical_axes_handler,
     canonical_axes_order,
     canonical_label_axes_order,
@@ -30,36 +31,6 @@ from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import NgioValueError, StoreOrGroup, ZarrGroupHandler
 
 _image_or_label_meta = TypeVar("_image_or_label_meta", NgioImageMeta, NgioLabelMeta)
-
-
-def _build_axes_handler(
-    *,
-    shape: tuple[int, ...],
-    axes_names: Sequence[str] | None,
-    default_channel_order: tuple[str, ...],
-    space_units: SpaceUnits | str | None = DefaultSpaceUnit,
-    time_units: TimeUnits | str | None = DefaultTimeUnit,
-    axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = False,
-) -> AxesHandler:
-    """Compute axes names for given shape."""
-    if axes_names is None:
-        axes_names = default_channel_order[-len(shape) :]
-    # Validate length
-    if len(axes_names) != len(shape):
-        raise NgioValueError(
-            f"Number of axes names {axes_names} does not match the number of "
-            f"dimensions {shape}."
-        )
-    return build_canonical_axes_handler(
-        axes_names=axes_names,
-        space_units=space_units,
-        time_units=time_units,
-        axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
-    )
 
 
 def _align_to_axes(
@@ -231,6 +202,32 @@ def _add_channels_meta(
     return meta
 
 
+def _build_axes_handler(
+    *,
+    shape: tuple[int, ...],
+    meta_type: type[_image_or_label_meta],
+    axes_names: Sequence[str] | None = None,
+    axes_setup: AxesSetup | None = None,
+) -> AxesHandler:
+    """Build axes handler for given shape and axes names."""
+    if meta_type is NgioImageMeta:
+        canonical_axes_order_ = canonical_axes_order()
+    else:
+        canonical_axes_order_ = canonical_label_axes_order()
+    if axes_names is None:
+        axes_names = canonical_axes_order_[-len(shape) :]
+
+    if axes_setup is None:
+        return build_canonical_axes_handler(
+            axes_names=axes_names,
+            canonical_channel_order=canonical_axes_order_,
+        )
+    return build_axes_handler(
+        axes_names=axes_names,
+        axes_setup=axes_setup,
+    )
+
+
 def init_image_like(
     *,
     # Where to create the image
@@ -259,31 +256,25 @@ def init_image_like(
     extra_array_kwargs: Mapping[str, Any] | None = None,
     # internal axes configuration for advanced use cases
     axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = False,
     # Whether to overwrite existing image
     overwrite: bool = False,
     # Deprecated arguments
     yx_scaling_factor: float | tuple[float, float] | None = None,
     z_scaling_factor: float | None = None,
-) -> ZarrGroupHandler:
+) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image with the given shape and metadata."""
     shape = tuple(shape)
-    if meta_type is NgioImageMeta:
-        default_axes_order = canonical_axes_order()
-    else:
-        default_axes_order = canonical_label_axes_order()
-
     axes_handler = _build_axes_handler(
         shape=shape,
+        meta_type=meta_type,
         axes_names=axes_names,
-        default_channel_order=default_axes_order,
-        space_units=space_unit,
-        time_units=time_unit,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
+    if len(shape) != len(axes_handler.axes_names):
+        raise NgioValueError(
+            f"Mismatch between shape {shape} "
+            f"and number of axes {len(axes_handler.axes_names)}."
+        )
     base_scale = compute_base_scale(
         pixelsize=pixelsize,
         z_spacing=z_spacing,
@@ -327,12 +318,13 @@ def init_image_like(
     )
     meta = _add_channels_meta(meta=meta, channels_meta=channels_meta)
     # Keep this creation at the end to avoid partial creations on errors
-    return _create_image_like_group(
+    image_handler = _create_image_like_group(
         store=store,
         pyramid_builder=pyramid_builder,
         meta=meta,
         overwrite=overwrite,
     )
+    return image_handler, axes_handler.axes_setup
 
 
 def init_image_like_from_shapes(
@@ -360,28 +352,22 @@ def init_image_like_from_shapes(
     extra_array_kwargs: Mapping[str, Any] | None = None,
     # internal axes configuration for advanced use cases
     axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = False,
     # Whether to overwrite existing image
     overwrite: bool = False,
-) -> ZarrGroupHandler:
+) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image with the given shape and metadata."""
     base_shape = shapes[0]
-    if meta_type is NgioImageMeta:
-        default_axes_order = canonical_axes_order()
-    else:
-        default_axes_order = canonical_label_axes_order()
-
     axes_handler = _build_axes_handler(
         shape=base_shape,
+        meta_type=meta_type,
         axes_names=axes_names,
-        default_channel_order=default_axes_order,
-        space_units=space_unit,
-        time_units=time_unit,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
+    if len(base_shape) != len(axes_handler.axes_names):
+        raise NgioValueError(
+            f"Mismatch between shape {base_shape} "
+            f"and number of axes {len(axes_handler.axes_names)}."
+        )
     if levels is None:
         levels_paths = tuple(str(i) for i in range(len(shapes)))
     else:
@@ -411,9 +397,10 @@ def init_image_like_from_shapes(
     )
     meta = _add_channels_meta(meta=meta, channels_meta=channels_meta)
     # Keep this creation at the end to avoid partial creations on errors
-    return _create_image_like_group(
+    image_handler = _create_image_like_group(
         store=store,
         pyramid_builder=pyramid_builder,
         meta=meta,
         overwrite=overwrite,
     )
+    return image_handler, axes_handler.axes_setup

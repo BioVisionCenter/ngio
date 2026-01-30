@@ -24,6 +24,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     SpaceUnits,
     TimeUnits,
 )
+from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
     NgioValidationError,
@@ -49,7 +50,7 @@ class Label(AbstractImage):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: LabelMetaHandler | None,
+        meta_handler: LabelMetaHandler,
     ) -> None:
         """Initialize the Image at a single level.
 
@@ -59,8 +60,6 @@ class Label(AbstractImage):
             meta_handler: The image metadata handler.
 
         """
-        if meta_handler is None:
-            meta_handler = LabelMetaHandler(group_handler)
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
@@ -128,10 +127,12 @@ class LabelsContainer:
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
+        axes_setup: AxesSetup | None = None,
         ngff_version: NgffVersions | None = None,
     ) -> None:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
+        self._axes_setup = axes_setup or AxesSetup()
         # If the group is empty, initialize the metadata
         try:
             self._meta_handler = LabelsGroupMetaHandler(group_handler)
@@ -154,6 +155,11 @@ class LabelsContainer:
         """Return the metadata."""
         meta = self._meta_handler.get_meta()
         return meta
+
+    @property
+    def axes_setup(self) -> AxesSetup:
+        """Return the axes setup."""
+        return self._axes_setup
 
     def list(self) -> list[str]:
         """Create the /labels group if it doesn't exist."""
@@ -184,13 +190,17 @@ class LabelsContainer:
             )
 
         group_handler = self._group_handler.get_handler(name)
-        label_meta_handler = LabelMetaHandler(group_handler)
+        label_meta_handler = LabelMetaHandler(group_handler, axes_setup=self.axes_setup)
         path = (
             label_meta_handler.get_meta()
             .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
             .path
         )
-        return Label(group_handler, path, label_meta_handler)
+        return Label(
+            group_handler=group_handler,
+            path=path,
+            meta_handler=label_meta_handler,
+        )
 
     def delete(self, name: str, missing_ok: bool = False) -> None:
         """Delete a label from the group.
@@ -290,7 +300,6 @@ class LabelsContainer:
             )
 
         label_group = self._group_handler.get_group(name, create_mode=True)
-
         derive_label(
             ref_image=ref_image,
             store=label_group,
@@ -347,7 +356,7 @@ def derive_label(
     # Deprecated arguments
     labels: Sequence[str] | None = None,
     pixel_size: PixelSize | None = None,
-) -> ZarrGroupHandler:
+) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Derive a new OME-Zarr label from an existing image or label.
 
     If a kwarg is not provided, the value from the reference image will be used.
@@ -386,12 +395,13 @@ def derive_label(
             and time_spacing instead.
 
     Returns:
-        ZarrGroupHandler: The group handler of the new label.
+        tuple[ZarrGroupHandler, AxesSetup]: The group handler of the new label
+            and the axes setup.
 
     """
     if dtype is None and isinstance(ref_image, Image):
         dtype = "uint32"
-    group_handler = abstract_derive(
+    group_handler, axes_setup = abstract_derive(
         ref_image=ref_image,
         meta_type=NgioLabelMeta,
         store=store,
@@ -414,7 +424,7 @@ def derive_label(
         labels=labels,
         pixel_size=pixel_size,
     )
-    return group_handler
+    return group_handler, axes_setup
 
 
 def build_masking_roi_table(

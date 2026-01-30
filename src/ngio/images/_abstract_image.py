@@ -52,6 +52,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     NgffVersions,
     NgioLabelMeta,
 )
+from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.tables import RoiTable
 from ngio.utils import (
     NgioFileExistsError,
@@ -135,6 +136,11 @@ class AbstractImage(ABC):
     def axes_handler(self) -> AxesHandler:
         """Return the axes handler of the image."""
         return self.dataset.axes_handler
+
+    @property
+    def axes_setup(self) -> AxesSetup:
+        """Return the axes setup of the image."""
+        return self.axes_handler.axes_setup
 
     @property
     def axes(self) -> tuple[str, ...]:
@@ -887,7 +893,7 @@ def abstract_derive(
     # Deprecated arguments
     labels: Sequence[str] | None = None,
     pixel_size: PixelSize | None = None,
-) -> ZarrGroupHandler:
+) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image from an existing image.
 
     If a kwarg is not provided, the value from the reference image will be used.
@@ -1012,7 +1018,7 @@ def abstract_derive(
         channels_meta=channels_meta,
     )
 
-    handler = init_image_like_from_shapes(
+    handler, axes_setup = init_image_like_from_shapes(
         store=store,
         meta_type=meta_type,
         shapes=shapes,
@@ -1033,4 +1039,4 @@ def abstract_derive(
         ngff_version=ngff_version,
         extra_array_kwargs=extra_array_kwargs,
     )
-    return handler
+    return handler, axes_setup

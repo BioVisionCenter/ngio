@@ -26,6 +26,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     SpaceUnits,
     TimeUnits,
 )
+from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.tables import (
     ConditionTable,
@@ -62,12 +63,19 @@ def _try_get_table_container(
 
 
 def _try_get_label_container(
-    handler: ZarrGroupHandler, ngff_version: NgffVersions, create_mode: bool = True
+    handler: ZarrGroupHandler,
+    ngff_version: NgffVersions,
+    axes_setup: AxesSetup | None = None,
+    create_mode: bool = True,
 ) -> LabelsContainer | None:
     """Return a default label container."""
     try:
         label_handler = handler.get_handler("labels", create_mode=create_mode)
-        return LabelsContainer(label_handler, ngff_version=ngff_version)
+        return LabelsContainer(
+            group_handler=label_handler,
+            axes_setup=axes_setup,
+            ngff_version=ngff_version,
+        )
     except FileNotFoundError:
         return None
 
@@ -98,6 +106,7 @@ class OmeZarrContainer:
         group_handler: ZarrGroupHandler,
         table_container: TablesContainer | None = None,
         label_container: LabelsContainer | None = None,
+        axes_setup: AxesSetup | None = None,
         validate_paths: bool = False,
     ) -> None:
         """Initialize the OmeZarrContainer.
@@ -106,11 +115,14 @@ class OmeZarrContainer:
             group_handler (ZarrGroupHandler): The Zarr group handler.
             table_container (TablesContainer | None): The tables container.
             label_container (LabelsContainer | None): The labels container.
+            axes_setup (AxesSetup | None): Axes setup to load ome-zarr with
+                non-standard axes configurations.
             validate_paths (bool): Whether to validate the paths of the image multiscale
         """
         self._group_handler = group_handler
-        self._images_container = ImagesContainer(self._group_handler)
-
+        self._images_container = ImagesContainer(
+            self._group_handler, axes_setup=axes_setup
+        )
         self._labels_container = label_container
         self._tables_container = table_container
 
@@ -153,6 +165,7 @@ class OmeZarrContainer:
             self._group_handler,
             create_mode=create_mode,
             ngff_version=self.image_meta.version,
+            axes_setup=self._images_container.axes_setup,
         )
         self._labels_container = _labels_container
         return self._labels_container
@@ -199,6 +212,11 @@ class OmeZarrContainer:
             stacklevel=2,
         )
         return self.images_container.meta
+
+    @property
+    def axes_setup(self) -> AxesSetup:
+        """Return the axes setup."""
+        return self.images_container.axes_setup
 
     @property
     def levels(self) -> int:
@@ -649,10 +667,10 @@ class OmeZarrContainer:
             labels=labels,
             pixel_size=pixel_size,
         )
-
         new_ome_zarr = OmeZarrContainer(
             group_handler=new_container._group_handler,
             validate_paths=False,
+            axes_setup=new_container.meta.axes_handler.axes_setup,
         )
 
         if copy_labels:
@@ -1007,6 +1025,7 @@ def open_ome_zarr_container(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
+    axes_setup: AxesSetup | None = None,
     validate_arrays: bool = True,
 ) -> OmeZarrContainer:
     """Open an OME-Zarr image."""
@@ -1014,6 +1033,7 @@ def open_ome_zarr_container(
     return OmeZarrContainer(
         group_handler=handler,
         validate_paths=validate_arrays,
+        axes_setup=axes_setup,
     )
 
 
@@ -1022,6 +1042,7 @@ def open_image(
     path: str | None = None,
     pixel_size: PixelSize | None = None,
     strict: bool = True,
+    axes_setup: AxesSetup | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
 ) -> Image:
@@ -1034,12 +1055,14 @@ def open_image(
         strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
+        axes_setup (AxesSetup | None): Axes setup to load ome-zarr with
+            non-standard axes configurations.
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The
             access mode for the image. Defaults to "r+".
     """
     group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
-    images_container = ImagesContainer(group_handler)
+    images_container = ImagesContainer(group_handler, axes_setup=axes_setup)
     return images_container.get(
         path=path,
         pixel_size=pixel_size,
@@ -1053,6 +1076,7 @@ def open_label(
     path: str | None = None,
     pixel_size: PixelSize | None = None,
     strict: bool = True,
+    axes_setup: AxesSetup | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
 ) -> Label:
@@ -1067,13 +1091,15 @@ def open_label(
         strict (bool): Only used if the pixel size is provided. If True, the
             pixel size must match the image pixel size exactly. If False, the
             closest pixel size level will be returned.
+        axes_setup (AxesSetup | None): Axes setup to load ome-zarr with
+            non-standard axes configurations.
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The access mode for the image. Defaults to "r+".
 
     """
     group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     if name is None:
-        label_meta_handler = LabelMetaHandler(group_handler)
+        label_meta_handler = LabelMetaHandler(group_handler, axes_setup=axes_setup)
         path = (
             label_meta_handler.get_meta()
             .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
@@ -1081,7 +1107,7 @@ def open_label(
         )
         return Label(group_handler, path, label_meta_handler)
 
-    labels_container = LabelsContainer(group_handler)
+    labels_container = LabelsContainer(group_handler, axes_setup=axes_setup)
     return labels_container.get(
         name=name,
         path=path,
@@ -1104,6 +1130,7 @@ def create_empty_ome_zarr(
     axes_names: Sequence[str] | None = None,
     channels_meta: Sequence[str | Channel] | None = None,
     name: str | None = None,
+    axes_setup: AxesSetup | None = None,
     ngff_version: NgffVersions = DefaultNgffVersion,
     chunks: ChunksLike = "auto",
     shards: ShardsLike | None = None,
@@ -1143,6 +1170,8 @@ def create_empty_ome_zarr(
         channels_meta (Sequence[str | Channel] | None): The channels metadata.
             Defaults to None.
         name (str | None): The name of the image. Defaults to None.
+        axes_setup (AxesSetup | None): Axes setup to create ome-zarr with
+            non-standard axes configurations. Defaults to None.
         ngff_version (NgffVersions): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
         chunks (ChunksLike): The chunk shape. Defaults to "auto".
@@ -1219,7 +1248,7 @@ def create_empty_ome_zarr(
     if pixelsize is None:
         raise NgioValueError("pixelsize must be provided.")
 
-    handler = init_image_like(
+    handler, axes_setup = init_image_like(
         store=store,
         meta_type=NgioImageMeta,
         shape=shape,
@@ -1234,6 +1263,7 @@ def create_empty_ome_zarr(
         axes_names=axes_names,
         channels_meta=channels_meta,
         name=name,
+        axes_setup=axes_setup,
         ngff_version=ngff_version,
         chunks=chunks,
         shards=shards,
@@ -1244,7 +1274,7 @@ def create_empty_ome_zarr(
         overwrite=overwrite,
     )
 
-    ome_zarr = OmeZarrContainer(group_handler=handler)
+    ome_zarr = OmeZarrContainer(group_handler=handler, axes_setup=axes_setup)
     if (
         channel_wavelengths is not None
         or channel_colors is not None
@@ -1281,6 +1311,7 @@ def create_ome_zarr_from_array(
     channels_meta: Sequence[str | Channel] | None = None,
     percentiles: tuple[float, float] = (0.1, 99.9),
     name: str | None = None,
+    axes_setup: AxesSetup | None = None,
     ngff_version: NgffVersions = DefaultNgffVersion,
     chunks: ChunksLike = "auto",
     shards: ShardsLike | None = None,
@@ -1321,6 +1352,8 @@ def create_ome_zarr_from_array(
         percentiles (tuple[float, float]): The percentiles of the channels for
             computing display ranges. Defaults to (0.1, 99.9).
         name (str | None): The name of the image. Defaults to None.
+        axes_setup (AxesSetup | None): Axes setup to create ome-zarr with
+            non-standard axes configurations. Defaults to None.
         ngff_version (NgffVersions): The version of the OME-Zarr specification.
             Defaults to DefaultNgffVersion.
         chunks (ChunksLike): The chunk shape. Defaults to "auto".
@@ -1375,8 +1408,5 @@ def create_ome_zarr_from_array(
         raise NgioValueError(
             f"'percentiles' must be a tuple of two values. Got {percentiles}"
         )
-    ome_zarr.set_channel_percentiles(
-        start_percentile=percentiles[0],
-        end_percentile=percentiles[1],
-    )
+    ome_zarr.set_channel_windows_with_percentiles(percentiles=percentiles)
     return ome_zarr
