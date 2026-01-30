@@ -7,6 +7,15 @@
 - Move to zarr-python v3
 - API to delete labels and tables from OME-Zarr containers and HCS plates.
 - Allow to explicitly set axes order when building masking roi tables.
+- New metadata modification APIs for `Image`, `Label`, and `OmeZarrContainer`:
+  - `set_channel_labels` - Update channel labels
+  - `set_channel_colors` - Update channel colors
+  - `set_channel_windows` - Update channel display windows (start/end values)
+  - `set_channel_windows_with_percentiles` - Update display windows based on data percentiles
+  - `set_axes_names` - Rename axes in the metadata
+  - `set_axes_unit` - Set space and time units for axes
+  - `set_name` - Set the image/label name in metadata
+- Add translation support in all image/label creation and derivation APIs.
 
 ### API Breaking Changes
 
@@ -19,8 +28,12 @@
 - Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
 - Remove `ngio_logger` in favor of standard warnings module.
 
+### Deprecations
+- Standardized all deprecation warnings to indicate removal in `ngio=0.6`.
+- Deprecated `set_channel_percentiles` method, use `set_channel_windows_with_percentiles` instead.
+
 ### Bug Fixes
-- Fix bug in `consolidate` function when using corsening mode with non power-of-two shapes.
+- Fix bug in `consolidate` function when using coarsening mode with non power-of-two shapes.
 
 ## [v0.4.7]
 
