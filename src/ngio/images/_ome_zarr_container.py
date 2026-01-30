@@ -455,6 +455,19 @@ class OmeZarrContainer:
         """
         self._images_container.set_axes_names(axes_names=axes_names)
 
+    def set_name(
+        self,
+        name: str,
+    ) -> None:
+        """Set the name of the image in the metadata.
+
+        This does not change the group name or any paths.
+
+        Args:
+            name (str): The name of the image.
+        """
+        self._images_container.set_name(name=name)
+
     def get_image(
         self,
         path: str | None = None,

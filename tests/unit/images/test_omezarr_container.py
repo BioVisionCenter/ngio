@@ -196,6 +196,8 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     image = ome_zarr.get_image()
     assert image.channel_labels == ["channel_y"]
     assert image.wavelength_ids == ["500"]
+    ome_zarr.set_name("test_image")
+    assert ome_zarr.meta.name == "test_image"
 
     ome_zarr.set_channel_percentiles()
     ome_zarr.set_channel_windows_with_percentiles()

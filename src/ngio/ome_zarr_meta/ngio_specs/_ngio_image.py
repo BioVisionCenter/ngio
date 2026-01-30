@@ -153,6 +153,18 @@ class AbstractNgioImageMeta:
             datasets=new_datasets,
         )
 
+    def rename_image(self, name: str):
+        """Rename the image in the metadata.
+
+        Args:
+            name(str): The new name of the image.
+        """
+        return type(self)(
+            version=self.version,
+            name=name,
+            datasets=self.datasets,
+        )
+
     @property
     def version(self) -> NgffVersions:
         """Version of the OME-NFF metadata used to build the object."""

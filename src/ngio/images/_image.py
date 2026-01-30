@@ -837,6 +837,19 @@ class ImagesContainer:
         image.set_axes_names(axes_names=axes_names)
         self._meta_handler._axes_setup = image.meta.axes_handler.axes_setup
 
+    def set_name(
+        self,
+        name: str,
+    ) -> None:
+        """Set the name of the image in the metadata.
+
+        This does not change the group name or any paths.
+
+        Args:
+            name (str): The name of the image.
+        """
+        self.get().set_name(name=name)
+
     def derive(
         self,
         store: StoreOrGroup,

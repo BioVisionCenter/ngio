@@ -243,6 +243,21 @@ class AbstractImage(ABC):
         self._meta_handler._axes_setup = meta.axes_handler.axes_setup
         self._meta_handler.update_meta(meta)  # type: ignore
 
+    def set_name(
+        self,
+        name: str,
+    ) -> None:
+        """Set the name of the image in the metadata.
+
+        This does not change the group name or any paths.
+
+        Args:
+            name (str): The name of the image.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.rename_image(name=name)
+        self._meta_handler.update_meta(meta)  # type: ignore
+
     def _get_as_numpy(
         self,
         axes_order: Sequence[str] | None = None,
