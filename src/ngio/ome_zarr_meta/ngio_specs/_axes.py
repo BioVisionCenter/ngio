@@ -187,11 +187,15 @@ class AxesSetup(BaseModel):
                 "The number of axes names cannot be greater than the "
                 "number of canonical axes."
             )
-        # Trim the canonical order to match the length of axes_names
-        canonical_order = list(canonical_order)[-len(axes_names) :]
+        canonical_order = list(canonical_order)
+        chanonical_axes = canonical_axes_order()
         axes_mapping = {}
-        for can_name, ax_name in zip(canonical_order, axes_names, strict=True):
-            axes_mapping[can_name] = ax_name
+        for ax in reversed(axes_names):
+            c_ax = canonical_order.pop()
+            if ax in chanonical_axes:
+                axes_mapping[ax] = ax
+            else:
+                axes_mapping[c_ax] = ax
         return cls(**axes_mapping)
 
     def canonical_map(self) -> dict[str, str]:
@@ -281,7 +285,7 @@ def validate_axes(
 ) -> None:
     """Validate the axes."""
     if axes_setup.allow_non_canonical_axes and axes_setup.strict_canonical_order:
-        raise NgioValidationError(
+        raise NgioValueError(
             "`allow_non_canonical_axes` and"
             "`strict_canonical_order` cannot be true at the same time."
             "If non canonical axes are allowed, the order cannot be checked."

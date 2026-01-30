@@ -18,50 +18,48 @@ from ngio.ome_zarr_meta.ngio_specs import (
     PixelSize,
 )
 from ngio.ome_zarr_meta.ngio_specs._channels import valid_hex_color
+from ngio.utils import NgioValidationError, NgioValueError
 
 
 @pytest.mark.parametrize(
-    "axes, axes_setup, allow_non_canonical_axes, strict_canonical_order",
+    "axes, axes_setup",
     [
         (
             ["t", "c", "z", "y", "x"],
             None,
-            False,
-            True,
         ),
         (
             ["c", "t", "z", "y", "x"],
             None,
-            False,
-            False,
         ),
         (
             ["c", "t", "z", "y", "X"],
-            AxesSetup(x="X"),
-            False,
-            False,
+            AxesSetup(
+                x="X", allow_non_canonical_axes=False, strict_canonical_order=False
+            ),
         ),
         (
             ["y", "X"],
-            AxesSetup(x="X"),
-            False,
-            False,
+            AxesSetup(
+                x="X", allow_non_canonical_axes=False, strict_canonical_order=False
+            ),
         ),
         (
             ["weird", "y", "X"],
-            AxesSetup(x="X", others=["weird"]),
-            True,
-            False,
+            AxesSetup(
+                x="X",
+                others=["weird"],
+                allow_non_canonical_axes=True,
+                strict_canonical_order=False,
+            ),
         ),
     ],
 )
-def test_axes_base(axes, axes_setup, allow_non_canonical_axes, strict_canonical_order):
+def test_axes_base(axes, axes_setup):
     _axes = [Axis(name=name) for name in axes]
     mapper = AxesHandler(
         axes=_axes,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
     )
     for i, ax in enumerate(axes):
         assert mapper.get_index(ax) == i
@@ -90,54 +88,56 @@ def test_axis_cast(canonical_name, axis_type, unit, expected_type, expected_unit
 
 
 def test_axes_fail():
-    with pytest.raises(ValueError):
+    with pytest.raises(NgioValidationError):
         AxesHandler(
             axes=[Axis(name="x")],
-            axes_setup=AxesSetup(x="X"),
-            allow_non_canonical_axes=False,
-            strict_canonical_order=False,
+            axes_setup=AxesSetup(
+                x="X", strict_canonical_order=False, allow_non_canonical_axes=False
+            ),
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NgioValueError):
         AxesHandler(
             axes=[Axis(name="x")],
-            axes_setup=AxesSetup(x="x"),
-            allow_non_canonical_axes=True,
-            strict_canonical_order=True,
+            axes_setup=AxesSetup(
+                x="x", strict_canonical_order=True, allow_non_canonical_axes=True
+            ),
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NgioValidationError):
         AxesHandler(
             axes=[
                 Axis(name="x"),
                 Axis(name="x"),
             ],
-            axes_setup=None,
-            allow_non_canonical_axes=False,
-            strict_canonical_order=True,
+            axes_setup=AxesSetup(
+                allow_non_canonical_axes=False, strict_canonical_order=True
+            ),
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NgioValidationError):
         AxesHandler(
             axes=[
                 Axis(name="x"),
                 Axis(name="z"),
             ],
-            axes_setup=None,
-            allow_non_canonical_axes=False,
-            strict_canonical_order=True,
+            axes_setup=AxesSetup(
+                allow_non_canonical_axes=False, strict_canonical_order=True
+            ),
         )
 
-    with pytest.raises(ValueError):
+    with pytest.raises(NgioValidationError):
         AxesHandler(
             axes=[
                 Axis(name="weird"),
                 Axis(name="y"),
                 Axis(name="x"),
             ],
-            axes_setup=AxesSetup(others=["weird"]),
-            allow_non_canonical_axes=False,
-            strict_canonical_order=False,
+            axes_setup=AxesSetup(
+                others=["weird"],
+                strict_canonical_order=False,
+                allow_non_canonical_axes=False,
+            ),
         )
 
 
@@ -177,9 +177,9 @@ def test_dataset():
 
     axes_handler = AxesHandler(
         axes=axes,
-        axes_setup=AxesSetup(),
-        allow_non_canonical_axes=False,
-        strict_canonical_order=True,
+        axes_setup=AxesSetup(
+            allow_non_canonical_axes=False, strict_canonical_order=True
+        ),
     )
 
     scale = [1.0, 1.0, 1.0, 0.5, 0.5]
@@ -210,9 +210,9 @@ def test_dataset_fail():
     ]
     axes_handler = AxesHandler(
         axes=axes,
-        axes_setup=AxesSetup(),
-        allow_non_canonical_axes=False,
-        strict_canonical_order=True,
+        axes_setup=AxesSetup(
+            allow_non_canonical_axes=False, strict_canonical_order=True
+        ),
     )
     ds = Dataset(
         path="0",
@@ -313,9 +313,9 @@ def test_image_meta():
 
     axes_handler = AxesHandler(
         axes=axes,
-        axes_setup=AxesSetup(),
-        allow_non_canonical_axes=False,
-        strict_canonical_order=True,
+        axes_setup=AxesSetup(
+            allow_non_canonical_axes=False, strict_canonical_order=True
+        ),
     )
     translation = [0.0, 0.0, 0.0, 0.0, 0.0]
     scale = [1.0, 1.0, 1.0, 0.5, 0.5]
@@ -360,9 +360,9 @@ def test_label_meta():
     ]
     axes_handler = AxesHandler(
         axes=axes,
-        axes_setup=AxesSetup(),
-        allow_non_canonical_axes=False,
-        strict_canonical_order=True,
+        axes_setup=AxesSetup(
+            allow_non_canonical_axes=False, strict_canonical_order=True
+        ),
     )
     translation = [0.0, 0.0, 0.0, 0.0]
     scale = [1.0, 1.0, 0.5, 0.5]
@@ -404,9 +404,9 @@ def test_channels_label_meta():
     ]
     axes_handler = AxesHandler(
         axes=axes,
-        axes_setup=AxesSetup(),
-        allow_non_canonical_axes=False,
-        strict_canonical_order=True,
+        axes_setup=AxesSetup(
+            allow_non_canonical_axes=False, strict_canonical_order=True
+        ),
     )
     translation = [0.0, 0.0, 0.0, 0.0, 0.0]
     scale = [1.0, 1.0, 1.0, 0.5, 0.5]

@@ -1029,6 +1029,7 @@ def abstract_derive(
         space_unit=ref_image.space_unit,
         axes_names=axes,
         name=name,
+        axes_setup=ref_image.axes_setup,
         channels_meta=channels_meta_,
         chunks=chunks,
         shards=shards,

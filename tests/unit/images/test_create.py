@@ -169,13 +169,13 @@ def test_derive_from_non_dishogeneus_shapes():
         (4, 3, 32, 25),
     ]
     store = MemoryStore()
-    image_handler = init_image_like_from_shapes(
+    image_handler, axes_setup = init_image_like_from_shapes(
         store=store,
         meta_type=NgioImageMeta,
         shapes=shapes,
         base_scale=(1.0, 1.0, 2.0, 2.0),
     )
-    ome_zarr = OmeZarrContainer(group_handler=image_handler)
+    ome_zarr = OmeZarrContainer(group_handler=image_handler, axes_setup=axes_setup)
     ome_zarr.derive_label("test-label-same", channels_policy="same")
     for path in ome_zarr.levels_paths:
         img = ome_zarr.get_image(path=path)
