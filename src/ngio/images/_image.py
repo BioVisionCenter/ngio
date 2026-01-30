@@ -1,5 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -27,7 +28,6 @@ from ngio.ome_zarr_meta import (
 from ngio.ome_zarr_meta.ngio_specs import (
     Channel,
     ChannelsMeta,
-    ChannelVisualisation,
     DefaultSpaceUnit,
     DefaultTimeUnit,
     NgffVersions,
@@ -403,10 +403,15 @@ class Image(AbstractImage):
 class ImagesContainer:
     """A class to handle the /labels group in an OME-NGFF file."""
 
-    def __init__(self, group_handler: ZarrGroupHandler) -> None:
+    def __init__(
+        self, group_handler: ZarrGroupHandler, validate_paths: bool = False
+    ) -> None:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
         self._meta_handler = ImageMetaHandler(group_handler)
+        if validate_paths:
+            for level_path in self._meta_handler.get_meta().paths:
+                self.get(path=level_path)
 
     @property
     def meta(self) -> NgioImageMeta:
@@ -414,63 +419,106 @@ class ImagesContainer:
         return self._meta_handler.get_meta()
 
     @property
-    def levels(self) -> int:
-        """Return the number of levels in the image."""
-        return self._meta_handler.get_meta().levels
+    def channels_meta(self) -> ChannelsMeta:
+        """Return the channels metadata."""
+        return self.get().channels_meta
+
+    @property
+    def level_paths(self) -> list[str]:
+        """Return the paths of the levels in the image."""
+        return self.meta.paths
 
     @property
     def levels_paths(self) -> list[str]:
-        """Return the paths of the levels in the image."""
-        return self._meta_handler.get_meta().paths
+        """Deprecated: use 'level_paths' instead."""
+        warnings.warn(
+            "'levels_paths' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'level_paths' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.level_paths
 
     @property
-    def num_channels(self) -> int:
-        """Return the number of channels."""
-        image = self.get()
-        return image.num_channels
+    def levels(self) -> int:
+        """Return the number of levels in the image."""
+        return self.meta.levels
+
+    @property
+    def is_3d(self) -> bool:
+        """Return True if the image is 3D."""
+        return self.get().is_3d
+
+    @property
+    def is_2d(self) -> bool:
+        """Return True if the image is 2D."""
+        return self.get().is_2d
+
+    @property
+    def is_time_series(self) -> bool:
+        """Return True if the image is a time series."""
+        return self.get().is_time_series
+
+    @property
+    def is_2d_time_series(self) -> bool:
+        """Return True if the image is a 2D time series."""
+        return self.get().is_2d_time_series
+
+    @property
+    def is_3d_time_series(self) -> bool:
+        """Return True if the image is a 3D time series."""
+        return self.get().is_3d_time_series
+
+    @property
+    def is_multi_channels(self) -> bool:
+        """Return True if the image is multichannel."""
+        return self.get().is_multi_channels
+
+    @property
+    def space_unit(self) -> str | None:
+        """Return the space unit of the image."""
+        return self.meta.space_unit
+
+    @property
+    def time_unit(self) -> str | None:
+        """Return the time unit of the image."""
+        return self.meta.time_unit
 
     @property
     def channel_labels(self) -> list[str]:
         """Return the channels of the image."""
-        image = self.get()
-        return image.channel_labels
+        return self.get().channel_labels
 
     @property
     def wavelength_ids(self) -> list[str | None]:
-        """Return the wavelength of the image."""
-        image = self.get()
-        return image.wavelength_ids
+        """Return the list of wavelength of the image."""
+        return self.get().wavelength_ids
+
+    @property
+    def num_channels(self) -> int:
+        """Return the number of channels."""
+        return self.get().num_channels
 
     def get_channel_idx(
         self, channel_label: str | None = None, wavelength_id: str | None = None
     ) -> int:
-        """Get the index of a channel by label or wavelength ID.
-
-        Args:
-            channel_label (str | None): The label of the channel.
-                If None a wavelength ID must be provided.
-            wavelength_id (str | None): The wavelength ID of the channel.
-                If None a channel label must be provided.
-
-        Returns:
-            int: The index of the channel.
-
-        """
-        image = self.get()
-        return image.get_channel_idx(
+        """Get the index of a channel by its label or wavelength ID."""
+        return self.channels_meta.get_channel_idx(
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
     def _set_channel_meta(
         self,
-        channels_meta: ChannelsMeta,
+        channels_meta: ChannelsMeta | None = None,
     ) -> None:
         """Set the channels metadata."""
+        if channels_meta is None:
+            channels_meta = ChannelsMeta.default_init(labels=self.num_channels)
         meta = self.meta
         meta.set_channels_meta(channels_meta)
         self._meta_handler.update_meta(meta)
 
-    def set_channel_meta(
+    def _set_channel_meta_legacy(
         self,
         labels: Sequence[str | None] | int | None = None,
         wavelength_id: Sequence[str | None] | None = None,
@@ -515,12 +563,6 @@ class ImagesContainer:
                 "If start and end are provided, percentiles must be None."
             )
 
-        if percentiles is not None:
-            start, end = compute_image_percentile(
-                ref_image,
-                start_percentile=percentiles[0],
-                end_percentile=percentiles[1],
-            )
         elif start is not None and end is not None:
             if len(start) != len(end):
                 raise NgioValueError(
@@ -552,40 +594,212 @@ class ImagesContainer:
             **omero_kwargs,
         )
         self._set_channel_meta(channel_meta)
+        if percentiles is not None:
+            self.set_channel_windows_with_percentiles(percentiles=percentiles)
+
+    def set_channel_meta(
+        self,
+        channel_meta: ChannelsMeta | None = None,
+        labels: Sequence[str | None] | int | None = None,
+        wavelength_id: Sequence[str | None] | None = None,
+        start: Sequence[float | None] | None = None,
+        end: Sequence[float | None] | None = None,
+        percentiles: tuple[float, float] | None = None,
+        colors: Sequence[str | None] | None = None,
+        active: Sequence[bool | None] | None = None,
+        **omero_kwargs: dict,
+    ) -> None:
+        """Create a ChannelsMeta object with the default unit.
+
+        Args:
+            channel_meta (ChannelsMeta | None): The channels metadata to set.
+                If none, it will fall back to the deprecated parameters.
+            labels(Sequence[str | None] | int): Deprecated. The list of channels names
+                in the image. If an integer is provided, the channels will
+                be named "channel_i".
+            wavelength_id(Sequence[str | None]): Deprecated. The wavelength ID of the
+                channel. If None, the wavelength ID will be the same as
+                the channel name.
+            start(Sequence[float | None]): Deprecated. The start value for each channel.
+                If None, the start value will be computed from the image.
+            end(Sequence[float | None]): Deprecated. The end value for each channel.
+                If None, the end value will be computed from the image.
+            percentiles(tuple[float, float] | None): Deprecated. The start and end
+                percentiles for each channel. If None, the percentiles will
+                not be computed.
+            colors(Sequence[str | None]): Deprecated. The list of colors for the
+                channels. If None, the colors will be random.
+            active (Sequence[bool | None]): Deprecated. Whether the channel should
+                be shown by default.
+            omero_kwargs(dict): Deprecated. Extra fields to store in the omero
+                attributes.
+        """
+        _is_legacy = any(
+            param is not None
+            for param in [
+                labels,
+                wavelength_id,
+                start,
+                end,
+                percentiles,
+                colors,
+                active,
+            ]
+        )
+        if _is_legacy:
+            warnings.warn(
+                "The following parameters are deprecated and will be removed in the "
+                "ngio=0.6.0 release: labels, wavelength_id, start, end, percentiles, "
+                "colors, active, omero_kwargs. Please use the "
+                "channel_meta parameter instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            self._set_channel_meta_legacy(
+                labels=labels,
+                wavelength_id=wavelength_id,
+                start=start,
+                end=end,
+                percentiles=percentiles,
+                colors=colors,
+                active=active,
+                **omero_kwargs,
+            )
+            return None
+        self._set_channel_meta(channel_meta)
+
+    def set_channel_labels(
+        self,
+        labels: Sequence[str],
+    ) -> None:
+        """Update the labels of the channels.
+
+        Args:
+            labels (Sequence[str]): The new labels for the channels.
+        """
+        channels_meta = self.channels_meta
+        if len(labels) != len(channels_meta.channels):
+            raise NgioValueError(
+                "The number of labels must match the number of channels."
+            )
+        new_channels = []
+        for label, ch in zip(labels, channels_meta.channels, strict=True):
+            channel = ch.model_copy(update={"label": label})
+            new_channels.append(channel)
+        new_meta = channels_meta.model_copy(update={"channels": new_channels})
+        self._set_channel_meta(new_meta)
+
+    def set_channel_colors(
+        self,
+        colors: Sequence[str],
+    ) -> None:
+        """Update the colors of the channels.
+
+        Args:
+            colors (Sequence[str]): The new colors for the channels.
+        """
+        channel_meta = self.channels_meta
+        if len(colors) != len(channel_meta.channels):
+            raise NgioValueError(
+                "The number of colors must match the number of channels."
+            )
+        new_channels = []
+        for color, ch in zip(colors, channel_meta.channels, strict=True):
+            ch_visualisation = ch.channel_visualisation.model_copy(
+                update={"color": color}
+            )
+            channel = ch.model_copy(update={"channel_visualisation": ch_visualisation})
+            new_channels.append(channel)
+        new_meta = channel_meta.model_copy(update={"channels": new_channels})
+        self._set_channel_meta(new_meta)
 
     def set_channel_percentiles(
         self,
         start_percentile: float = 0.1,
         end_percentile: float = 99.9,
     ) -> None:
-        """Update the percentiles of the channels."""
+        """Deprecated: Update the channel windows using percentiles.
+
+        Args:
+            start_percentile (float): The start percentile.
+            end_percentile (float): The end percentile.
+        """
+        warnings.warn(
+            "The set_channel_percentiles method is deprecated and will be removed in "
+            "the ngio=0.6.0 release. "
+            "Please use set_channel_windows_with_percentiles instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self.set_channel_windows_with_percentiles(
+            percentiles=(start_percentile, end_percentile)
+        )
+
+    def set_channel_windows(
+        self,
+        starts_ends: Sequence[tuple[float, float]],
+        min_max: Sequence[tuple[float, float]] | None = None,
+    ) -> None:
+        """Update the channel windows.
+
+        These values are used by viewers to set the display
+        range of each channel.
+
+        Args:
+            starts_ends (Sequence[tuple[float, float]]): The start and end values
+                for each channel.
+            min_max (Sequence[tuple[float, float]] | None): The min and max values
+                for each channel. If None, the min and max values will not be updated.
+        """
+        current_channels = self.channels_meta.channels
+        if len(starts_ends) != len(current_channels):
+            raise NgioValueError(
+                "The number of start-end pairs must match the number of channels."
+            )
+        if min_max is not None and len(min_max) != len(current_channels):
+            raise NgioValueError(
+                "The number of min-max pairs must match the number of channels."
+            )
+        if min_max is None:
+            min_max_ = [None] * len(current_channels)
+        else:
+            min_max_ = list(min_max)
+        channels = []
+        for se, mm, ch in zip(
+            starts_ends, min_max_, self.channels_meta.channels, strict=True
+        ):
+            updates = {"start": se[0], "end": se[1]}
+            if mm is not None:
+                updates.update({"min": mm[0], "max": mm[1]})
+            channel_visualisation = ch.channel_visualisation.model_copy(update=updates)
+            channel = ch.model_copy(
+                update={"channel_visualisation": channel_visualisation}
+            )
+            channels.append(channel)
+        new_meta = ChannelsMeta(channels=channels)
+        meta = self.meta
+        meta.set_channels_meta(new_meta)
+        self._meta_handler.update_meta(meta)
+
+    def set_channel_windows_with_percentiles(
+        self,
+        percentiles: tuple[float, float] | list[tuple[float, float]] = (0.1, 99.9),
+    ) -> None:
+        """Update the channel windows using percentiles.
+
+        Args:
+            percentiles (tuple[float, float] | list[tuple[float, float]]):
+                The start and end percentiles for each channel.
+                If a single tuple is provided,
+                the same percentiles will be used for all channels.
+        """
         if self.meta._channels_meta is None:
             raise NgioValueError("The channels meta is not initialized.")
 
         low_res_dataset = self.meta.get_lowest_resolution_dataset()
         ref_image = self.get(path=low_res_dataset.path)
-        starts, ends = compute_image_percentile(
-            ref_image, start_percentile=start_percentile, end_percentile=end_percentile
-        )
-
-        channels = []
-        for c, channel in enumerate(self.meta._channels_meta.channels):
-            new_v = ChannelVisualisation(
-                start=starts[c],
-                end=ends[c],
-                **channel.channel_visualisation.model_dump(exclude={"start", "end"}),
-            )
-            new_c = Channel(
-                channel_visualisation=new_v,
-                **channel.model_dump(exclude={"channel_visualisation"}),
-            )
-            channels.append(new_c)
-
-        new_meta = ChannelsMeta(channels=channels)
-
-        meta = self.meta
-        meta.set_channels_meta(new_meta)
-        self._meta_handler.update_meta(meta)
+        starts_ends = compute_image_percentile(ref_image, percentiles=percentiles)
+        self.set_channel_windows(starts_ends=starts_ends)
 
     def set_axes_unit(
         self,
@@ -601,6 +815,17 @@ class ImagesContainer:
         meta = self.meta
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
         self._meta_handler.update_meta(meta)
+
+    def set_axes_names(
+        self,
+        axes_names: Sequence[str],
+    ) -> None:
+        """Set the axes names of the image.
+
+        Args:
+            axes_names (Sequence[str]): The axes names of the image.
+        """
+        raise NotImplementedError("Setting axes names is not implemented yet.")
 
     def derive(
         self,
@@ -727,34 +952,53 @@ class ImagesContainer:
 
 def compute_image_percentile(
     image: Image,
-    start_percentile: float = 0.1,
-    end_percentile: float = 99.9,
-) -> tuple[list[float], list[float]]:
+    percentiles: tuple[float, float] | list[tuple[float, float]] = (0.1, 99.9),
+) -> list[tuple[float, float]]:
     """Compute the start and end percentiles for each channel of an image.
 
     Args:
         image: The image to compute the percentiles for.
-        start_percentile: The start percentile to compute.
-        end_percentile: The end percentile to compute.
+        percentiles: The start and end percentiles for each channel.
+            If a single tuple is provided, the same percentiles will be used
+            for all channels.
 
     Returns:
         A tuple containing the start and end percentiles for each channel.
     """
-    starts, ends = [], []
-    for c in range(image.num_channels):
-        if image.num_channels == 1:
-            data = image.get_as_dask()
-        else:
-            data = image.get_as_dask(c=c)
+    num_channels = image.num_channels
+    # handle the case where a single tuple is provided
+    if isinstance(percentiles, tuple):
+        if len(percentiles) != 2:
+            raise NgioValueError(
+                "Percentiles must be a tuple of two floats: "
+                "(start_percentile, end_percentile) or "
+                "a list of such tuples with length equal to the number of channels."
+            )
+        if not isinstance(percentiles[0], float) or not isinstance(
+            percentiles[1], float
+        ):
+            raise NgioValueError(
+                "Percentiles must be a tuple of two floats: "
+                "(start_percentile, end_percentile) or "
+                "a list of such tuples with length equal to the number of channels."
+            )
+        percentiles = [percentiles] * num_channels
 
+    if len(percentiles) != num_channels:
+        raise NgioValueError(
+            "If a list of percentiles is provided, its length must be equal "
+            "to the number of channels."
+        )
+    starts_and_ends = []
+    for c_idx, (start_percentile, end_percentile) in enumerate(percentiles):
+        data = image.get_as_dask(c=c_idx)
         data = da.ravel(data)
         # remove all the zeros
         mask = data > 1e-16
         data = data[mask]
         _data = data.compute()
         if _data.size == 0:
-            starts.append(0.0)
-            ends.append(0.0)
+            starts_and_ends.append((0.0, 0.0))
             continue
 
         # compute the percentiles
@@ -762,9 +1006,8 @@ def compute_image_percentile(
             data, [start_percentile, end_percentile], method="nearest"
         ).compute()  # type: ignore (return type is a tuple of floats)
 
-        starts.append(float(_s_perc))
-        ends.append(float(_e_perc))
-    return starts, ends
+        starts_and_ends.append((float(_s_perc), float(_e_perc)))
+    return starts_and_ends
 
 
 def derive_image_container(

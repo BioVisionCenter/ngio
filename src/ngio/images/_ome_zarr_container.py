@@ -26,6 +26,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     SpaceUnits,
     TimeUnits,
 )
+from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.tables import (
     ConditionTable,
     DefaultTableBackend,
@@ -184,115 +185,226 @@ class OmeZarrContainer:
         return _tables_container
 
     @property
+    def meta(self) -> NgioImageMeta:
+        """Return the image metadata."""
+        return self.images_container.meta
+
+    @property
     def image_meta(self) -> NgioImageMeta:
         """Return the image metadata."""
-        return self._images_container.meta
+        warnings.warn(
+            "'image_meta' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'meta' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.images_container.meta
 
     @property
     def levels(self) -> int:
         """Return the number of levels in the image."""
-        return self._images_container.levels
+        return self.images_container.levels
+
+    @property
+    def level_paths(self) -> list[str]:
+        """Return the paths of the levels in the image."""
+        return self.images_container.levels_paths
 
     @property
     def levels_paths(self) -> list[str]:
-        """Return the paths of the levels in the image."""
-        return self._images_container.levels_paths
+        """Deprecated: use 'level_paths' instead."""
+        warnings.warn(
+            "'levels_paths' is deprecated and will be removed in ngio=0.6. "
+            "Please use 'level_paths' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.images_container.levels_paths
 
     @property
     def is_3d(self) -> bool:
         """Return True if the image is 3D."""
-        return self.get_image().is_3d
+        return self.images_container.is_3d
 
     @property
     def is_2d(self) -> bool:
         """Return True if the image is 2D."""
-        return self.get_image().is_2d
+        return self.images_container.is_2d
 
     @property
     def is_time_series(self) -> bool:
         """Return True if the image is a time series."""
-        return self.get_image().is_time_series
+        return self.images_container.is_time_series
 
     @property
     def is_2d_time_series(self) -> bool:
         """Return True if the image is a 2D time series."""
-        return self.get_image().is_2d_time_series
+        return self.images_container.is_2d_time_series
 
     @property
     def is_3d_time_series(self) -> bool:
         """Return True if the image is a 3D time series."""
-        return self.get_image().is_3d_time_series
+        return self.images_container.is_3d_time_series
 
     @property
     def is_multi_channels(self) -> bool:
         """Return True if the image is multichannel."""
-        return self.get_image().is_multi_channels
+        return self.images_container.is_multi_channels
 
     @property
     def space_unit(self) -> str | None:
         """Return the space unit of the image."""
-        return self.image_meta.space_unit
+        return self.images_container.space_unit
 
     @property
     def time_unit(self) -> str | None:
         """Return the time unit of the image."""
-        return self.image_meta.time_unit
+        return self.images_container.time_unit
 
     @property
     def channel_labels(self) -> list[str]:
         """Return the channels of the image."""
-        image = self.get_image()
-        return image.channel_labels
+        return self.images_container.channel_labels
 
     @property
     def wavelength_ids(self) -> list[str | None]:
         """Return the list of wavelength of the image."""
-        image = self.get_image()
-        return image.wavelength_ids
+        return self.images_container.wavelength_ids
 
     @property
     def num_channels(self) -> int:
         """Return the number of channels."""
-        return len(self.channel_labels)
+        return self.images_container.num_channels
 
     def get_channel_idx(
         self, channel_label: str | None = None, wavelength_id: str | None = None
     ) -> int:
         """Get the index of a channel by its label or wavelength ID."""
-        image = self.get_image()
-        return image.channels_meta.get_channel_idx(
+        return self.images_container.get_channel_idx(
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
     def set_channel_meta(
         self,
+        channel_meta: ChannelsMeta | None = None,
         labels: Sequence[str | None] | int | None = None,
         wavelength_id: Sequence[str | None] | None = None,
+        start: Sequence[float | None] | None = None,
+        end: Sequence[float | None] | None = None,
         percentiles: tuple[float, float] | None = None,
-        colors: Sequence[str] | None = None,
-        active: Sequence[bool] | None = None,
+        colors: Sequence[str | None] | None = None,
+        active: Sequence[bool | None] | None = None,
         **omero_kwargs: dict,
     ) -> None:
-        """Create a ChannelsMeta object with the default unit."""
+        """Create a ChannelsMeta object with the default unit.
+
+        Args:
+            channel_meta (ChannelsMeta | None): The channels metadata to set.
+                If none, it will fall back to the deprecated parameters.
+            labels(Sequence[str | None] | int): Deprecated. The list of channels names
+                in the image. If an integer is provided, the channels will
+                be named "channel_i".
+            wavelength_id(Sequence[str | None]): Deprecated. The wavelength ID of the
+                channel. If None, the wavelength ID will be the same as
+                the channel name.
+            start(Sequence[float | None]): Deprecated. The start value for each channel.
+                If None, the start value will be computed from the image.
+            end(Sequence[float | None]): Deprecated. The end value for each channel.
+                If None, the end value will be computed from the image.
+            percentiles(tuple[float, float] | None): Deprecated. The start and end
+                percentiles for each channel. If None, the percentiles will
+                not be computed.
+            colors(Sequence[str | None]): Deprecated. The list of colors for the
+                channels. If None, the colors will be random.
+            active (Sequence[bool | None]): Deprecated. Whether the channel should
+                be shown by default.
+            omero_kwargs(dict): Deprecated. Extra fields to store in the omero
+                attributes.
+        """
         self._images_container.set_channel_meta(
+            channel_meta=channel_meta,
             labels=labels,
             wavelength_id=wavelength_id,
-            start=None,
-            end=None,
+            start=start,
+            end=end,
             percentiles=percentiles,
             colors=colors,
             active=active,
             **omero_kwargs,
         )
 
+    def set_channel_labels(
+        self,
+        labels: Sequence[str],
+    ) -> None:
+        """Update the labels of the channels.
+
+        Args:
+            labels (Sequence[str]): The new labels for the channels.
+        """
+        self._images_container.set_channel_labels(labels=labels)
+
+    def set_channel_colors(
+        self,
+        colors: Sequence[str],
+    ) -> None:
+        """Update the colors of the channels.
+
+        Args:
+            colors (Sequence[str]): The new colors for the channels.
+        """
+        self._images_container.set_channel_colors(colors=colors)
+
     def set_channel_percentiles(
         self,
         start_percentile: float = 0.1,
         end_percentile: float = 99.9,
     ) -> None:
-        """Update the percentiles of the image."""
+        """Deprecated: Update the channel windows using percentiles.
+
+        Args:
+            start_percentile (float): The start percentile.
+            end_percentile (float): The end percentile.
+        """
         self._images_container.set_channel_percentiles(
             start_percentile=start_percentile, end_percentile=end_percentile
+        )
+
+    def set_channel_windows(
+        self,
+        starts_ends: Sequence[tuple[float, float]],
+        min_max: Sequence[tuple[float, float]] | None = None,
+    ) -> None:
+        """Update the channel windows.
+
+        These values are used by viewers to set the display
+        range of each channel.
+
+        Args:
+            starts_ends (Sequence[tuple[float, float]]): The start and end values
+                for each channel.
+            min_max (Sequence[tuple[float, float]] | None): The min and max values
+                for each channel. If None, the min and max values will not be updated.
+        """
+        self._images_container.set_channel_windows(
+            starts_ends=starts_ends,
+            min_max=min_max,
+        )
+
+    def set_channel_windows_with_percentiles(
+        self,
+        percentiles: tuple[float, float] | list[tuple[float, float]] = (0.1, 99.9),
+    ) -> None:
+        """Update the channel windows using percentiles.
+
+        Args:
+            percentiles (tuple[float, float] | list[tuple[float, float]]):
+                The start and end percentiles for each channel.
+                If a single tuple is provided,
+                the same percentiles will be used for all channels.
+        """
+        self._images_container.set_channel_windows_with_percentiles(
+            percentiles=percentiles
         )
 
     def set_axes_units(
@@ -314,6 +426,23 @@ class OmeZarrContainer:
         for label_name in self.list_labels():
             label = self.get_label(label_name)
             label.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
+
+    def set_axes_names(
+        self,
+        axes_names: Sequence[str],
+        set_labels: bool = True,
+    ) -> None:
+        """Set the axes names of the image.
+
+        Args:
+            axes_names (Sequence[str]): The axes names of the image.
+            set_labels (bool): Whether to set the axes names for the labels as well.
+        """
+        self._images_container.set_axes_names(axes_names=axes_names)
+        if set_labels:
+            for label_name in self.list_labels():
+                label = self.get_label(label_name)
+                label.set_axes_names(axes_names=axes_names)
 
     def get_image(
         self,

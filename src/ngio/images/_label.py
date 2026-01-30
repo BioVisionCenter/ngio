@@ -97,6 +97,14 @@ class Label(AbstractImage):
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
         self.meta_handler.update_meta(meta)
 
+    def set_axes_names(self, axes_names: Sequence[str]) -> None:
+        """Set the axes names of the label.
+
+        Args:
+            axes_names (Sequence[str]): The axes names to set.
+        """
+        raise NotImplementedError("Setting axes names is not implemented yet.")
+
     def build_masking_roi_table(
         self, axes_order: Sequence[str] | None = None
     ) -> MaskingRoiTable:

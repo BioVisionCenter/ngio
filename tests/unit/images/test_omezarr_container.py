@@ -186,11 +186,29 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     )
     image.consolidate(mode=array_mode)  # type: ignore
 
-    # Omemeta
-    ome_zarr.set_channel_meta(labels=["channel_x"])
+    # Omero-meta
+    ome_zarr.set_channel_meta(labels=["channel_x"], wavelength_id=["500"])
     image = ome_zarr.get_image()
     assert image.channel_labels == ["channel_x"]
+    assert image.wavelength_ids == ["500"]
+
+    ome_zarr.set_channel_labels(labels=["channel_y"])
+    image = ome_zarr.get_image()
+    assert image.channel_labels == ["channel_y"]
+    assert image.wavelength_ids == ["500"]
+
     ome_zarr.set_channel_percentiles()
+    ome_zarr.set_channel_windows_with_percentiles()
+    ome_zarr.set_channel_windows(starts_ends=[(10, 200)], min_max=[(0, 255)])
+    channels_meta = ome_zarr.meta.channels_meta
+    assert channels_meta is not None
+    assert len(channels_meta.channels) == 1
+    assert channels_meta.channels[0].label == "channel_y"
+    assert channels_meta.channels[0].wavelength_id == "500"
+    assert channels_meta.channels[0].channel_visualisation.start == 10
+    assert channels_meta.channels[0].channel_visualisation.end == 200
+    assert channels_meta.channels[0].channel_visualisation.min == 0
+    assert channels_meta.channels[0].channel_visualisation.max == 255
 
     image = ome_zarr.get_image(path="2")
     assert np.mean(image.get_array()) == 1  # type: ignore
