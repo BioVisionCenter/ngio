@@ -127,7 +127,7 @@ class OmeZarrContainer:
         self._tables_container = table_container
 
         if validate_paths:
-            for level_path in self._images_container.levels_paths:
+            for level_path in self._images_container.level_paths:
                 self.get_image(path=level_path)
 
     def __repr__(self) -> str:
@@ -226,7 +226,7 @@ class OmeZarrContainer:
     @property
     def level_paths(self) -> list[str]:
         """Return the paths of the levels in the image."""
-        return self.images_container.levels_paths
+        return self.images_container.level_paths
 
     @property
     def levels_paths(self) -> list[str]:
@@ -237,7 +237,7 @@ class OmeZarrContainer:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self.images_container.levels_paths
+        return self.images_container.level_paths
 
     @property
     def is_3d(self) -> bool:
@@ -384,8 +384,14 @@ class OmeZarrContainer:
             start_percentile (float): The start percentile.
             end_percentile (float): The end percentile.
         """
-        self._images_container.set_channel_percentiles(
-            start_percentile=start_percentile, end_percentile=end_percentile
+        warnings.warn(
+            "The 'set_channel_percentiles' method is deprecated and will be removed in "
+            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        self._images_container.set_channel_windows_with_percentiles(
+            percentiles=(start_percentile, end_percentile)
         )
 
     def set_channel_windows(

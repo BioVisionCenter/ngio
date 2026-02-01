@@ -85,7 +85,7 @@ def create_synthetic_ome_zarr(
     ome_zarr = create_ome_zarr_from_array(
         store=store,
         array=raw,
-        pixelsize=sample_info.xy_pixelsize,
+        pixelsize=sample_info.pixelsize,
         z_spacing=sample_info.z_spacing,
         time_spacing=sample_info.time_spacing,
         levels=levels,

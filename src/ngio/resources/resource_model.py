@@ -27,7 +27,7 @@ class SampleInfo(BaseModel):
 
     img_path: Path
     labels: list[LabelsInfo] = Field(default_factory=list)
-    xy_pixelsize: float
+    pixelsize: float
     z_spacing: float = 1.0
     time_spacing: float = 1.0
     space_unit: SpaceUnits = DefaultSpaceUnit
