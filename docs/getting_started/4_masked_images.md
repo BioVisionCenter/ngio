@@ -30,10 +30,10 @@ Let's create a masked image from the `nuclei` label:
 
 Since the `MaskedImage` is a subclass of `Image`, we can use all the methods available for `Image` objects.
 
-The two most notable exceptions are the `get_roi` and `set_roi` which now instead of requiring a `roi` object, require an integer `label`.
+The two most notable exceptions are the `get_roi_as_numpy` (or `get_roi_as_dask`) and `set_roi` which now instead of requiring a `roi` object, require an integer `label`.
 
 ```pycon exec="true" source="console" session="masked_images"
->>> roi_data = masked_image.get_roi(label=1009, c=0)
+>>> roi_data = masked_image.get_roi_as_numpy(label=1009, c=0)
 >>> roi_data.shape
 >>> print(roi_data.shape) # markdown-exec: hide
 ```
@@ -50,7 +50,7 @@ cmap_array = np.random.rand(1000, 3)
 cmap_array[0] = 0
 cmap = ListedColormap(cmap_array)
 
-image_data = masked_image.get_roi(label=1009, c=0)
+image_data = masked_image.get_roi_as_numpy(label=1009, c=0)
 image_data = np.squeeze(image_data)
 
 fig, ax = plt.subplots(figsize=(8, 4))
@@ -68,13 +68,13 @@ Additionally we can used the `zoom_factor` argument to get more context around t
 For example we can zoom out the ROI by a factor of `2`:
 
 ```pycon exec="true" source="console" session="masked_images"
->>> roi_data = masked_image.get_roi(label=1009, c=0, zoom_factor=2)
+>>> roi_data = masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2)
 >>> roi_data.shape
 >>> print(roi_data.shape) # markdown-exec: hide
 ```
 
 ```python exec="1" html="1" session="masked_images"
-image_data = masked_image.get_roi(label=1009, c=0, zoom_factor=2)
+image_data = masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2)
 image_data = np.squeeze(image_data)
 
 fig, ax = plt.subplots(figsize=(8, 4))
@@ -90,7 +90,7 @@ print(buffer.getvalue())
 
 ## Masked operations
 
-In addition to the `get_roi` method, the `MaskedImage` class also provides a masked operation method that allows you to perform reading and writing only on the masked pixels.
+In addition to the `get_roi_as_numpy` method, the `MaskedImage` class also provides a masked operation method that allows you to perform reading and writing only on the masked pixels.
 
 For these operations we can use the `get_roi_masked` and `set_roi_masked` methods.
 For example, we can use the `get_roi_masked` method to get the masked data for a specific label:
@@ -123,7 +123,7 @@ We can also use the `set_roi_masked` method to set the masked data for a specifi
 ```
 
 ```python exec="1" html="1" session="masked_images"
-masked_data = masked_image.get_roi(label=1009, c=0, zoom_factor=2)
+masked_data = masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2)
 masked_data = np.squeeze(masked_data)
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.set_title("Masked Label 1009 ROI - After setting")

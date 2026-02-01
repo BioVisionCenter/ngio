@@ -22,11 +22,52 @@
 - New `Roi` models, now supporting arbitrary axes.
 - The `compressor` argument has been renamed to `compressors` in all relevant functions and methods to reflect the support for multiple compressors in zarr v3.
 - The `version` argument has been renamed to `ngff_version` in all relevant functions and methods to specify the OME-NGFF version.
-- Remove the `parallel_safe` argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the 
+- Remove the `parallel_safe` argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the
 `cache`.
 - Remove the unused `parent` argument from `ZarrGroupHandler`.
 - Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
 - Remove `ngio_logger` in favor of standard warnings module.
+
+### Migration Guide (v0.4 → v0.5)
+
+#### Roi API Changes
+
+The `Roi` class now uses a flexible slice-based model supporting arbitrary axes:
+
+```python
+# Old (v0.4)
+roi = Roi(x=34.1, y=10, x_length=321.6, y_length=330)
+
+# New (v0.5)
+roi = Roi.from_values(slices={"x": (34.1, 321.6), "y": (10, 330)}, name=None)
+
+# Accessing coordinates
+# Old: roi.x, roi.y, roi.x_length, roi.y_length
+# New: roi.get("x").start, roi.get("y").start, roi.get("x").length, roi.get("y").length
+```
+
+#### Argument Renames
+
+```python
+# compressor → compressors
+# Old (v0.4)
+create_empty_ome_zarr(..., compressor=Blosc())
+
+# New (v0.5)
+create_empty_ome_zarr(..., compressors=Blosc())
+
+# version → ngff_version
+# Old (v0.4)
+create_empty_ome_zarr(..., version="0.4")
+
+# New (v0.5)
+create_empty_ome_zarr(..., ngff_version="0.4")
+```
+
+#### Removed Arguments
+
+- `parallel_safe`: No longer needed, locking is handled internally
+- `ngio_logger`: Use Python's standard `warnings` module instead
 
 ### Deprecations
 - Standardized all deprecation warnings to indicate removal in `ngio=0.6`.

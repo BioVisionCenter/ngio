@@ -35,17 +35,19 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     cmap_array[0] = 0
     cmap = ListedColormap(cmap_array)
     image_3 = ome_zarr_container.get_image(path="3")
-    image_data = image_3.get_array(c=0)
+    image_data = image_3.get_as_numpy(c=0)
     image_data = np.squeeze(image_data)
     roi = roi_table.get("FOV_1")
-    roi = roi.to_roi_pixels(pixel_size=image_3.pixel_size)
+    roi = roi.to_pixel(pixel_size=image_3.pixel_size)
+    x_slice = roi.get("x")
+    y_slice = roi.get("y")
     #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    #label_data = label_3.get_array()
+    #label_data = label_3.get_as_numpy()
     #label_data = np.squeeze(label_data)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.set_title("FOV_1 ROI")
     ax.imshow(image_data, cmap='gray')
-    ax.add_patch(Rectangle((roi.x, roi.y), roi.x_length, roi.y_length, edgecolor='red', facecolor='none', lw=2))
+    ax.add_patch(Rectangle((x_slice.start, y_slice.start), x_slice.length, y_slice.length, edgecolor='red', facecolor='none', lw=2))
     #ax.imshow(label_data, cmap=cmap, alpha=0.6)
     # make sure the roi is centered
     ax.axis('off')
@@ -58,7 +60,7 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     ROIs can be used to slice the image data:
     ```pycon exec="true" source="console" session="get_started"
     >>> roi = roi_table.get("FOV_1")
-    >>> roi_data = image.get_roi(roi)
+    >>> roi_data = image.get_roi_as_numpy(roi)
     >>> roi_data.shape
     >>> print(roi_data.shape) # markdown-exec: hide
     ```
@@ -76,10 +78,10 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     cmap = ListedColormap(cmap_array)
     roi = roi_table.get("FOV_1")
     image_3 = ome_zarr_container.get_image(path="3")
-    image_data = image_3.get_roi(roi, c=0)
+    image_data = image_3.get_roi_as_numpy(roi, c=0)
     image_data = np.squeeze(image_data)
     #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    #label_data = label_3.get_array()
+    #label_data = label_3.get_as_numpy()
     #label_data = np.squeeze(label_data)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.set_title("FOV_1 ROI")
@@ -104,7 +106,7 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     ROIs can be used to slice the image data:
     ```pycon exec="true" source="console" session="get_started"
     >>> roi = masking_table.get_label(100)
-    >>> roi_data = image.get_roi(roi)
+    >>> roi_data = image.get_roi_as_numpy(roi)
     >>> roi_data.shape
     >>> print(roi_data.shape) # markdown-exec: hide
     ```
@@ -122,10 +124,10 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     cmap = ListedColormap(cmap_array)
     roi = masking_table.get_label(100)
     image_3 = ome_zarr_container.get_image(path="2")
-    image_data = image_3.get_roi(roi, c=0)
+    image_data = image_3.get_roi_as_numpy(roi, c=0)
     image_data = np.squeeze(image_data)
     label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    label_data = label_3.get_roi(roi)
+    label_data = label_3.get_roi_as_numpy(roi)
     label_data = np.squeeze(label_data)
     fig, ax = plt.subplots(figsize=(8, 4))
     ax.set_title("Label 1 ROI")
@@ -156,7 +158,7 @@ Tables (differently from Images and Labels) can be purely in memory objects, and
     ```pycon exec="true" source="console" session="get_started"
     >>> from ngio.tables import RoiTable
     >>> from ngio import Roi
-    >>> roi = Roi(x=0, y=0, x_length=128, y_length=128, name="FOV_1")
+    >>> roi = Roi.from_values(slices={"x": (0, 128), "y": (0, 128)}, name="FOV_1")
     >>> roi_table = RoiTable(rois=[roi])
     >>> print(roi_table) # markdown-exec: hide
     ```

@@ -28,11 +28,11 @@ Ngio's mission is to streamline working with OME-Zarr files by providing a simpl
 ## Getting Started
 
 Refer to the [Getting Started](getting_started/0_quickstart.md) guide to integrate ngio into your workflows. We also provide a collection of [Tutorials](tutorials/image_processing.ipynb) to help you get up and running quickly.
-For more advanced usage and API documentation, see our [API Reference](api/ngio.md).
+For more advanced usage and API documentation, see our [API Reference](api/ome_zarr_container.md).
 
 ## Supported OME-Zarr versions
 
-Currently, ngio only supports OME-Zarr v0.4. Support for version 0.5 and higher is planned for future releases.
+Ngio supports OME-Zarr v0.4 and v0.5, with Zarr v2 and v3 storage formats.
 
 ## Development Status
 
@@ -51,7 +51,6 @@ Currently, ngio only supports OME-Zarr v0.4. Support for version 0.5 and higher 
 
 ### Upcoming Features
 
-- Support for OME-Zarr v0.5 and Zarr v3 (via `zarr-python` v3)
 - Enhanced performance optimizations (parallel iterators, optimized io strategies)
 
 ## Contributors

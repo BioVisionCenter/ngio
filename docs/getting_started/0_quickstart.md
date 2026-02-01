@@ -96,4 +96,4 @@ Also, checkout our jupyer notebook tutorials for more examples:
 - [Image Processing](../tutorials/image_processing.ipynb): Learn how to perform simple image processing operations.
 - [Image Segmentation](../tutorials/image_segmentation.ipynb): Learn how to create new labels from images.
 - [Feature Extraction](../tutorials/feature_extraction.ipynb): Learn how to extract features from images.
-- [HCS Processing](../tutorials/hcs_processing.ipynb): Learn how to process high-content screening data using ngio.
+- [HCS Exploration](../tutorials/hcs_exploration.ipynb): Learn how to explore high-content screening data using ngio.

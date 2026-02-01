@@ -164,7 +164,7 @@ class OmeZarrContainer:
         _labels_container = _try_get_label_container(
             self._group_handler,
             create_mode=create_mode,
-            ngff_version=self.image_meta.version,
+            ngff_version=self.meta.version,
             axes_setup=self._images_container.axes_setup,
         )
         self._labels_container = _labels_container

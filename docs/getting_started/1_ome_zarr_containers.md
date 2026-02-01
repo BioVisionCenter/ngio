@@ -58,8 +58,8 @@ Examples of the OME-Zarr metadata access:
 === "Available Paths"
     Show the paths to all available resolution levels:
     ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.levels_paths # Show the paths to all available images
-    >>> print(ome_zarr_container.levels_paths) # markdown-exec: hide
+    >>> ome_zarr_container.level_paths # Show the paths to all available images
+    >>> print(ome_zarr_container.level_paths) # markdown-exec: hide
     ```
 
 === "Dimensionality"
@@ -76,7 +76,7 @@ Examples of the OME-Zarr metadata access:
 
 === "Full Metadata Object"
     ```pycon exec="true" source="console" session="get_started"
-    >>> metadata = ome_zarr_container.image_meta
+    >>> metadata = ome_zarr_container.meta
     >>> print(metadata) # markdown-exec: hide
     ```
     The metadata object contains all the information about the image, for example, the channel labels:
@@ -84,6 +84,65 @@ Examples of the OME-Zarr metadata access:
     >>> metadata.channels_meta.channel_labels
     >>> print(metadata.channels_meta.channel_labels) # markdown-exec: hide
     ```
+
+## Modifying metadata
+
+ngio provides methods to modify the image metadata, such as channel labels, colors, display windows, axes names, and units.
+
+### Channel metadata
+
+You can update channel labels, colors, and display windows:
+
+=== "Channel Labels"
+    Update the labels (names) of the channels:
+    ```python
+    >>> ome_zarr_container.set_channel_labels(["DAPI", "GFP", "RFP"])
+    ```
+
+=== "Channel Colors"
+    Update the display colors of the channels (hex format):
+    ```python
+    >>> ome_zarr_container.set_channel_colors(["0000FF", "00FF00", "FF0000"])
+    ```
+
+=== "Channel Windows"
+    Update the display windows (start/end values) for each channel:
+    ```python
+    >>> ome_zarr_container.set_channel_windows([(0, 255), (0, 1000), (0, 500)])
+    ```
+
+=== "Channel Windows from Percentiles"
+    Automatically compute display windows based on data percentiles:
+    ```python
+    >>> ome_zarr_container.set_channel_windows_with_percentiles(percentiles=(0.1, 99.9))
+    ```
+
+### Axes metadata
+
+You can update the axes names and units:
+
+=== "Axes Names"
+    Rename the axes in the metadata:
+    ```python
+    >>> ome_zarr_container.set_axes_names(["t", "c", "z", "y", "x"])
+    ```
+
+=== "Axes Units"
+    Set the space and time units:
+    ```python
+    >>> ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
+    ```
+
+### Image name
+
+You can set the name of the image in the metadata:
+
+```python
+>>> ome_zarr_container.set_name("My Processed Image")
+```
+
+!!! note
+    The `set_name` method only updates the metadata. It does not change the group name or file paths.
 
 ## Accessing images / labels / tables
 
@@ -109,7 +168,7 @@ new_image = ome_zarr_container.derive_image(
     "data/new_ome.zarr", 
     overwrite=True, 
     shape=(16, 128, 128), 
-    xy_pixelsize=0.65, 
+    pixelsize=0.65, 
     z_spacing=1.0
 )
 ```
@@ -129,7 +188,7 @@ x = np.random.randint(0, 255, (16, 128, 128), dtype=np.uint8)
 new_ome_zarr_image = create_ome_zarr_from_array(
     store="random_ome.zarr", 
     array=x, 
-    xy_pixelsize=0.65, 
+    pixelsize=0.65, 
     z_spacing=1.0
 )
 ```
@@ -142,7 +201,7 @@ from ngio import create_empty_ome_zarr
 new_ome_zarr_image = create_empty_ome_zarr(
     store="empty_ome.zarr", 
     shape=(16, 128, 128), 
-    xy_pixelsize=0.65, 
+    pixelsize=0.65, 
     z_spacing=1.0
 )
 ```
