@@ -1,13 +1,19 @@
+import json
 from pathlib import Path
 
 import numpy as np
 import pytest
+from pydantic import ValidationError
+from zarr.storage import MemoryStore
 
 from ngio import (
+    OmeZarrContainer,
     create_empty_ome_zarr,
     create_ome_zarr_from_array,
     create_synthetic_ome_zarr,
 )
+from ngio.images._create_utils import init_image_like_from_shapes
+from ngio.ome_zarr_meta import NgioImageMeta
 from ngio.utils import NgioValueError
 
 
@@ -128,7 +134,7 @@ def test_create_fail(tmp_path: Path):
             overwrite=True,
         )
 
-    with pytest.raises(NgioValueError):
+    with pytest.raises(ValidationError):
         create_ome_zarr_from_array(
             array=np.random.randint(0, 255, (2, 64, 64), dtype="uint8"),
             store=tmp_path / "fail.zarr",
@@ -138,3 +144,153 @@ def test_create_fail(tmp_path: Path):
             chunks=(1, 64, 64, 64),  # should fail expected 3 axes
             overwrite=True,
         )
+
+
+def test_derive_label_channels_policy():
+    store = MemoryStore()
+    ome_zarr = create_synthetic_ome_zarr(store, shape=(3, 1, 64, 65))
+
+    label = ome_zarr.derive_label("test-label-singleton", channels_policy="singleton")
+    assert label.dimensions.get("c") == 1
+    label = ome_zarr.derive_label("test-label-same", channels_policy="same")
+    assert label.dimensions.get("c") == 3
+    label = ome_zarr.derive_label("test-label-squeeze", channels_policy="squeeze")
+    assert "c" not in label.axes
+    assert label.dimensions.get("c") is None
+    label = ome_zarr.derive_label("test-label-int", channels_policy=2)
+    assert label.dimensions.get("c") == 2
+
+
+def test_derive_from_non_dishogeneus_shapes():
+    # Yes those shapes are intentionally weird
+    shapes = [
+        (4, 3, 64, 65),
+        (4, 3, 64, 50),
+        (4, 3, 32, 25),
+    ]
+    store = MemoryStore()
+    image_handler, axes_setup = init_image_like_from_shapes(
+        store=store,
+        meta_type=NgioImageMeta,
+        shapes=shapes,
+        base_scale=(1.0, 1.0, 2.0, 2.0),
+    )
+    ome_zarr = OmeZarrContainer(group_handler=image_handler, axes_setup=axes_setup)
+    ome_zarr.derive_label("test-label-same", channels_policy="same")
+    for path in ome_zarr.levels_paths:
+        img = ome_zarr.get_image(path=path)
+        lbl = ome_zarr.get_label(name="test-label-same", path=path)
+        assert img.shape == lbl.shape
+
+    image = ome_zarr.get_image(path="1")
+    ome_zarr.derive_label("test-label-level-1", ref_image=image, channels_policy="same")
+
+    for path_img, path_lbl in zip(["1", "2"], ["0", "1"], strict=True):
+        img = ome_zarr.get_image(path=path_img)
+        lbl = ome_zarr.get_label(name="test-label-level-1", path=path_lbl)
+        assert img.shape == lbl.shape
+
+    lbl = ome_zarr.get_label(name="test-label-level-1", path="2")
+    scaling_factor = tuple(s1 / s2 for s1, s2 in zip(shapes[0], shapes[1], strict=True))
+    assert image.meta.scaling_factor() == scaling_factor
+    assert lbl.shape == (4, 3, 32, 19)
+
+
+def test_create_with_sharding(tmp_path: Path):
+    store = tmp_path / "test_image_sharded.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store=store,
+        shape=(4, 3, 64, 64),
+        pixelsize=0.5,
+        chunks=(2, 1, 32, 32),
+        shards=(4, 3, 64, 64),
+        dtype="uint8",
+        levels=3,
+        overwrite=True,
+        ngff_version="0.5",
+    )
+    ome_zarr.derive_label("label_sharded")
+    img = ome_zarr.get_image(path="0")
+    assert img.zarr_array.shards is not None
+    assert img.zarr_array.chunks == (2, 1, 32, 32)
+    assert img.zarr_array.shards == (4, 3, 64, 64)
+
+    img = ome_zarr.get_image(path="2")
+    assert img.zarr_array.shards is not None
+    # Check clipping of chunks/shards at the smallest level
+    assert img.zarr_array.chunks == (2, 1, 16, 16)
+    assert img.zarr_array.shards == (4, 3, 16, 16)
+
+
+def test_fail_derive_singleton():
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(store=store, shape=(1, 1, 64, 4), pixelsize=0.5)
+    expected_shapes = [
+        (1, 1, 64, 4),
+        (1, 1, 32, 2),
+        (1, 1, 16, 1),
+        (1, 1, 8, 1),
+        (1, 1, 4, 1),
+    ]
+    expected_pixel_size_x = [0.5, 1.0, 2.0, 2.0, 2.0]
+    for path, shape, px_x in zip(
+        ome_zarr.levels_paths, expected_shapes, expected_pixel_size_x, strict=True
+    ):
+        img = ome_zarr.get_image(path=path)
+        assert img.shape == shape
+        assert img.pixel_size.x == px_x
+
+
+def test_fail_create_from_non_decreasing_shapes():
+    # Yes those shapes are intentionally weird
+    shapes = [
+        (4, 3, 64, 64),
+        (4, 3, 128, 128),
+        (4, 3, 256, 256),
+    ]
+    store = MemoryStore()
+
+    with pytest.raises(NgioValueError):
+        _ = init_image_like_from_shapes(
+            store=store,
+            meta_type=NgioImageMeta,
+            shapes=shapes,
+            base_scale=(1.0, 1.0, 2.0, 2.0),
+        )
+
+
+def derive_from_legacy_images(tmp_path: Path):
+    store = tmp_path / "test_image_legacy.zarr"
+    ome_zarr = create_empty_ome_zarr(
+        store=store, shape=(4, 3, 127, 128), pixelsize=1.0, overwrite=True
+    )
+
+    # Simulate legacy multiscale were the scaling factors did not
+    # take into account rounding issues when downsampling
+    attrs_path = tmp_path / "test_image_legacy.zarr" / "zarr.json"
+    with open(attrs_path) as f:
+        json_dict = json.load(f)
+    datasets = json_dict["attributes"]["ome"]["multiscales"][0]["datasets"]
+    scale_0 = [1.0, 1.0, 1.0, 1.0]
+    for i in range(len(datasets)):
+        datasets[i]["coordinateTransformations"][0]["scale"] = scale_0
+        scale_0 = [1.0, 1.0, scale_0[2] * 2, scale_0[3] * 2]
+    json_dict["attributes"]["ome"]["multiscales"][0]["datasets"] = datasets
+    with open(attrs_path, "w") as f:
+        json.dump(json_dict, f, indent=4)
+
+    # Tes1 plain derive label
+    ome_zarr.derive_label(name="my_label")
+    for level in ome_zarr.levels_paths:
+        scale_yx = ome_zarr.get_image(path=level).dataset.scale[-2:]
+        label = ome_zarr.get_label(name="my_label", path=level)
+        label_scale_yx = label.dataset.scale[-2:]
+        assert scale_yx == label_scale_yx
+
+    # Test 2 derive label from level 1
+    image_1 = ome_zarr.get_image(path="1")
+    ome_zarr.derive_label(name="my_label_level_1", ref_image=image_1)
+    for path_img, path_lbl in zip(["0", "1", "2"], ["1", "2", "3"], strict=True):
+        img = ome_zarr.get_image(path=path_img)
+        lbl = ome_zarr.get_label(name="my_label_level_1", path=path_lbl)
+        assert img.shape == lbl.shape

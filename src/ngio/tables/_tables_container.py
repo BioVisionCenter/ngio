@@ -258,7 +258,7 @@ class TablesContainer:
 
     def _get_table_group_handler(self, name: str) -> ZarrGroupHandler:
         """Get the group handler for a table."""
-        handler = self._group_handler.derive_handler(path=name)
+        handler = self._group_handler.get_handler(path=name)
         return handler
 
     def list(self, filter_types: TypedTable | str | None = None) -> list[str]:
@@ -311,6 +311,27 @@ class TablesContainer:
             backend=backend,
         )  # type: ignore[return-value]
 
+    def delete(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a table from the group.
+
+        Args:
+            name (str): The name of the table to delete.
+            missing_ok (bool): If True, do not raise an error if
+                the table does not exist.
+        """
+        existing_tables = self._get_tables_list()
+        if name not in existing_tables:
+            if missing_ok:
+                return
+            raise NgioValueError(
+                f"Table '{name}' not found in the Tables group. "
+                f"Available tables: {existing_tables}"
+            )
+
+        self._group_handler.delete_group(name)
+        existing_tables.remove(name)
+        self._group_handler.write_attrs({"tables": existing_tables})
+
     def add(
         self,
         name: str,
@@ -326,9 +347,7 @@ class TablesContainer:
                 "Use overwrite=True to replace it."
             )
 
-        table_handler = self._group_handler.derive_handler(
-            path=name, overwrite=overwrite
-        )
+        table_handler = self._group_handler.get_handler(path=name, overwrite=overwrite)
 
         if backend is None:
             backend = table.backend_name
@@ -360,12 +379,9 @@ def open_tables_container(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = False,
 ) -> TablesContainer:
     """Open a table handler from a Zarr store."""
-    handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     return TablesContainer(handler)
 
 
@@ -374,11 +390,12 @@ def open_table(
     backend: TableBackend | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = False,
 ) -> Table:
     """Open a table from a Zarr store."""
     handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     meta = _get_meta(handler)
     return ImplementedTables().get_table(
@@ -392,11 +409,12 @@ def open_table_as(
     backend: TableBackend | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = False,
 ) -> TableType:
     """Open a table from a Zarr store as a specific type."""
     handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     return table_cls.from_handler(
         handler=handler,
@@ -410,12 +428,20 @@ def write_table(
     backend: TableBackend = DefaultTableBackend,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
-    parallel_safe: bool = False,
 ) -> None:
-    """Write a table to a Zarr store."""
-    handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    """Write a table to a Zarr store.
+
+    A table will be created at the given store location.
+
+    Args:
+        store (StoreOrGroup): The Zarr store or group to write the table to.
+        table (Table): The table to write.
+        backend (TableBackend): The backend to use for writing the table.
+        cache (bool): Whether to use caching for the Zarr group handler.
+        mode (AccessModeLiteral): The access mode to use for the Zarr group handler.
+
+    """
+    handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     table.set_backend(
         handler=handler,
         backend=backend,

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from zarr.storage import MemoryStore
 
 from ngio import Image, create_empty_ome_zarr, open_image
 from ngio.transforms import ZoomTransform
@@ -10,19 +11,28 @@ from ngio.utils import NgioValueError
 @pytest.mark.parametrize(
     "zarr_name",
     [
-        "test_image_yx.zarr",
-        "test_image_cyx.zarr",
-        "test_image_zyx.zarr",
-        "test_image_czyx.zarr",
-        "test_image_c1yx.zarr",
-        "test_image_tyx.zarr",
-        "test_image_tcyx.zarr",
-        "test_image_tzyx.zarr",
-        "test_image_tczyx.zarr",
+        "v04/test_image_yx.zarr",
+        "v04/test_image_cyx.zarr",
+        "v04/test_image_zyx.zarr",
+        "v04/test_image_czyx.zarr",
+        "v04/test_image_c1yx.zarr",
+        "v04/test_image_tyx.zarr",
+        "v04/test_image_tcyx.zarr",
+        "v04/test_image_tzyx.zarr",
+        "v04/test_image_tczyx.zarr",
+        "v05/test_image_yx.zarr",
+        "v05/test_image_cyx.zarr",
+        "v05/test_image_zyx.zarr",
+        "v05/test_image_czyx.zarr",
+        "v05/test_image_c1yx.zarr",
+        "v05/test_image_tyx.zarr",
+        "v05/test_image_tcyx.zarr",
+        "v05/test_image_tzyx.zarr",
+        "v05/test_image_tczyx.zarr",
     ],
 )
-def test_open_image(images_v04: dict[str, Path], zarr_name: str):
-    path = images_v04[zarr_name]
+def test_open_image(images_all_versions: dict[str, Path], zarr_name: str):
+    path = images_all_versions[zarr_name]
     image = open_image(path)
     assert isinstance(image, Image)
 
@@ -241,3 +251,37 @@ def test_derive_image_consistency(
 
     label = ome_zarr.derive_label("derived_label")
     assert label.path == "s0"
+
+
+@pytest.mark.parametrize(
+    ("shape", "factors"),
+    [
+        ((1, 1111, 1111), (1, 2, 2)),
+        ((1, 1111, 1111), (1, 4, 4)),
+        ((1, 1111, 1111), (1, 3, 3)),
+    ],
+)
+def test_consolidate_consistency(shape, factors):
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=shape,
+        axes_names="zyx",
+        xy_pixelsize=1.0,
+        scaling_factors=factors,
+        levels=3,
+    )
+    image = ome_zarr.get_image()
+    image.consolidate()
+
+    derived_store = MemoryStore()
+    derived_ome_zarr = ome_zarr.derive_image(derived_store)
+    derived_image = derived_ome_zarr.get_image()
+    derived_image.consolidate()
+
+    for level_path in ome_zarr.levels_paths:
+        img1 = ome_zarr.get_image(path=level_path)
+        img2 = derived_ome_zarr.get_image(path=level_path)
+        assert img1.shape == img2.shape, (
+            f"Shapes do not match at level {level_path}: {img1.shape} vs {img2.shape}"
+        )

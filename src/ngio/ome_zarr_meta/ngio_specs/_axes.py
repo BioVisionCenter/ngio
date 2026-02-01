@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from enum import Enum
 from typing import Literal, TypeAlias, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from ngio.utils import NgioValidationError, NgioValueError
 
@@ -153,8 +153,50 @@ class AxesSetup(BaseModel):
     c: str = "c"
     t: str = "t"
     others: list[str] = Field(default_factory=list)
+    allow_non_canonical_axes: bool = False
+    strict_canonical_order: bool = False
 
     model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @model_validator(mode="after")
+    def _validate_axes_values(self) -> "AxesSetup":
+        """Validate the axes values."""
+        canonical = {"x", "y", "z", "c", "t"}
+        axes = {"x": self.x, "y": self.y, "z": self.z, "c": self.c, "t": self.t}
+
+        for axis_name, axis_value in axes.items():
+            reserved = canonical - {axis_name}
+            if axis_value in reserved:
+                raise NgioValueError(
+                    f"The {axis_name} axis cannot be called: '{axis_value}'. "
+                    f"{axis_value} is reserved. If you want to set a non canonical "
+                    "axis order, please set the 'strict_canonical_order'to False."
+                )
+        return self
+
+    @classmethod
+    def from_ordered_list(
+        cls, axes_names: Sequence[str], canonical_order: Sequence[str]
+    ):
+        """Create an AxesSetup from an ordered list of axes names."""
+        # Make sure to only keep as many default axes as provided in axes_names
+        if len(axes_names) > len(canonical_order):
+            raise NgioValueError(
+                f"Cannot create AxesSetup from axes names {axes_names} "
+                f"and canonical order {canonical_order}. "
+                "The number of axes names cannot be greater than the "
+                "number of canonical axes."
+            )
+        canonical_order = list(canonical_order)
+        chanonical_axes = canonical_axes_order()
+        axes_mapping = {}
+        for ax in reversed(axes_names):
+            c_ax = canonical_order.pop()
+            if ax in chanonical_axes:
+                axes_mapping[ax] = ax
+            else:
+                axes_mapping[c_ax] = ax
+        return cls(**axes_mapping)
 
     def canonical_map(self) -> dict[str, str]:
         """Get the canonical map of axes."""
@@ -197,9 +239,9 @@ def _check_unique_names(axes: Sequence[Axis]):
         )
 
 
-def _check_non_canonical_axes(axes_setup: AxesSetup, allow_non_canonical_axes: bool):
+def _check_non_canonical_axes(axes_setup: AxesSetup):
     """Check if all axes are known."""
-    if not allow_non_canonical_axes and len(axes_setup.others) > 0:
+    if not axes_setup.allow_non_canonical_axes and len(axes_setup.others) > 0:
         raise NgioValidationError(
             f"Unknown axes {axes_setup.others}. Please set "
             "`allow_non_canonical_axes=True` to ignore them"
@@ -219,11 +261,9 @@ def _check_axes_validity(axes: Sequence[Axis], axes_setup: AxesSetup):
             )
 
 
-def _check_canonical_order(
-    axes: Sequence[Axis], axes_setup: AxesSetup, strict_canonical_order: bool
-):
+def _check_canonical_order(axes: Sequence[Axis], axes_setup: AxesSetup):
     """Check if the axes are in the canonical order."""
-    if not strict_canonical_order:
+    if not axes_setup.strict_canonical_order:
         return
     _names = [ax.name for ax in axes]
     _canonical_order = []
@@ -242,24 +282,18 @@ def _check_canonical_order(
 def validate_axes(
     axes: Sequence[Axis],
     axes_setup: AxesSetup,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = False,
 ) -> None:
     """Validate the axes."""
-    if allow_non_canonical_axes and strict_canonical_order:
-        raise NgioValidationError(
+    if axes_setup.allow_non_canonical_axes and axes_setup.strict_canonical_order:
+        raise NgioValueError(
             "`allow_non_canonical_axes` and"
             "`strict_canonical_order` cannot be true at the same time."
             "If non canonical axes are allowed, the order cannot be checked."
         )
     _check_unique_names(axes=axes)
-    _check_non_canonical_axes(
-        axes_setup=axes_setup, allow_non_canonical_axes=allow_non_canonical_axes
-    )
+    _check_non_canonical_axes(axes_setup=axes_setup)
     _check_axes_validity(axes=axes, axes_setup=axes_setup)
-    _check_canonical_order(
-        axes=axes, axes_setup=axes_setup, strict_canonical_order=strict_canonical_order
-    )
+    _check_canonical_order(axes=axes, axes_setup=axes_setup)
 
 
 class AxesHandler:
@@ -278,29 +312,22 @@ class AxesHandler:
         axes: Sequence[Axis],
         # user defined args
         axes_setup: AxesSetup | None = None,
-        allow_non_canonical_axes: bool = False,
-        strict_canonical_order: bool = False,
     ):
         """Create a new AxesMapper object.
 
         Args:
             axes (list[Axis]): The axes on disk.
             axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
-            allow_non_canonical_axes (bool, optional): Allow non canonical axes.
-            strict_canonical_order (bool, optional): Check if the axes are in the
-                canonical order. Defaults to False.
         """
         axes_setup = axes_setup if axes_setup is not None else AxesSetup()
 
         validate_axes(
             axes=axes,
             axes_setup=axes_setup,
-            allow_non_canonical_axes=allow_non_canonical_axes,
-            strict_canonical_order=strict_canonical_order,
         )
 
-        self._allow_non_canonical_axes = allow_non_canonical_axes
-        self._strict_canonical_order = strict_canonical_order
+        self._allow_non_canonical_axes = axes_setup.allow_non_canonical_axes
+        self._strict_canonical_order = axes_setup.strict_canonical_order
 
         self._canonical_order = canonical_axes_order()
 
@@ -352,6 +379,7 @@ class AxesHandler:
 
     @property
     def axes_names(self) -> tuple[str, ...]:
+        """On disk axes names."""
         return tuple(ax.name for ax in self._axes)
 
     @property
@@ -421,8 +449,48 @@ class AxesHandler:
         return AxesHandler(
             axes=new_axes,
             axes_setup=self.axes_setup,
-            allow_non_canonical_axes=self.allow_non_canonical_axes,
-            strict_canonical_order=self.strict_canonical_order,
+        )
+
+    def rename_axes(self, axes_names: Sequence[str]) -> "AxesHandler":
+        """Rename the axes.
+
+        Args:
+            axes_names (Sequence[str]): The new axes names.
+        """
+        if len(axes_names) != len(self.axes):
+            raise NgioValueError(
+                f"Cannot rename axes. "
+                f"Expected {len(self.axes)} axes, but got {len(axes_names)}."
+            )
+        new_axes = []
+        axes_setup = self.axes_setup
+        for ax, new_name in zip(self.axes, axes_names, strict=True):
+            if ax.name == new_name:
+                new_axes.append(ax)
+                continue
+            new_ax = Axis(name=new_name, axis_type=ax.axis_type, unit=ax.unit)
+            match ax.name:
+                case axes_setup.x:
+                    axes_setup = axes_setup.model_copy(update={"x": new_name})
+                case axes_setup.y:
+                    axes_setup = axes_setup.model_copy(update={"y": new_name})
+                case axes_setup.z:
+                    axes_setup = axes_setup.model_copy(update={"z": new_name})
+                case axes_setup.c:
+                    axes_setup = axes_setup.model_copy(update={"c": new_name})
+                case axes_setup.t:
+                    axes_setup = axes_setup.model_copy(update={"t": new_name})
+                case _:
+                    if ax.name in axes_setup.others:
+                        others = axes_setup.others.copy()
+                        others.remove(ax.name)
+                        others.append(new_name)
+                        axes_setup = axes_setup.model_copy(update={"others": others})
+            new_axes.append(new_ax)
+            # Update the axes setup
+        return AxesHandler(
+            axes=new_axes,
+            axes_setup=axes_setup,
         )
 
     def get_index(self, name: str) -> int | None:
@@ -464,14 +532,33 @@ class AxesHandler:
         self._axes = new_axes
 
 
-def build_canonical_axes_handler(
+def _build_axes_list_from_names(
     axes_names: Sequence[str],
+    axes_setup: AxesSetup,
     space_units: SpaceUnits | str | None = DefaultSpaceUnit,
     time_units: TimeUnits | str | None = DefaultTimeUnit,
-    # user defined args
-    axes_setup: AxesSetup | None = None,
-    allow_non_canonical_axes: bool = False,
-    strict_canonical_order: bool = False,
+) -> list[Axis]:
+    """Build a list of Axis objects from a list of axis names."""
+    axes = []
+    for name in axes_names:
+        c_name = axes_setup.get_canonical_name(name)
+        match c_name:
+            case "t":
+                axes.append(Axis(name=name, axis_type=AxisType.time, unit=time_units))
+            case "c":
+                axes.append(Axis(name=name, axis_type=AxisType.channel))
+            case "z" | "y" | "x":
+                axes.append(Axis(name=name, axis_type=AxisType.space, unit=space_units))
+            case _:
+                axes.append(Axis(name=name, axis_type=AxisType.space))
+    return axes
+
+
+def build_canonical_axes_handler(
+    axes_names: Sequence[str],
+    canonical_channel_order: Sequence[str] | None = None,
+    space_units: SpaceUnits | str | None = DefaultSpaceUnit,
+    time_units: TimeUnits | str | None = DefaultTimeUnit,
 ) -> AxesHandler:
     """Create a new canonical axes mapper.
 
@@ -482,33 +569,47 @@ def build_canonical_axes_handler(
             - If an integer is provided, the axes are created from the last axis
               to the first
                 e.g. 3 -> ["z", "y", "x"]
+        canonical_channel_order (Sequence[str], optional): The canonical channel
+            order. Defaults to None, which uses the default order.
         space_units (SpaceUnits, optional): The space units. Defaults to None.
         time_units (TimeUnits, optional): The time units. Defaults to None.
-        axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
-        allow_non_canonical_axes (bool, optional): Allow non canonical axes.
-            Defaults to False.
-        strict_canonical_order (bool, optional): Check if the axes are in the
-            canonical order. Defaults to False.
-
     """
-    axes = []
-    for name in axes_names:
-        match name:
-            case "t":
-                axes.append(Axis(name=name, axis_type=AxisType.time, unit=time_units))
-            case "c":
-                axes.append(Axis(name=name, axis_type=AxisType.channel))
-            case "z" | "y" | "x":
-                axes.append(Axis(name=name, axis_type=AxisType.space, unit=space_units))
-            case _:
-                raise NgioValueError(
-                    f"Invalid axis name '{name}'. "
-                    "Only 't', 'c', 'z', 'y', 'x' are allowed."
-                )
-
+    if canonical_channel_order is None:
+        canonical_channel_order = canonical_axes_order()
+    axes_setup = AxesSetup.from_ordered_list(
+        axes_names=axes_names, canonical_order=canonical_channel_order
+    )
+    axes = _build_axes_list_from_names(
+        axes_names=axes_names,
+        axes_setup=axes_setup,
+        space_units=space_units,
+        time_units=time_units,
+    )
     return AxesHandler(
         axes=axes,
         axes_setup=axes_setup,
-        allow_non_canonical_axes=allow_non_canonical_axes,
-        strict_canonical_order=strict_canonical_order,
+    )
+
+
+def build_axes_handler(
+    axes_names: Sequence[str],
+    axes_setup: AxesSetup | None = None,
+) -> AxesHandler:
+    """Create a new axes mapper.
+
+    Args:
+        axes_names (Sequence[str]): The axes names on disk.
+        axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
+        allow_non_canonical_axes (bool, optional): Allow non canonical axes.
+        strict_canonical_order (bool, optional): Check if the axes are in the
+            canonical order. Defaults to False.
+    """
+    axes_setup = axes_setup if axes_setup is not None else AxesSetup()
+    axes = _build_axes_list_from_names(
+        axes_names=axes_names,
+        axes_setup=axes_setup,
+    )
+    return AxesHandler(
+        axes=axes,
+        axes_setup=axes_setup,
     )

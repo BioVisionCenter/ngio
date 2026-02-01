@@ -5,9 +5,8 @@ from ome_zarr_models.v04.image_label import ImageLabelAttrs as LabelAttrsV04
 from ome_zarr_models.v04.well import WellAttrs as WellAttrsV04
 
 from ngio.ome_zarr_meta import NgioImageMeta, NgioLabelMeta, NgioWellMeta
-from ngio.ome_zarr_meta.v04._v04_spec_utils import (
-    _is_v04_image_meta,
-    _is_v04_label_meta,
+from ngio.ome_zarr_meta.ngio_specs import AxesSetup
+from ngio.ome_zarr_meta.v04._v04_spec import (
     ngio_to_v04_image_meta,
     ngio_to_v04_label_meta,
     ngio_to_v04_well_meta,
@@ -22,9 +21,7 @@ def test_image_round_trip():
     with open(path) as f:
         input_metadata = json.load(f)
 
-    assert _is_v04_image_meta(input_metadata)
-    is_valid, ngio_image = v04_to_ngio_image_meta(input_metadata)
-    assert is_valid
+    ngio_image = v04_to_ngio_image_meta(input_metadata, axes_setup=AxesSetup())
     assert isinstance(ngio_image, NgioImageMeta)
     output_metadata = ngio_to_v04_image_meta(ngio_image)
     assert ImageAttrsV04(**output_metadata) == ImageAttrsV04(**input_metadata)
@@ -35,10 +32,7 @@ def test_label_round_trip():
     with open(path) as f:
         metadata = json.load(f)
 
-    assert _is_v04_label_meta(metadata)
-
-    is_valid, ngio_label = v04_to_ngio_label_meta(metadata)
-    assert is_valid
+    ngio_label = v04_to_ngio_label_meta(metadata, axes_setup=AxesSetup())
     assert isinstance(ngio_label, NgioLabelMeta)
     output_metadata = ngio_to_v04_label_meta(ngio_label)
     assert LabelAttrsV04(**output_metadata) == LabelAttrsV04(**metadata)
@@ -49,8 +43,7 @@ def test_well_meta():
     with open(path) as f:
         metadata = json.load(f)
 
-    is_valid, ngio_well = v04_to_ngio_well_meta(metadata)
-    assert is_valid
+    ngio_well = v04_to_ngio_well_meta(metadata)
     assert isinstance(ngio_well, NgioWellMeta)
     output_metadata = ngio_to_v04_well_meta(ngio_well)
     assert isinstance(output_metadata, dict)
@@ -62,8 +55,7 @@ def test_well_meta_path_normalization():
     with open(path) as f:
         metadata = json.load(f)
 
-    is_valid, ngio_well = v04_to_ngio_well_meta(metadata)
-    assert is_valid
+    ngio_well = v04_to_ngio_well_meta(metadata)
     assert isinstance(ngio_well, NgioWellMeta)
     output_metadata = ngio_to_v04_well_meta(ngio_well)
     assert isinstance(output_metadata, dict)

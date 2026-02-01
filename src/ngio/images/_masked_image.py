@@ -34,7 +34,7 @@ class MaskedImage(Image):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: ImageMetaHandler | None,
+        meta_handler: ImageMetaHandler,
         label: Label,
         masking_roi_table: MaskingRoiTable,
     ) -> None:
@@ -299,7 +299,7 @@ class MaskedLabel(Label):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: LabelMetaHandler | None,
+        meta_handler: LabelMetaHandler,
         label: Label,
         masking_roi_table: MaskingRoiTable,
     ) -> None:

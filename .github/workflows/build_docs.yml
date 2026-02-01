@@ -3,7 +3,6 @@ name: Build Docs
 on:
   push:
     branches:
-      - dev
       - main
     tags:
       - "v*"
@@ -38,7 +37,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-        
+
       - name: Restore shared data cache
         id: cache-data
         uses: actions/cache@v5
@@ -47,7 +46,7 @@ jobs:
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
           restore-keys: |
             "${{ runner.os }}-data-"
-            
+
       - name: Deploy docs
         run: |
           VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///' | sed 's/refs\/heads\///')
@@ -59,8 +58,8 @@ jobs:
             mike set-default --push stable
             echo "Deployed stable version $VERSION (stable)"
 
-          elif [[ $GITHUB_REF == refs/heads/dev ]]; then
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
             mike deploy --push dev
             mike set-default --push dev
-            echo "Deployed development version (dev)"
+            echo "Deployed development version (dev) from main"
           fi

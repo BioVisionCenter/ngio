@@ -1,26 +1,26 @@
 """A module for handling label images in OME-NGFF files."""
 
-from collections.abc import Sequence
-from typing import Literal
+from collections.abc import Mapping, Sequence
+from typing import Any, Literal
 
-from zarr.types import DIMENSION_SEPARATOR
+from zarr.core.array import CompressorLike
 
 from ngio.common import compute_masking_roi
-from ngio.images._abstract_image import AbstractImage
-from ngio.images._create import create_empty_label_container
+from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
     LabelMetaHandler,
+    LabelsGroupMetaHandler,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
     PixelSize,
-    find_label_meta_handler,
+    update_ngio_labels_group_meta,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
-    SpaceUnits,
-    TimeUnits,
+    NgffVersions,
 )
+from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
     NgioValidationError,
@@ -30,7 +30,7 @@ from ngio.utils import (
 )
 
 
-class Label(AbstractImage[LabelMetaHandler]):
+class Label(AbstractImage):
     """Placeholder class for a label."""
 
     get_as_numpy = AbstractImage._get_as_numpy
@@ -46,7 +46,7 @@ class Label(AbstractImage[LabelMetaHandler]):
         self,
         group_handler: ZarrGroupHandler,
         path: str,
-        meta_handler: LabelMetaHandler | None,
+        meta_handler: LabelMetaHandler,
     ) -> None:
         """Initialize the Image at a single level.
 
@@ -56,8 +56,6 @@ class Label(AbstractImage[LabelMetaHandler]):
             meta_handler: The image metadata handler.
 
         """
-        if meta_handler is None:
-            meta_handler = find_label_meta_handler(group_handler)
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
@@ -67,28 +65,23 @@ class Label(AbstractImage[LabelMetaHandler]):
         return f"Label(path={self.path}, {self.dimensions})"
 
     @property
+    def meta_handler(self) -> LabelMetaHandler:
+        """Return the metadata handler."""
+        assert isinstance(self._meta_handler, LabelMetaHandler)
+        return self._meta_handler
+
+    @property
     def meta(self) -> NgioLabelMeta:
         """Return the metadata."""
-        return self._meta_handler.meta
+        meta = self.meta_handler.get_meta()
+        assert isinstance(meta, NgioLabelMeta)
+        return meta
 
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Set the axes unit of the image.
-
-        Args:
-            space_unit (SpaceUnits): The space unit of the image.
-            time_unit (TimeUnits): The time unit of the image.
-        """
-        meta = self.meta
-        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.write_meta(meta)
-
-    def build_masking_roi_table(self) -> MaskingRoiTable:
+    def build_masking_roi_table(
+        self, axes_order: Sequence[str] | None = None
+    ) -> MaskingRoiTable:
         """Compute the masking ROI table."""
-        return build_masking_roi_table(self)
+        return build_masking_roi_table(self, axes_order=axes_order)
 
     def consolidate(
         self,
@@ -104,30 +97,46 @@ class Label(AbstractImage[LabelMetaHandler]):
 class LabelsContainer:
     """A class to handle the /labels group in an OME-NGFF file."""
 
-    def __init__(self, group_handler: ZarrGroupHandler) -> None:
+    def __init__(
+        self,
+        group_handler: ZarrGroupHandler,
+        axes_setup: AxesSetup | None = None,
+        ngff_version: NgffVersions | None = None,
+    ) -> None:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
-
-        # Validate the group
-        # Either contains a labels attribute or is empty
-        attrs = self._group_handler.load_attrs()
-        if len(attrs) == 0:
-            # It's an empty group
-            pass
-        elif "labels" in attrs and isinstance(attrs["labels"], list):
-            # It's a valid group
-            pass
-        else:
-            raise NgioValidationError(
-                f"Invalid /labels group. "
-                f"Expected a single labels attribute with a list of label names. "
-                f"Found: {attrs}"
+        self._axes_setup = axes_setup or AxesSetup()
+        # If the group is empty, initialize the metadata
+        try:
+            self._meta_handler = LabelsGroupMetaHandler(group_handler)
+        except NgioValidationError:
+            if ngff_version is None:
+                raise NgioValueError(
+                    "The /labels group is missing metadata. "
+                    "Please provide the ngff_version to initialize it."
+                ) from None
+            meta = NgioLabelsGroupMeta(labels=[], version=ngff_version)
+            update_ngio_labels_group_meta(
+                group_handler=group_handler,
+                ngio_meta=meta,
             )
+            self._group_handler = self._group_handler.reopen_handler()
+            self._meta_handler = LabelsGroupMetaHandler(group_handler)
+
+    @property
+    def meta(self) -> NgioLabelsGroupMeta:
+        """Return the metadata."""
+        meta = self._meta_handler.get_meta()
+        return meta
+
+    @property
+    def axes_setup(self) -> AxesSetup:
+        """Return the axes setup."""
+        return self._axes_setup
 
     def list(self) -> list[str]:
         """Create the /labels group if it doesn't exist."""
-        attrs = self._group_handler.load_attrs()
-        return attrs.get("labels", [])
+        return self.meta.labels
 
     def get(
         self,
@@ -153,49 +162,107 @@ class LabelsContainer:
                 f"Available labels: {self.list()}"
             )
 
-        group_handler = self._group_handler.derive_handler(name)
-        label_meta_handler = find_label_meta_handler(group_handler)
-        path = label_meta_handler.meta.get_dataset(
-            path=path, pixel_size=pixel_size, strict=strict
-        ).path
-        return Label(group_handler, path, label_meta_handler)
+        group_handler = self._group_handler.get_handler(name)
+        label_meta_handler = LabelMetaHandler(group_handler, axes_setup=self.axes_setup)
+        path = (
+            label_meta_handler.get_meta()
+            .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
+            .path
+        )
+        return Label(
+            group_handler=group_handler,
+            path=path,
+            meta_handler=label_meta_handler,
+        )
+
+    def delete(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a label from the group.
+
+        Args:
+            name (str): The name of the label to delete.
+            missing_ok (bool): If True, do not raise an error if the label does not
+                exist.
+
+        """
+        existing_labels = self.list()
+        if name not in existing_labels:
+            if missing_ok:
+                return
+            raise NgioValueError(
+                f"Label '{name}' not found in the Labels group. "
+                f"Available labels: {existing_labels}"
+            )
+
+        self._group_handler.delete_group(name)
+        existing_labels.remove(name)
+        update_meta = NgioLabelsGroupMeta(
+            labels=existing_labels, version=self.meta.version
+        )
+        self._meta_handler.update_meta(update_meta)
 
     def derive(
         self,
         name: str,
         ref_image: Image | Label,
+        # Metadata parameters
         shape: Sequence[int] | None = None,
-        pixel_size: PixelSize | None = None,
-        axes_names: Sequence[str] | None = None,
-        chunks: Sequence[int] | None = None,
-        dtype: str = "uint32",
-        dimension_separator: DIMENSION_SEPARATOR | None = None,
-        compressor=None,
+        pixelsize: float | tuple[float, float] | None = None,
+        z_spacing: float | None = None,
+        time_spacing: float | None = None,
+        translation: Sequence[float] | None = None,
+        channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
+        ngff_version: NgffVersions | None = None,
+        # Zarr Array parameters
+        chunks: ChunksLike | None = None,
+        shards: ShardsLike | None = None,
+        dtype: str | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
+        extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
+        # Deprecated arguments
+        labels: Sequence[str] | None = None,
+        pixel_size: PixelSize | None = None,
     ) -> "Label":
-        """Create an empty OME-Zarr label from a reference image.
+        """Create an empty OME-Zarr label from an existing image or label.
 
-        And add the label to the /labels group.
+        If a kwarg is not provided, the value from the reference image will be used.
 
         Args:
-            store (StoreOrGroup): The Zarr store or group to create the image in.
-            ref_image (Image | Label): A reference image that will be used to create
-                the new image.
-            name (str): The name of the new image.
-            shape (Sequence[int] | None): The shape of the new image.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-            axes_names (Sequence[str] | None): The axes names of the new image.
-                For labels, the channel axis is not allowed.
-            chunks (Sequence[int] | None): The chunk shape of the new image.
-            dtype (str): The data type of the new label.
-            dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
-                dimensions. If None it will use the same as the reference image.
-            compressor: The compressor to use. If None it will use
-                the same as the reference image.
-            overwrite (bool): Whether to overwrite an existing image.
+            name (str): The name of the new label.
+            ref_image (Image | Label): The reference image to derive the new label from.
+            shape (Sequence[int] | None): The shape of the new label.
+            pixelsize (float | tuple[float, float] | None): The pixel size of the new
+                label.
+            z_spacing (float | None): The z spacing of the new label.
+            time_spacing (float | None): The time spacing of the new label.
+            translation (Sequence[float] | None): The translation for each axis
+                at the highest resolution level. Defaults to None.
+            channels_policy (Literal["squeeze", "same", "singleton"] | int):
+                Possible policies:
+                - If "squeeze", the channels axis will be removed (no matter its size).
+                - If "same", the channels axis will be kept as is (if it exists).
+                - If "singleton", the channels axis will be set to size 1.
+                - If an integer is provided, the channels axis will be changed to have
+                    that size.
+            ngff_version (NgffVersions | None): The NGFF version to use.
+            chunks (ChunksLike | None): The chunk shape of the new label.
+            shards (ShardsLike | None): The shard shape of the new label.
+            dtype (str | None): The data type of the new label.
+            dimension_separator (Literal[".", "/"] | None): The separator to use for
+                dimensions.
+            compressors (CompressorLike | None): The compressors to use.
+            extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+                the zarr array creation.
+            overwrite (bool): Whether to overwrite an existing label.
+            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+                please use channels_meta instead.
+            pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
+                This argument is deprecated, please use pixelsize, z_spacing,
+                and time_spacing instead.
 
         Returns:
-            Label: The new label.
+            Label: The new derived label.
 
         """
         existing_labels = self.list()
@@ -206,137 +273,138 @@ class LabelsContainer:
             )
 
         label_group = self._group_handler.get_group(name, create_mode=True)
-
         derive_label(
-            store=label_group,
             ref_image=ref_image,
-            name=name,
+            store=label_group,
             shape=shape,
-            pixel_size=pixel_size,
-            axes_names=axes_names,
+            pixelsize=pixelsize,
+            z_spacing=z_spacing,
+            time_spacing=time_spacing,
+            name=name,
+            translation=translation,
+            channels_policy=channels_policy,
+            ngff_version=ngff_version,
             chunks=chunks,
+            shards=shards,
             dtype=dtype,
             dimension_separator=dimension_separator,
-            compressor=compressor,
+            compressors=compressors,
+            extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
+            labels=labels,
+            pixel_size=pixel_size,
         )
 
         if name not in existing_labels:
             existing_labels.append(name)
-            self._group_handler.write_attrs({"labels": existing_labels})
 
+        update_meta = NgioLabelsGroupMeta(
+            labels=existing_labels, version=self.meta.version
+        )
+        self._meta_handler.update_meta(update_meta)
         return self.get(name)
 
 
 def derive_label(
+    *,
     store: StoreOrGroup,
     ref_image: Image | Label,
-    name: str,
+    # Metadata parameters
     shape: Sequence[int] | None = None,
-    pixel_size: PixelSize | None = None,
-    axes_names: Sequence[str] | None = None,
-    chunks: Sequence[int] | None = None,
-    dimension_separator: DIMENSION_SEPARATOR | None = None,
-    compressor=None,
-    dtype: str = "uint32",
+    pixelsize: float | tuple[float, float] | None = None,
+    z_spacing: float | None = None,
+    time_spacing: float | None = None,
+    name: str | None = None,
+    translation: Sequence[float] | None = None,
+    channels_policy: Literal["same", "squeeze", "singleton"] | int = "squeeze",
+    ngff_version: NgffVersions | None = None,
+    # Zarr Array parameters
+    chunks: ChunksLike | None = None,
+    shards: ShardsLike | None = None,
+    dtype: str | None = None,
+    dimension_separator: Literal[".", "/"] | None = None,
+    compressors: CompressorLike | None = None,
+    extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-) -> None:
-    """Create an empty OME-Zarr label from a reference image.
+    # Deprecated arguments
+    labels: Sequence[str] | None = None,
+    pixel_size: PixelSize | None = None,
+) -> tuple[ZarrGroupHandler, AxesSetup]:
+    """Derive a new OME-Zarr label from an existing image or label.
+
+    If a kwarg is not provided, the value from the reference image will be used.
 
     Args:
-        store (StoreOrGroup): The Zarr store or group to create the image in.
-        ref_image (Image | Label): A reference image that will be used to
-            create the new image.
-        name (str): The name of the new image.
-        shape (Sequence[int] | None): The shape of the new image.
-        pixel_size (PixelSize | None): The pixel size of the new image.
-        axes_names (Sequence[str] | None): The axes names of the new image.
-            For labels, the channel axis is not allowed.
-        chunks (Sequence[int] | None): The chunk shape of the new image.
-        dtype (str): The data type of the new label.
-        dimension_separator (DIMENSION_SEPARATOR | None): The separator to use for
-            dimensions. If None it will use the same as the reference image.
-        compressor: The compressor to use. If None it will use
-            the same as the reference image.
-        overwrite (bool): Whether to overwrite an existing image.
+        store (StoreOrGroup): The Zarr store or group to create the label in.
+        ref_image (Image | Label): The reference image to derive the new label from.
+        shape (Sequence[int] | None): The shape of the new label.
+        pixelsize (float | tuple[float, float] | None): The pixel size of the new label.
+        z_spacing (float | None): The z spacing of the new label.
+        time_spacing (float | None): The time spacing of the new label.
+        name (str | None): The name of the new label.
+        translation (Sequence[float] | None): The translation for each axis
+            at the highest resolution level. Defaults to None.
+        channels_policy (Literal["squeeze", "same", "singleton"] | int): Possible
+            policies:
+            - If "squeeze", the channels axis will be removed (no matter its size).
+            - If "same", the channels axis will be kept as is (if it exists).
+            - If "singleton", the channels axis will be set to size 1.
+            - If an integer is provided, the channels axis will be changed to have that
+                size.
+        ngff_version (NgffVersions | None): The NGFF version to use.
+        chunks (ChunksLike | None): The chunk shape of the new label.
+        shards (ShardsLike | None): The shard shape of the new label.
+        dtype (str | None): The data type of the new label.
+        dimension_separator (Literal[".", "/"] | None): The separator to use for
+            dimensions.
+        compressors (CompressorLike | None): The compressors to use.
+        extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
+            the zarr array creation.
+        overwrite (bool): Whether to overwrite an existing label. Defaults to False.
+        labels (Sequence[str] | None): Deprecated. This argument is deprecated,
+            please use channels_meta instead.
+        pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
+            This argument is deprecated, please use pixelsize, z_spacing,
+            and time_spacing instead.
 
     Returns:
-        None
+        tuple[ZarrGroupHandler, AxesSetup]: The group handler of the new label
+            and the axes setup.
 
     """
-    ref_meta = ref_image.meta
-
-    if shape is None:
-        shape = ref_image.shape
-
-    if pixel_size is None:
-        pixel_size = ref_image.pixel_size
-
-    if axes_names is None:
-        axes_names = ref_meta.axes_handler.axes_names
-        c_axis = ref_meta.axes_handler.get_index("c")
-    else:
-        if "c" in axes_names:
-            raise NgioValidationError(
-                "Labels cannot have a channel axis. "
-                "Please remove the channel axis from the axes names."
-            )
-        c_axis = None
-
-    if len(axes_names) != len(shape):
-        raise NgioValidationError(
-            "The axes names of the new image does not match the reference image."
-            f"Got {axes_names} for shape {shape}."
-        )
-
-    if chunks is None:
-        chunks = ref_image.chunks
-
-    if len(chunks) != len(shape):
-        raise NgioValidationError(
-            "The chunks of the new image does not match the reference image."
-            f"Got {chunks} for shape {shape}."
-        )
-
-    if c_axis is not None:
-        # remove channel if present
-        shape = list(shape)
-        shape = shape[:c_axis] + shape[c_axis + 1 :]
-        chunks = list(chunks)
-        chunks = chunks[:c_axis] + chunks[c_axis + 1 :]
-        axes_names = list(axes_names)
-        axes_names = axes_names[:c_axis] + axes_names[c_axis + 1 :]
-
-    if dimension_separator is None:
-        dimension_separator = ref_image.zarr_array._dimension_separator  # type: ignore
-    if compressor is None:
-        compressor = ref_image.zarr_array.compressor  # type: ignore
-
-    _ = create_empty_label_container(
+    if dtype is None and isinstance(ref_image, Image):
+        dtype = "uint32"
+    group_handler, axes_setup = abstract_derive(
+        ref_image=ref_image,
+        meta_type=NgioLabelMeta,
         store=store,
         shape=shape,
-        pixelsize=ref_image.pixel_size.x,
-        z_spacing=ref_image.pixel_size.z,
-        time_spacing=ref_image.pixel_size.t,
-        levels=ref_meta.paths,
-        yx_scaling_factor=ref_meta.yx_scaling(),
-        z_scaling_factor=ref_meta.z_scaling(),
-        time_unit=ref_image.pixel_size.time_unit,
-        space_unit=ref_image.pixel_size.space_unit,
-        axes_names=axes_names,
-        chunks=chunks,
-        dtype=dtype,
-        dimension_separator=dimension_separator,  # type: ignore
-        compressor=compressor,  # type: ignore
-        overwrite=overwrite,
-        version=ref_meta.version,
+        pixelsize=pixelsize,
+        z_spacing=z_spacing,
+        time_spacing=time_spacing,
         name=name,
+        translation=translation,
+        channels_meta=None,
+        channels_policy=channels_policy,
+        ngff_version=ngff_version,
+        chunks=chunks,
+        shards=shards,
+        dtype=dtype,
+        dimension_separator=dimension_separator,
+        compressors=compressors,
+        extra_array_kwargs=extra_array_kwargs,
+        overwrite=overwrite,
+        labels=labels,
+        pixel_size=pixel_size,
     )
-    return None
+    return group_handler, axes_setup
 
 
-def build_masking_roi_table(label: Label) -> MaskingRoiTable:
+def build_masking_roi_table(
+    label: Label, axes_order: Sequence[str] | None = None
+) -> MaskingRoiTable:
     """Compute the masking ROI table for a label."""
-    array = label.get_as_dask(axes_order=["t", "z", "y", "x"])
-    rois = compute_masking_roi(array, label.pixel_size)
+    axes_order = axes_order or label.axes
+    array = label.get_as_dask(axes_order=axes_order)
+    rois = compute_masking_roi(array, label.pixel_size, axes_order=axes_order)
     return MaskingRoiTable(rois, reference_label=label.meta.name)

@@ -8,7 +8,7 @@ from ngio.tables.backends._utils import (
     normalize_pandas_df,
     normalize_polars_lf,
 )
-from ngio.utils import NgioFileNotFoundError
+from ngio.utils import NgioError
 
 
 class JsonTableBackend(AbstractTableBackend):
@@ -37,22 +37,19 @@ class JsonTableBackend(AbstractTableBackend):
     def _get_table_group(self):
         """Get the table group, creating it if it doesn't exist."""
         try:
-            table_group = self._group_handler.get_group(path="table")
-        except NgioFileNotFoundError:
-            table_group = self._group_handler.group.create_group("table")
+            table_group = self._group_handler.get_group(path="table", create_mode=True)
+        except NgioError as e:
+            raise NgioError(
+                "Could not get or create a 'table' group in the store "
+                f"{self._group_handler.store} path "
+                f"{self._group_handler.group.path}/table."
+            ) from e
         return table_group
-
-    def _load_as_pandas_df(self) -> DataFrame:
-        """Load the table as a pandas DataFrame."""
-        table_group = self._get_table_group()
-        table_dict = dict(table_group.attrs)
-
-        data_frame = pd.DataFrame.from_dict(table_dict)
-        return data_frame
 
     def load_as_pandas_df(self) -> DataFrame:
         """Load the table as a pandas DataFrame."""
-        data_frame = self._load_as_pandas_df()
+        table_dict = self._get_table_group().attrs.asdict()
+        data_frame = pd.DataFrame.from_dict(table_dict)
         data_frame = normalize_pandas_df(
             data_frame,
             index_key=self.index_key,

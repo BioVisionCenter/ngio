@@ -15,6 +15,7 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
+    build_axes_handler,
     build_canonical_axes_handler,
     canonical_axes_order,
     canonical_label_axes_order,
@@ -40,6 +41,7 @@ from ngio.ome_zarr_meta.ngio_specs._ngio_image import (
     NgioImageLabelMeta,
     NgioImageMeta,
     NgioLabelMeta,
+    NgioLabelsGroupMeta,
 )
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 
@@ -62,11 +64,13 @@ __all__ = [
     "NgioImageLabelMeta",
     "NgioImageMeta",
     "NgioLabelMeta",
+    "NgioLabelsGroupMeta",
     "NgioPlateMeta",
     "NgioWellMeta",
     "PixelSize",
     "SpaceUnits",
     "TimeUnits",
+    "build_axes_handler",
     "build_canonical_axes_handler",
     "canonical_axes_order",
     "canonical_label_axes_order",

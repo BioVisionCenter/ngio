@@ -106,7 +106,7 @@ def test_csv_backend(tmp_path: Path):
     assert backend.implements_pandas()
 
     test_table = pd.DataFrame(
-        {"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["a", "b", "c"]}
+        {"a": [1, 2, 3], "b": [4.1, 5.1, 6.1], "c": ["a", "b", "c"]}
     )
 
     backend.write(test_table, metadata={"test": "test"})
@@ -155,7 +155,7 @@ def test_parquet_backend(tmp_path: Path):
 
 def test_anndata_backend(tmp_path: Path):
     store = tmp_path / "test_anndata_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a", zarr_format=2)
     backend = AnnDataBackend()
     backend.set_group_handler(handler, index_type="int")
 

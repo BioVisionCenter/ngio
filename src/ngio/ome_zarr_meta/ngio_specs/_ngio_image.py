@@ -13,11 +13,11 @@ import numpy as np
 from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
+    AxesHandler,
     DefaultSpaceUnit,
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
-    build_canonical_axes_handler,
 )
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.ome_zarr_meta.ngio_specs._dataset import Dataset
@@ -25,7 +25,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError, NgioValueError
 
 T = TypeVar("T")
-NgffVersions = Literal["0.4"]
+NgffVersions = Literal["0.4", "0.5"]
 DefaultNgffVersion: Literal["0.4"] = "0.4"
 
 
@@ -39,6 +39,13 @@ class ImageLabelSource(BaseModel):
     def default_init(cls, version: NgffVersions) -> "ImageLabelSource":
         """Initialize the ImageLabelSource object."""
         return cls(version=version, source={"image": "../../"})
+
+
+class NgioLabelsGroupMeta(BaseModel):
+    """Metadata model for the /labels group in OME-NGFF."""
+
+    version: NgffVersions
+    labels: list[str]
 
 
 class AbstractNgioImageMeta:
@@ -66,42 +73,23 @@ class AbstractNgioImageMeta:
     @classmethod
     def default_init(
         cls,
-        levels: int | Sequence[str],
-        axes_names: Sequence[str],
-        pixel_size: PixelSize,
-        scaling_factors: Sequence[float] | None = None,
+        levels: Sequence[str],
+        axes_handler: AxesHandler,
+        scales: Sequence[tuple[float, ...]],
+        translations: Sequence[tuple[float, ...] | None],
         name: str | None = None,
         version: NgffVersions = DefaultNgffVersion,
     ):
         """Initialize the ImageMeta object."""
-        axes_handler = build_canonical_axes_handler(
-            axes_names,
-            space_units=pixel_size.space_unit,
-            time_units=pixel_size.time_unit,
-        )
-
-        px_size_dict = pixel_size.as_dict()
-        scale = [px_size_dict.get(name, 1.0) for name in axes_handler.axes_names]
-
-        if scaling_factors is None:
-            _default = {"x": 2.0, "y": 2.0}
-            scaling_factors = [
-                _default.get(name, 1.0) for name in axes_handler.axes_names
-            ]
-
-        if isinstance(levels, int):
-            levels = [str(i) for i in range(levels)]
-
         datasets = []
-        for level in levels:
+        for level, scale, translation in zip(levels, scales, translations, strict=True):
             dataset = Dataset(
                 path=level,
                 axes_handler=axes_handler,
                 scale=scale,
-                translation=None,
+                translation=translation,
             )
             datasets.append(dataset)
-            scale = [s * f for s, f in zip(scale, scaling_factors, strict=True)]
 
         return cls(
             version=version,
@@ -141,10 +129,57 @@ class AbstractNgioImageMeta:
             datasets=new_datasets,
         )
 
+    def rename_axes(self, axes_names: Sequence[str]):
+        """Rename axes in the metadata.
+
+        Args:
+            axes_names(Sequence[str]): The new axes names in the order of the current
+                axes.
+        """
+        new_axes_handler = self.axes_handler.rename_axes(axes_names=axes_names)
+        new_datasets = []
+        for dataset in self.datasets:
+            new_dataset = Dataset(
+                path=dataset.path,
+                axes_handler=new_axes_handler,
+                scale=dataset.scale,
+                translation=dataset.translation,
+            )
+            new_datasets.append(new_dataset)
+
+        return type(self)(
+            version=self.version,
+            name=self.name,
+            datasets=new_datasets,
+        )
+
+    def rename_image(self, name: str):
+        """Rename the image in the metadata.
+
+        Args:
+            name(str): The new name of the image.
+        """
+        return type(self)(
+            version=self.version,
+            name=name,
+            datasets=self.datasets,
+        )
+
     @property
     def version(self) -> NgffVersions:
         """Version of the OME-NFF metadata used to build the object."""
         return self._version  # type: ignore (version is a Literal type)
+
+    @property
+    def zarr_format(self) -> Literal[2, 3]:
+        """Zarr version used to store the data."""
+        match self.version:
+            case "0.4":
+                return 2
+            case "0.5":
+                return 3
+            case _:
+                raise NgioValueError(f"Unsupported NGFF version: {self.version}")
 
     @property
     def name(self) -> str | None:
@@ -326,50 +361,15 @@ class AbstractNgioImageMeta:
             )
         return dataset, lr_dataset
 
-    def scaling_factor(self, path: str | None = None) -> list[float]:
-        """Get the scaling factors from a dataset to its lower resolution."""
+    def scaling_factor(self, path: str | None = None) -> tuple[float, ...]:
+        """Get the scaling factors to downscale to the next lower resolution dataset."""
         if self.levels == 1:
-            return [1.0] * len(self.axes_handler.axes_names)
+            return (1.0,) * len(self.axes_handler.axes_names)
         dataset, lr_dataset = self._get_closest_datasets(path=path)
-
-        scaling_factors = []
-        for ax_name in self.axes_handler.axes_names:
-            s_d = dataset.get_scale(ax_name)
-            s_lr_d = lr_dataset.get_scale(ax_name)
-            scaling_factors.append(s_lr_d / s_d)
-        return scaling_factors
-
-    def yx_scaling(self, path: str | None = None) -> tuple[float, float]:
-        """Get the scaling factor from a dataset to its lower resolution."""
-        if self.levels == 1:
-            return 1.0, 1.0
-        dataset, lr_dataset = self._get_closest_datasets(path=path)
-
-        if lr_dataset is None:
-            raise NgioValueError(
-                "No lower resolution dataset found. "
-                "This is the lowest resolution dataset."
-            )
-
-        s_d = dataset.get_scale("y")
-        s_lr_d = lr_dataset.get_scale("y")
-        scale_y = s_lr_d / s_d
-
-        s_d = dataset.get_scale("x")
-        s_lr_d = lr_dataset.get_scale("x")
-        scale_x = s_lr_d / s_d
-
-        return scale_y, scale_x
-
-    def z_scaling(self, path: str | None = None) -> float:
-        """Get the scaling factor from a dataset to its lower resolution."""
-        if self.levels == 1:
-            return 1.0
-        dataset, lr_dataset = self._get_closest_datasets(path=path)
-
-        s_d = dataset.get_scale("z", default=1.0)
-        s_lr_d = lr_dataset.get_scale("z", default=1.0)
-        return s_lr_d / s_d
+        scale = dataset.scale
+        lr_scale = lr_dataset.scale
+        scaling_factors = [s / s_lr for s_lr, s in zip(scale, lr_scale, strict=True)]
+        return tuple(scaling_factors)
 
 
 class NgioLabelMeta(AbstractNgioImageMeta):

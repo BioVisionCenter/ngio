@@ -1,13 +1,14 @@
 """Utilities to build masking regions of interest (ROIs)."""
 
 import itertools
+from collections.abc import Sequence
 
 import dask.array as da
 import numpy as np
 import scipy.ndimage as ndi
 from dask.delayed import delayed
 
-from ngio.common._roi import Roi, RoiPixels
+from ngio.common._roi import Roi
 from ngio.ome_zarr_meta import PixelSize
 from ngio.utils import NgioValueError
 
@@ -115,7 +116,9 @@ def lazy_compute_slices(segmentation: da.Array) -> dict[int, tuple[slice, ...]]:
 
 
 def compute_masking_roi(
-    segmentation: np.ndarray | da.Array, pixel_size: PixelSize
+    segmentation: np.ndarray | da.Array,
+    pixel_size: PixelSize,
+    axes_order: Sequence[str],
 ) -> list[Roi]:
     """Compute a ROIs for each label in a segmentation.
 
@@ -127,6 +130,12 @@ def compute_masking_roi(
     if segmentation.ndim not in [2, 3, 4]:
         raise NgioValueError("Only 2D, 3D, and 4D segmentations are supported.")
 
+    if len(axes_order) != segmentation.ndim:
+        raise NgioValueError(
+            "The length of axes_order must match the number of dimensions "
+            "of the segmentation."
+        )
+
     if isinstance(segmentation, da.Array):
         slices = lazy_compute_slices(segmentation)
     else:
@@ -134,53 +143,11 @@ def compute_masking_roi(
 
     rois = []
     for label, slice_ in slices.items():
-        if len(slice_) == 2:
-            min_t, max_t = None, None
-            min_z, max_z = None, None
-            min_y, min_x = slice_[0].start, slice_[1].start
-            max_y, max_x = slice_[0].stop, slice_[1].stop
-        elif len(slice_) == 3:
-            min_t, max_t = None, None
-            min_z, min_y, min_x = slice_[0].start, slice_[1].start, slice_[2].start
-            max_z, max_y, max_x = slice_[0].stop, slice_[1].stop, slice_[2].stop
-        elif len(slice_) == 4:
-            min_t, min_z, min_y, min_x = (
-                slice_[0].start,
-                slice_[1].start,
-                slice_[2].start,
-                slice_[3].start,
-            )
-            max_t, max_z, max_y, max_x = (
-                slice_[0].stop,
-                slice_[1].stop,
-                slice_[2].stop,
-                slice_[3].stop,
-            )
-        else:
-            raise ValueError("Invalid slice length.")
-
-        if max_t is None:
-            t_length = None
-        else:
-            t_length = max_t - min_t
-
-        if max_z is None:
-            z_length = None
-        else:
-            z_length = max_z - min_z
-
-        roi = RoiPixels(
-            name=str(label),
-            x_length=max_x - min_x,
-            y_length=max_y - min_y,
-            z_length=z_length,
-            t_length=t_length,
-            x=min_x,
-            y=min_y,
-            z=min_z,
-            label=label,
+        assert len(slice_) == len(axes_order)
+        slices = dict(zip(axes_order, slice_, strict=True))
+        roi = Roi.from_values(
+            name=str(label), slices=slices, label=label, space="pixel"
         )
-
-        roi = roi.to_roi(pixel_size)
+        roi = roi.to_world(pixel_size=pixel_size)
         rois.append(roi)
     return rois

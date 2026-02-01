@@ -1,32 +1,31 @@
 """HCS (High Content Screening) specific metadata classes for NGIO."""
 
+import warnings
 from typing import Annotated
 
-from ome_zarr_models.v04.hcs import HCSAttrs
-from ome_zarr_models.v04.plate import (
+from ome_zarr_models.common.plate import (
     Acquisition,
     Column,
-    Plate,
+    PlateBase,
     Row,
     WellInPlate,
 )
-from ome_zarr_models.v04.well import WellAttrs as WellAttrs04
-from ome_zarr_models.v04.well_types import WellImage as WellImage04
-from ome_zarr_models.v04.well_types import WellMeta as WellMeta04
+from ome_zarr_models.common.well_types import WellImage as WellImageCommon
 from pydantic import BaseModel, SkipValidation, field_serializer
 
 from ngio.ome_zarr_meta.ngio_specs._ngio_image import DefaultNgffVersion, NgffVersions
-from ngio.utils import NgioValueError, ngio_logger
+from ngio.utils import NgioValueError
 
 
 def path_in_well_validation(path: str) -> str:
     """Validate the path in the well."""
     # Check if the value contains only alphanumeric characters
     if not path.isalnum():
-        ngio_logger.warning(
+        warnings.warn(
             f"Path '{path}' contains non-alphanumeric characters. "
             "This may cause issues with some tools. "
-            "Consider using only alphanumeric characters in the path."
+            "Consider using only alphanumeric characters in the path.",
+            stacklevel=2,
         )
     return path
 
@@ -41,7 +40,7 @@ class ImageInWellPath(BaseModel):
     acquisition_name: str | None = None
 
 
-class CustomWellImage(WellImage04):
+class CustomWellImage(WellImageCommon):
     path: Annotated[str, SkipValidation]
 
     @field_serializer("path")
@@ -50,32 +49,29 @@ class CustomWellImage(WellImage04):
         return path_in_well_validation(value)
 
 
-class CustomWellMeta(WellMeta04):
-    images: list[CustomWellImage]  # type: ignore (override of WellMeta04.images)
+class PlateWithVersion(PlateBase):
+    version: NgffVersions
 
 
-class CustomWellAttrs(WellAttrs04):
-    well: CustomWellMeta  # type: ignore (override of WellAttrs04.well)
-
-
-class NgioWellMeta(CustomWellAttrs):
+class NgioWellMeta(BaseModel):
     """HCS well metadata."""
+
+    images: list[CustomWellImage]  # type: ignore (override of WellMeta04.images)
+    version: NgffVersions
 
     @classmethod
     def default_init(
         cls,
-        version: NgffVersions | None = None,
+        ngff_version: NgffVersions = DefaultNgffVersion,
     ) -> "NgioWellMeta":
-        if version is None:
-            version = DefaultNgffVersion
-        well = cls(well=CustomWellMeta(images=[], version=version))
+        well = cls(images=[], version=ngff_version)
         return well
 
     @property
     def acquisition_ids(self) -> list[int]:
         """Return the acquisition ids in the well."""
         acquisitions = []
-        for images in self.well.images:
+        for images in self.images:
             if (
                 images.acquisition is not None
                 and images.acquisition not in acquisitions
@@ -85,7 +81,7 @@ class NgioWellMeta(CustomWellAttrs):
 
     def get_image_acquisition_id(self, image_path: str) -> int | None:
         """Return the acquisition id for the given image path."""
-        for images in self.well.images:
+        for images in self.images:
             if images.path == image_path:
                 return images.acquisition
         raise NgioValueError(f"Image at path {image_path} not found in the well.")
@@ -100,11 +96,9 @@ class NgioWellMeta(CustomWellAttrs):
             acquisition (int | None): The acquisition id to filter the images.
         """
         if acquisition is None:
-            return [images.path for images in self.well.images]
+            return [images.path for images in self.images]
         return [
-            images.path
-            for images in self.well.images
-            if images.acquisition == acquisition
+            images.path for images in self.images if images.acquisition == acquisition
         ]
 
     def add_image(
@@ -118,7 +112,7 @@ class NgioWellMeta(CustomWellAttrs):
             strict (bool): If True, check if the image already exists in the well.
                 If False, do not check if the image already exists in the well.
         """
-        list_of_images = self.well.images
+        list_of_images = self.images
         for image in list_of_images:
             if image.path == path:
                 raise NgioValueError(
@@ -137,9 +131,7 @@ class NgioWellMeta(CustomWellAttrs):
 
         new_image = CustomWellImage(path=path, acquisition=acquisition)
         list_of_images.append(new_image)
-        return NgioWellMeta(
-            well=CustomWellMeta(images=list_of_images, version=self.well.version)
-        )
+        return NgioWellMeta(images=list_of_images, version=self.version)
 
     def remove_image(self, path: str) -> "NgioWellMeta":
         """Remove an image from the well.
@@ -147,15 +139,11 @@ class NgioWellMeta(CustomWellAttrs):
         Args:
             path (str): The path of the image.
         """
-        list_of_images = self.well.images
+        list_of_images = self.images
         for image in list_of_images:
             if image.path == path:
                 list_of_images.remove(image)
-                return NgioWellMeta(
-                    well=CustomWellMeta(
-                        images=list_of_images, version=self.well.version
-                    )
-                )
+                return NgioWellMeta(images=list_of_images, version=self.version)
         raise NgioValueError(f"Image at path {path} not found in the well.")
 
 
@@ -218,26 +206,30 @@ def _relabel_wells(
     return new_wells
 
 
-class NgioPlateMeta(HCSAttrs):
+class NgioPlateMeta(BaseModel):
     """HCS plate metadata."""
+
+    plate: PlateWithVersion
+    version: NgffVersions
 
     @classmethod
     def default_init(
         cls,
         images: list[ImageInWellPath] | None = None,
         name: str | None = None,
-        version: NgffVersions | None = None,
+        ngff_version: NgffVersions = DefaultNgffVersion,
     ) -> "NgioPlateMeta":
         plate = cls(
-            plate=Plate(
+            plate=PlateWithVersion(
                 rows=[],
                 columns=[],
                 acquisitions=None,
                 wells=[],
                 field_count=None,
-                version=version,
                 name=name,
-            )
+                version=ngff_version,
+            ),
+            version=ngff_version,
         )
 
         if images is None:
@@ -346,16 +338,16 @@ class NgioPlateMeta(HCSAttrs):
         else:
             wells = self.plate.wells
 
-        new_plate = Plate(
+        new_plate = PlateWithVersion(
             rows=rows,
             columns=self.plate.columns,
             acquisitions=self.plate.acquisitions,
             wells=wells,
             field_count=self.plate.field_count,
             name=self.plate.name,
-            version=self.plate.version,
+            version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate), row_idx
+        return NgioPlateMeta(plate=new_plate, version=self.version), row_idx
 
     def add_column(self, column: str | int) -> "tuple[NgioPlateMeta, int]":
         """Add a column to the plate.
@@ -384,16 +376,16 @@ class NgioPlateMeta(HCSAttrs):
         else:
             wells = self.plate.wells
 
-        new_plate = Plate(
+        new_plate = PlateWithVersion(
             rows=self.plate.rows,
             columns=columns,
             acquisitions=self.plate.acquisitions,
             wells=wells,
             field_count=self.plate.field_count,
             name=self.plate.name,
-            version=self.plate.version,
+            version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate), column_idx
+        return NgioPlateMeta(plate=new_plate, version=self.version), column_idx
 
     def add_well(
         self,
@@ -422,16 +414,16 @@ class NgioPlateMeta(HCSAttrs):
                 )
             )
 
-        new_plate = Plate(
+        new_plate = PlateWithVersion(
             rows=plate.plate.rows,
             columns=plate.plate.columns,
             acquisitions=plate.plate.acquisitions,
             wells=wells,
             field_count=plate.plate.field_count,
             name=plate.plate.name,
-            version=plate.plate.version,
+            version=plate.version,
         )
-        return NgioPlateMeta(plate=new_plate)
+        return NgioPlateMeta(plate=new_plate, version=plate.version)
 
     def add_acquisition(
         self,
@@ -461,16 +453,16 @@ class NgioPlateMeta(HCSAttrs):
             Acquisition(id=acquisition_id, name=acquisition_name, **acquisition_kwargs)
         )
 
-        new_plate = Plate(
+        new_plate = PlateWithVersion(
             rows=self.plate.rows,
             columns=self.plate.columns,
             acquisitions=acquisitions,
             wells=self.plate.wells,
             field_count=self.plate.field_count,
             name=self.plate.name,
-            version=self.plate.version,
+            version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate)
+        return NgioPlateMeta(plate=new_plate, version=self.version)
 
     def remove_well(self, row: str, column: str | int) -> "NgioPlateMeta":
         """Remove a well from the plate.
@@ -497,28 +489,28 @@ class NgioPlateMeta(HCSAttrs):
                 f"Well at row {row} and column {column} not found in the plate."
             )
 
-        new_plate = Plate(
+        new_plate = PlateWithVersion(
             rows=self.plate.rows,
             columns=self.plate.columns,
             acquisitions=self.plate.acquisitions,
             wells=wells,
             field_count=self.plate.field_count,
             name=self.plate.name,
-            version=self.plate.version,
+            version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate)
+        return NgioPlateMeta(plate=new_plate, version=self.version)
 
     def derive(
         self,
         name: str | None = None,
-        version: NgffVersions | None = None,
+        ngff_version: NgffVersions | None = None,
         keep_acquisitions: bool = False,
     ) -> "NgioPlateMeta":
         """Derive the plate metadata.
 
         Args:
             name (str): The name of the derived plate.
-            version (NgffVersion | None): The version of the derived plate.
+            ngff_version (NgffVersion | None): The version of the derived plate.
                 If None, use the version of the original plate.
             keep_acquisitions (bool): If True, keep the acquisitions in the plate.
         """
@@ -530,17 +522,18 @@ class NgioPlateMeta(HCSAttrs):
         else:
             acquisitions = None
 
-        if version is None:
-            version = self.plate.version  # type: ignore (version is NgffVersions or None)
+        if ngff_version is None:
+            ngff_version = self.version
 
         return NgioPlateMeta(
-            plate=Plate(
+            plate=PlateWithVersion(
                 rows=rows,
                 columns=columns,
                 acquisitions=acquisitions,
                 wells=[],
                 field_count=self.plate.field_count,
-                version=version,
                 name=name,
-            )
+                version=ngff_version,
+            ),
+            version=ngff_version,
         )

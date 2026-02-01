@@ -60,11 +60,20 @@ class Dataset:
     @property
     def pixel_size(self) -> PixelSize:
         """Return the pixel size for the dataset."""
+        scale = self._scale
+        pix_size_dict = {}
+        # Mandatory axes: x, y
+        for ax in ["x", "y"]:
+            index = self.axes_handler.get_index(ax)
+            assert index is not None
+            pix_size_dict[ax] = scale[index]
+
+        for ax in ["z", "t"]:
+            index = self.axes_handler.get_index(ax)
+            pix_size_dict[ax] = scale[index] if index is not None else 1.0
+
         return PixelSize(
-            x=self.get_scale("x", default=1.0),
-            y=self.get_scale("y", default=1.0),
-            z=self.get_scale("z", default=1.0),
-            t=self.get_scale("t", default=1.0),
+            **pix_size_dict,
             space_unit=self.axes_handler.space_unit,
             time_unit=self.axes_handler.time_unit,
         )
@@ -78,21 +87,3 @@ class Dataset:
     def translation(self) -> tuple[float, ...]:
         """Return the translation as a tuple."""
         return tuple(self._translation)
-
-    def get_scale(self, axis_name: str, default: float | None = None) -> float:
-        """Return the scale for a given axis."""
-        idx = self.axes_handler.get_index(axis_name)
-        if idx is None:
-            if default is not None:
-                return default
-            raise ValueError(f"Axis {axis_name} not found in axes {self.axes_handler}.")
-        return self._scale[idx]
-
-    def get_translation(self, axis_name: str, default: float | None = None) -> float:
-        """Return the translation for a given axis."""
-        idx = self.axes_handler.get_index(axis_name)
-        if idx is None:
-            if default is not None:
-                return default
-            raise ValueError(f"Axis {axis_name} not found in axes {self.axes_handler}.")
-        return self._translation[idx]

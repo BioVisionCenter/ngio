@@ -4,11 +4,15 @@ import dask.array as da
 import numpy as np
 import pytest
 
-from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio import (
+    create_empty_ome_zarr,
+    create_synthetic_ome_zarr,
+    open_ome_zarr_container,
+)
 from ngio.images._image import ChannelSelectionModel
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
-from ngio.utils import fractal_fsspec_store
+from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
 class IdentityTransform:
@@ -40,19 +44,28 @@ class IdentityTransform:
 @pytest.mark.parametrize(
     "zarr_name",
     [
-        "test_image_yx.zarr",
-        "test_image_cyx.zarr",
-        "test_image_zyx.zarr",
-        "test_image_czyx.zarr",
-        "test_image_c1yx.zarr",
-        "test_image_tyx.zarr",
-        "test_image_tcyx.zarr",
-        "test_image_tzyx.zarr",
-        "test_image_tczyx.zarr",
+        "v04/test_image_yx.zarr",
+        "v04/test_image_cyx.zarr",
+        "v04/test_image_zyx.zarr",
+        "v04/test_image_czyx.zarr",
+        "v04/test_image_c1yx.zarr",
+        "v04/test_image_tyx.zarr",
+        "v04/test_image_tcyx.zarr",
+        "v04/test_image_tzyx.zarr",
+        "v04/test_image_tczyx.zarr",
+        "v05/test_image_yx.zarr",
+        "v05/test_image_cyx.zarr",
+        "v05/test_image_zyx.zarr",
+        "v05/test_image_czyx.zarr",
+        "v05/test_image_c1yx.zarr",
+        "v05/test_image_tyx.zarr",
+        "v05/test_image_tcyx.zarr",
+        "v05/test_image_tzyx.zarr",
+        "v05/test_image_tczyx.zarr",
     ],
 )
-def test_open_ome_zarr_container(images_v04: dict[str, Path], zarr_name: str):
-    path = images_v04[zarr_name]
+def test_open_ome_zarr_container(images_all_versions: dict[str, Path], zarr_name: str):
+    path = images_all_versions[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     whole_image_roi = ome_zarr.build_image_roi_table().get("image")
@@ -173,11 +186,36 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     )
     image.consolidate(mode=array_mode)  # type: ignore
 
-    # Omemeta
-    ome_zarr.set_channel_meta(labels=["channel_x"])
+    # Omero-meta
+    ome_zarr.set_channel_meta(labels=["channel_x"], wavelength_id=["500"])
     image = ome_zarr.get_image()
     assert image.channel_labels == ["channel_x"]
+    assert image.wavelength_ids == ["500"]
+
+    ome_zarr.set_channel_labels(labels=["channel_y"])
+    image = ome_zarr.get_image()
+    assert image.channel_labels == ["channel_y"]
+    assert image.wavelength_ids == ["500"]
+    ome_zarr.set_name("test_image")
+    assert ome_zarr.meta.name == "test_image"
+
+    ome_zarr.set_channel_colors(colors=["00FF00"])
+    channels_meta = ome_zarr.meta.channels_meta
+    assert channels_meta is not None
+    assert channels_meta.channels[0].channel_visualisation.color == "00FF00"
+
     ome_zarr.set_channel_percentiles()
+    ome_zarr.set_channel_windows_with_percentiles()
+    ome_zarr.set_channel_windows(starts_ends=[(10, 200)], min_max=[(0, 255)])
+    channels_meta = ome_zarr.meta.channels_meta
+    assert channels_meta is not None
+    assert len(channels_meta.channels) == 1
+    assert channels_meta.channels[0].label == "channel_y"
+    assert channels_meta.channels[0].wavelength_id == "500"
+    assert channels_meta.channels[0].channel_visualisation.start == 10
+    assert channels_meta.channels[0].channel_visualisation.end == 200
+    assert channels_meta.channels[0].channel_visualisation.min == 0
+    assert channels_meta.channels[0].channel_visualisation.max == 255
 
     image = ome_zarr.get_image(path="2")
     assert np.mean(image.get_array()) == 1  # type: ignore
@@ -225,7 +263,7 @@ def test_remote_ome_zarr_container():
     # ]
 
     _ = ome_zarr.get_label("nuclei", path="0")
-    _ = ome_zarr.get_table("well_ROI_table")
+    _ = ome_zarr.get_table("well_ROI_table").dataframe
 
 
 def test_get_and_squeeze(tmp_path: Path):
@@ -311,3 +349,74 @@ def test_derive_image_and_labels(tmp_path: Path):
     )
     derived_ome_zarr = ome_zarr.derive_image(tmp_path / "derived.zarr")
     _ = derived_ome_zarr.derive_label("derived_label")
+
+
+def test_derive_copy_labels_and_tables(tmp_path: Path):
+    # Testing for #116
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_synthetic_ome_zarr(
+        store,
+        shape=(3, 20, 30),
+        levels=1,
+        axes_names=["c", "y", "x"],
+    )
+    derived_ome_zarr = ome_zarr.derive_image(
+        tmp_path / "derived.zarr", copy_labels=True, copy_tables=True
+    )
+    assert ome_zarr.list_labels() == derived_ome_zarr.list_labels()
+    assert ome_zarr.list_tables() == derived_ome_zarr.list_tables()
+
+
+def test_delete_label_and_table(tmp_path: Path):
+    store = tmp_path / "ome_zarr.zarr"
+    ome_zarr = create_synthetic_ome_zarr(
+        store,
+        shape=(3, 20, 30),
+        levels=1,
+        axes_names=["c", "y", "x"],
+    )
+    ome_zarr.derive_label("label_to_delete")
+    assert "label_to_delete" in ome_zarr.list_labels()
+    ome_zarr.delete_label("label_to_delete")
+    assert "label_to_delete" not in ome_zarr.list_labels()
+    ome_zarr.delete_label("label_to_delete", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_label("label_to_delete", missing_ok=False)
+
+    new_table = ome_zarr.build_image_roi_table()
+    ome_zarr.add_table("table_to_delete", new_table)
+    assert "table_to_delete" in ome_zarr.list_tables()
+    ome_zarr.delete_table("table_to_delete")
+    assert "table_to_delete" not in ome_zarr.list_tables()
+    ome_zarr.delete_table("table_to_delete", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_table("table_to_delete", missing_ok=False)
+
+    ome_zarr = create_empty_ome_zarr(
+        store, shape=(3, 20, 30), pixelsize=0.5, overwrite=True
+    )
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_label("non_existing_label")
+    ome_zarr.delete_label("non_existing_label", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        ome_zarr.delete_table("non_existing_table")
+    ome_zarr.delete_table("non_existing_table", missing_ok=True)
+
+
+def test_rename_axes():
+    ome_zarr = create_empty_ome_zarr(
+        store={},
+        shape=(3, 127, 128),
+        pixelsize=1.0,
+        translation=(0.0, 1.0, 1.0),
+        ngff_version="0.5",
+        axes_names=["c", "y", "XX"],
+        overwrite=True,
+    )
+
+    ome_zarr.derive_label("label_1")
+    assert ome_zarr.get_image().axes == ("c", "y", "XX")
+    label = ome_zarr.get_label("label_1")
+    assert label.axes == ("y", "XX")
+    ome_zarr.set_axes_names(axes_names=["c", "y", "x"])
+    assert ome_zarr.get_image().axes == ("c", "y", "x")

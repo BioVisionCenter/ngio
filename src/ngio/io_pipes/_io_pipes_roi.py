@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import zarr
 
 from ngio.common._dimensions import Dimensions
-from ngio.common._roi import Roi, RoiPixels
+from ngio.common._roi import Roi
 from ngio.io_pipes._io_pipes import (
     DaskGetter,
     DaskSetter,
@@ -17,7 +17,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 
 def roi_to_slicing_dict(
     *,
-    roi: Roi | RoiPixels,
+    roi: Roi,
     pixel_size: PixelSize,
     slicing_dict: dict[str, SlicingInputType] | None = None,
 ) -> dict[str, SlicingInputType]:
@@ -40,7 +40,7 @@ class NumpyRoiGetter(NumpyGetter):
         *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
@@ -68,7 +68,7 @@ class DaskRoiGetter(DaskGetter):
         *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
@@ -96,7 +96,7 @@ class NumpyRoiSetter(NumpySetter):
         *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,
@@ -124,7 +124,7 @@ class DaskRoiSetter(DaskSetter):
         *,
         zarr_array: zarr.Array,
         dimensions: Dimensions,
-        roi: Roi | RoiPixels,
+        roi: Roi,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         slicing_dict: dict[str, SlicingInputType] | None = None,

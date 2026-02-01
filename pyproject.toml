@@ -18,7 +18,7 @@ name = "ngio"
 dynamic = ["version"]
 description = "Next Generation file format IO"
 readme = "README.md"
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.11,<3.15"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "Lorenzo Cerrone", email = "lorenzo.cerrone@uzh.ch" }]
 # https://pypi.org/classifiers/
@@ -29,14 +29,15 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Typing :: Typed",
 ]
 # add your package dependencies here
 dependencies = [
     "numpy",
     "filelock",
-    "zarr<3",
-    "anndata>=0.8.0,<0.11.4",      # To be removed when we transition to zarr v3
+    "zarr>3",
+    "anndata",
     "pydantic",
     "pandas>=1.2.0,<3.0.0",
     "requests",
@@ -54,14 +55,23 @@ dependencies = [
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 # "extras" (e.g. for `pip install .[test]`)
 [project.optional-dependencies]
-test = ["pytest", "pytest-cov", "scikit-image"]
+test = [
+    "pytest",
+    "pytest-cov",
+    "scikit-image",
+    "moto[server]",
+    "boto",
+    "pytest_httpserver",
+    "devtools",
+    "s3fs",
+]
 
 dev = [
+    "zarrs",
     "Pympler",
     "napari",
     "pyqt5",
     "matplotlib",
-    "devtools",
     "notebook",
     "mypy",
     "pdbpp",        # https://github.com/pdbpp/pdbpp
@@ -155,7 +165,9 @@ minversion = "7.0"
 testpaths = ["tests"]
 filterwarnings = [
     "error",
-    "ignore::FutureWarning", # TODO remove after zarr-python v3 
+    "ignore::zarr.errors.ZarrUserWarning", # required for anndata
+    "ignore::UserWarning",                 # from ngio.utils._zarr_utils
+    "ignore::DeprecationWarning",          # temporary ignore deprecation warnings
 ]
 addopts = [
     "-vv",
@@ -224,6 +236,7 @@ test13 = { features = ["py13", "test"], solve-group = "py13" }
 
 # dev env
 dev = { features = ["dev", "test"], solve-group = "py11" }
+test = { features = ["test"], solve-group = "py11" }
 
 [tool.pixi.tasks]
 serve_docs = "mkdocs serve"

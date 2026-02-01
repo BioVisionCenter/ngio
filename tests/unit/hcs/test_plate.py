@@ -1,5 +1,6 @@
 import asyncio
 from pathlib import Path
+from typing import Literal
 
 import pandas.testing as pdt
 import pytest
@@ -59,8 +60,11 @@ def test_open_real_ome_zarr_plate(cardiomyocyte_tiny_path: Path):
     assert well.get_image_acquisition_id("0") is None
 
 
-def test_create_and_edit_plate(tmp_path: Path):
-    test_plate = create_empty_plate(tmp_path / "test_plate.zarr", name="test_plate")
+@pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
+def test_create_and_edit_plate(tmp_path: Path, ngff_version: Literal["0.4", "0.5"]):
+    test_plate = create_empty_plate(
+        tmp_path / "test_plate.zarr", name="test_plate", ngff_version=ngff_version
+    )
     assert test_plate.columns == []
     assert test_plate.rows == []
     assert test_plate.acquisition_ids == []
@@ -168,7 +172,11 @@ def test_tables_api(tmp_path: Path):
     test_plate.add_table("test_table", test_table, backend="csv")
 
     test_roi_table = RoiTable(
-        rois=[Roi(name="roi_1", x_length=10, y_length=10, z_length=10)]  # type: ignore
+        rois=[
+            Roi.from_values(
+                name="roi_1", slices={"x": (0, 10), "y": (0, 10), "z": (0, 10)}
+            )
+        ]  # type: ignore
     )
     test_plate.add_table("test_roi_table", test_roi_table)
     assert test_plate.list_tables() == ["test_table", "test_roi_table"]
@@ -179,6 +187,18 @@ def test_tables_api(tmp_path: Path):
         test_df,
         check_names=False,
     )
+    test_plate.delete_table("test_table")
+    assert "test_table" not in test_plate.list_tables()
+    test_plate.delete_table("test_table", missing_ok=True)
+    with pytest.raises(NgioValueError):
+        test_plate.delete_table("test_table", missing_ok=False)
+
+    test_plate = create_empty_plate(
+        tmp_path / "test_plate.zarr", name="test_plate", overwrite=True
+    )
+    with pytest.raises(NgioValueError):
+        test_plate.delete_table("non_existing_table")
+    test_plate.delete_table("non_existing_table", missing_ok=True)
 
 
 @pytest.mark.filterwarnings("ignore::anndata._warnings.ImplicitModificationWarning")

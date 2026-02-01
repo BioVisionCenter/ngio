@@ -34,10 +34,6 @@ def custom_anndata_read_zarr(
         elem_to_read (Sequence[str] | None): The elements to read from the store.
     """
     group = open_group_wrapper(store=store, mode="r")
-
-    if not isinstance(group.store, zarr.DirectoryStore):
-        elem_to_read = ["X", "obs", "var"]
-
     if elem_to_read is None:
         elem_to_read = [
             "X",
@@ -87,6 +83,8 @@ def custom_anndata_read_zarr(
     if isinstance(group["obs"], zarr.Array):
         _clean_uns(adata)
 
+    if isinstance(adata, dict):
+        adata = AnnData(**adata)  # type: ignore
     if not isinstance(adata, AnnData):
         raise NgioValueError(f"Expected an AnnData object, but got {type(adata)}")
     return adata

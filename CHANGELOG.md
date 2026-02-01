@@ -1,9 +1,88 @@
 # Changelog
 
-## [v0.4.6]
+## [v0.5.0]
+
+### Features
+- Add support for OME-NGFF v0.5
+- Move to zarr-python v3
+- API to delete labels and tables from OME-Zarr containers and HCS plates.
+- Allow to explicitly set axes order when building masking roi tables.
+- New metadata modification APIs for `Image`, `Label`, and `OmeZarrContainer`:
+  - `set_channel_labels` - Update channel labels
+  - `set_channel_colors` - Update channel colors
+  - `set_channel_windows` - Update channel display windows (start/end values)
+  - `set_channel_windows_with_percentiles` - Update display windows based on data percentiles
+  - `set_axes_names` - Rename axes in the metadata
+  - `set_axes_unit` - Set space and time units for axes
+  - `set_name` - Set the image/label name in metadata
+- Add translation support in all image/label creation and derivation APIs.
+
+### API Breaking Changes
+
+- New `Roi` models, now supporting arbitrary axes.
+- The `compressor` argument has been renamed to `compressors` in all relevant functions and methods to reflect the support for multiple compressors in zarr v3.
+- The `version` argument has been renamed to `ngff_version` in all relevant functions and methods to specify the OME-NGFF version.
+- Remove the `parallel_safe` argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the
+`cache`.
+- Remove the unused `parent` argument from `ZarrGroupHandler`.
+- Internal changes to `ZarrGroupHandler` to support cleanup unused apis.
+- Remove `ngio_logger` in favor of standard warnings module.
+
+### Migration Guide (v0.4 → v0.5)
+
+#### Roi API Changes
+
+The `Roi` class now uses a flexible slice-based model supporting arbitrary axes:
+
+```python
+# Old (v0.4)
+roi = Roi(x=34.1, y=10, x_length=321.6, y_length=330)
+
+# New (v0.5)
+roi = Roi.from_values(slices={"x": (34.1, 321.6), "y": (10, 330)}, name=None)
+
+# Accessing coordinates
+# Old: roi.x, roi.y, roi.x_length, roi.y_length
+# New: roi.get("x").start, roi.get("y").start, roi.get("x").length, roi.get("y").length
+```
+
+#### Argument Renames
+
+```python
+# compressor → compressors
+# Old (v0.4)
+create_empty_ome_zarr(..., compressor=Blosc())
+
+# New (v0.5)
+create_empty_ome_zarr(..., compressors=Blosc())
+
+# version → ngff_version
+# Old (v0.4)
+create_empty_ome_zarr(..., version="0.4")
+
+# New (v0.5)
+create_empty_ome_zarr(..., ngff_version="0.4")
+```
+
+#### Removed Arguments
+
+- `parallel_safe`: No longer needed, locking is handled internally
+- `ngio_logger`: Use Python's standard `warnings` module instead
+
+### Deprecations
+- Standardized all deprecation warnings to indicate removal in `ngio=0.6`.
+- Deprecated `set_channel_percentiles` method, use `set_channel_windows_with_percentiles` instead.
 
 ### Bug Fixes
-- Fix channel selection from `wavelenght_id`
+- Fix bug in `consolidate` function when using coarsening mode with non power-of-two shapes.
+
+## [v0.4.7]
+
+### Bug Fixes
+- Fix bug adding time axis to masking roi tables.
+
+### Bug Fixes
+- Fix channel selection from `wavelength_id`
 - Fix table opening mode to stop wrtiting groups when opening in append mode.
 
 ## [v0.4.5]

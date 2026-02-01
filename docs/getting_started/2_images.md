@@ -137,7 +137,7 @@ To read or write a specific region of the image defined in world coordinates, yo
 
 ```pycon exec="true" source="console" session="get_started"
 >>> from ngio import Roi
->>> roi = Roi(x=34.1, y=10, x_length=321.6, y_length=330) # Define a ROI in world coordinates
+>>> roi = Roi.from_values(slices={"x": (34.1, 321.6), "y": (10, 330)}, name=None) # Define a ROI in world coordinates
 >>> image.get_roi_as_numpy(roi) # Get the image data in the ROI as a numpy array
 >>> print(image.get_roi_as_numpy(roi).shape) # markdown-exec: hide
 ```

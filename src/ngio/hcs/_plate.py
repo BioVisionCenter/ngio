@@ -15,15 +15,16 @@ from ngio.images import (
     list_image_tables_async,
 )
 from ngio.ome_zarr_meta import (
+    DefaultNgffVersion,
     ImageInWellPath,
     NgffVersions,
     NgioPlateMeta,
     NgioWellMeta,
-    find_plate_meta_handler,
-    find_well_meta_handler,
-    get_plate_meta_handler,
-    get_well_meta_handler,
+    PlateMetaHandler,
+    WellMetaHandler,
     path_in_well_validation,
+    update_ngio_plate_meta,
+    update_ngio_well_meta,
 )
 from ngio.tables import (
     ConditionTable,
@@ -40,17 +41,23 @@ from ngio.tables import (
 )
 from ngio.utils import (
     AccessModeLiteral,
+    NgioCache,
+    NgioError,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
 )
 
 
-def _default_table_container(handler: ZarrGroupHandler) -> TablesContainer | None:
+def _try_get_table_container(
+    handler: ZarrGroupHandler, create_mode: bool = True
+) -> TablesContainer | None:
     """Return a default table container."""
-    success, table_handler = handler.safe_derive_handler("tables")
-    if success and isinstance(table_handler, ZarrGroupHandler):
+    try:
+        table_handler = handler.get_handler("tables", create_mode=create_mode)
         return TablesContainer(table_handler)
+    except NgioError:
+        return None
 
 
 # Mock lock class that does nothing
@@ -76,7 +83,7 @@ class OmeZarrWell:
             group_handler: The Zarr group handler that contains the Well.
         """
         self._group_handler = group_handler
-        self._meta_handler = find_well_meta_handler(group_handler)
+        self._meta_handler = WellMetaHandler(group_handler)
 
     def __repr__(self) -> str:
         """Return a string representation of the well."""
@@ -90,7 +97,7 @@ class OmeZarrWell:
     @property
     def meta(self):
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def acquisition_ids(self) -> list[int]:
@@ -136,7 +143,7 @@ class OmeZarrWell:
         Returns:
             OmeZarrContainer: The image.
         """
-        handler = self._group_handler.derive_handler(image_path)
+        handler = self._group_handler.get_handler(image_path)
         return OmeZarrContainer(handler)
 
     def _add_image(
@@ -158,7 +165,7 @@ class OmeZarrWell:
             meta = self.meta.add_image(
                 path=image_path, acquisition=acquisition_id, strict=strict
             )
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
         return self._group_handler.get_group(image_path, create_mode=True)
@@ -237,8 +244,14 @@ class OmeZarrPlate:
             table_container: The tables container that contains plate level tables.
         """
         self._group_handler = group_handler
-        self._meta_handler = find_plate_meta_handler(group_handler)
+        self._meta_handler = PlateMetaHandler(group_handler)
         self._tables_container = table_container
+        self._wells_cache: NgioCache[OmeZarrWell] = NgioCache(
+            use_cache=self._group_handler.use_cache
+        )
+        self._images_cache: NgioCache[OmeZarrContainer] = NgioCache(
+            use_cache=self._group_handler.use_cache
+        )
 
     def __repr__(self) -> str:
         """Return a string representation of the plate."""
@@ -252,7 +265,7 @@ class OmeZarrPlate:
     @property
     def meta(self):
         """Return the metadata."""
-        return self._meta_handler.meta
+        return self._meta_handler.get_meta()
 
     @property
     def columns(self) -> list[str]:
@@ -356,6 +369,24 @@ class OmeZarrPlate:
         well = self.get_well(row=row, column=column)
         return well.get_image_acquisition_id(image_path=image_path)
 
+    def _get_well(self, well_path: str) -> OmeZarrWell:
+        """Get a well from the plate by its path.
+
+        Args:
+            well_path (str): The path of the well.
+
+        Returns:
+            OmeZarrWell: The well.
+
+        """
+        cached_well = self._wells_cache.get(well_path)
+        if cached_well is not None:
+            return cached_well
+
+        group_handler = self._group_handler.get_handler(well_path)
+        self._wells_cache.set(well_path, OmeZarrWell(group_handler))
+        return OmeZarrWell(group_handler)
+
     def get_well(self, row: str, column: int | str) -> OmeZarrWell:
         """Get a well from the plate.
 
@@ -367,8 +398,7 @@ class OmeZarrPlate:
             OmeZarrWell: The well.
         """
         well_path = self._well_path(row=row, column=column)
-        group_handler = self._group_handler.derive_handler(well_path)
-        return OmeZarrWell(group_handler)
+        return self._get_well(well_path=well_path)
 
     async def get_wells_async(self) -> dict[str, OmeZarrWell]:
         """Get all wells in the plate asynchronously.
@@ -380,26 +410,17 @@ class OmeZarrPlate:
             dict[str, OmeZarrWell]: A dictionary of wells, where the key is the well
                 path and the value is the well object.
         """
-        wells = self._group_handler.get_from_cache("wells")
-        if wells is not None:
-            assert isinstance(wells, dict)
-            return wells
-
-        def process_well(well_path):
-            group_handler = self._group_handler.derive_handler(well_path)
-            well = OmeZarrWell(group_handler)
-            return well_path, well
-
         wells, tasks = {}, []
         for well_path in self.wells_paths():
-            task = asyncio.to_thread(process_well, well_path)
+            task = asyncio.to_thread(
+                lambda well_path: (well_path, self._get_well(well_path)), well_path
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks)
         for well_path, well in results:
             wells[well_path] = well
 
-        self._group_handler.add_to_cache("wells", wells)
         return wells
 
     def get_wells(self) -> dict[str, OmeZarrWell]:
@@ -409,23 +430,24 @@ class OmeZarrPlate:
             dict[str, OmeZarrWell]: A dictionary of wells, where the key is the well
                 path and the value is the well object.
         """
-        wells = self._group_handler.get_from_cache("wells")
-        if wells is not None:
-            assert isinstance(wells, dict)
-            return wells
-
-        def process_well(well_path):
-            group_handler = self._group_handler.derive_handler(well_path)
-            well = OmeZarrWell(group_handler)
-            return well_path, well
-
         wells = {}
         for well_path in self.wells_paths():
-            _, well = process_well(well_path)
-            wells[well_path] = well
-
-        self._group_handler.add_to_cache("wells", wells)
+            wells[well_path] = self._get_well(well_path)
         return wells
+
+    def _get_image(self, image_path: str) -> OmeZarrContainer:
+        """Get an image from the plate by its path.
+
+        Args:
+            image_path (str): The path of the image.
+        """
+        cached_image = self._images_cache.get(image_path)
+        if cached_image is not None:
+            return cached_image
+        img_group_handler = self._group_handler.get_handler(image_path)
+        image = OmeZarrContainer(img_group_handler)
+        self._images_cache.set(image_path, image)
+        return image
 
     async def get_images_async(
         self, acquisition: int | None = None
@@ -442,30 +464,19 @@ class OmeZarrPlate:
             dict[str, OmeZarrContainer]: A dictionary of images, where the key is the
                 image path and the value is the image object.
         """
-        images = self._group_handler.get_from_cache("images")
-        if images is not None:
-            assert isinstance(images, dict)
-            return images
-
         paths = await self.images_paths_async(acquisition=acquisition)
-
-        def process_image(image_path):
-            """Process a single image and return the image path and image object."""
-            img_group_handler = self._group_handler.derive_handler(image_path)
-            image = OmeZarrContainer(img_group_handler)
-            return image_path, image
 
         images, tasks = {}, []
         for image_path in paths:
-            task = asyncio.to_thread(process_image, image_path)
+            task = asyncio.to_thread(
+                lambda image_path: (image_path, self._get_image(image_path)), image_path
+            )
             tasks.append(task)
 
         results = await asyncio.gather(*tasks)
 
         for image_path, image in results:
             images[image_path] = image
-
-        self._group_handler.add_to_cache("images", images)
         return images
 
     def get_images(self, acquisition: int | None = None) -> dict[str, OmeZarrContainer]:
@@ -474,24 +485,11 @@ class OmeZarrPlate:
         Args:
             acquisition: The acquisition id to filter the images.
         """
-        images = self._group_handler.get_from_cache("images")
-        if images is not None:
-            assert isinstance(images, dict)
-            return images
         paths = self.images_paths(acquisition=acquisition)
-
-        def process_image(image_path):
-            """Process a single image and return the image path and image object."""
-            img_group_handler = self._group_handler.derive_handler(image_path)
-            image = OmeZarrContainer(img_group_handler)
-            return image_path, image
-
         images = {}
         for image_path in paths:
-            _, image = process_image(image_path)
-            images[image_path] = image
+            images[image_path] = self._get_image(image_path)
 
-        self._group_handler.add_to_cache("images", images)
         return images
 
     def get_image(
@@ -508,8 +506,7 @@ class OmeZarrPlate:
             OmeZarrContainer: The image.
         """
         image_path = self._image_path(row=row, column=column, path=image_path)
-        group_handler = self._group_handler.derive_handler(image_path)
-        return OmeZarrContainer(group_handler)
+        return self._get_image(image_path)
 
     def get_image_store(
         self, row: str, column: int | str, image_path: str
@@ -538,7 +535,7 @@ class OmeZarrPlate:
         for image_paths in self.well_images_paths(
             row=row, column=column, acquisition=acquisition
         ):
-            group_handler = self._group_handler.derive_handler(image_paths)
+            group_handler = self._group_handler.get_handler(image_paths)
             images[image_paths] = OmeZarrContainer(group_handler)
         return images
 
@@ -567,11 +564,11 @@ class OmeZarrPlate:
                 meta = meta.add_acquisition(
                     acquisition_id=acquisition_id, acquisition_name=acquisition_name
                 )
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
         well_path = self.meta.get_well_path(row=row, column=column)
-        group_handler = self._group_handler.derive_handler(well_path)
+        group_handler = self._group_handler.get_handler(well_path)
 
         if atomic:
             well_lock = group_handler.lock
@@ -586,18 +583,19 @@ class OmeZarrPlate:
                 well_meta = NgioWellMeta.default_init()
                 version = self.meta.plate.version
                 version = version if version is not None else "0.4"
-                meta_handler = get_well_meta_handler(group_handler, version=version)
+                update_ngio_well_meta(group_handler, well_meta)
+                meta_handler = WellMetaHandler(group_handler=group_handler)
             else:
-                meta_handler = find_well_meta_handler(group_handler)
-                well_meta = meta_handler.meta
+                meta_handler = WellMetaHandler(group_handler=group_handler)
+                well_meta = meta_handler.get_meta()
 
-            group_handler = self._group_handler.derive_handler(well_path)
+            group_handler = self._group_handler.get_handler(well_path)
 
             if image_path is not None:
                 well_meta = well_meta.add_image(
                     path=image_path, acquisition=acquisition_id, strict=False
                 )
-            meta_handler.write_meta(well_meta)
+            meta_handler.update_meta(well_meta)
             meta_handler._group_handler.clean_cache()
 
         if image_path is not None:
@@ -674,7 +672,7 @@ class OmeZarrPlate:
     ) -> "OmeZarrPlate":
         """Add a column to an ome-zarr plate."""
         meta, _ = self.meta.add_column(column)
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -684,7 +682,7 @@ class OmeZarrPlate:
     ) -> "OmeZarrPlate":
         """Add a row to an ome-zarr plate."""
         meta, _ = self.meta.add_row(row)
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -704,7 +702,7 @@ class OmeZarrPlate:
         meta = self.meta.add_acquisition(
             acquisition_id=acquisition_id, acquisition_name=acquisition_name
         )
-        self.meta_handler.write_meta(meta)
+        self.meta_handler.update_meta(meta)
         self.meta_handler._group_handler.clean_cache()
         return self
 
@@ -723,7 +721,7 @@ class OmeZarrPlate:
         with plate_lock:
             meta = self.meta
             meta = meta.remove_well(row, column)
-            self.meta_handler.write_meta(meta)
+            self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
     def _remove_image(
@@ -744,7 +742,7 @@ class OmeZarrPlate:
         with well_lock:
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
-            well.meta_handler.write_meta(well_meta)
+            well.meta_handler.update_meta(well_meta)
             well.meta_handler._group_handler.clean_cache()
             if len(well_meta.paths()) == 0:
                 self._remove_well(row, column, atomic=atomic)
@@ -781,41 +779,42 @@ class OmeZarrPlate:
         self,
         store: StoreOrGroup,
         plate_name: str | None = None,
-        version: NgffVersions = "0.4",
+        version: NgffVersions | None = None,
+        ngff_version: NgffVersions = DefaultNgffVersion,
         keep_acquisitions: bool = False,
         cache: bool = False,
         overwrite: bool = False,
-        parallel_safe: bool = True,
     ) -> "OmeZarrPlate":
         """Derive a new OME-Zarr plate from an existing one.
 
         Args:
             store (StoreOrGroup): The Zarr store or group that stores the plate.
             plate_name (str | None): The name of the new plate.
-            version (NgffVersion): The version of the new plate.
+            version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
+            ngff_version (NgffVersion): The NGFF version to use for the new plate.
             keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
             cache (bool): Whether to use a cache for the zarr group metadata.
             overwrite (bool): Whether to overwrite the existing plate.
-            parallel_safe (bool): Whether the group handler is parallel safe.
         """
         return derive_ome_zarr_plate(
             ome_zarr_plate=self,
             store=store,
             plate_name=plate_name,
+            ngff_version=ngff_version,
             version=version,
             keep_acquisitions=keep_acquisitions,
             cache=cache,
             overwrite=overwrite,
-            parallel_safe=parallel_safe,
         )
 
-    def _get_tables_container(self) -> TablesContainer | None:
+    def _get_tables_container(self, create_mode: bool = True) -> TablesContainer | None:
         """Return the tables container."""
-        if self._tables_container is None:
-            _tables_container = _default_table_container(self._group_handler)
-            if _tables_container is None:
-                return None
-            self._tables_container = _tables_container
+        if self._tables_container is not None:
+            return self._tables_container
+        _tables_container = _try_get_table_container(
+            self._group_handler, create_mode=create_mode
+        )
+        self._tables_container = _tables_container
         return self._tables_container
 
     @property
@@ -830,17 +829,20 @@ class OmeZarrPlate:
 
     def list_tables(self, filter_types: TypedTable | str | None = None) -> list[str]:
         """List all tables in the image."""
+        _tables_container = self._get_tables_container(create_mode=False)
+        if _tables_container is None:
+            return []
         return self.tables_container.list(filter_types=filter_types)
 
     def list_roi_tables(self) -> list[str]:
         """List all ROI tables in the image."""
-        masking_roi = self.tables_container.list(
-            filter_types="masking_roi_table",
-        )
         roi = self.tables_container.list(
             filter_types="roi_table",
         )
-        return masking_roi + roi
+        masking_roi = self.tables_container.list(
+            filter_types="masking_roi_table",
+        )
+        return roi + masking_roi
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.
@@ -917,8 +919,8 @@ class OmeZarrPlate:
         """
         if check_type is not None:
             warnings.warn(
-                "The 'check_type' argument is deprecated, and will be removed in "
-                "ngio=0.3. Use 'get_table_as' instead or one of the "
+                "The 'check_type' argument is deprecated and will be removed in "
+                "ngio=0.6. Please use 'get_table_as' instead or one of the "
                 "type specific get_*table() methods.",
                 DeprecationWarning,
                 stacklevel=2,
@@ -956,6 +958,25 @@ class OmeZarrPlate:
         self.tables_container.add(
             name=name, table=table, backend=backend, overwrite=overwrite
         )
+
+    def delete_table(self, name: str, missing_ok: bool = False) -> None:
+        """Delete a table from the group.
+
+        Args:
+            name (str): The name of the table to delete.
+            missing_ok (bool): If True, do not raise an error if the table does not
+                exist.
+
+        """
+        table_container = self._get_tables_container(create_mode=False)
+        if table_container is None and missing_ok:
+            return
+        if table_container is None:
+            raise NgioValueError(
+                f"No tables found in the image, cannot delete {name}. "
+                "Set missing_ok=True to ignore this error."
+            )
+        table_container.delete(name=name, missing_ok=missing_ok)
 
     def list_image_tables(
         self,
@@ -1143,7 +1164,6 @@ def open_ome_zarr_plate(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
     """Open an OME-Zarr plate.
 
@@ -1152,27 +1172,20 @@ def open_ome_zarr_plate(
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The
             access mode for the image. Defaults to "r+".
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
-    group_handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
-    )
+    group_handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     return OmeZarrPlate(group_handler)
 
 
 def _create_empty_plate_from_meta(
     store: StoreOrGroup,
     meta: NgioPlateMeta,
-    version: NgffVersions = "0.4",
     overwrite: bool = False,
 ) -> ZarrGroupHandler:
     """Create an empty OME-Zarr plate from metadata."""
     mode = "w" if overwrite else "w-"
-    group_handler = ZarrGroupHandler(
-        store=store, cache=True, mode=mode, parallel_safe=False
-    )
-    meta_handler = get_plate_meta_handler(group_handler, version=version)
-    meta_handler.write_meta(meta)
+    group_handler = ZarrGroupHandler(store=store, cache=True, mode=mode)
+    update_ngio_plate_meta(group_handler, meta)
     return group_handler
 
 
@@ -1180,20 +1193,38 @@ def create_empty_plate(
     store: StoreOrGroup,
     name: str,
     images: list[ImageInWellPath] | None = None,
-    version: NgffVersions = "0.4",
+    version: NgffVersions | None = None,
+    ngff_version: NgffVersions = DefaultNgffVersion,
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
-    """Initialize and create an empty OME-Zarr plate."""
+    """Initialize and create an empty OME-Zarr plate.
+
+    Args:
+        store (StoreOrGroup): The Zarr store or group that stores the plate.
+        name (str): The name of the plate.
+        images (list[ImageInWellPath] | None): A list of images to add to the plate.
+            If None, no images are added. Defaults to None.
+        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
+        ngff_version (NgffVersion): The NGFF version to use for the new plate.
+        cache (bool): Whether to use a cache for the zarr group metadata.
+        overwrite (bool): Whether to overwrite the existing plate.
+    """
+    if version is not None:
+        warnings.warn(
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
+            "Please use 'ngff_version' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        ngff_version = version
     plate_meta = NgioPlateMeta.default_init(
         name=name,
-        version=version,
+        ngff_version=ngff_version,
     )
     group_handler = _create_empty_plate_from_meta(
         store=store,
         meta=plate_meta,
-        version=version,
         overwrite=overwrite,
     )
 
@@ -1211,7 +1242,6 @@ def create_empty_plate(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )
 
 
@@ -1219,11 +1249,11 @@ def derive_ome_zarr_plate(
     ome_zarr_plate: OmeZarrPlate,
     store: StoreOrGroup,
     plate_name: str | None = None,
-    version: NgffVersions = "0.4",
+    version: NgffVersions | None = None,
+    ngff_version: NgffVersions = DefaultNgffVersion,
     keep_acquisitions: bool = False,
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrPlate:
     """Derive a new OME-Zarr plate from an existing one.
 
@@ -1231,31 +1261,38 @@ def derive_ome_zarr_plate(
         ome_zarr_plate (OmeZarrPlate): The existing OME-Zarr plate.
         store (StoreOrGroup): The Zarr store or group that stores the plate.
         plate_name (str | None): The name of the new plate.
-        version (NgffVersion): The version of the new plate.
+        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
+        ngff_version (NgffVersion): The NGFF version to use for the new plate.
         keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing plate.
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
+    if version is not None:
+        warnings.warn(
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
+            "Please use 'ngff_version' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        ngff_version = version
+
     if plate_name is None:
         plate_name = ome_zarr_plate.meta.plate.name
 
     new_meta = ome_zarr_plate.meta.derive(
         name=plate_name,
-        version=version,
+        ngff_version=ngff_version,
         keep_acquisitions=keep_acquisitions,
     )
     _ = _create_empty_plate_from_meta(
         store=store,
         meta=new_meta,
         overwrite=overwrite,
-        version=version,
     )
     return open_ome_zarr_plate(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )
 
 
@@ -1263,7 +1300,6 @@ def open_ome_zarr_well(
     store: StoreOrGroup,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
-    parallel_safe: bool = True,
 ) -> OmeZarrWell:
     """Open an OME-Zarr well.
 
@@ -1271,40 +1307,48 @@ def open_ome_zarr_well(
         store (StoreOrGroup): The Zarr store or group that stores the plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         mode (AccessModeLiteral): The access mode for the image. Defaults to "r+".
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
     group_handler = ZarrGroupHandler(
-        store=store, cache=cache, mode=mode, parallel_safe=parallel_safe
+        store=store,
+        cache=cache,
+        mode=mode,
     )
     return OmeZarrWell(group_handler)
 
 
 def create_empty_well(
     store: StoreOrGroup,
-    version: NgffVersions = "0.4",
+    version: NgffVersions | None = None,
+    ngff_version: NgffVersions = DefaultNgffVersion,
     cache: bool = False,
     overwrite: bool = False,
-    parallel_safe: bool = True,
 ) -> OmeZarrWell:
     """Create an empty OME-Zarr well.
 
     Args:
         store (StoreOrGroup): The Zarr store or group that stores the well.
-        version (NgffVersion): The version of the new well.
+        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
+        ngff_version (NgffVersion): The version of the new well.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing well.
-        parallel_safe (bool): Whether the group handler is parallel safe.
     """
+    if version is not None:
+        warnings.warn(
+            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
+            "Please use 'ngff_version' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        ngff_version = version
     group_handler = ZarrGroupHandler(
-        store=store, cache=True, mode="w" if overwrite else "w-", parallel_safe=False
+        store=store, cache=True, mode="w" if overwrite else "w-"
     )
-    meta_handler = get_well_meta_handler(group_handler, version=version)
-    meta = NgioWellMeta.default_init()
-    meta_handler.write_meta(meta)
+    update_ngio_well_meta(
+        group_handler, NgioWellMeta.default_init(ngff_version=ngff_version)
+    )
 
     return open_ome_zarr_well(
         store=store,
         cache=cache,
         mode="r+",
-        parallel_safe=parallel_safe,
     )

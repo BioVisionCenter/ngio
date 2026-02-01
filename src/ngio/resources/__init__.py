@@ -31,7 +31,7 @@ _resources = {
                 dtype="uint8",
             ),
         ],
-        xy_pixelsize=0.325,
+        pixelsize=0.325,
         z_spacing=1.0,
         time_spacing=1.0,
         name="Cardiomyocyte Differentiation",
