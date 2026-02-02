@@ -1813,6 +1813,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2377,6 +2388,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2850,6 +2872,19 @@
 <ul>
 <li>Fix bug in <code>consolidate</code> function when using coarsening mode with non power-of-two shapes.</li>
 <li>Fix HCS plate column name formatting to use standardized zero-padding (e.g., column <code>3</code> is now stored as <code>"03"</code>).</li>
+<li>Fix <code>_stringify_column</code> not passing <code>num_digits</code> parameter to <code>_format_int_column</code>.</li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix incorrect and incomplete docstrings across the codebase:</li>
+<li><code>compute_masking_roi</code>: Added Args/Returns, fixed description (supports 2D, 3D, 4D).</li>
+<li><code>lazy_compute_slices</code>: Added Args/Returns sections.</li>
+<li><code>LabelsContainer.list</code>: Fixed description (was "Create the /labels group").</li>
+<li><code>build_masking_roi_table</code>: Added Args/Returns sections.</li>
+<li><code>TablesContainer</code>: Fixed class and method descriptions (were referencing labels instead of tables).</li>
+<li><code>NgioPlateMeta.add_well</code>: Fixed description (was "Add an image to the well").</li>
+<li><code>NgioPlateMeta.derive</code>: Fixed type annotation in docstring (<code>NgffVersion</code> → <code>NgffVersions</code>).</li>
+<li>Added missing docstrings to several HCS helper functions.</li>
 </ul>
 <h2 id="v047">[v0.4.7]<a class="headerlink" href="#v047" title="Permanent link">&para;</a></h2>
 <h3 id="bug-fixes_1">Bug Fixes<a class="headerlink" href="#bug-fixes_1" title="Permanent link">&para;</a></h3>

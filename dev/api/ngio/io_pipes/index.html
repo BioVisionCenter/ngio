@@ -6865,7 +6865,10 @@ an error will be raised.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/io_pipes/_match_shape.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
 <span class="normal">314</span>
 <span class="normal">315</span>
 <span class="normal">316</span>
@@ -6926,10 +6929,7 @@ an error will be raised.</p>
 <span class="normal">371</span>
 <span class="normal">372</span>
 <span class="normal">373</span>
-<span class="normal">374</span>
-<span class="normal">375</span>
-<span class="normal">376</span>
-<span class="normal">377</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dask_match_shape</span><span class="p">(</span>
+<span class="normal">374</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">dask_match_shape</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">reference_shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">array_axes</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
@@ -7076,16 +7076,6 @@ can differ when matching shapes.</p>
           </div>
         </li>
         <li class="doc-section-item field-body">
-            <b><code>allow_broadcast</code></b>
-              (<code><span title="bool">bool</span></code>)
-          –
-          <div class="doc-md-description">
-            <p>If True, allow broadcasting new dimensions to
-match the reference shape. If False, single-dimension axes will
-be left as is.</p>
-          </div>
-        </li>
-        <li class="doc-section-item field-body">
             <b><code>pad_mode</code></b>
               (<code><span title="str">str</span></code>, default:
                   <code>&#39;constant&#39;</code>
@@ -7114,7 +7104,7 @@ pad_mode is 'constant'.</p>
           –
           <div class="doc-md-description">
             <p>If True, when the array differs more than the
-tolerance, it will be rescalingd to the reference shape. If False,
+tolerance, it will be rescaled to the reference shape. If False,
 an error will be raised.</p>
           </div>
         </li>
@@ -7187,10 +7177,7 @@ an error will be raised.</p>
 <span class="normal">304</span>
 <span class="normal">305</span>
 <span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numpy_match_shape</span><span class="p">(</span>
+<span class="normal">307</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">numpy_match_shape</span><span class="p">(</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">reference_shape</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">array_axes</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
@@ -7216,14 +7203,11 @@ an error will be raised.</p>
 <span class="sd">        reference_axes (Sequence[str]): The axes names of the reference shape.</span>
 <span class="sd">        tolerance (int): The maximum number of pixels by which dimensions</span>
 <span class="sd">            can differ when matching shapes.</span>
-<span class="sd">        allow_broadcast (bool): If True, allow broadcasting new dimensions to</span>
-<span class="sd">            match the reference shape. If False, single-dimension axes will</span>
-<span class="sd">            be left as is.</span>
 <span class="sd">        pad_mode (str): The mode to use for padding. See numpy.pad for options.</span>
 <span class="sd">        pad_values (int | float): The constant value to use for padding if</span>
 <span class="sd">            pad_mode is &#39;constant&#39;.</span>
 <span class="sd">        allow_rescaling (bool): If True, when the array differs more than the</span>
-<span class="sd">            tolerance, it will be rescalingd to the reference shape. If False,</span>
+<span class="sd">            tolerance, it will be rescaled to the reference shape. If False,</span>
 <span class="sd">            an error will be raised.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_check_axes</span><span class="p">(</span>

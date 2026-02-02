@@ -2076,29 +2076,14 @@
 <p>This model is used to select a channel by label, wavelength ID, or index.</p>
 
 
-<p><span class="doc-section-title">Parameters:</span></p>
-    <ul>
-        <li class="doc-section-item field-body">
-            <b><code>identifier</code></b>
-              (<code><span title="str">str</span></code>)
-          –
-          <div class="doc-md-description">
-            <p>Unique identifier for the channel.
-This can be a channel label, wavelength ID, or index.</p>
-          </div>
-        </li>
-        <li class="doc-section-item field-body">
-            <b><code>mode</code></b>
-              (<code><span title="typing.Literal">Literal</span>[&#39;label&#39;, &#39;wavelength_id&#39;, &#39;index&#39;]</code>)
-          –
-          <div class="doc-md-description">
-            <p>Specifies how to
-interpret the identifier. Can be "label", "wavelength_id", or
-"index" (must be an integer).</p>
-          </div>
-        </li>
-    </ul>
-
+<details class="properties" open>
+  <summary>Properties</summary>
+  <p>identifier (str): Unique identifier for the channel.
+    This can be a channel label, wavelength ID, or index.
+mode (Literal["label", "wavelength_id", "index"]): Specifies how to
+    interpret the identifier. Can be "label", "wavelength_id", or
+    "index" (must be an integer).</p>
+</details>
 
 
 
@@ -6635,15 +6620,6 @@ the same percentiles will be used for all channels.</p>
 <p><span class="doc-section-title">Parameters:</span></p>
     <ul>
         <li class="doc-section-item field-body">
-            <b><code>image_container</code></b>
-              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ImagesContainer&lt;/span&gt; (&lt;code&gt;ngio.images._image.ImagesContainer&lt;/code&gt;)" href="#ngio.images.ImagesContainer">ImagesContainer</a></code>)
-          –
-          <div class="doc-md-description">
-            <p>The image container to derive the new
-image.</p>
-          </div>
-        </li>
-        <li class="doc-section-item field-body">
             <b><code>store</code></b>
               (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;StoreOrGroup&lt;/span&gt;
 
@@ -6985,9 +6961,7 @@ and time_spacing instead.</p>
 <span class="normal">942</span>
 <span class="normal">943</span>
 <span class="normal">944</span>
-<span class="normal">945</span>
-<span class="normal">946</span>
-<span class="normal">947</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
+<span class="normal">945</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">derive</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">ref_path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -7018,8 +6992,6 @@ and time_spacing instead.</p>
 <span class="sd">    If a kwarg is not provided, the value from the reference image will be used.</span>
 
 <span class="sd">    Args:</span>
-<span class="sd">        image_container (ImagesContainer): The image container to derive the new</span>
-<span class="sd">            image.</span>
 <span class="sd">        store (StoreOrGroup): The Zarr store or group to create the image in.</span>
 <span class="sd">        ref_path (str | None): The path to the reference image in the image</span>
 <span class="sd">            container.</span>
@@ -7148,7 +7120,9 @@ closest pixel size level will be returned.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/images/_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">949</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span>
 <span class="normal">950</span>
 <span class="normal">951</span>
 <span class="normal">952</span>
@@ -7169,9 +7143,7 @@ closest pixel size level will be returned.</p>
 <span class="normal">967</span>
 <span class="normal">968</span>
 <span class="normal">969</span>
-<span class="normal">970</span>
-<span class="normal">971</span>
-<span class="normal">972</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
+<span class="normal">970</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">path</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -9081,7 +9053,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
 
     <div class="doc doc-contents ">
 
-        <p>Create the /labels group if it doesn't exist.</p>
+        <p>Return the list of label names in the group.</p>
 
 
             <details class="mkdocstrings-source">
@@ -9089,7 +9061,7 @@ the pixel sizes must be compatible (i.e. one can be scaled to the other).</p>
               <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">137</span>
 <span class="normal">138</span>
 <span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">list</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create the /labels group if it doesn&#39;t exist.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the list of label names in the group.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">meta</span><span class="o">.</span><span class="n">labels</span>
 </code></pre></div></td></tr></table></div>
             </details>

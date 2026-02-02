@@ -4508,22 +4508,55 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
-        <p>Compute a ROIs for each label in a segmentation.</p>
-<p>This function expects a 2D or 3D segmentation array.
-And this function expects the axes order to be 'zyx' or 'yx'.
-Other axes orders are not supported.</p>
+        <p>Compute ROIs for each label in a segmentation.</p>
+<p>This function expects a 2D, 3D, or 4D segmentation array.
+The axes order should match the segmentation dimensions.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>segmentation</code></b>
+              (<code><span title="numpy.ndarray">ndarray</span> | <span title="dask.array.Array">Array</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>The segmentation array (2D, 3D, or 4D).</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PixelSize&lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.PixelSize&lt;/code&gt;)" href="../ngio/#ngio.PixelSize">PixelSize</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The pixel size metadata for coordinate conversion.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>axes_order</code></b>
+              (<code><span title="collections.abc.Sequence">Sequence</span>[<span title="str">str</span>]</code>)
+          –
+          <div class="doc-md-description">
+            <p>The order of axes in the segmentation (e.g., 'zyx' or 'yx').</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;Roi&lt;/span&gt; (&lt;code&gt;ngio.common._roi.Roi&lt;/code&gt;)" href="#ngio.common.Roi">Roi</a>]</code>
+          –
+          <div class="doc-md-description">
+            <p>A list of Roi objects, one for each unique label in the segmentation.</p>
+          </div>
+        </li>
+    </ul>
 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_masking_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span>
-<span class="normal">122</span>
-<span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">125</span>
 <span class="normal">126</span>
 <span class="normal">127</span>
 <span class="normal">128</span>
@@ -4551,17 +4584,36 @@ Other axes orders are not supported.</p>
 <span class="normal">150</span>
 <span class="normal">151</span>
 <span class="normal">152</span>
-<span class="normal">153</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_masking_roi</span><span class="p">(</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span>
+<span class="normal">166</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">compute_masking_roi</span><span class="p">(</span>
     <span class="n">segmentation</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span> <span class="o">|</span> <span class="n">da</span><span class="o">.</span><span class="n">Array</span><span class="p">,</span>
     <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span><span class="p">,</span>
     <span class="n">axes_order</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Roi</span><span class="p">]:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute a ROIs for each label in a segmentation.</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute ROIs for each label in a segmentation.</span>
 
-<span class="sd">    This function expects a 2D or 3D segmentation array.</span>
-<span class="sd">    And this function expects the axes order to be &#39;zyx&#39; or &#39;yx&#39;.</span>
-<span class="sd">    Other axes orders are not supported.</span>
+<span class="sd">    This function expects a 2D, 3D, or 4D segmentation array.</span>
+<span class="sd">    The axes order should match the segmentation dimensions.</span>
 
+<span class="sd">    Args:</span>
+<span class="sd">        segmentation: The segmentation array (2D, 3D, or 4D).</span>
+<span class="sd">        pixel_size: The pixel size metadata for coordinate conversion.</span>
+<span class="sd">        axes_order: The order of axes in the segmentation (e.g., &#39;zyx&#39; or &#39;yx&#39;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A list of Roi objects, one for each unique label in the segmentation.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">segmentation</span><span class="o">.</span><span class="n">ndim</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">4</span><span class="p">]:</span>
         <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Only 2D, 3D, and 4D segmentations are supported.&quot;</span><span class="p">)</span>
