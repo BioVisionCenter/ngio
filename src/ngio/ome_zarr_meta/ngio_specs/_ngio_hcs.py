@@ -147,20 +147,46 @@ class NgioWellMeta(BaseModel):
         raise NgioValueError(f"Image at path {path} not found in the well.")
 
 
-def _stringify_column(column: str | int) -> str:
-    """Convert the column to a string.
+def _format_int_column(column: int, num_digits: int = 2) -> str:
+    """Format the column as a string.
+
+    We make sure to pad the column with zeros
+    to have a consistent format.
 
     Args:
-        column (str | int): The column to convert.
+        column (int): The column to format.
+        num_digits (int): The number of digits to pad the column.
 
     Returns:
         str: The column as a string.
     """
-    if isinstance(column, str):
-        return column
+    return f"{column:0{num_digits}d}"
 
-    # Maybe we should pad the column with zeros
-    return str(column)
+
+def _stringify_column(column: str | int, num_digits: int = 2) -> str:
+    """Convert the column to a string.
+
+    This will ensure that columns are always strings.
+    and will help with sorting and comparison.
+
+    Args:
+        column (str | int): The column to convert.
+        num_digits (int): The number of digits to pad the column.
+
+    Returns:
+        str: The column as a string.
+    """
+    if isinstance(column, int):
+        return _format_int_column(column)
+
+    elif isinstance(column, str):
+        try:
+            column_int = int(column)
+            return _format_int_column(column_int)
+        except ValueError:
+            pass
+        return column
+    raise NgioValueError(f"Column {column} must be a string or an integer.")
 
 
 def _find_row_index(rows: list[str], row: str) -> int | None:
@@ -171,8 +197,8 @@ def _find_row_index(rows: list[str], row: str) -> int | None:
 
 
 def _find_column_index(columns: list[str], column: str | int) -> int | None:
-    _num_columns = [int(columns) for columns in columns]
-    column = int(column)
+    _num_columns = [_stringify_column(columns) for columns in columns]
+    column = _stringify_column(column)
     try:
         return _num_columns.index(column)
     except ValueError:
@@ -286,23 +312,8 @@ class NgioPlateMeta(BaseModel):
         Returns:
             str: The path of the well.
         """
-        if row not in self.rows:
-            raise NgioValueError(
-                f"Row {row} not found in the plate. Available rows are {self.rows}."
-            )
-
-        row_idx = self.rows.index(row)
-
-        _num_columns = [int(columns) for columns in self.columns]
-
-        try:
-            _column = int(column)
-        except ValueError:
-            raise NgioValueError(
-                f"Column {column} must be an integer or convertible to an integer."
-            ) from None
-
-        column_idx = _num_columns.index(_column)
+        row_idx = _find_row_index(self.rows, row)
+        column_idx = _find_column_index(self.columns, column)
 
         for well in self.plate.wells:
             if well.columnIndex == column_idx and well.rowIndex == row_idx:
@@ -365,7 +376,7 @@ class NgioPlateMeta(BaseModel):
 
         columns_names.append(_stringify_column(column))
         # sort as numbers
-        columns_names.sort(key=lambda x: int(x))
+        columns_names.sort(key=lambda x: _stringify_column(x))
         column_idx = columns_names.index(_stringify_column(column))
         relabel_wells = True
 

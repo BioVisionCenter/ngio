@@ -75,6 +75,7 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 
 ### Bug Fixes
 - Fix bug in `consolidate` function when using coarsening mode with non power-of-two shapes.
+- Fix HCS plate column name formatting to use standardized zero-padding (e.g., column `3` is now stored as `"03"`).
 
 ## [v0.4.7]
 
