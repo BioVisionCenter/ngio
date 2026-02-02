@@ -129,6 +129,43 @@ def test_add_well(tmp_path: Path):
     assert test_plate.wells_paths() == ["B/03"]
 
 
+def test_add_image(tmp_path: Path):
+    test_plate = create_empty_plate(tmp_path / "test_plate.zarr", name="test_plate")
+    test_plate.add_image(row="B", column="03", image_path="0")
+    assert test_plate.columns == ["03"]
+    assert test_plate.rows == ["B"]
+    assert test_plate.acquisition_ids == []
+    assert test_plate.wells_paths() == ["B/03"]
+    assert test_plate.images_paths() == ["B/03/0"]
+
+    with pytest.raises(NgioValueError):
+        test_plate.add_image(row="B", column="03", image_path="0")
+
+    with pytest.raises(NgioValueError):
+        test_plate.add_image(row="B", column="3", image_path="0")
+
+    with pytest.raises(NgioValueError):
+        test_plate.add_image(row="B", column=3, image_path="0")
+
+    test_plate.add_image(row="C", column=3, image_path="1")
+    assert test_plate.columns == ["03"]
+    assert test_plate.rows == ["B", "C"]
+    assert test_plate.wells_paths() == ["B/03", "C/03"]
+    assert test_plate.images_paths() == ["B/03/0", "C/03/1"]
+
+    test_plate.add_image(row="A", column="3", image_path="2")
+    assert test_plate.columns == ["03"]
+    assert test_plate.rows == ["A", "B", "C"]
+    assert test_plate.wells_paths() == ["B/03", "C/03", "A/03"]
+    assert test_plate.images_paths() == ["B/03/0", "C/03/1", "A/03/2"]
+
+    test_plate.add_image(row="A", column="notnumber", image_path="2")
+    assert test_plate.columns == ["03", "notnumber"]
+    assert test_plate.rows == ["A", "B", "C"]
+    assert test_plate.wells_paths() == ["B/03", "C/03", "A/03", "A/notnumber"]
+    assert test_plate.images_paths() == ["B/03/0", "C/03/1", "A/03/2", "A/notnumber/2"]
+
+
 def test_add_well_with_acquisition(tmp_path: Path):
     test_plate = create_empty_plate(tmp_path / "test_plate.zarr", name="test_plate")
     test_plate.add_acquisition(acquisition_id=0, acquisition_name="test_acquisition")

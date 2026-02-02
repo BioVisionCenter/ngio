@@ -1184,7 +1184,10 @@ def _create_empty_plate_from_meta(
 ) -> ZarrGroupHandler:
     """Create an empty OME-Zarr plate from metadata."""
     mode = "w" if overwrite else "w-"
-    group_handler = ZarrGroupHandler(store=store, cache=True, mode=mode)
+    zarr_format = 2 if meta.plate.version == "0.4" else 3
+    group_handler = ZarrGroupHandler(
+        store=store, cache=True, mode=mode, zarr_format=zarr_format
+    )
     update_ngio_plate_meta(group_handler, meta)
     return group_handler
 
