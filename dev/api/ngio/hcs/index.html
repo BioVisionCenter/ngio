@@ -6439,10 +6439,7 @@ If None, no images are added. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1192</span>
-<span class="normal">1193</span>
-<span class="normal">1194</span>
-<span class="normal">1195</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1195</span>
 <span class="normal">1196</span>
 <span class="normal">1197</span>
 <span class="normal">1198</span>
@@ -6492,7 +6489,10 @@ If None, no images are added. Defaults to None.</p>
 <span class="normal">1242</span>
 <span class="normal">1243</span>
 <span class="normal">1244</span>
-<span class="normal">1245</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_plate</span><span class="p">(</span>
+<span class="normal">1245</span>
+<span class="normal">1246</span>
+<span class="normal">1247</span>
+<span class="normal">1248</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_plate</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">images</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ImageInWellPath</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -6659,10 +6659,7 @@ If None, no images are added. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1319</span>
-<span class="normal">1320</span>
-<span class="normal">1321</span>
-<span class="normal">1322</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1322</span>
 <span class="normal">1323</span>
 <span class="normal">1324</span>
 <span class="normal">1325</span>
@@ -6694,7 +6691,10 @@ If None, no images are added. Defaults to None.</p>
 <span class="normal">1351</span>
 <span class="normal">1352</span>
 <span class="normal">1353</span>
-<span class="normal">1354</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_well</span><span class="p">(</span>
+<span class="normal">1354</span>
+<span class="normal">1355</span>
+<span class="normal">1356</span>
+<span class="normal">1357</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_well</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">version</span><span class="p">:</span> <span class="n">NgffVersions</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">ngff_version</span><span class="p">:</span> <span class="n">NgffVersions</span> <span class="o">=</span> <span class="n">DefaultNgffVersion</span><span class="p">,</span>
@@ -6922,10 +6922,7 @@ access mode for the image. Defaults to "r+".</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/hcs/_plate.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1299</span>
-<span class="normal">1300</span>
-<span class="normal">1301</span>
-<span class="normal">1302</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1302</span>
 <span class="normal">1303</span>
 <span class="normal">1304</span>
 <span class="normal">1305</span>
@@ -6939,7 +6936,10 @@ access mode for the image. Defaults to "r+".</p>
 <span class="normal">1313</span>
 <span class="normal">1314</span>
 <span class="normal">1315</span>
-<span class="normal">1316</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_well</span><span class="p">(</span>
+<span class="normal">1316</span>
+<span class="normal">1317</span>
+<span class="normal">1318</span>
+<span class="normal">1319</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">open_ome_zarr_well</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">cache</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="n">mode</span><span class="p">:</span> <span class="n">AccessModeLiteral</span> <span class="o">=</span> <span class="s2">&quot;r+&quot;</span><span class="p">,</span>

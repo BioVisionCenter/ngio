@@ -2226,8 +2226,8 @@ The <code>acquisition</code> is not required, and if not provided, an empty dict
 <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Before adding images: </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">rows</span><span class="si">}</span><span class="s2"> rows, </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">columns</span><span class="si">}</span><span class="s2"> columns&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">plate</span><span class="o">.</span><span class="n">add_image</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">image_path</span><span class="o">=</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After adding images: </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">rows</span><span class="si">}</span><span class="s2"> rows, </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">columns</span><span class="si">}</span><span class="s2"> columns&quot;</span><span class="p">)</span>
-<span class="go">Before adding images: [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;] rows, [&#39;0&#39;, &#39;1&#39;] columns</span>
-<span class="go">After adding images: [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;] rows, [&#39;0&#39;, &#39;1&#39;] columns</span>
+<span class="go">Before adding images: [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;] rows, [&#39;00&#39;, &#39;01&#39;] columns</span>
+<span class="go">After adding images: [&#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;] rows, [&#39;00&#39;, &#39;01&#39;] columns</span>
 </code></pre></div>
 This will add a new image to the plate and well metadata.</p>
 <div class="admonition note">
@@ -2244,8 +2244,8 @@ This will add a new image to the plate and well metadata.</p>
 <div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Before removing images: </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">wells_paths</span><span class="p">()</span><span class="si">}</span><span class="s2"> wells&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">plate</span><span class="o">.</span><span class="n">remove_image</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">image_path</span><span class="o">=</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;After removing images: </span><span class="si">{</span><span class="n">plate</span><span class="o">.</span><span class="n">wells_paths</span><span class="p">()</span><span class="si">}</span><span class="s2"> wells&quot;</span><span class="p">)</span>
-<span class="go">Before removing images: [&#39;A/0&#39;, &#39;B/1&#39;, &#39;C/1&#39;, &#39;D/0&#39;] wells</span>
-<span class="go">After removing images: [&#39;A/0&#39;, &#39;B/1&#39;, &#39;C/1&#39;] wells</span>
+<span class="go">Before removing images: [&#39;A/00&#39;, &#39;B/01&#39;, &#39;C/01&#39;, &#39;D/00&#39;] wells</span>
+<span class="go">After removing images: [&#39;A/00&#39;, &#39;B/01&#39;, &#39;C/01&#39;] wells</span>
 </code></pre></div>
 This will remove the image metadata from the plate and well metadata.</p>
 <div class="admonition warning">
