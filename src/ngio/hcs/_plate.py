@@ -1182,7 +1182,16 @@ def _create_empty_plate_from_meta(
     meta: NgioPlateMeta,
     overwrite: bool = False,
 ) -> ZarrGroupHandler:
-    """Create an empty OME-Zarr plate from metadata."""
+    """Create an empty OME-Zarr plate from metadata.
+
+    Args:
+        store: The Zarr store or group to create the plate in.
+        meta: The plate metadata to use.
+        overwrite: Whether to overwrite an existing plate.
+
+    Returns:
+        The ZarrGroupHandler for the created plate.
+    """
     mode = "w" if overwrite else "w-"
     zarr_format = 2 if meta.plate.version == "0.4" else 3
     group_handler = ZarrGroupHandler(

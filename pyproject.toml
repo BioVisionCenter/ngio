@@ -82,6 +82,7 @@ dev = [
 ] # add anything else you like to have in your dev environment here
 
 docs = [
+    "ruff",
     "mkdocs",
     "mkdocs-include-markdown-plugin",
     "mkdocs-material",

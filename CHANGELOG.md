@@ -76,6 +76,18 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 ### Bug Fixes
 - Fix bug in `consolidate` function when using coarsening mode with non power-of-two shapes.
 - Fix HCS plate column name formatting to use standardized zero-padding (e.g., column `3` is now stored as `"03"`).
+- Fix `_stringify_column` not passing `num_digits` parameter to `_format_int_column`.
+
+### Documentation
+- Fix incorrect and incomplete docstrings across the codebase:
+  - `compute_masking_roi`: Added Args/Returns, fixed description (supports 2D, 3D, 4D).
+  - `lazy_compute_slices`: Added Args/Returns sections.
+  - `LabelsContainer.list`: Fixed description (was "Create the /labels group").
+  - `build_masking_roi_table`: Added Args/Returns sections.
+  - `TablesContainer`: Fixed class and method descriptions (were referencing labels instead of tables).
+  - `NgioPlateMeta.add_well`: Fixed description (was "Add an image to the well").
+  - `NgioPlateMeta.derive`: Fixed type annotation in docstring (`NgffVersion` → `NgffVersions`).
+  - Added missing docstrings to several HCS helper functions.
 
 ## [v0.4.7]
 

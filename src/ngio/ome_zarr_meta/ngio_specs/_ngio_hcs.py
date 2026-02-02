@@ -177,12 +177,12 @@ def _stringify_column(column: str | int, num_digits: int = 2) -> str:
         str: The column as a string.
     """
     if isinstance(column, int):
-        return _format_int_column(column)
+        return _format_int_column(column, num_digits=num_digits)
 
     elif isinstance(column, str):
         try:
             column_int = int(column)
-            return _format_int_column(column_int)
+            return _format_int_column(column_int, num_digits=num_digits)
         except ValueError:
             pass
         return column
@@ -190,6 +190,15 @@ def _stringify_column(column: str | int, num_digits: int = 2) -> str:
 
 
 def _find_row_index(rows: list[str], row: str) -> int | None:
+    """Find the index of a row in the list of rows.
+
+    Args:
+        rows: List of row names.
+        row: The row name to find.
+
+    Returns:
+        The index of the row, or None if not found.
+    """
     try:
         return rows.index(row)
     except ValueError:
@@ -197,6 +206,15 @@ def _find_row_index(rows: list[str], row: str) -> int | None:
 
 
 def _find_column_index(columns: list[str], column: str | int) -> int | None:
+    """Find the index of a column in the list of columns.
+
+    Args:
+        columns: List of column names.
+        column: The column name or number to find.
+
+    Returns:
+        The index of the column, or None if not found.
+    """
     _num_columns = [_stringify_column(columns) for columns in columns]
     column = _stringify_column(column)
     try:
@@ -208,6 +226,16 @@ def _find_column_index(columns: list[str], column: str | int) -> int | None:
 def _relabel_wells(
     wells: list[WellInPlate], rows: list[Row], columns: list[Column]
 ) -> list[WellInPlate]:
+    """Relabel well indices after rows or columns have been added.
+
+    Args:
+        wells: List of wells to relabel.
+        rows: Updated list of rows.
+        columns: Updated list of columns.
+
+    Returns:
+        List of wells with updated row and column indices.
+    """
     new_wells = []
     _rows = [row.name for row in rows]
     _columns = [column.name for column in columns]
@@ -403,11 +431,14 @@ class NgioPlateMeta(BaseModel):
         row: str,
         column: str | int,
     ) -> "NgioPlateMeta":
-        """Add an image to the well.
+        """Add a well to the plate.
 
         Args:
             row (str): The row of the well.
             column (str | int): The column of the well.
+
+        Returns:
+            NgioPlateMeta: Updated plate metadata with the new well.
         """
         plate, row_idx = self.add_row(row=row)
         plate, column_idx = plate.add_column(column=column)
@@ -520,10 +551,13 @@ class NgioPlateMeta(BaseModel):
         """Derive the plate metadata.
 
         Args:
-            name (str): The name of the derived plate.
-            ngff_version (NgffVersion | None): The version of the derived plate.
+            name (str | None): The name of the derived plate.
+            ngff_version (NgffVersions | None): The version of the derived plate.
                 If None, use the version of the original plate.
             keep_acquisitions (bool): If True, keep the acquisitions in the plate.
+
+        Returns:
+            NgioPlateMeta: The derived plate metadata.
         """
         columns = self.plate.columns
         rows = self.plate.rows
