@@ -132,3 +132,7 @@ tests/_v01
 *.lock
 
 benchmark/*
+
+# Agents files (for now let's not track them)
+AGENTS.md
+CLAUDE.md
