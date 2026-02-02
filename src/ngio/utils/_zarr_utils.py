@@ -114,7 +114,6 @@ class ZarrGroupHandler:
 
         Args:
             store (StoreOrGroup): The Zarr store or group containing the image data.
-            meta_mode (str): The mode of the metadata handler.
             zarr_format (int | None): The Zarr format version to use.
             cache (bool): Whether to cache the metadata.
             mode (str | None): The mode of the store.

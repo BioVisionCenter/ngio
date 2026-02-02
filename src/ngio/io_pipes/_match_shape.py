@@ -266,14 +266,11 @@ def numpy_match_shape(
         reference_axes (Sequence[str]): The axes names of the reference shape.
         tolerance (int): The maximum number of pixels by which dimensions
             can differ when matching shapes.
-        allow_broadcast (bool): If True, allow broadcasting new dimensions to
-            match the reference shape. If False, single-dimension axes will
-            be left as is.
         pad_mode (str): The mode to use for padding. See numpy.pad for options.
         pad_values (int | float): The constant value to use for padding if
             pad_mode is 'constant'.
         allow_rescaling (bool): If True, when the array differs more than the
-            tolerance, it will be rescalingd to the reference shape. If False,
+            tolerance, it will be rescaled to the reference shape. If False,
             an error will be raised.
     """
     _check_axes(

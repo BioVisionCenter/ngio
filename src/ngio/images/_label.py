@@ -135,7 +135,7 @@ class LabelsContainer:
         return self._axes_setup
 
     def list(self) -> list[str]:
-        """Create the /labels group if it doesn't exist."""
+        """Return the list of label names in the group."""
         return self.meta.labels
 
     def get(
@@ -403,7 +403,16 @@ def derive_label(
 def build_masking_roi_table(
     label: Label, axes_order: Sequence[str] | None = None
 ) -> MaskingRoiTable:
-    """Compute the masking ROI table for a label."""
+    """Compute the masking ROI table for a label.
+
+    Args:
+        label: The label to compute the masking ROI table for.
+        axes_order: The order of axes for the computation. If None,
+            uses the label's default axes order.
+
+    Returns:
+        A MaskingRoiTable containing ROIs for each label in the segmentation.
+    """
     axes_order = axes_order or label.axes
     array = label.get_as_dask(axes_order=axes_order)
     rois = compute_masking_roi(array, label.pixel_size, axes_order=axes_order)

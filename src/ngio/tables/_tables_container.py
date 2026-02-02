@@ -229,10 +229,10 @@ class ImplementedTables:
 
 
 class TablesContainer:
-    """A class to handle the /labels group in an OME-NGFF file."""
+    """A class to handle the /tables group in an OME-NGFF file."""
 
     def __init__(self, group_handler: ZarrGroupHandler) -> None:
-        """Initialize the LabelGroupHandler."""
+        """Initialize the TablesContainer."""
         self._group_handler = group_handler
 
         # Validate the group
@@ -252,7 +252,7 @@ class TablesContainer:
             )
 
     def _get_tables_list(self) -> list[str]:
-        """Create the /tables group if it doesn't exist."""
+        """Return the list of table names from the group attributes."""
         attrs = self._group_handler.load_attrs()
         return attrs.get("tables", [])
 
@@ -262,7 +262,14 @@ class TablesContainer:
         return handler
 
     def list(self, filter_types: TypedTable | str | None = None) -> list[str]:
-        """List all labels in the group."""
+        """List all tables in the group.
+
+        Args:
+            filter_types: If provided, only return tables of this type.
+
+        Returns:
+            A list of table names.
+        """
         tables = self._get_tables_list()
         if filter_types is None:
             return tables
@@ -281,7 +288,16 @@ class TablesContainer:
         backend: TableBackend | None = None,
         strict: bool = True,
     ) -> Table:
-        """Get a label from the group."""
+        """Get a table from the group.
+
+        Args:
+            name: The name of the table.
+            backend: The backend to use for reading the table.
+            strict: If True, raise an error if the table type is not implemented.
+
+        Returns:
+            The table object.
+        """
         if name not in self.list():
             raise NgioValueError(f"Table '{name}' not found in the group.")
 
@@ -301,7 +317,16 @@ class TablesContainer:
         table_cls: type[TableType],
         backend: TableBackend | None = None,
     ) -> TableType:
-        """Get a table from the group as a specific type."""
+        """Get a table from the group as a specific type.
+
+        Args:
+            name: The name of the table.
+            table_cls: The table class to use for loading the table.
+            backend: The backend to use for reading the table.
+
+        Returns:
+            The table object of the specified type.
+        """
         if name not in self.list():
             raise NgioValueError(f"Table '{name}' not found in the group.")
 
@@ -339,7 +364,14 @@ class TablesContainer:
         backend: TableBackend = DefaultTableBackend,
         overwrite: bool = False,
     ) -> None:
-        """Add a table to the group."""
+        """Add a table to the group.
+
+        Args:
+            name: The name of the table.
+            table: The table object to add.
+            backend: The backend to use for writing the table.
+            overwrite: Whether to overwrite an existing table with the same name.
+        """
         existing_tables = self._get_tables_list()
         if name in existing_tables and not overwrite:
             raise NgioValueError(

@@ -99,7 +99,14 @@ def compute_slices(segmentation: np.ndarray) -> dict[int, tuple[slice, ...]]:
 
 
 def lazy_compute_slices(segmentation: da.Array) -> dict[int, tuple[slice, ...]]:
-    """Compute slices for each label in a segmentation."""
+    """Compute slices for each label in a segmentation using lazy evaluation.
+
+    Args:
+        segmentation: The dask segmentation array.
+
+    Returns:
+        A dictionary mapping label IDs to their bounding box slices.
+    """
     global_offsets = _compute_offsets(segmentation.chunks)
     delayed_chunks = segmentation.to_delayed()  # type: ignore
 
@@ -120,12 +127,18 @@ def compute_masking_roi(
     pixel_size: PixelSize,
     axes_order: Sequence[str],
 ) -> list[Roi]:
-    """Compute a ROIs for each label in a segmentation.
+    """Compute ROIs for each label in a segmentation.
 
-    This function expects a 2D or 3D segmentation array.
-    And this function expects the axes order to be 'zyx' or 'yx'.
-    Other axes orders are not supported.
+    This function expects a 2D, 3D, or 4D segmentation array.
+    The axes order should match the segmentation dimensions.
 
+    Args:
+        segmentation: The segmentation array (2D, 3D, or 4D).
+        pixel_size: The pixel size metadata for coordinate conversion.
+        axes_order: The order of axes in the segmentation (e.g., 'zyx' or 'yx').
+
+    Returns:
+        A list of Roi objects, one for each unique label in the segmentation.
     """
     if segmentation.ndim not in [2, 3, 4]:
         raise NgioValueError("Only 2D, 3D, and 4D segmentations are supported.")

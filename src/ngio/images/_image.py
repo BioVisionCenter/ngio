@@ -47,7 +47,7 @@ class ChannelSelectionModel(BaseModel):
 
     This model is used to select a channel by label, wavelength ID, or index.
 
-    Args:
+    Properties:
         identifier (str): Unique identifier for the channel.
             This can be a channel label, wavelength ID, or index.
         mode (Literal["label", "wavelength_id", "index"]): Specifies how to
@@ -880,8 +880,6 @@ class ImagesContainer:
         If a kwarg is not provided, the value from the reference image will be used.
 
         Args:
-            image_container (ImagesContainer): The image container to derive the new
-                image.
             store (StoreOrGroup): The Zarr store or group to create the image in.
             ref_path (str | None): The path to the reference image in the image
                 container.
