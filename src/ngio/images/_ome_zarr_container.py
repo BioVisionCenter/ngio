@@ -1,6 +1,6 @@
 """Abstract class for handling OME-NGFF images."""
 
-import warnings
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -49,6 +49,8 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
 )
+
+logger = logging.getLogger(f"ngio:{__name__}")
 
 
 def _try_get_table_container(
@@ -205,11 +207,9 @@ class OmeZarrContainer:
     @property
     def image_meta(self) -> NgioImageMeta:
         """Return the image metadata."""
-        warnings.warn(
+        logger.warning(
             "'image_meta' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'meta' instead."
         )
         return self.images_container.meta
 
@@ -231,11 +231,9 @@ class OmeZarrContainer:
     @property
     def levels_paths(self) -> list[str]:
         """Deprecated: use 'level_paths' instead."""
-        warnings.warn(
+        logger.warning(
             "'levels_paths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'level_paths' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'level_paths' instead."
         )
         return self.images_container.level_paths
 
@@ -384,11 +382,9 @@ class OmeZarrContainer:
             start_percentile (float): The start percentile.
             end_percentile (float): The end percentile.
         """
-        warnings.warn(
+        logger.warning(
             "The 'set_channel_percentiles' method is deprecated and will be removed in "
-            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead."
         )
         self._images_container.set_channel_windows_with_percentiles(
             percentiles=(start_percentile, end_percentile)
@@ -790,12 +786,10 @@ class OmeZarrContainer:
 
         """
         if check_type is not None:
-            warnings.warn(
+            logger.warning(
                 "The 'check_type' argument is deprecated and will be removed in "
                 "ngio=0.6. Please use 'get_table_as' instead or one of the "
-                "type specific get_*table() methods.",
-                DeprecationWarning,
-                stacklevel=2,
+                "type specific get_*table() methods."
             )
         return self.tables_container.get(name=name, strict=False)
 
@@ -1204,19 +1198,15 @@ def create_empty_ome_zarr(
         channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
     if xy_pixelsize is not None:
-        warnings.warn(
+        logger.warning(
             "'xy_pixelsize' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'pixelsize' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'pixelsize' instead."
         )
         pixelsize = xy_pixelsize
     if xy_scaling_factor is not None or z_scaling_factor is not None:
-        warnings.warn(
+        logger.warning(
             "'xy_scaling_factor' and 'z_scaling_factor' are deprecated and will be "
-            "removed in ngio=0.6. Please use 'scaling_factors' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "removed in ngio=0.6. Please use 'scaling_factors' instead."
         )
         xy_scaling_factor_ = xy_scaling_factor or 2.0
         z_scaling_factor_ = z_scaling_factor or 1.0
@@ -1227,34 +1217,26 @@ def create_empty_ome_zarr(
             scaling_factors = (1.0,) * (len(shape) - 3) + zyx_factors
 
     if channel_labels is not None:
-        warnings.warn(
+        logger.warning(
             "'channel_labels' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'channels_meta' instead."
         )
         channels_meta = channel_labels
 
     if channel_wavelengths is not None:
-        warnings.warn(
+        logger.warning(
             "'channel_wavelengths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'channels_meta' instead."
         )
     if channel_colors is not None:
-        warnings.warn(
+        logger.warning(
             "'channel_colors' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'channels_meta' instead."
         )
     if channel_active is not None:
-        warnings.warn(
+        logger.warning(
             "'channel_active' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'channels_meta' instead."
         )
 
     if pixelsize is None:

@@ -1,6 +1,6 @@
 """Utility functions for working with OME-Zarr images."""
 
-import warnings
+import logging
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, TypeVar
 
@@ -30,6 +30,8 @@ from ngio.ome_zarr_meta.ngio_specs import (
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import NgioValueError, StoreOrGroup, ZarrGroupHandler
 
+logger = logging.getLogger(f"ngio:{__name__}")
+
 _image_or_label_meta = TypeVar("_image_or_label_meta", NgioImageMeta, NgioLabelMeta)
 
 
@@ -56,7 +58,7 @@ def _check_deprecated_scaling_factors(
     shape: tuple[int, ...],
 ) -> Sequence[float] | Literal["auto"]:
     if yx_scaling_factor is not None or z_scaling_factor is not None:
-        warnings.warn(
+        logger.warning(
             "The 'yx_scaling_factor' and 'z_scaling_factor' arguments are deprecated "
             "and will be removed in ngio=0.6. Please use the 'scaling_factors' "
             "argument instead.",

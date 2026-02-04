@@ -4,7 +4,7 @@ This class follows the roi_table specification at:
 https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/
 """
 
-import warnings
+import logging
 from collections.abc import Iterable
 from typing import Literal
 from uuid import uuid4
@@ -28,6 +28,8 @@ from ngio.utils import (
     NgioValueError,
     ZarrGroupHandler,
 )
+
+logger = logging.getLogger(f"ngio:{__name__}")
 
 REQUIRED_COLUMNS = [
     "x_micrometer",
@@ -77,9 +79,7 @@ OPTIONAL_COLUMNS = ORIGIN_COLUMNS + TRANSLATION_COLUMNS + PLATE_COLUMNS + INDEX_
 def _check_optional_columns(col_name: str) -> None:
     """Check if the column name is in the optional columns."""
     if col_name not in OPTIONAL_COLUMNS + TIME_COLUMNS:
-        warnings.warn(
-            f"Column {col_name} is not in the optional columns.", stacklevel=2
-        )
+        logger.warning(f"Column {col_name} is not in the optional columns.")
 
 
 def _dataframe_to_rois(
