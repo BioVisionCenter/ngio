@@ -535,8 +535,8 @@ class AxesHandler:
 def _build_axes_list_from_names(
     axes_names: Sequence[str],
     axes_setup: AxesSetup,
-    space_units: SpaceUnits | str | None = DefaultSpaceUnit,
-    time_units: TimeUnits | str | None = DefaultTimeUnit,
+    space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
+    time_unit: TimeUnits | str | None = DefaultTimeUnit,
 ) -> list[Axis]:
     """Build a list of Axis objects from a list of axis names."""
     axes = []
@@ -544,11 +544,11 @@ def _build_axes_list_from_names(
         c_name = axes_setup.get_canonical_name(name)
         match c_name:
             case "t":
-                axes.append(Axis(name=name, axis_type=AxisType.time, unit=time_units))
+                axes.append(Axis(name=name, axis_type=AxisType.time, unit=time_unit))
             case "c":
                 axes.append(Axis(name=name, axis_type=AxisType.channel))
             case "z" | "y" | "x":
-                axes.append(Axis(name=name, axis_type=AxisType.space, unit=space_units))
+                axes.append(Axis(name=name, axis_type=AxisType.space, unit=space_unit))
             case _:
                 axes.append(Axis(name=name, axis_type=AxisType.space))
     return axes
@@ -557,8 +557,8 @@ def _build_axes_list_from_names(
 def build_canonical_axes_handler(
     axes_names: Sequence[str],
     canonical_channel_order: Sequence[str] | None = None,
-    space_units: SpaceUnits | str | None = DefaultSpaceUnit,
-    time_units: TimeUnits | str | None = DefaultTimeUnit,
+    space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
+    time_unit: TimeUnits | str | None = DefaultTimeUnit,
 ) -> AxesHandler:
     """Create a new canonical axes mapper.
 
@@ -571,8 +571,8 @@ def build_canonical_axes_handler(
                 e.g. 3 -> ["z", "y", "x"]
         canonical_channel_order (Sequence[str], optional): The canonical channel
             order. Defaults to None, which uses the default order.
-        space_units (SpaceUnits, optional): The space units. Defaults to None.
-        time_units (TimeUnits, optional): The time units. Defaults to None.
+        space_unit (SpaceUnits, optional): The space units. Defaults to None.
+        time_unit (TimeUnits, optional): The time units. Defaults to None.
     """
     if canonical_channel_order is None:
         canonical_channel_order = canonical_axes_order()
@@ -582,8 +582,8 @@ def build_canonical_axes_handler(
     axes = _build_axes_list_from_names(
         axes_names=axes_names,
         axes_setup=axes_setup,
-        space_units=space_units,
-        time_units=time_units,
+        space_unit=space_unit,
+        time_unit=time_unit,
     )
     return AxesHandler(
         axes=axes,
@@ -594,20 +594,23 @@ def build_canonical_axes_handler(
 def build_axes_handler(
     axes_names: Sequence[str],
     axes_setup: AxesSetup | None = None,
+    space_unit: SpaceUnits | str | None = DefaultSpaceUnit,
+    time_unit: TimeUnits | str | None = DefaultTimeUnit,
 ) -> AxesHandler:
     """Create a new axes mapper.
 
     Args:
         axes_names (Sequence[str]): The axes names on disk.
         axes_setup (AxesSetup, optional): The axis setup. Defaults to None.
-        allow_non_canonical_axes (bool, optional): Allow non canonical axes.
-        strict_canonical_order (bool, optional): Check if the axes are in the
-            canonical order. Defaults to False.
+        space_unit (SpaceUnits, optional): The space units. Defaults to None.
+        time_unit (TimeUnits, optional): The time units. Defaults to None.
     """
     axes_setup = axes_setup if axes_setup is not None else AxesSetup()
     axes = _build_axes_list_from_names(
         axes_names=axes_names,
         axes_setup=axes_setup,
+        space_unit=space_unit,
+        time_unit=time_unit,
     )
     return AxesHandler(
         axes=axes,
