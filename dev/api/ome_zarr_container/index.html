@@ -2801,10 +2801,7 @@ the zarr array creation. Defaults to None.</p>
 <span class="normal">1284</span>
 <span class="normal">1285</span>
 <span class="normal">1286</span>
-<span class="normal">1287</span>
-<span class="normal">1288</span>
-<span class="normal">1289</span>
-<span class="normal">1290</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_ome_zarr</span><span class="p">(</span>
+<span class="normal">1287</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_empty_ome_zarr</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">shape</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">int</span><span class="p">],</span>
     <span class="n">pixelsize</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -2952,22 +2949,19 @@ the zarr array creation. Defaults to None.</p>
 
     <span class="n">ome_zarr</span> <span class="o">=</span> <span class="n">OmeZarrContainer</span><span class="p">(</span><span class="n">group_handler</span><span class="o">=</span><span class="n">handler</span><span class="p">,</span> <span class="n">axes_setup</span><span class="o">=</span><span class="n">axes_setup</span><span class="p">)</span>
     <span class="k">if</span> <span class="p">(</span>
-        <span class="n">channel_wavelengths</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="n">channel_labels</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="ow">or</span> <span class="n">channel_wavelengths</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="ow">or</span> <span class="n">channel_colors</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
         <span class="ow">or</span> <span class="n">channel_active</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
     <span class="p">):</span>
-        <span class="n">channel_names</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">channel_labels</span>
+        <span class="c1"># Deprecated way of setting channel metadata</span>
+        <span class="c1"># we set it here for backward compatibility</span>
         <span class="n">ome_zarr</span><span class="o">.</span><span class="n">set_channel_meta</span><span class="p">(</span>
-            <span class="n">labels</span><span class="o">=</span><span class="n">channel_names</span><span class="p">,</span>
+            <span class="n">labels</span><span class="o">=</span><span class="n">channel_labels</span><span class="p">,</span>
             <span class="n">wavelength_id</span><span class="o">=</span><span class="n">channel_wavelengths</span><span class="p">,</span>
             <span class="n">percentiles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
             <span class="n">colors</span><span class="o">=</span><span class="n">channel_colors</span><span class="p">,</span>
             <span class="n">active</span><span class="o">=</span><span class="n">channel_active</span><span class="p">,</span>
-        <span class="p">)</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">ome_zarr</span><span class="o">.</span><span class="n">set_channel_meta</span><span class="p">(</span>
-            <span class="n">labels</span><span class="o">=</span><span class="n">ome_zarr</span><span class="o">.</span><span class="n">channel_labels</span><span class="p">,</span>
-            <span class="n">percentiles</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
         <span class="p">)</span>
     <span class="k">return</span> <span class="n">ome_zarr</span>
 </code></pre></div></td></tr></table></div>
@@ -3377,7 +3371,10 @@ the zarr array creation. Defaults to None.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/images/_ome_zarr_container.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1293</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1290</span>
+<span class="normal">1291</span>
+<span class="normal">1292</span>
+<span class="normal">1293</span>
 <span class="normal">1294</span>
 <span class="normal">1295</span>
 <span class="normal">1296</span>
@@ -3488,9 +3485,7 @@ the zarr array creation. Defaults to None.</p>
 <span class="normal">1401</span>
 <span class="normal">1402</span>
 <span class="normal">1403</span>
-<span class="normal">1404</span>
-<span class="normal">1405</span>
-<span class="normal">1406</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ome_zarr_from_array</span><span class="p">(</span>
+<span class="normal">1404</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ome_zarr_from_array</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">pixelsize</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -3566,6 +3561,10 @@ the zarr array creation. Defaults to None.</p>
 <span class="sd">        channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.</span>
 <span class="sd">        channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">percentiles</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&#39;percentiles&#39; must be a tuple of two values. Got </span><span class="si">{</span><span class="n">percentiles</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
     <span class="n">ome_zarr</span> <span class="o">=</span> <span class="n">create_empty_ome_zarr</span><span class="p">(</span>
         <span class="n">store</span><span class="o">=</span><span class="n">store</span><span class="p">,</span>
         <span class="n">shape</span><span class="o">=</span><span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span>
@@ -3580,6 +3579,7 @@ the zarr array creation. Defaults to None.</p>
         <span class="n">axes_names</span><span class="o">=</span><span class="n">axes_names</span><span class="p">,</span>
         <span class="n">channels_meta</span><span class="o">=</span><span class="n">channels_meta</span><span class="p">,</span>
         <span class="n">name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span>
+        <span class="n">axes_setup</span><span class="o">=</span><span class="n">axes_setup</span><span class="p">,</span>
         <span class="n">ngff_version</span><span class="o">=</span><span class="n">ngff_version</span><span class="p">,</span>
         <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
         <span class="n">shards</span><span class="o">=</span><span class="n">shards</span><span class="p">,</span>
@@ -3598,10 +3598,6 @@ the zarr array creation. Defaults to None.</p>
     <span class="n">image</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span>
     <span class="n">image</span><span class="o">.</span><span class="n">set_array</span><span class="p">(</span><span class="n">array</span><span class="p">)</span>
     <span class="n">image</span><span class="o">.</span><span class="n">consolidate</span><span class="p">()</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">percentiles</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;&#39;percentiles&#39; must be a tuple of two values. Got </span><span class="si">{</span><span class="n">percentiles</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="p">)</span>
     <span class="n">ome_zarr</span><span class="o">.</span><span class="n">set_channel_windows_with_percentiles</span><span class="p">(</span><span class="n">percentiles</span><span class="o">=</span><span class="n">percentiles</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">ome_zarr</span>
 </code></pre></div></td></tr></table></div>
