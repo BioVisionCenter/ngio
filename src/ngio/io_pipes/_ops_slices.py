@@ -1,7 +1,7 @@
+import logging
 import math
 from collections.abc import Mapping, Sequence
 from typing import TypeAlias, assert_never
-from warnings import warn
 
 import dask.array as da
 import numpy as np
@@ -12,6 +12,9 @@ from ngio.common._dimensions import Dimensions
 from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
+
+logger = logging.getLogger(f"ngio:{__name__}")
+
 
 SlicingInputType: TypeAlias = slice | Sequence[int] | int | None
 SlicingType: TypeAlias = slice | list[int] | int
@@ -141,12 +144,11 @@ def _check_list_in_slicing_tuple(
     # Complex case, we have exactly one tuple in the slicing tuple
     ax, first_tuple = list_in_slice[0]
     if len(first_tuple) > 100:
-        warn(
+        logger.warning(
             "Performance warning: "
             "Non-contiguous slicing with a tuple/list with more than 100 elements is "
             "not natively supported by zarr. This is implemented by Ngio by performing "
-            "multiple reads and stacking the result.",
-            stacklevel=2,
+            "multiple reads and stacking the result."
         )
     return ax, first_tuple
 

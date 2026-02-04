@@ -1,6 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
-import warnings
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
@@ -67,6 +67,8 @@ from ngio.utils import (
     ZarrGroupHandler,
 )
 from ngio.utils._zarr_utils import find_dimension_separator
+
+logger = logging.getLogger(f"ngio:{__name__}")
 
 
 class AbstractImage(ABC):
@@ -987,20 +989,16 @@ def abstract_derive(
     """
     # TODO: remove in ngio 0.6
     if labels is not None:
-        warnings.warn(
+        logger.warning(
             "The 'labels' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'channels_meta' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "ngio=0.6. Please use 'channels_meta' instead."
         )
         channels_meta = list(labels)
     if pixel_size is not None:
-        warnings.warn(
+        logger.warning(
             "The 'pixel_size' argument is deprecated and will be removed in "
             "ngio=0.6. Please use 'pixelsize', 'z_spacing', and 'time_spacing'"
-            "instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "instead."
         )
         pixelsize = (pixel_size.y, pixel_size.x)
     # End of deprecated arguments handling

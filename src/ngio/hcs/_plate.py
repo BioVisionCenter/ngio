@@ -1,7 +1,7 @@
 """A module for handling the Plate Sequence in an OME-Zarr file."""
 
 import asyncio
-import warnings
+import logging
 from collections.abc import Sequence
 from typing import Literal
 
@@ -47,6 +47,8 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
 )
+
+logger = logging.getLogger(f"ngio:{__name__}")
 
 
 def _try_get_table_container(
@@ -918,12 +920,10 @@ class OmeZarrPlate:
 
         """
         if check_type is not None:
-            warnings.warn(
+            logger.warning(
                 "The 'check_type' argument is deprecated and will be removed in "
                 "ngio=0.6. Please use 'get_table_as' instead or one of the "
-                "type specific get_*table() methods.",
-                DeprecationWarning,
-                stacklevel=2,
+                "type specific get_*table() methods."
             )
         return self.tables_container.get(name=name, strict=False)
 
@@ -1223,11 +1223,9 @@ def create_empty_plate(
         overwrite (bool): Whether to overwrite the existing plate.
     """
     if version is not None:
-        warnings.warn(
+        logger.warning(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'ngff_version' instead."
         )
         ngff_version = version
     plate_meta = NgioPlateMeta.default_init(
@@ -1280,11 +1278,9 @@ def derive_ome_zarr_plate(
         overwrite (bool): Whether to overwrite the existing plate.
     """
     if version is not None:
-        warnings.warn(
+        logger.warning(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'ngff_version' instead."
         )
         ngff_version = version
 
@@ -1345,11 +1341,9 @@ def create_empty_well(
         overwrite (bool): Whether to overwrite the existing well.
     """
     if version is not None:
-        warnings.warn(
+        logger.warning(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            DeprecationWarning,
-            stacklevel=2,
+            "Please use 'ngff_version' instead."
         )
         ngff_version = version
     group_handler = ZarrGroupHandler(

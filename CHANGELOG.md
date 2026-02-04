@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Chores
+- Improve logging consistency across the codebase.
+
 ## [v0.5.0]
 
 ### Features

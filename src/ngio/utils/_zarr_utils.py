@@ -1,7 +1,7 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
 import json
-import warnings
+import logging
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -22,6 +22,8 @@ from ngio.utils._errors import (
     NgioValueError,
 )
 
+logger = logging.getLogger(f"ngio:{__name__}")
+
 AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # StoreLike is more restrictive than it could be
 # but to make sure we can handle the store correctly
@@ -36,12 +38,10 @@ StoreOrGroup: TypeAlias = NgioSupportedStore | zarr.Group
 def _check_store(store) -> NgioSupportedStore:
     """Check the store and return a valid store."""
     if not isinstance(store, NgioSupportedStore):
-        warnings.warn(
+        logger.warning(
             f"Store type {type(store)} is not explicitly supported. "
             f"Supported types are: {NgioSupportedStore}. "
-            "Proceeding, but this may lead to unexpected behavior.",
-            UserWarning,
-            stacklevel=2,
+            "Proceeding, but this may lead to unexpected behavior."
         )
     return store
 
@@ -153,11 +153,7 @@ class ZarrGroupHandler:
             return (self.store.path / self.group.path).as_posix()
         elif isinstance(self.store, MemoryStore):
             return None
-        warnings.warn(
-            f"Cannot determine full URL for store type {type(self.store)}. ",
-            UserWarning,
-            stacklevel=2,
-        )
+        logger.warning(f"Cannot determine full URL for store type {type(self.store)}.")
         return None
 
     @property
@@ -523,11 +519,9 @@ def copy_group(
         _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
         return
     if not suppress_warnings:
-        warnings.warn(
+        logger.warning(
             "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
             "This will preserve some tabular data non-zarr native (parquet, and csv), "
-            "and it will be slower for large datasets.",
-            UserWarning,
-            stacklevel=2,
+            "and it will be slower for large datasets."
         )
     _zarr_python_copy(src_group, dest_group)
