@@ -210,6 +210,8 @@ def _build_axes_handler(
     meta_type: type[_image_or_label_meta],
     axes_names: Sequence[str] | None = None,
     axes_setup: AxesSetup | None = None,
+    space_unit: SpaceUnits | str | None = None,
+    time_unit: TimeUnits | str | None = None,
 ) -> AxesHandler:
     """Build axes handler for given shape and axes names."""
     if meta_type is NgioImageMeta:
@@ -223,10 +225,14 @@ def _build_axes_handler(
         return build_canonical_axes_handler(
             axes_names=axes_names,
             canonical_channel_order=canonical_axes_order_,
+            space_unit=space_unit,
+            time_unit=time_unit,
         )
     return build_axes_handler(
         axes_names=axes_names,
         axes_setup=axes_setup,
+        space_unit=space_unit,
+        time_unit=time_unit,
     )
 
 
@@ -271,6 +277,8 @@ def init_image_like(
         meta_type=meta_type,
         axes_names=axes_names,
         axes_setup=axes_setup,
+        space_unit=space_unit,
+        time_unit=time_unit,
     )
     if len(shape) != len(axes_handler.axes_names):
         raise NgioValueError(
@@ -364,6 +372,8 @@ def init_image_like_from_shapes(
         meta_type=meta_type,
         axes_names=axes_names,
         axes_setup=axes_setup,
+        space_unit=space_unit,
+        time_unit=time_unit,
     )
     if len(base_shape) != len(axes_handler.axes_names):
         raise NgioValueError(

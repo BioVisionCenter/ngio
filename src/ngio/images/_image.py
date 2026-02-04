@@ -798,9 +798,6 @@ class ImagesContainer:
                 If a single tuple is provided,
                 the same percentiles will be used for all channels.
         """
-        if self.meta._channels_meta is None:
-            raise NgioValueError("The channels meta is not initialized.")
-
         low_res_dataset = self.meta.get_lowest_resolution_dataset()
         ref_image = self.get(path=low_res_dataset.path)
         starts_ends = compute_image_percentile(ref_image, percentiles=percentiles)

@@ -1270,22 +1270,19 @@ def create_empty_ome_zarr(
 
     ome_zarr = OmeZarrContainer(group_handler=handler, axes_setup=axes_setup)
     if (
-        channel_wavelengths is not None
+        channel_labels is not None
+        or channel_wavelengths is not None
         or channel_colors is not None
         or channel_active is not None
     ):
-        channel_names = ome_zarr.channel_labels
+        # Deprecated way of setting channel metadata
+        # we set it here for backward compatibility
         ome_zarr.set_channel_meta(
-            labels=channel_names,
+            labels=channel_labels,
             wavelength_id=channel_wavelengths,
             percentiles=None,
             colors=channel_colors,
             active=channel_active,
-        )
-    else:
-        ome_zarr.set_channel_meta(
-            labels=ome_zarr.channel_labels,
-            percentiles=None,
         )
     return ome_zarr
 
@@ -1366,6 +1363,10 @@ def create_ome_zarr_from_array(
         channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.
         channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
+    if len(percentiles) != 2:
+        raise NgioValueError(
+            f"'percentiles' must be a tuple of two values. Got {percentiles}"
+        )
     ome_zarr = create_empty_ome_zarr(
         store=store,
         shape=array.shape,
@@ -1380,6 +1381,7 @@ def create_ome_zarr_from_array(
         axes_names=axes_names,
         channels_meta=channels_meta,
         name=name,
+        axes_setup=axes_setup,
         ngff_version=ngff_version,
         chunks=chunks,
         shards=shards,
@@ -1398,9 +1400,5 @@ def create_ome_zarr_from_array(
     image = ome_zarr.get_image()
     image.set_array(array)
     image.consolidate()
-    if len(percentiles) != 2:
-        raise NgioValueError(
-            f"'percentiles' must be a tuple of two values. Got {percentiles}"
-        )
     ome_zarr.set_channel_windows_with_percentiles(percentiles=percentiles)
     return ome_zarr
