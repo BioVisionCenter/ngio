@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fix
+- Fix bug causing incorrect channel metadata when creating an image.
+- Fix correctly setting the space and time units when creating an image.
+- Fix minor bug in `set_channel_windows_with_percentiles` method.
+
 ### Chores
 - Improve logging consistency across the codebase.
 
