@@ -565,7 +565,7 @@ class OmeZarrContainer:
         masking_label, masking_table = self._find_matching_masking_label(
             masking_label_name=masking_label_name,
             masking_table_name=masking_table_name,
-            pixel_size=pixel_size,
+            pixel_size=image.pixel_size,
         )
         return MaskedImage(
             group_handler=image._group_handler,
