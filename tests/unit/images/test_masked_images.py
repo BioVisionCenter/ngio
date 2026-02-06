@@ -6,8 +6,14 @@ import pytest
 from scipy import ndimage
 from skimage.segmentation import watershed
 
-from ngio import create_ome_zarr_from_array, open_ome_zarr_container
+from ngio import (
+    create_empty_ome_zarr,
+    create_ome_zarr_from_array,
+    open_ome_zarr_container,
+)
+from ngio.images._masked_image import MaskedImage
 from ngio.transforms import ZoomTransform
+from ngio.utils._errors import NgioValueError
 
 
 def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
@@ -137,7 +143,102 @@ def test_masking(
         masked_new_label.set_roi(label_id, x, zoom_factor=1.1)
 
 
-@pytest.mark.filterwarnings("ignore::anndata._warnings.ImplicitModificationWarning")
+@pytest.mark.parametrize(
+    "image_scale, label_scale",
+    [("0", "1"), ("1", "0"), ("0", "4"), ("4", "0")],
+)
+def test_masking_at_different_res(image_scale: str, label_scale: str):
+    # Test on a real example
+    ome_zarr = create_empty_ome_zarr(
+        store={},
+        shape=(2, 3, 200, 200),
+        pixelsize=1.0,
+    )
+    masked_label = ome_zarr.derive_label("mask")
+    masked_label.set_array(np.ones(shape=masked_label.shape, dtype=masked_label.dtype))
+    masked_label.consolidate()
+
+    # Image at higher res and label at lower res, with zooming
+    image = ome_zarr.get_image(path=image_scale)
+    masking_label = ome_zarr.get_label(name="mask", path=label_scale)
+    masking_table = masked_label.build_masking_roi_table()
+    masked_image = MaskedImage(
+        group_handler=image._group_handler,
+        path=image_scale,
+        meta_handler=image.meta_handler,
+        label=masking_label,
+        masking_roi_table=masking_table,
+    )
+    roi = masked_image.get_roi_masked_as_numpy(label=1)
+    assert roi.shape == image.shape
+    roi = masked_image.get_roi_masked_as_dask(label=1)
+    assert roi.shape == image.shape
+
+    with pytest.raises(NgioValueError):
+        masked_image.get_roi_masked_as_numpy(label=1, allow_rescaling=False)
+
+    with pytest.raises(NgioValueError):
+        masked_image.get_roi_masked_as_dask(label=1, allow_rescaling=False)
+
+
+def test_masking_oneoff_handling():
+    # Test on a real example
+    ome_zarr = create_empty_ome_zarr(
+        store={},
+        shape=(2, 3, 200, 200),
+        pixelsize=1.0,
+    )
+
+    masked_label2 = ome_zarr.derive_label("mask2", shape=(1, 3, 200, 200))
+    masked_label2.set_array(
+        np.ones(shape=masked_label2.shape, dtype=masked_label2.dtype)
+    )
+    masked_label2.consolidate()
+
+    masked_label = ome_zarr.derive_label("mask", shape=(1, 3, 199, 201))
+    masked_label.set_array(np.ones(shape=masked_label.shape, dtype=masked_label.dtype))
+    masked_label.consolidate()
+
+    # Image at higher res and label at lower res, with zooming
+    image = ome_zarr.get_image(path="0")
+    masking_label = ome_zarr.get_label(name="mask", path="0")
+    # Use the second label to allow testing the one-off handling in the zoom transform
+    masking_table = masked_label2.build_masking_roi_table()
+    masked_image = MaskedImage(
+        group_handler=image._group_handler,
+        path="0",
+        meta_handler=image.meta_handler,
+        label=masking_label,
+        masking_roi_table=masking_table,
+    )
+    roi = masked_image.get_roi_masked_as_numpy(label=1, allow_rescaling=False)
+    assert roi.shape == (2, 3, 200, 200)
+    roi = masked_image.get_roi_masked_as_dask(label=1, allow_rescaling=False)
+    assert roi.shape == (2, 3, 200, 200)
+
+    # Fail if more than 1 pixel difference and allow_rescaling is False
+    masked_label = ome_zarr.derive_label("mask", shape=(1, 3, 198, 202), overwrite=True)
+    masked_label.set_array(np.ones(shape=masked_label.shape, dtype=masked_label.dtype))
+    masked_label.consolidate()
+
+    # Image at higher res and label at lower res, with zooming
+    image = ome_zarr.get_image(path="0")
+    masking_label = ome_zarr.get_label(name="mask", path="0")
+    # Use the second label to allow testing the one-off handling in the zoom transform
+    masking_table = masked_label2.build_masking_roi_table()
+    masked_image = MaskedImage(
+        group_handler=image._group_handler,
+        path="0",
+        meta_handler=image.meta_handler,
+        label=masking_label,
+        masking_roi_table=masking_table,
+    )
+    with pytest.raises(NgioValueError):
+        roi = masked_image.get_roi_masked_as_numpy(label=1, allow_rescaling=False)
+    with pytest.raises(NgioValueError):
+        roi = masked_image.get_roi_masked_as_dask(label=1, allow_rescaling=False)
+
+
 @pytest.mark.parametrize(
     ("label", "c", "zoom_factor", "expected_shape"),
     [
