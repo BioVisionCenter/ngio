@@ -17,9 +17,11 @@ def _draw_random_labels(shape: tuple[int, ...], num_regions: int):
     for i, (y, x) in enumerate(seeds_list, start=1):
         markers[y, x] = i
 
-    image = ndimage.distance_transform_edt(markers == 0).astype("uint32")
-    labels = watershed(image, markers).astype("uint32")
-    return image, labels
+    dt_image = ndimage.distance_transform_edt(markers == 0)
+    assert isinstance(dt_image, np.ndarray)
+    dt_image = dt_image.astype("float32")
+    labels = watershed(dt_image, markers).astype("uint32")
+    return dt_image, labels
 
 
 @pytest.mark.parametrize(
@@ -99,7 +101,10 @@ def test_masking(
 
     _roi_mask = masked_image.get_roi_masked(label=1, mode=array_mode)
     # Check that the mask is binary after masking
-    np.testing.assert_allclose(np.unique(_roi_mask), [0, 1])
+    if isinstance(_roi_mask, np.ndarray):
+        np.testing.assert_allclose(np.unique(_roi_mask), [0, 1])
+    else:
+        np.testing.assert_allclose(np.unique(_roi_mask.compute()), [0, 1])
 
     # Just test the API
     masked_image.set_roi(label=1, patch=np.zeros_like(_roi_array), zoom_factor=1.123)
@@ -113,12 +118,17 @@ def test_masking(
 
     for label_id in labels_stats.keys():
         label_mask = masked_new_label.get_roi(label_id, mode=array_mode)
+        if not isinstance(label_mask, np.ndarray):
+            label_mask = label_mask.compute()
         label_mask = np.full(label_mask.shape, label_id, dtype=label_mask.dtype)
         # Set the label only inside the mask
         masked_new_label.set_roi_masked(label_id, label_mask)
 
     # rerun the stats on the new masked label
-    unique_labels, counts = np.unique(masked_new_label.get_array(), return_counts=True)
+    masked_array = masked_new_label.get_array()
+    if not isinstance(masked_array, np.ndarray):
+        masked_array = masked_array.compute()
+    unique_labels, counts = np.unique(masked_array, return_counts=True)
     labels_stats_masked = dict(zip(unique_labels, counts, strict=True))
     assert labels_stats == labels_stats_masked
 

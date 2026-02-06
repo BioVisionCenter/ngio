@@ -84,15 +84,14 @@ def _setup_numpy_getters(
 
     if allow_rescaling:
         _zoom_transform = BaseZoomTransform(
-            input_dimensions=dimensions,
-            target_dimensions=label_dimensions,
+            input_dimensions=label_dimensions,
+            target_dimensions=dimensions,
             order="nearest",
         )
         if label_transforms is None or len(label_transforms) == 0:
             label_transforms = [_zoom_transform]
         else:
             label_transforms = [_zoom_transform, *label_transforms]
-
     label_slicing_dict = roi_to_slicing_dict(
         roi=roi,
         pixel_size=label_dimensions.pixel_size,
@@ -317,8 +316,8 @@ def _setup_dask_getters(
 
     if allow_rescaling:
         _zoom_transform = BaseZoomTransform(
-            input_dimensions=dimensions,
-            target_dimensions=label_dimensions,
+            input_dimensions=label_dimensions,
+            target_dimensions=dimensions,
             order="nearest",
         )
         if label_transforms is None or len(label_transforms) == 0:

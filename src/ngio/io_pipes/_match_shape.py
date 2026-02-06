@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 
 import dask.array as da
 import numpy as np
@@ -10,7 +10,7 @@ from ngio.utils import NgioValueError
 logger = logging.getLogger(f"ngio:{__name__}")
 
 
-class Action(str, Enum):
+class Action(StrEnum):
     NONE = "none"
     PAD = "pad"
     TRIM = "trim"
