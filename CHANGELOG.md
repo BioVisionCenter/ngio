@@ -1,6 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.2]
+
+### Fix
+- Fix critical bug in masking roi image handling causing incorrect results when image and mask have different pixel sizes.
+- Fix bug in loading masking roi images when paths other than default are used.
+
+## [0.5.1]
 
 ### Fix
 - Fix bug causing incorrect channel metadata when creating an image.

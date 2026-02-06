@@ -37,6 +37,8 @@ dependencies = [
     "numpy",
     "filelock",
     "zarr>3",
+    "scipy",
+    "fsspec",
     "anndata",
     "pydantic",
     "pandas>=1.2.0,<3.0.0",

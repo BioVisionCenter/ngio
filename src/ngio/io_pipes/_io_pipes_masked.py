@@ -34,7 +34,6 @@ def _numpy_label_to_bool_mask(
     data_shape: tuple[int, ...],
     label_axes: tuple[str, ...],
     data_axes: tuple[str, ...],
-    allow_rescaling: bool = True,
 ) -> np.ndarray:
     """Convert label data to a boolean mask."""
     if label is not None:
@@ -47,7 +46,6 @@ def _numpy_label_to_bool_mask(
         reference_shape=data_shape,
         array_axes=label_axes,
         reference_axes=data_axes,
-        allow_rescaling=allow_rescaling,
     )
     return bool_mask
 
@@ -84,15 +82,14 @@ def _setup_numpy_getters(
 
     if allow_rescaling:
         _zoom_transform = BaseZoomTransform(
-            input_dimensions=dimensions,
-            target_dimensions=label_dimensions,
+            input_dimensions=label_dimensions,
+            target_dimensions=dimensions,
             order="nearest",
         )
         if label_transforms is None or len(label_transforms) == 0:
             label_transforms = [_zoom_transform]
         else:
             label_transforms = [_zoom_transform, *label_transforms]
-
     label_slicing_dict = roi_to_slicing_dict(
         roi=roi,
         pixel_size=label_dimensions.pixel_size,
@@ -147,7 +144,6 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
 
         self._label_id = roi.label
         self._fill_value = fill_value
-        self._allow_rescaling = allow_rescaling
         super().__init__(
             zarr_array=zarr_array,
             slicing_ops=self._data_getter.slicing_ops,
@@ -164,14 +160,12 @@ class NumpyGetterMasked(DataGetter[np.ndarray]):
         """Get the masked data as a numpy array."""
         data = self._data_getter()
         label_data = self._label_data_getter()
-
         bool_mask = _numpy_label_to_bool_mask(
             label_data=label_data,
             label=self.label_id,
             data_shape=data.shape,
             label_axes=self._label_data_getter.axes_ops.output_axes,
             data_axes=self._data_getter.axes_ops.output_axes,
-            allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
             bool_mask = np.broadcast_to(bool_mask, data.shape)
@@ -214,7 +208,6 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
         self._data_getter = _data_getter
         self._label_data_getter = _label_data_getter
         self._label_id = roi.label
-        self._allow_rescaling = allow_rescaling
 
         self._data_setter = NumpySetter(
             zarr_array=zarr_array,
@@ -246,7 +239,6 @@ class NumpySetterMasked(DataSetter[np.ndarray]):
             data_shape=data.shape,
             label_axes=self._label_data_getter.axes_ops.output_axes,
             data_axes=self._data_getter.axes_ops.output_axes,
-            allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
             bool_mask = np.broadcast_to(bool_mask, data.shape)
@@ -267,7 +259,6 @@ def _dask_label_to_bool_mask(
     data_shape: tuple[int, ...],
     label_axes: tuple[str, ...],
     data_axes: tuple[str, ...],
-    allow_rescaling: bool = True,
 ) -> DaskArray:
     """Convert label data to a boolean mask."""
     if label is not None:
@@ -280,7 +271,6 @@ def _dask_label_to_bool_mask(
         reference_shape=data_shape,
         array_axes=label_axes,
         reference_axes=data_axes,
-        allow_rescaling=allow_rescaling,
     )
     return bool_mask
 
@@ -317,15 +307,14 @@ def _setup_dask_getters(
 
     if allow_rescaling:
         _zoom_transform = BaseZoomTransform(
-            input_dimensions=dimensions,
-            target_dimensions=label_dimensions,
+            input_dimensions=label_dimensions,
+            target_dimensions=dimensions,
             order="nearest",
         )
         if label_transforms is None or len(label_transforms) == 0:
             label_transforms = [_zoom_transform]
         else:
             label_transforms = [_zoom_transform, *label_transforms]
-
     label_slicing_dict = roi_to_slicing_dict(
         roi=roi,
         pixel_size=label_dimensions.pixel_size,
@@ -379,7 +368,6 @@ class DaskGetterMasked(DataGetter[DaskArray]):
         self._label_data_getter = _label_data_getter
         self._label_id = roi.label
         self._fill_value = fill_value
-        self._allow_rescaling = allow_rescaling
         super().__init__(
             zarr_array=zarr_array,
             slicing_ops=self._data_getter.slicing_ops,
@@ -402,7 +390,6 @@ class DaskGetterMasked(DataGetter[DaskArray]):
             data_shape=data_shape,
             label_axes=self._label_data_getter.axes_ops.output_axes,
             data_axes=self._data_getter.axes_ops.output_axes,
-            allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
             bool_mask = da.broadcast_to(bool_mask, data.shape)
@@ -446,7 +433,6 @@ class DaskSetterMasked(DataSetter[DaskArray]):
         self._label_data_getter = _label_data_getter
 
         self._label_id = roi.label
-        self._allow_rescaling = allow_rescaling
 
         self._data_setter = DaskSetter(
             zarr_array=zarr_array,
@@ -480,7 +466,6 @@ class DaskSetterMasked(DataSetter[DaskArray]):
             data_shape=data_shape,
             label_axes=self._label_data_getter.axes_ops.output_axes,
             data_axes=self._data_getter.axes_ops.output_axes,
-            allow_rescaling=self._allow_rescaling,
         )
         if bool_mask.shape != data.shape:
             bool_mask = da.broadcast_to(bool_mask, data.shape)

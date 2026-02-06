@@ -28,7 +28,7 @@ class BaseZoomTransform:
         self._order: InterpolationOrder = order
 
     def _normalize_shape(
-        self, slice_: slice | int | tuple, scale: float, max_dim: int
+        self, slice_: slice | int | list[int], scale: float, max_dim: int
     ) -> int:
         if isinstance(slice_, slice):
             _start = slice_.start or 0
@@ -43,7 +43,7 @@ class BaseZoomTransform:
 
         elif isinstance(slice_, int):
             target_shape = 1
-        elif isinstance(slice_, tuple):
+        elif isinstance(slice_, list):
             target_shape = len(slice_) * scale
         else:
             raise ValueError(f"Unsupported slice type: {type(slice_)}")
