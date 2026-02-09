@@ -185,6 +185,11 @@ def test_anndata_backend(tmp_path: Path):
     lf_data = backend.load_as_polars_lf()
     backend.write(lf_data, metadata={"test": "test"})
 
+    # Test that the "raw" entry with encoding-type "null" is
+    # removed after writing for compatibility with older anndata versions
+    with pytest.raises(KeyError):
+        backend._group_handler._group["raw"]
+
 
 @pytest.mark.parametrize(
     "index_label, index_type",

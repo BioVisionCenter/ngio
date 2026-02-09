@@ -81,6 +81,17 @@ class AnnDataBackend(AbstractTableBackend):
             suppress_warnings=True,
         )
 
+    def _cleanup_after_write(self) -> None:
+        """Clean up any temporary data after writing."""
+        group = self._group_handler._group
+        try:
+            raw_group = group["raw"]
+        except KeyError:
+            return
+        # Remove "raw" entry (encoding-type "null") that anndata <0.11 can't read
+        if dict(raw_group.attrs).get("encoding-type") == "null":
+            del group["raw"]
+
     def write_from_anndata(self, table: AnnData) -> None:
         """Serialize the table from an AnnData object."""
         # Make sure to use the correct zarr format
@@ -112,6 +123,7 @@ class AnnDataBackend(AbstractTableBackend):
                 "Please make sure to use a compatible "
                 "store like a LocalStore, or FsspecStore."
             )
+        self._cleanup_after_write()
 
     def write_from_pandas(self, table: DataFrame) -> None:
         """Serialize the table from a pandas DataFrame."""

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.5.3]
+
+### Fix
+- Fix bug in AnnData backend where "raw" entry with encoding-type "null" is written by default in newer anndata versions, which causes compatibility issues with older anndata versions. Now the "raw" entry is removed after writing if it has encoding-type "null".
+
 ## [0.5.2]
 
 ### Fix
