@@ -1747,6 +1747,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#053" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.5.3]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#052" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1759,7 +1787,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fix_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -1787,7 +1815,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_1" class="md-nav__link">
+  <a href="#fix_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2389,6 +2417,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#053" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [0.5.3]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#052" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2401,7 +2457,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fix_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2429,7 +2485,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_1" class="md-nav__link">
+  <a href="#fix_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2936,14 +2992,19 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="052">[0.5.2]<a class="headerlink" href="#052" title="Permanent link">&para;</a></h2>
+<h2 id="053">[0.5.3]<a class="headerlink" href="#053" title="Permanent link">&para;</a></h2>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in AnnData backend where "raw" entry with encoding-type "null" is written by default in newer anndata versions, which causes compatibility issues with older anndata versions. Now the "raw" entry is removed after writing if it has encoding-type "null".</li>
+</ul>
+<h2 id="052">[0.5.2]<a class="headerlink" href="#052" title="Permanent link">&para;</a></h2>
+<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix critical bug in masking roi image handling causing incorrect results when image and mask have different pixel sizes.</li>
 <li>Fix bug in loading masking roi images when paths other than default are used.</li>
 </ul>
 <h2 id="051">[0.5.1]<a class="headerlink" href="#051" title="Permanent link">&para;</a></h2>
-<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
+<h3 id="fix_2">Fix<a class="headerlink" href="#fix_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix bug causing incorrect channel metadata when creating an image.</li>
 <li>Fix correctly setting the space and time units when creating an image.</li>
