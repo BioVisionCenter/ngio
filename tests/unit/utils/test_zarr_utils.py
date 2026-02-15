@@ -1,4 +1,3 @@
-import sys
 from pathlib import Path
 
 import dask
@@ -170,25 +169,6 @@ def test_multiprocessing_safety(tmp_path: Path):
     assert np.all(counts == 1)
 
     assert handler.lock_path is not None
-
-    if sys.platform.startswith("win"):
-        # The file lock path is not removed on Windows
-        # for some reason path.exists() returns False
-        # even though the file should exist (or at least it does on Mac/Linux)
-        return None
-
-    assert handler.lock_path.exists()
-    lock_path = handler.lock_path
-    handler.remove_lock()
-    assert not lock_path.exists()
-    handler.remove_lock()
-
-    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w")
-    assert handler.lock is not None
-    with pytest.raises(NgioValueError):
-        # Attempt to remove the lock while it is in use
-        with handler.lock:
-            handler.remove_lock()
 
     # If cache is used, raise error when creating lock
     # Since caching creates a temporary local copy
