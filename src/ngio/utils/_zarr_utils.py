@@ -202,19 +202,6 @@ class ZarrGroupHandler:
             self._lock = self._create_lock()
         return self._lock[0]
 
-    def remove_lock(self) -> None:
-        """Return the lock."""
-        if self._lock is None:
-            return None
-
-        lock_path, lock = self._lock
-        if lock_path.exists() and lock.lock_counter == 0:
-            lock_path.unlink()
-            self._lock = None
-            return None
-
-        raise NgioValueError("The lock is still in use. Cannot remove it.")
-
     def reopen_group(self) -> zarr.Group:
         """Reopen the group.
 

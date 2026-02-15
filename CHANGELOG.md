@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+### Fix
+- Remove file locking remove in `ZarrGroupHandler`, which was not used anywhere and is unnecessary in new lockfile release.
+
 ## [0.5.3]
 
 ### Fix
