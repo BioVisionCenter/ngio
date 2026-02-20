@@ -1,9 +1,10 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.4]
 
 ### Fix
 - Remove file locking remove in `ZarrGroupHandler`, which was not used anywhere and is unnecessary in new lockfile release.
+- Correctly set Zarr array dtype to array dtype in `create_ome_zarr_from_array`
 
 ## [0.5.3]
 
