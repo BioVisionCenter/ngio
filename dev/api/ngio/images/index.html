@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.2">
     
     
       
@@ -15642,7 +15642,8 @@ the zarr array creation. Defaults to None.</p>
 <span class="normal">1401</span>
 <span class="normal">1402</span>
 <span class="normal">1403</span>
-<span class="normal">1404</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ome_zarr_from_array</span><span class="p">(</span>
+<span class="normal">1404</span>
+<span class="normal">1405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">create_ome_zarr_from_array</span><span class="p">(</span>
     <span class="n">store</span><span class="p">:</span> <span class="n">StoreOrGroup</span><span class="p">,</span>
     <span class="n">array</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span>
     <span class="n">pixelsize</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -15740,6 +15741,7 @@ the zarr array creation. Defaults to None.</p>
         <span class="n">ngff_version</span><span class="o">=</span><span class="n">ngff_version</span><span class="p">,</span>
         <span class="n">chunks</span><span class="o">=</span><span class="n">chunks</span><span class="p">,</span>
         <span class="n">shards</span><span class="o">=</span><span class="n">shards</span><span class="p">,</span>
+        <span class="n">dtype</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">array</span><span class="o">.</span><span class="n">dtype</span><span class="p">),</span>
         <span class="n">dimension_separator</span><span class="o">=</span><span class="n">dimension_separator</span><span class="p">,</span>
         <span class="n">compressors</span><span class="o">=</span><span class="n">compressors</span><span class="p">,</span>
         <span class="n">extra_array_kwargs</span><span class="o">=</span><span class="n">extra_array_kwargs</span><span class="p">,</span>
