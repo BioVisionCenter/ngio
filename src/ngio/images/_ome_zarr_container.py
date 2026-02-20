@@ -1385,7 +1385,7 @@ def create_ome_zarr_from_array(
         ngff_version=ngff_version,
         chunks=chunks,
         shards=shards,
-        dtype=array.dtype,
+        dtype=str(array.dtype),
         dimension_separator=dimension_separator,
         compressors=compressors,
         extra_array_kwargs=extra_array_kwargs,
