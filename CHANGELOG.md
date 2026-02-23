@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v0.5.5]
 
 ### Features
 - `Roi` now supports dict-like slice access: `roi["x"]` returns the slice for axis `"x"` and raises `KeyError` if the axis is not present.
