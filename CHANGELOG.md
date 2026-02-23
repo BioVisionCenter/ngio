@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+- `Roi` now supports dict-like slice access: `roi["x"]` returns the slice for axis `"x"` and raises `KeyError` if the axis is not present.
+- `Roi.get(axis_name, default=None)` now accepts an explicit `default` value, following the `dict.get` convention.
+- New `Roi.update_slice(name, new_slice)` method: replaces the slice for an existing axis or appends a new one. Returns a new `Roi` instance.
+- New `Roi.remove_slice(name)` method: removes the slice for a named axis. Returns a new `Roi` instance. Raises `NgioValueError` if the axis is not present.
+
 ## [0.5.4]
 
 ### Fix
