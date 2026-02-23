@@ -3458,6 +3458,73 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
 
 
+        <p>A multi-dimensional Region of Interest (ROI).</p>
+<p>An Roi groups one RoiSlice per axis into a named, labelled region that
+can live in either world (physical) or pixel coordinate space.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;name&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.Roi.name&lt;/code&gt;)" href="#ngio.common.Roi.name">name</a></code></b>
+              (<code><span title="str">str</span> | None</code>)
+          –
+          <div class="doc-md-description">
+            <p>Human-readable name for this ROI, or None.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;slices&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-class-attribute&quot;&gt;&lt;code&gt;class-attribute&lt;/code&gt;&lt;/small&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.Roi.slices&lt;/code&gt;)" href="#ngio.common.Roi.slices">slices</a></code></b>
+              (<code><span title="list">list</span>[<a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a>]</code>)
+          –
+          <div class="doc-md-description">
+            <p>List of per-axis slices. Must contain at least two entries
+and each axis name must be unique.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;label&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-class-attribute&quot;&gt;&lt;code&gt;class-attribute&lt;/code&gt;&lt;/small&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.Roi.label&lt;/code&gt;)" href="#ngio.common.Roi.label">label</a></code></b>
+              (<code><span title="int">int</span> | None</code>)
+          –
+          <div class="doc-md-description">
+            <p>Integer label identifying the ROI (e.g. from a label image).
+Must be non-negative, or None if unlabelled.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;space&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-class-attribute&quot;&gt;&lt;code&gt;class-attribute&lt;/code&gt;&lt;/small&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.Roi.space&lt;/code&gt;)" href="#ngio.common.Roi.space">space</a></code></b>
+              (<code><span title="typing.Literal">Literal</span>[&#39;world&#39;, &#39;pixel&#39;]</code>)
+          –
+          <div class="doc-md-description">
+            <p>Coordinate space of the slice values - either "world" for
+physical units or "pixel" for pixel indices.</p>
+          </div>
+        </li>
+    </ul>
+
 
 
 
@@ -3615,13 +3682,13 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">162</span>
-<span class="normal">163</span>
-<span class="normal">164</span>
-<span class="normal">165</span>
-<span class="normal">166</span>
-<span class="normal">167</span>
-<span class="normal">168</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;slices&quot;</span><span class="p">)</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">277</span>
+<span class="normal">278</span>
+<span class="normal">279</span>
+<span class="normal">280</span>
+<span class="normal">281</span>
+<span class="normal">282</span>
+<span class="normal">283</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;slices&quot;</span><span class="p">)</span>
 <span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">validate_no_duplicate_axes</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">RoiSlice</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">RoiSlice</span><span class="p">]:</span>
     <span class="n">axis_names</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span><span class="o">.</span><span class="n">axis_name</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">v</span><span class="p">]</span>
@@ -3647,10 +3714,7 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
 <a href="#ngio.common.Roi.from_values" class="headerlink" title="Permanent link">&para;</a></h5>
 <div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_values</span><span class="p">(</span>
-    <span class="n">slices</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span>
-        <span class="n"><span title="str">str</span></span><span class="p">,</span>
-        <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="n"><span title="tuple">tuple</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="n"><span title="slice">slice</span></span><span class="p">,</span>
-    <span class="p">],</span>
+    <span class="n">slices</span><span class="p">:</span> <span class="n"><span title="collections.abc.Mapping">Mapping</span></span><span class="p">[</span><span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n"><span title="ngio.common._roi.SliceValueType">SliceValueType</span></span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span><span class="p">],</span>
     <span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">label</span><span class="p">:</span> <span class="n"><span title="int">int</span></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">space</span><span class="p">:</span> <span class="n"><span title="typing.Literal">Literal</span></span><span class="p">[</span><span class="s2">&quot;world&quot;</span><span class="p">,</span> <span class="s2">&quot;pixel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;world&quot;</span><span class="p">,</span>
@@ -3660,32 +3724,124 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Create an Roi from a mapping of axis names to slice values.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>slices</code></b>
+              (<code><span title="collections.abc.Mapping">Mapping</span>[<span title="str">str</span>, <span title="ngio.common._roi.SliceValueType">SliceValueType</span> | <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a>]</code>)
+          –
+          <div class="doc-md-description">
+            <p>Mapping from axis name to a slice value accepted by
+RoiSlice.from_value (slice, tuple, float, or RoiSlice).</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>name</code></b>
+              (<code><span title="str">str</span> | None</code>)
+          –
+          <div class="doc-md-description">
+            <p>Human-readable name for the ROI.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>label</code></b>
+              (<code><span title="int">int</span> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Integer label, or None if unlabelled.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>space</code></b>
+              (<code><span title="typing.Literal">Literal</span>[&#39;world&#39;, &#39;pixel&#39;]</code>, default:
+                  <code>&#39;world&#39;</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Coordinate space of the provided values ("world" or
+"pixel").</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>**kwargs</code></b>
+          –
+          <div class="doc-md-description">
+            <p>Additional fields stored on the model.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi instance.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">183</span>
-<span class="normal">184</span>
-<span class="normal">185</span>
-<span class="normal">186</span>
-<span class="normal">187</span>
-<span class="normal">188</span>
-<span class="normal">189</span>
-<span class="normal">190</span>
-<span class="normal">191</span>
-<span class="normal">192</span>
-<span class="normal">193</span>
-<span class="normal">194</span>
-<span class="normal">195</span>
-<span class="normal">196</span>
-<span class="normal">197</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
+<span class="normal">299</span>
+<span class="normal">300</span>
+<span class="normal">301</span>
+<span class="normal">302</span>
+<span class="normal">303</span>
+<span class="normal">304</span>
+<span class="normal">305</span>
+<span class="normal">306</span>
+<span class="normal">307</span>
+<span class="normal">308</span>
+<span class="normal">309</span>
+<span class="normal">310</span>
+<span class="normal">311</span>
+<span class="normal">312</span>
+<span class="normal">313</span>
+<span class="normal">314</span>
+<span class="normal">315</span>
+<span class="normal">316</span>
+<span class="normal">317</span>
+<span class="normal">318</span>
+<span class="normal">319</span>
+<span class="normal">320</span>
+<span class="normal">321</span>
+<span class="normal">322</span>
+<span class="normal">323</span>
+<span class="normal">324</span>
+<span class="normal">325</span>
+<span class="normal">326</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_values</span><span class="p">(</span>
     <span class="bp">cls</span><span class="p">,</span>
-    <span class="n">slices</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="nb">slice</span><span class="p">],</span>
+    <span class="n">slices</span><span class="p">:</span> <span class="n">Mapping</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">SliceValueType</span> <span class="o">|</span> <span class="n">RoiSlice</span><span class="p">],</span>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">label</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
     <span class="n">space</span><span class="p">:</span> <span class="n">Literal</span><span class="p">[</span><span class="s2">&quot;world&quot;</span><span class="p">,</span> <span class="s2">&quot;pixel&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;world&quot;</span><span class="p">,</span>
     <span class="o">**</span><span class="n">kwargs</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create an Roi from a mapping of axis names to slice values.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        slices: Mapping from axis name to a slice value accepted by</span>
+<span class="sd">            RoiSlice.from_value (slice, tuple, float, or RoiSlice).</span>
+<span class="sd">        name: Human-readable name for the ROI.</span>
+<span class="sd">        label: Integer label, or None if unlabelled.</span>
+<span class="sd">        space: Coordinate space of the provided values (&quot;world&quot; or</span>
+<span class="sd">            &quot;pixel&quot;).</span>
+<span class="sd">        **kwargs: Additional fields stored on the model.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi instance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">_slices</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">axis</span><span class="p">,</span> <span class="n">_slice</span> <span class="ow">in</span> <span class="n">slices</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="n">_slices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">RoiSlice</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">axis_name</span><span class="o">=</span><span class="n">axis</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">_slice</span><span class="p">))</span>
@@ -3706,23 +3862,89 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
 
 <a href="#ngio.common.Roi.get" class="headerlink" title="Permanent link">&para;</a></h5>
-<div class="doc-signature highlight"><pre><span></span><code><span class="nf">get</span><span class="p">(</span><span class="n">axis_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span> <span class="o">|</span> <span class="kc">None</span>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">get</span><span class="p">(</span>
+    <span class="n">axis_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span> <span class="o">|</span> <span class="kc">None</span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
+        <p>Return the RoiSlice for a given axis, or None if not present.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>axis_name</code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Name of the axis to look up.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>default</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Value to return if the axis is not found.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>The matching RoiSlice, or the default value if no slice with</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>the given axis name exists.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">199</span>
-<span class="normal">200</span>
-<span class="normal">201</span>
-<span class="normal">202</span>
-<span class="normal">203</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiSlice</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">335</span>
+<span class="normal">336</span>
+<span class="normal">337</span>
+<span class="normal">338</span>
+<span class="normal">339</span>
+<span class="normal">340</span>
+<span class="normal">341</span>
+<span class="normal">342</span>
+<span class="normal">343</span>
+<span class="normal">344</span>
+<span class="normal">345</span>
+<span class="normal">346</span>
+<span class="normal">347</span>
+<span class="normal">348</span>
+<span class="normal">349</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">default</span><span class="p">:</span> <span class="n">RoiSlice</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">RoiSlice</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the RoiSlice for a given axis, or None if not present.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        axis_name: Name of the axis to look up.</span>
+<span class="sd">        default: Value to return if the axis is not found.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The matching RoiSlice, or the default value if no slice with</span>
+<span class="sd">        the given axis name exists.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">for</span> <span class="n">roi_slice</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slices</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">roi_slice</span><span class="o">.</span><span class="n">axis_name</span> <span class="o">==</span> <span class="n">axis_name</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">roi_slice</span>
-    <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="n">default</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3742,15 +3964,44 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Return a display name for this ROI.</p>
+<p>Falls back to the string label, then a full repr, when name is None.</p>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="str">str</span></code>
+          –
+          <div class="doc-md-description">
+            <p>The ROI name, label as string, or a repr string.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">205</span>
-<span class="normal">206</span>
-<span class="normal">207</span>
-<span class="normal">208</span>
-<span class="normal">209</span>
-<span class="normal">210</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">351</span>
+<span class="normal">352</span>
+<span class="normal">353</span>
+<span class="normal">354</span>
+<span class="normal">355</span>
+<span class="normal">356</span>
+<span class="normal">357</span>
+<span class="normal">358</span>
+<span class="normal">359</span>
+<span class="normal">360</span>
+<span class="normal">361</span>
+<span class="normal">362</span>
+<span class="normal">363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return a display name for this ROI.</span>
+
+<span class="sd">    Falls back to the string label, then a full repr, when name is None.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        The ROI name, label as string, or a repr string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">name</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">label</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -3775,27 +4026,108 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Return the per-axis intersection of this ROI and other, or None.</p>
+<p>Axes present in both ROIs are intersected; axes present in only one
+are kept as-is. Returns None if any shared axis has no overlap.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="typing.Self">Self</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Another Roi in the same coordinate space.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi representing the intersection, or None if the ROIs</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>do not overlap.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the two ROIs are in different coordinate
+spaces, or if the labels conflict.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">236</span>
-<span class="normal">237</span>
-<span class="normal">238</span>
-<span class="normal">239</span>
-<span class="normal">240</span>
-<span class="normal">241</span>
-<span class="normal">242</span>
-<span class="normal">243</span>
-<span class="normal">244</span>
-<span class="normal">245</span>
-<span class="normal">246</span>
-<span class="normal">247</span>
-<span class="normal">248</span>
-<span class="normal">249</span>
-<span class="normal">250</span>
-<span class="normal">251</span>
-<span class="normal">252</span>
-<span class="normal">253</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">intersection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">389</span>
+<span class="normal">390</span>
+<span class="normal">391</span>
+<span class="normal">392</span>
+<span class="normal">393</span>
+<span class="normal">394</span>
+<span class="normal">395</span>
+<span class="normal">396</span>
+<span class="normal">397</span>
+<span class="normal">398</span>
+<span class="normal">399</span>
+<span class="normal">400</span>
+<span class="normal">401</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span>
+<span class="normal">406</span>
+<span class="normal">407</span>
+<span class="normal">408</span>
+<span class="normal">409</span>
+<span class="normal">410</span>
+<span class="normal">411</span>
+<span class="normal">412</span>
+<span class="normal">413</span>
+<span class="normal">414</span>
+<span class="normal">415</span>
+<span class="normal">416</span>
+<span class="normal">417</span>
+<span class="normal">418</span>
+<span class="normal">419</span>
+<span class="normal">420</span>
+<span class="normal">421</span>
+<span class="normal">422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">intersection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the per-axis intersection of this ROI and other, or None.</span>
+
+<span class="sd">    Axes present in both ROIs are intersected; axes present in only one</span>
+<span class="sd">    are kept as-is. Returns None if any shared axis has no overlap.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: Another Roi in the same coordinate space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi representing the intersection, or None if the ROIs</span>
+<span class="sd">        do not overlap.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the two ROIs are in different coordinate</span>
+<span class="sd">            spaces, or if the labels conflict.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">space</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
             <span class="s2">&quot;Roi intersection failed: One ROI is in pixel space and the &quot;</span>
@@ -3832,27 +4164,99 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Return the per-axis union (bounding box) of this ROI and other.</p>
+<p>Axes present in both ROIs are unioned; axes present in only one are
+kept as-is.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><span title="typing.Self">Self</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Another Roi in the same coordinate space.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi whose slices span the combined extent of both inputs.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the two ROIs are in different coordinate
+spaces, or if the labels conflict.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">255</span>
-<span class="normal">256</span>
-<span class="normal">257</span>
-<span class="normal">258</span>
-<span class="normal">259</span>
-<span class="normal">260</span>
-<span class="normal">261</span>
-<span class="normal">262</span>
-<span class="normal">263</span>
-<span class="normal">264</span>
-<span class="normal">265</span>
-<span class="normal">266</span>
-<span class="normal">267</span>
-<span class="normal">268</span>
-<span class="normal">269</span>
-<span class="normal">270</span>
-<span class="normal">271</span>
-<span class="normal">272</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">424</span>
+<span class="normal">425</span>
+<span class="normal">426</span>
+<span class="normal">427</span>
+<span class="normal">428</span>
+<span class="normal">429</span>
+<span class="normal">430</span>
+<span class="normal">431</span>
+<span class="normal">432</span>
+<span class="normal">433</span>
+<span class="normal">434</span>
+<span class="normal">435</span>
+<span class="normal">436</span>
+<span class="normal">437</span>
+<span class="normal">438</span>
+<span class="normal">439</span>
+<span class="normal">440</span>
+<span class="normal">441</span>
+<span class="normal">442</span>
+<span class="normal">443</span>
+<span class="normal">444</span>
+<span class="normal">445</span>
+<span class="normal">446</span>
+<span class="normal">447</span>
+<span class="normal">448</span>
+<span class="normal">449</span>
+<span class="normal">450</span>
+<span class="normal">451</span>
+<span class="normal">452</span>
+<span class="normal">453</span>
+<span class="normal">454</span>
+<span class="normal">455</span>
+<span class="normal">456</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="n">Self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the per-axis union (bounding box) of this ROI and other.</span>
+
+<span class="sd">    Axes present in both ROIs are unioned; axes present in only one are</span>
+<span class="sd">    kept as-is.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: Another Roi in the same coordinate space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi whose slices span the combined extent of both inputs.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the two ROIs are in different coordinate</span>
+<span class="sd">            spaces, or if the labels conflict.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span> <span class="o">!=</span> <span class="n">other</span><span class="o">.</span><span class="n">space</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span>
             <span class="s2">&quot;Roi union failed: One ROI is in pixel space and the &quot;</span>
@@ -3892,21 +4296,81 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Expand or shrink the ROI symmetrically along the specified axes.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>zoom_factor</code></b>
+              (<code><span title="float">float</span></code>, default:
+                  <code>1.0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Multiplicative scale applied to the length of each
+selected slice. Must be strictly positive.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>axes</code></b>
+              (<code><span title="tuple">tuple</span>[<span title="str">str</span>, ...]</code>, default:
+                  <code>(&#39;x&#39;, &#39;y&#39;)</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Names of the axes to zoom. Defaults to ("x", "y").</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi with the zoom applied to the selected axes.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">274</span>
-<span class="normal">275</span>
-<span class="normal">276</span>
-<span class="normal">277</span>
-<span class="normal">278</span>
-<span class="normal">279</span>
-<span class="normal">280</span>
-<span class="normal">281</span>
-<span class="normal">282</span>
-<span class="normal">283</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">458</span>
+<span class="normal">459</span>
+<span class="normal">460</span>
+<span class="normal">461</span>
+<span class="normal">462</span>
+<span class="normal">463</span>
+<span class="normal">464</span>
+<span class="normal">465</span>
+<span class="normal">466</span>
+<span class="normal">467</span>
+<span class="normal">468</span>
+<span class="normal">469</span>
+<span class="normal">470</span>
+<span class="normal">471</span>
+<span class="normal">472</span>
+<span class="normal">473</span>
+<span class="normal">474</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span> <span class="n">zoom_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">axes</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;x&quot;</span><span class="p">,</span> <span class="s2">&quot;y&quot;</span><span class="p">)</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Expand or shrink the ROI symmetrically along the specified axes.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        zoom_factor: Multiplicative scale applied to the length of each</span>
+<span class="sd">            selected slice. Must be strictly positive.</span>
+<span class="sd">        axes: Names of the axes to zoom. Defaults to (&quot;x&quot;, &quot;y&quot;).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi with the zoom applied to the selected axes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">new_slices</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">roi_slice</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slices</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">roi_slice</span><span class="o">.</span><span class="n">axis_name</span> <span class="ow">in</span> <span class="n">axes</span><span class="p">:</span>
@@ -3933,21 +4397,95 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert the ROI to world (physical) coordinate space.</p>
+<p>If the ROI is already in world space, a copy is returned unchanged.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PixelSize&lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.PixelSize&lt;/code&gt;)" href="../ngio/#ngio.PixelSize">PixelSize</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Per-axis pixel sizes used for the conversion.
+Required when the ROI is currently in pixel space.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi with all slices expressed in world units.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the ROI is in pixel space and pixel_size is
+not provided.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">285</span>
-<span class="normal">286</span>
-<span class="normal">287</span>
-<span class="normal">288</span>
-<span class="normal">289</span>
-<span class="normal">290</span>
-<span class="normal">291</span>
-<span class="normal">292</span>
-<span class="normal">293</span>
-<span class="normal">294</span>
-<span class="normal">295</span>
-<span class="normal">296</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">479</span>
+<span class="normal">480</span>
+<span class="normal">481</span>
+<span class="normal">482</span>
+<span class="normal">483</span>
+<span class="normal">484</span>
+<span class="normal">485</span>
+<span class="normal">486</span>
+<span class="normal">487</span>
+<span class="normal">488</span>
+<span class="normal">489</span>
+<span class="normal">490</span>
+<span class="normal">491</span>
+<span class="normal">492</span>
+<span class="normal">493</span>
+<span class="normal">494</span>
+<span class="normal">495</span>
+<span class="normal">496</span>
+<span class="normal">497</span>
+<span class="normal">498</span>
+<span class="normal">499</span>
+<span class="normal">500</span>
+<span class="normal">501</span>
+<span class="normal">502</span>
+<span class="normal">503</span>
+<span class="normal">504</span>
+<span class="normal">505</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the ROI to world (physical) coordinate space.</span>
+
+<span class="sd">    If the ROI is already in world space, a copy is returned unchanged.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pixel_size: Per-axis pixel sizes used for the conversion.</span>
+<span class="sd">            Required when the ROI is currently in pixel space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi with all slices expressed in world units.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the ROI is in pixel space and pixel_size is</span>
+<span class="sd">            not provided.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span> <span class="o">==</span> <span class="s2">&quot;world&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_copy</span><span class="p">()</span>
     <span class="k">if</span> <span class="n">pixel_size</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -3978,23 +4516,97 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert the ROI to pixel coordinate space.</p>
+<p>If the ROI is already in pixel space, a copy is returned unchanged.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PixelSize&lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.PixelSize&lt;/code&gt;)" href="../ngio/#ngio.PixelSize">PixelSize</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Per-axis pixel sizes used for the conversion.
+Required when the ROI is currently in world space.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi with all slices expressed in pixel units.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the ROI is in world space and pixel_size is
+not provided.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">298</span>
-<span class="normal">299</span>
-<span class="normal">300</span>
-<span class="normal">301</span>
-<span class="normal">302</span>
-<span class="normal">303</span>
-<span class="normal">304</span>
-<span class="normal">305</span>
-<span class="normal">306</span>
-<span class="normal">307</span>
-<span class="normal">308</span>
-<span class="normal">309</span>
-<span class="normal">310</span>
-<span class="normal">311</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">507</span>
+<span class="normal">508</span>
+<span class="normal">509</span>
+<span class="normal">510</span>
+<span class="normal">511</span>
+<span class="normal">512</span>
+<span class="normal">513</span>
+<span class="normal">514</span>
+<span class="normal">515</span>
+<span class="normal">516</span>
+<span class="normal">517</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span>
+<span class="normal">530</span>
+<span class="normal">531</span>
+<span class="normal">532</span>
+<span class="normal">533</span>
+<span class="normal">534</span>
+<span class="normal">535</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the ROI to pixel coordinate space.</span>
+
+<span class="sd">    If the ROI is already in pixel space, a copy is returned unchanged.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pixel_size: Per-axis pixel sizes used for the conversion.</span>
+<span class="sd">            Required when the ROI is currently in world space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi with all slices expressed in pixel units.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the ROI is in world space and pixel_size is</span>
+<span class="sd">            not provided.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">space</span> <span class="o">==</span> <span class="s2">&quot;pixel&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_copy</span><span class="p">()</span>
 
@@ -4029,14 +4641,269 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert the ROI to a dict of axis-name -&gt; slice in pixel space.</p>
+<p>Converts to pixel coordinates first if necessary.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;PixelSize&lt;/span&gt; (&lt;code&gt;ngio.ome_zarr_meta.PixelSize&lt;/code&gt;)" href="../ngio/#ngio.PixelSize">PixelSize</a> | None</code>, default:
+                  <code>None</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Per-axis pixel sizes, required when the ROI is in
+world space.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="dict">dict</span>[<span title="str">str</span>, <span title="slice">slice</span>]</code>
+          –
+          <div class="doc-md-description">
+            <p>A dict mapping each axis name to a Python slice object.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">313</span>
-<span class="normal">314</span>
-<span class="normal">315</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slicing_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">slice</span><span class="p">]:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">537</span>
+<span class="normal">538</span>
+<span class="normal">539</span>
+<span class="normal">540</span>
+<span class="normal">541</span>
+<span class="normal">542</span>
+<span class="normal">543</span>
+<span class="normal">544</span>
+<span class="normal">545</span>
+<span class="normal">546</span>
+<span class="normal">547</span>
+<span class="normal">548</span>
+<span class="normal">549</span>
+<span class="normal">550</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slicing_dict</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="n">PixelSize</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">slice</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert the ROI to a dict of axis-name -&gt; slice in pixel space.</span>
+
+<span class="sd">    Converts to pixel coordinates first if necessary.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pixel_size: Per-axis pixel sizes, required when the ROI is in</span>
+<span class="sd">            world space.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A dict mapping each axis name to a Python slice object.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">roi</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">to_pixel</span><span class="p">(</span><span class="n">pixel_size</span><span class="o">=</span><span class="n">pixel_size</span><span class="p">)</span>
     <span class="k">return</span> <span class="p">{</span><span class="n">roi_slice</span><span class="o">.</span><span class="n">axis_name</span><span class="p">:</span> <span class="n">roi_slice</span><span class="o">.</span><span class="n">to_slice</span><span class="p">()</span> <span class="k">for</span> <span class="n">roi_slice</span> <span class="ow">in</span> <span class="n">roi</span><span class="o">.</span><span class="n">slices</span><span class="p">}</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.common.Roi.update_slice" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">update_slice</span>
+
+
+<a href="#ngio.common.Roi.update_slice" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">update_slice</span><span class="p">(</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">new_slice</span><span class="p">:</span> <span class="n"><span title="ngio.common._roi.SliceValueType">SliceValueType</span></span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="typing.Self">Self</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Replace or add the slice for a given axis.</p>
+<p>If an axis with the given name already exists it is replaced;
+otherwise the new slice is appended.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>name</code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Axis name of the slice to update or add.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>new_slice</code></b>
+              (<code><span title="ngio.common._roi.SliceValueType">SliceValueType</span> | <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>New slice value, accepted by RoiSlice.from_value.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi with the updated slice list.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>ngio/common/_roi.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">552</span>
+<span class="normal">553</span>
+<span class="normal">554</span>
+<span class="normal">555</span>
+<span class="normal">556</span>
+<span class="normal">557</span>
+<span class="normal">558</span>
+<span class="normal">559</span>
+<span class="normal">560</span>
+<span class="normal">561</span>
+<span class="normal">562</span>
+<span class="normal">563</span>
+<span class="normal">564</span>
+<span class="normal">565</span>
+<span class="normal">566</span>
+<span class="normal">567</span>
+<span class="normal">568</span>
+<span class="normal">569</span>
+<span class="normal">570</span>
+<span class="normal">571</span>
+<span class="normal">572</span>
+<span class="normal">573</span>
+<span class="normal">574</span>
+<span class="normal">575</span>
+<span class="normal">576</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">update_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">new_slice</span><span class="p">:</span> <span class="n">SliceValueType</span> <span class="o">|</span> <span class="n">RoiSlice</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Replace or add the slice for a given axis.</span>
+
+<span class="sd">    If an axis with the given name already exists it is replaced;</span>
+<span class="sd">    otherwise the new slice is appended.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Axis name of the slice to update or add.</span>
+<span class="sd">        new_slice: New slice value, accepted by RoiSlice.from_value.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi with the updated slice list.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_roi_slice</span> <span class="o">=</span> <span class="n">RoiSlice</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">axis_name</span><span class="o">=</span><span class="n">name</span><span class="p">,</span> <span class="n">value</span><span class="o">=</span><span class="n">new_slice</span><span class="p">)</span>
+    <span class="n">slices</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">found</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="k">for</span> <span class="n">roi_slice</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slices</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">roi_slice</span><span class="o">.</span><span class="n">axis_name</span> <span class="o">==</span> <span class="n">name</span><span class="p">:</span>
+            <span class="n">slices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_roi_slice</span><span class="p">)</span>
+            <span class="n">found</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">slices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">roi_slice</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">found</span><span class="p">:</span>
+        <span class="n">slices</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">new_roi_slice</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;slices&quot;</span><span class="p">:</span> <span class="n">slices</span><span class="p">})</span>
+</code></pre></div></td></tr></table></div>
+            </details>
+    </div>
+
+</div>
+
+<div class="doc doc-object doc-function">
+
+
+<h5 id="ngio.common.Roi.remove_slice" class="doc doc-heading">
+<code class="doc-symbol doc-symbol-heading doc-symbol-method"></code>            <span class="doc doc-object-name doc-function-name">remove_slice</span>
+
+
+<a href="#ngio.common.Roi.remove_slice" class="headerlink" title="Permanent link">&para;</a></h5>
+<div class="doc-signature highlight"><pre><span></span><code><span class="nf">remove_slice</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><span title="typing.Self">Self</span></span>
+</code></pre></div>
+
+    <div class="doc doc-contents ">
+
+        <p>Remove the slice for a given axis.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>name</code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Axis name of the slice to remove.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="typing.Self">Self</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A new Roi with the named slice removed.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If no slice with the given axis name exists.</p>
+          </div>
+        </li>
+    </ul>
+
+
+            <details class="mkdocstrings-source">
+              <summary>Source code in <code>ngio/common/_roi.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">578</span>
+<span class="normal">579</span>
+<span class="normal">580</span>
+<span class="normal">581</span>
+<span class="normal">582</span>
+<span class="normal">583</span>
+<span class="normal">584</span>
+<span class="normal">585</span>
+<span class="normal">586</span>
+<span class="normal">587</span>
+<span class="normal">588</span>
+<span class="normal">589</span>
+<span class="normal">590</span>
+<span class="normal">591</span>
+<span class="normal">592</span>
+<span class="normal">593</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">remove_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove the slice for a given axis.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        name: Axis name of the slice to remove.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new Roi with the named slice removed.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If no slice with the given axis name exists.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">slices</span> <span class="o">=</span> <span class="p">[</span><span class="n">s</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">slices</span> <span class="k">if</span> <span class="n">s</span><span class="o">.</span><span class="n">axis_name</span> <span class="o">!=</span> <span class="n">name</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">slices</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">slices</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Axis &#39;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&#39; not found in ROI slices&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_copy</span><span class="p">(</span><span class="n">update</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;slices&quot;</span><span class="p">:</span> <span class="n">slices</span><span class="p">})</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4067,6 +4934,59 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
               Bases: <code><span title="pydantic.BaseModel">BaseModel</span></code></p>
 
 
+
+        <p>A 1-D slice along a named axis for use within a Region of Interest.</p>
+<p>Represents a contiguous interval [start, start + length) along a
+single named axis. Either bound may be None to indicate an open
+(unbounded) interval.</p>
+
+
+<p><span class="doc-section-title">Attributes:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;axis_name&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.RoiSlice.axis_name&lt;/code&gt;)" href="#ngio.common.RoiSlice.axis_name">axis_name</a></code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Name of the axis this slice applies to (e.g. "x", "y", "z").</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;start&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-class-attribute&quot;&gt;&lt;code&gt;class-attribute&lt;/code&gt;&lt;/small&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.RoiSlice.start&lt;/code&gt;)" href="#ngio.common.RoiSlice.start">start</a></code></b>
+              (<code><span title="float">float</span> | None</code>)
+          –
+          <div class="doc-md-description">
+            <p>Start coordinate of the interval (inclusive). None means
+"from the beginning".</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+          <b><code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-attribute&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-attribute-name&quot;&gt;length&lt;/span&gt;
+
+
+  &lt;span class=&quot;doc doc-labels&quot;&gt;
+      &lt;small class=&quot;doc doc-label doc-label-class-attribute&quot;&gt;&lt;code&gt;class-attribute&lt;/code&gt;&lt;/small&gt;
+      &lt;small class=&quot;doc doc-label doc-label-instance-attribute&quot;&gt;&lt;code&gt;instance-attribute&lt;/code&gt;&lt;/small&gt;
+  &lt;/span&gt; (&lt;code&gt;ngio.common.RoiSlice.length&lt;/code&gt;)" href="#ngio.common.RoiSlice.length">length</a></code></b>
+              (<code><span title="float">float</span> | None</code>)
+          –
+          <div class="doc-md-description">
+            <p>Length of the interval. Must be non-negative. None means
+"to the end".</p>
+          </div>
+        </li>
+    </ul>
 
 
 
@@ -4195,6 +5115,20 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Exclusive end coordinate of the interval.</p>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="float">float</span> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>start + length, or None if either bound is unset.</p>
+          </div>
+        </li>
+    </ul>
+
     </div>
 
 </div>
@@ -4215,43 +5149,127 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
 <a href="#ngio.common.RoiSlice.from_value" class="headerlink" title="Permanent link">&para;</a></h5>
 <div class="doc-signature highlight"><pre><span></span><code><span class="nf">from_value</span><span class="p">(</span>
-    <span class="n">axis_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span>
-    <span class="n">value</span><span class="p">:</span> <span class="n"><span title="float">float</span></span>
-    <span class="o">|</span> <span class="n"><span title="tuple">tuple</span></span><span class="p">[</span><span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n"><span title="float">float</span></span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span>
-    <span class="o">|</span> <span class="n"><span title="slice">slice</span></span><span class="p">,</span>
+    <span class="n">axis_name</span><span class="p">:</span> <span class="n"><span title="str">str</span></span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n"><span title="ngio.common._roi.SliceValueType">SliceValueType</span></span> <span class="o">|</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="n"><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></span>
 </code></pre></div>
 
     <div class="doc doc-contents ">
 
+        <p>Create a RoiSlice from a variety of input types.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>axis_name</code></b>
+              (<code><span title="str">str</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Name of the axis this slice applies to.</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+            <b><code>value</code></b>
+              (<code><span title="ngio.common._roi.SliceValueType">SliceValueType</span> | <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>The interval to represent. Accepted types:
+- slice: converted directly via start / stop.
+- tuple[float | None, float | None]: interpreted as (start, length).
+- int | float: a single-unit interval starting at value (length=1).
+- RoiSlice: returned as-is.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice instance.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="TypeError">TypeError</span></code>
+            –
+          <div class="doc-md-description">
+            <p>If value is not one of the supported types.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span>
+<span class="normal">109</span>
+<span class="normal">110</span>
+<span class="normal">111</span>
+<span class="normal">112</span>
+<span class="normal">113</span>
+<span class="normal">114</span>
+<span class="normal">115</span>
+<span class="normal">116</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">from_value</span><span class="p">(</span>
     <span class="bp">cls</span><span class="p">,</span>
     <span class="n">axis_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
-    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="nb">slice</span><span class="p">,</span>
+    <span class="n">value</span><span class="p">:</span> <span class="s2">&quot;SliceValueType | RoiSlice&quot;</span><span class="p">,</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Create a RoiSlice from a variety of input types.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        axis_name: Name of the axis this slice applies to.</span>
+<span class="sd">        value: The interval to represent. Accepted types:</span>
+<span class="sd">            - slice: converted directly via start / stop.</span>
+<span class="sd">            - tuple[float | None, float | None]: interpreted as (start, length).</span>
+<span class="sd">            - int | float: a single-unit interval starting at value (length=1).</span>
+<span class="sd">            - RoiSlice: returned as-is.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice instance.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        TypeError: If value is not one of the supported types.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">slice</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_from_slice</span><span class="p">(</span><span class="n">axis_name</span><span class="o">=</span><span class="n">axis_name</span><span class="p">,</span> <span class="n">selection</span><span class="o">=</span><span class="n">value</span><span class="p">)</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">axis_name</span><span class="o">=</span><span class="n">axis_name</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">value</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">length</span><span class="o">=</span><span class="n">value</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
     <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">float</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="n">axis_name</span><span class="o">=</span><span class="n">axis_name</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="n">value</span><span class="p">,</span> <span class="n">length</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">RoiSlice</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span>
     <span class="k">else</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unsupported type for slice value: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">value</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
@@ -4273,11 +5291,35 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert to a standard Python slice object.</p>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><span title="slice">slice</span></code>
+          –
+          <div class="doc-md-description">
+            <p>A slice(start, end) representing this interval.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">93</span>
-<span class="normal">94</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">slice</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">132</span>
+<span class="normal">133</span>
+<span class="normal">134</span>
+<span class="normal">135</span>
+<span class="normal">136</span>
+<span class="normal">137</span>
+<span class="normal">138</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_slice</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">slice</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert to a standard Python slice object.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A slice(start, end) representing this interval.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="nb">slice</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">end</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -4298,17 +5340,87 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Return the smallest interval that contains both slices.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Another RoiSlice on the same axis.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice spanning from the minimum start to the maximum</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>end of the two inputs.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the two slices are on different axes.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">102</span>
-<span class="normal">103</span>
-<span class="normal">104</span>
-<span class="normal">105</span>
-<span class="normal">106</span>
-<span class="normal">107</span>
-<span class="normal">108</span>
-<span class="normal">109</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">146</span>
+<span class="normal">147</span>
+<span class="normal">148</span>
+<span class="normal">149</span>
+<span class="normal">150</span>
+<span class="normal">151</span>
+<span class="normal">152</span>
+<span class="normal">153</span>
+<span class="normal">154</span>
+<span class="normal">155</span>
+<span class="normal">156</span>
+<span class="normal">157</span>
+<span class="normal">158</span>
+<span class="normal">159</span>
+<span class="normal">160</span>
+<span class="normal">161</span>
+<span class="normal">162</span>
+<span class="normal">163</span>
+<span class="normal">164</span>
+<span class="normal">165</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">union</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the smallest interval that contains both slices.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: Another RoiSlice on the same axis.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice spanning from the minimum start to the maximum</span>
+<span class="sd">        end of the two inputs.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the two slices are on different axes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_is_compatible</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="s2">&quot;RoiSlice union failed&quot;</span><span class="p">)</span>
     <span class="n">start</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">start</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
     <span class="n">end</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="ow">or</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),</span> <span class="n">other</span><span class="o">.</span><span class="n">end</span> <span class="ow">or</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span>
@@ -4335,20 +5447,90 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Return the overlap between this slice and other, or None.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>other</code></b>
+              (<code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>)
+          –
+          <div class="doc-md-description">
+            <p>Another RoiSlice on the same axis.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice representing the overlapping interval, or None</p>
+          </div>
+        </li>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a> | None</code>
+          –
+          <div class="doc-md-description">
+            <p>if the two slices do not overlap.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If the two slices are on different axes.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">111</span>
-<span class="normal">112</span>
-<span class="normal">113</span>
-<span class="normal">114</span>
-<span class="normal">115</span>
-<span class="normal">116</span>
-<span class="normal">117</span>
-<span class="normal">118</span>
-<span class="normal">119</span>
-<span class="normal">120</span>
-<span class="normal">121</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">intersection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice | None&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">167</span>
+<span class="normal">168</span>
+<span class="normal">169</span>
+<span class="normal">170</span>
+<span class="normal">171</span>
+<span class="normal">172</span>
+<span class="normal">173</span>
+<span class="normal">174</span>
+<span class="normal">175</span>
+<span class="normal">176</span>
+<span class="normal">177</span>
+<span class="normal">178</span>
+<span class="normal">179</span>
+<span class="normal">180</span>
+<span class="normal">181</span>
+<span class="normal">182</span>
+<span class="normal">183</span>
+<span class="normal">184</span>
+<span class="normal">185</span>
+<span class="normal">186</span>
+<span class="normal">187</span>
+<span class="normal">188</span>
+<span class="normal">189</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">intersection</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice | None&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the overlap between this slice and other, or None.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        other: Another RoiSlice on the same axis.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice representing the overlapping interval, or None</span>
+<span class="sd">        if the two slices do not overlap.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If the two slices are on different axes.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">_is_compatible</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="s2">&quot;RoiSlice intersection failed&quot;</span><span class="p">)</span>
     <span class="n">start</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">,</span> <span class="n">other</span><span class="o">.</span><span class="n">start</span> <span class="ow">or</span> <span class="mi">0</span><span class="p">)</span>
     <span class="n">end</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">end</span> <span class="ow">or</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">),</span> <span class="n">other</span><span class="o">.</span><span class="n">end</span> <span class="ow">or</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span>
@@ -4378,17 +5560,60 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert from pixel coordinates to world (physical) coordinates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><span title="float">float</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Physical size of one pixel along this axis.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice with start and length expressed in world units.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">123</span>
-<span class="normal">124</span>
-<span class="normal">125</span>
-<span class="normal">126</span>
-<span class="normal">127</span>
-<span class="normal">128</span>
-<span class="normal">129</span>
-<span class="normal">130</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">191</span>
+<span class="normal">192</span>
+<span class="normal">193</span>
+<span class="normal">194</span>
+<span class="normal">195</span>
+<span class="normal">196</span>
+<span class="normal">197</span>
+<span class="normal">198</span>
+<span class="normal">199</span>
+<span class="normal">200</span>
+<span class="normal">201</span>
+<span class="normal">202</span>
+<span class="normal">203</span>
+<span class="normal">204</span>
+<span class="normal">205</span>
+<span class="normal">206</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_world</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert from pixel coordinates to world (physical) coordinates.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pixel_size: Physical size of one pixel along this axis.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice with start and length expressed in world units.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">start</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">pixel_to_world</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="p">)</span>
@@ -4415,17 +5640,60 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Convert from world (physical) coordinates to pixel coordinates.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>pixel_size</code></b>
+              (<code><span title="float">float</span></code>)
+          –
+          <div class="doc-md-description">
+            <p>Physical size of one pixel along this axis.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice with start and length expressed in pixel units.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">132</span>
-<span class="normal">133</span>
-<span class="normal">134</span>
-<span class="normal">135</span>
-<span class="normal">136</span>
-<span class="normal">137</span>
-<span class="normal">138</span>
-<span class="normal">139</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">208</span>
+<span class="normal">209</span>
+<span class="normal">210</span>
+<span class="normal">211</span>
+<span class="normal">212</span>
+<span class="normal">213</span>
+<span class="normal">214</span>
+<span class="normal">215</span>
+<span class="normal">216</span>
+<span class="normal">217</span>
+<span class="normal">218</span>
+<span class="normal">219</span>
+<span class="normal">220</span>
+<span class="normal">221</span>
+<span class="normal">222</span>
+<span class="normal">223</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">to_pixel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Convert from world (physical) coordinates to pixel coordinates.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        pixel_size: Physical size of one pixel along this axis.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice with start and length expressed in pixel units.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">start</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">world_to_pixel</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">start</span><span class="p">,</span> <span class="n">pixel_size</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">start</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
     <span class="p">)</span>
@@ -4452,20 +5720,97 @@ such as shape, axes, and properties like is_2d, is_3d, is_time_series, etc.</p>
 
     <div class="doc doc-contents ">
 
+        <p>Expand or shrink the slice symmetrically around its centre.</p>
+<p>A zoom_factor greater than 1 enlarges the interval; less than 1
+shrinks it. The centre of the interval is preserved, and the start
+is clamped to 0.</p>
+
+
+<p><span class="doc-section-title">Parameters:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+            <b><code>zoom_factor</code></b>
+              (<code><span title="float">float</span></code>, default:
+                  <code>1.0</code>
+)
+          –
+          <div class="doc-md-description">
+            <p>Multiplicative scale applied to the length.
+Must be strictly positive.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Returns:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;RoiSlice&lt;/span&gt; (&lt;code&gt;ngio.common._roi.RoiSlice&lt;/code&gt;)" href="#ngio.common.RoiSlice">RoiSlice</a></code>
+          –
+          <div class="doc-md-description">
+            <p>A new RoiSlice with the adjusted interval.</p>
+          </div>
+        </li>
+    </ul>
+
+
+<p><span class="doc-section-title">Raises:</span></p>
+    <ul>
+        <li class="doc-section-item field-body">
+              <code><a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;NgioValueError&lt;/span&gt; (&lt;code&gt;ngio.utils.NgioValueError&lt;/code&gt;)" href="../utils/#ngio.utils.NgioValueError">NgioValueError</a></code>
+            –
+          <div class="doc-md-description">
+            <p>If zoom_factor is not greater than 0.</p>
+          </div>
+        </li>
+    </ul>
+
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/common/_roi.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">141</span>
-<span class="normal">142</span>
-<span class="normal">143</span>
-<span class="normal">144</span>
-<span class="normal">145</span>
-<span class="normal">146</span>
-<span class="normal">147</span>
-<span class="normal">148</span>
-<span class="normal">149</span>
-<span class="normal">150</span>
-<span class="normal">151</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">zoom_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">225</span>
+<span class="normal">226</span>
+<span class="normal">227</span>
+<span class="normal">228</span>
+<span class="normal">229</span>
+<span class="normal">230</span>
+<span class="normal">231</span>
+<span class="normal">232</span>
+<span class="normal">233</span>
+<span class="normal">234</span>
+<span class="normal">235</span>
+<span class="normal">236</span>
+<span class="normal">237</span>
+<span class="normal">238</span>
+<span class="normal">239</span>
+<span class="normal">240</span>
+<span class="normal">241</span>
+<span class="normal">242</span>
+<span class="normal">243</span>
+<span class="normal">244</span>
+<span class="normal">245</span>
+<span class="normal">246</span>
+<span class="normal">247</span>
+<span class="normal">248</span>
+<span class="normal">249</span>
+<span class="normal">250</span>
+<span class="normal">251</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">zoom</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">zoom_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;RoiSlice&quot;</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Expand or shrink the slice symmetrically around its centre.</span>
+
+<span class="sd">    A zoom_factor greater than 1 enlarges the interval; less than 1</span>
+<span class="sd">    shrinks it. The centre of the interval is preserved, and the start</span>
+<span class="sd">    is clamped to 0.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        zoom_factor: Multiplicative scale applied to the length.</span>
+<span class="sd">            Must be strictly positive.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        A new RoiSlice with the adjusted interval.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">        NgioValueError: If zoom_factor is not greater than 0.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">zoom_factor</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
         <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Zoom factor must be greater than 0&quot;</span><span class="p">)</span>
     <span class="n">zoom_factor</span> <span class="o">-=</span> <span class="mf">1.0</span>
