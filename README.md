@@ -63,7 +63,6 @@ We follow [Semantic Versioning](https://semver.org/). Which means for 0.x releas
 
 ### Upcoming Features
 
-- Support for OME-Zarr v0.5 and Zarr v3 (via `zarr-python` v3)
 - Enhanced performance optimizations (parallel iterators, optimized io strategies)
 
 ## Contributors
