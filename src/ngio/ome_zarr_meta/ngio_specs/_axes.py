@@ -1,7 +1,7 @@
 """Fractal internal module for axes handling."""
 
 from collections.abc import Sequence
-from enum import Enum
+from enum import StrEnum
 from typing import Literal, TypeAlias, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -21,7 +21,7 @@ SlicingType: TypeAlias = slice | tuple[int, ...] | int
 #################################################################################################
 
 
-class AxisType(str, Enum):
+class AxisType(StrEnum):
     """Allowed axis types."""
 
     channel = "channel"

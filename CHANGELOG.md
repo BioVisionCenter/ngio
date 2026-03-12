@@ -2,6 +2,9 @@
 
 ## [v0.5.5]
 
+### Fix
+- Fix shape compatibility check in `_check_compatibility_of_shapes`: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.
+
 ### Features
 - `Roi` now supports dict-like slice access: `roi["x"]` returns the slice for axis `"x"` and raises `KeyError` if the axis is not present.
 - `Roi.get(axis_name, default=None)` now accepts an explicit `default` value, following the `dict.get` convention.
