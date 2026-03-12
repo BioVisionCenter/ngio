@@ -301,7 +301,7 @@ def _ngio_to_v05_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
     v05_datasets = []
     for dataset in datasets:
         transform = [VectorScaleV05(type="scale", scale=list(dataset._scale))]
-        if sum(dataset._translation) > 0:
+        if any(abs(t) > 1e-9 for t in dataset._translation):
             transform = (
                 VectorScaleV05(type="scale", scale=list(dataset._scale)),
                 VectorTranslationV05(
