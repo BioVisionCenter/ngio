@@ -175,12 +175,50 @@ def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Arr
     return da_array[slicing_tuple]
 
 
+def _check_compatibility_of_shapes(
+    shape_zarr: tuple[int, ...],
+    shape_patch: tuple[int, ...],
+    slice_tuple: tuple[SlicingType, ...],
+) -> None:
+    """Check the compatibility zarr array (slices) and the patch."""
+    expected_shape = []
+    for sl, sh in zip(slice_tuple, shape_zarr, strict=True):
+        if isinstance(sl, slice):
+            start, stop, step = sl.start, sl.stop, sl.step
+            if start is None:
+                start = 0
+            if stop is None:
+                stop = sh
+            expected_dim = math.ceil((stop - start) / (step or 1))
+        elif isinstance(sl, int):
+            continue  # int index reduces rank; not included in expected shape
+        elif isinstance(sl, list):
+            expected_dim = len(sl)
+        else:
+            raise NgioValueError(
+                f"Invalid slice {sl} of type {type(sl)} in slicing tuple\n"
+                f"{slice_tuple}. Allowed types are: int, slice or list of int."
+            )
+        expected_shape.append(expected_dim)
+
+    expected_shape = tuple(expected_shape)
+    if expected_shape != shape_patch:
+        raise NgioValueError(
+            f"Incompatible shapes for patch and slice.\n"
+            f"- Patch shape: {shape_patch}\n"
+            f"- Zarr array shape: {shape_zarr}\n"
+            f"- Slice tuple: {slice_tuple}\n"
+            f"- Expected shape: {shape_zarr}[{slice_tuple}] {expected_shape}\n"
+        )
+
+
 def set_slice_as_numpy(
     zarr_array: zarr.Array,
     patch: np.ndarray,
     slicing_ops: SlicingOps,
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
+    _check_compatibility_of_shapes(zarr_array.shape, patch.shape, slice_tuple)
     zarr_array[slice_tuple] = patch
 
 
@@ -204,6 +242,7 @@ def set_slice_as_dask(
     zarr_array: zarr.Array, patch: da.Array, slicing_ops: SlicingOps
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
+    _check_compatibility_of_shapes(zarr_array.shape, patch.shape, slice_tuple)
     ax, first_tuple = _check_list_in_slicing_tuple(slice_tuple)
     patch, slice_tuple = handle_int_set_as_dask(patch, slice_tuple)
     if ax is None:

@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.5.6]
+
+### Fix
+- Fix translation check in `_ngio_to_v04_multiscale` and `_ngio_to_v05_multiscale`: translations were incorrectly dropped when all values were negative or when positive and negative values cancelled out.
+- Fix shape compatibility check in `_check_compatibility_of_shapes`: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.
+
 ## [v0.5.5]
 
 ### Features

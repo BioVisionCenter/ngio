@@ -5,7 +5,7 @@ Stores the same information as the Omero section of the ngff 0.4 metadata.
 
 from collections.abc import Sequence
 from difflib import SequenceMatcher
-from enum import Enum
+from enum import StrEnum
 from typing import Any, TypeVar
 
 import numpy as np
@@ -22,7 +22,7 @@ from ngio.utils import NgioValidationError, NgioValueError
 #################################################################################################
 
 
-class NgioColors(str, Enum):
+class NgioColors(StrEnum):
     """Default colors for the channels."""
 
     dapi = "0000FF"

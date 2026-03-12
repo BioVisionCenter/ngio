@@ -26,7 +26,7 @@ TEST_TABLE.set_index("label", inplace=True)
 
 def set_to_image(ome_zarr: OmeZarrContainer) -> OmeZarrContainer:
     """Create and return an empty OME-Zarr container in the given store."""
-    image = ome_zarr.get_image(path="1")
+    image = ome_zarr.get_image(path="0")
     image.set_array(patch=TEST_IMAGE)
     image.consolidate()
     return ome_zarr
