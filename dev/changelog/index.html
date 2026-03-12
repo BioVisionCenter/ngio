@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../images/favicon.ico">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.4">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
     
     
       
@@ -1747,6 +1747,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#v056" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [v0.5.6]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.6]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v055" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1798,7 +1826,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fix_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -1826,7 +1854,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_1" class="md-nav__link">
+  <a href="#fix_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -1854,7 +1882,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_2" class="md-nav__link">
+  <a href="#fix_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -1882,7 +1910,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_3" class="md-nav__link">
+  <a href="#fix_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2484,6 +2512,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#v056" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [v0.5.6]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.6]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v055" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2535,7 +2591,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fix_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2563,7 +2619,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_1" class="md-nav__link">
+  <a href="#fix_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2591,7 +2647,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_2" class="md-nav__link">
+  <a href="#fix_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -2619,7 +2675,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix_3" class="md-nav__link">
+  <a href="#fix_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Fix
@@ -3126,6 +3182,12 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="v056">[v0.5.6]<a class="headerlink" href="#v056" title="Permanent link">&para;</a></h2>
+<h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix translation check in <code>_ngio_to_v04_multiscale</code> and <code>_ngio_to_v05_multiscale</code>: translations were incorrectly dropped when all values were negative or when positive and negative values cancelled out.</li>
+<li>Fix shape compatibility check in <code>_check_compatibility_of_shapes</code>: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.</li>
+</ul>
 <h2 id="v055">[v0.5.5]<a class="headerlink" href="#v055" title="Permanent link">&para;</a></h2>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3139,24 +3201,24 @@
 <li>Pin <code>mkdocs</code> to version &lt;2.0 to avoid build errors in CI due to breaking changes in mkdocs v2, and incompatibility with material design theme.</li>
 </ul>
 <h2 id="054">[0.5.4]<a class="headerlink" href="#054" title="Permanent link">&para;</a></h2>
-<h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Remove file locking remove in <code>ZarrGroupHandler</code>, which was not used anywhere and is unnecessary in new lockfile release.</li>
 <li>Correctly set Zarr array dtype to array dtype in <code>create_ome_zarr_from_array</code></li>
 </ul>
 <h2 id="053">[0.5.3]<a class="headerlink" href="#053" title="Permanent link">&para;</a></h2>
-<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
+<h3 id="fix_2">Fix<a class="headerlink" href="#fix_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix bug in AnnData backend where "raw" entry with encoding-type "null" is written by default in newer anndata versions, which causes compatibility issues with older anndata versions. Now the "raw" entry is removed after writing if it has encoding-type "null".</li>
 </ul>
 <h2 id="052">[0.5.2]<a class="headerlink" href="#052" title="Permanent link">&para;</a></h2>
-<h3 id="fix_2">Fix<a class="headerlink" href="#fix_2" title="Permanent link">&para;</a></h3>
+<h3 id="fix_3">Fix<a class="headerlink" href="#fix_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix critical bug in masking roi image handling causing incorrect results when image and mask have different pixel sizes.</li>
 <li>Fix bug in loading masking roi images when paths other than default are used.</li>
 </ul>
 <h2 id="051">[0.5.1]<a class="headerlink" href="#051" title="Permanent link">&para;</a></h2>
-<h3 id="fix_3">Fix<a class="headerlink" href="#fix_3" title="Permanent link">&para;</a></h3>
+<h3 id="fix_4">Fix<a class="headerlink" href="#fix_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix bug causing incorrect channel metadata when creating an image.</li>
 <li>Fix correctly setting the space and time units when creating an image.</li>
