@@ -2698,6 +2698,8 @@ mode (Literal["label", "wavelength_id", "index"]): Specifies how to
 
     <div class="doc doc-contents ">
 
+        <p>The mode to use for channel selection. Can be "label", "wavelength_id", or "index".</p>
+
     </div>
 
 </div>
@@ -2719,6 +2721,12 @@ mode (Literal["label", "wavelength_id", "index"]): Specifies how to
 </code></pre></div>
 
     <div class="doc doc-contents ">
+
+        <p>The identifier for the channel selection. The interpretation of this field depends
+on the mode:
+- If mode is "label", this should be the channel label.
+- If mode is "wavelength_id", this should be the wavelength ID of the channel.
+- If mode is "index", this should be the index of the channel (must be an integer).</p>
 
     </div>
 
@@ -2743,16 +2751,16 @@ mode (Literal["label", "wavelength_id", "index"]): Specifies how to
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>ngio/images/_image.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">75</span>
+<span class="normal">76</span>
+<span class="normal">77</span>
+<span class="normal">78</span>
+<span class="normal">79</span>
+<span class="normal">80</span>
+<span class="normal">81</span>
+<span class="normal">82</span>
+<span class="normal">83</span>
+<span class="normal">84</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">check_channel_selection</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;index&quot;</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>

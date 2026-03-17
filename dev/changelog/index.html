@@ -1747,6 +1747,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v056" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1759,10 +1787,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fixes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fix
+        Fixes
       
     </span>
   </a>
@@ -2512,6 +2540,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fix
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v056" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2524,10 +2580,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fix" class="md-nav__link">
+  <a href="#fixes" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fix
+        Fixes
       
     </span>
   </a>
@@ -3182,8 +3238,13 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="v056">[v0.5.6]<a class="headerlink" href="#v056" title="Permanent link">&para;</a></h2>
+<h2 id="unreleased">[unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add docstrings to <code>ChannelSelectionModel</code> to allow for correct json schema generation.</li>
+</ul>
+<h2 id="v056">[v0.5.6]<a class="headerlink" href="#v056" title="Permanent link">&para;</a></h2>
+<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix translation check in <code>_ngio_to_v04_multiscale</code> and <code>_ngio_to_v05_multiscale</code>: translations were incorrectly dropped when all values were negative or when positive and negative values cancelled out.</li>
 <li>Fix shape compatibility check in <code>_check_compatibility_of_shapes</code>: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.</li>
