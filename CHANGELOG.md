@@ -1,6 +1,6 @@
 # Changelog
 
-## [unreleased]
+## [v0.5.7]
 
 ### Fix
 - Add docstrings to `ChannelSelectionModel` to allow for correct json schema generation.
