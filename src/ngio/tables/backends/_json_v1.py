@@ -90,3 +90,12 @@ class JsonTableBackend(AbstractTableBackend):
 
         table_dict = table.to_dict(as_series=False)
         self._write_from_dict(table=table_dict)
+
+
+class JsonTableBackendFC(JsonTableBackend):
+    """Forwards compatible version of the JSON backend."""
+
+    @staticmethod
+    def backend_name() -> str:
+        """Return the name of the backend."""
+        return "json"

@@ -7,9 +7,9 @@ from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
 
-from ngio.tables.backends._anndata_v1 import AnnDataBackend
-from ngio.tables.backends._csv_v1 import CsvTableBackend
-from ngio.tables.backends._json_v1 import JsonTableBackend
+from ngio.tables.backends._anndata_v1 import AnnDataBackend, AnnDataBackendFC
+from ngio.tables.backends._csv_v1 import CsvTableBackend, CsvTableBackendFC
+from ngio.tables.backends._json_v1 import JsonTableBackend, JsonTableBackendFC
 from ngio.utils import NgioValueError, ZarrGroupHandler
 
 
@@ -180,3 +180,6 @@ class ImplementedTableBackends:
 ImplementedTableBackends().add_backend(AnnDataBackend)
 ImplementedTableBackends().add_backend(JsonTableBackend)
 ImplementedTableBackends().add_backend(CsvTableBackend)
+ImplementedTableBackends().add_backend(AnnDataBackendFC)
+ImplementedTableBackends().add_backend(JsonTableBackendFC)
+ImplementedTableBackends().add_backend(CsvTableBackendFC)

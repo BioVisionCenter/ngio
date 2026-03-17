@@ -24,6 +24,9 @@ def test_backend_manager(tmp_path: Path):
         "experimental_json_v1",
         "anndata_v1",
         "experimental_csv_v1",
+        "json",
+        "anndata",
+        "csv",
     }
     manager.add_backend(JsonTableBackend, overwrite=True)
 
@@ -32,11 +35,17 @@ def test_backend_manager(tmp_path: Path):
         "experimental_json_v1",
         "anndata_v1",
         "experimental_csv_v1",
+        "json",
+        "anndata",
+        "csv",
     }
     assert set(manager.available_backends) == {
         "experimental_json_v1",
         "anndata_v1",
         "experimental_csv_v1",
+        "json",
+        "anndata",
+        "csv",
     }
 
     store = tmp_path / "test_backend_manager.zarr"

@@ -71,3 +71,12 @@ class AnnDataBackend(AbstractTableBackend):
             index_key=self.index_key,
         )
         self.write_from_anndata(anndata)
+
+
+class AnnDataBackendFC(AnnDataBackend):
+    """Forwards compatible version of the AnnData backend."""
+
+    @staticmethod
+    def backend_name() -> str:
+        """Return the name of the backend."""
+        return "anndata"

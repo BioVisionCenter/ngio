@@ -160,3 +160,12 @@ class CsvTableBackend(AbstractTableBackend):
         full_url = self._get_store_url()
         csv_path = f"{full_url}/{self.csv_name}"
         table.write_csv(csv_path)
+
+
+class CsvTableBackendFC(CsvTableBackend):
+    """Forwards compatible version of the CSV backend."""
+
+    @staticmethod
+    def backend_name() -> str:
+        """Return the name of the backend."""
+        return "csv"
