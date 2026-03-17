@@ -59,7 +59,18 @@ class ChannelSelectionModel(BaseModel):
     """
 
     mode: Literal["label", "wavelength_id", "index"] = "label"
+    """
+    The mode to use for channel selection. Can be "label", "wavelength_id", or "index".
+    """
+
     identifier: str
+    """
+    The identifier for the channel selection. The interpretation of this field depends
+    on the mode:
+    - If mode is "label", this should be the channel label.
+    - If mode is "wavelength_id", this should be the wavelength ID of the channel.
+    - If mode is "index", this should be the index of the channel (must be an integer).
+    """
 
     @model_validator(mode="after")
     def check_channel_selection(self):
@@ -1017,7 +1028,7 @@ def compute_image_percentile(
         # compute the percentiles
         _s_perc, _e_perc = da.percentile(
             data, [start_percentile, end_percentile], method="nearest"
-        ).compute()  # type: ignore (return type is a tuple of floats)
+        ).compute()
 
         starts_and_ends.append((float(_s_perc), float(_e_perc)))
     return starts_and_ends
