@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/api/tables/">
+        <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/table_specs/overview/">
       
       
-        <link rel="prev" href="../hcs/">
+        <link rel="prev" href="../../tutorials/hcs_exploration/">
       
       
-        <link rel="next" href="../iterators/">
+        <link rel="next" href="../backend/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Tables - NGIO: Next Generation File Format I/O</title>
+        <title>Overview - NGIO: Next Generation File Format I/O</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#ngio-tables-api-documentation" class="md-skip">
+        <a href="#tables-overview" class="md-skip">
           Skip to content
         </a>
       
@@ -124,7 +124,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Tables
+              Overview
             
           </span>
         </div>
@@ -783,8 +783,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -803,11 +805,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
@@ -828,7 +830,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -843,10 +845,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../table_specs/overview/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -862,6 +891,98 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-table-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Table Backends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-in-memory-table-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. In-Memory Table Objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-table-type-specifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Table Type Specifications
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tables-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables Groups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tables-group-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables Group Attributes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -874,7 +995,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/backend/" class="md-nav__link">
+      <a href="../backend/" class="md-nav__link">
         
   
   
@@ -965,7 +1086,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/generic_table/" class="md-nav__link">
+      <a href="../table_types/generic_table/" class="md-nav__link">
         
   
   
@@ -993,7 +1114,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/roi_table/" class="md-nav__link">
+      <a href="../table_types/roi_table/" class="md-nav__link">
         
   
   
@@ -1021,7 +1142,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/masking_roi_table/" class="md-nav__link">
+      <a href="../table_types/masking_roi_table/" class="md-nav__link">
         
   
   
@@ -1049,7 +1170,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/feature_table/" class="md-nav__link">
+      <a href="../table_types/feature_table/" class="md-nav__link">
         
   
   
@@ -1077,7 +1198,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/condition_table/" class="md-nav__link">
+      <a href="../table_types/condition_table/" class="md-nav__link">
         
   
   
@@ -1105,7 +1226,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../table_specs/table_types/custom_table/" class="md-nav__link">
+      <a href="../table_types/custom_table/" class="md-nav__link">
         
   
   
@@ -1145,10 +1266,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1175,11 +1294,11 @@
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
           <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
@@ -1200,7 +1319,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1218,7 +1337,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ome_zarr_container/" class="md-nav__link">
+      <a href="../../api/ome_zarr_container/" class="md-nav__link">
         
   
   
@@ -1246,7 +1365,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../images/" class="md-nav__link">
+      <a href="../../api/images/" class="md-nav__link">
         
   
   
@@ -1274,7 +1393,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../hcs/" class="md-nav__link">
+      <a href="../../api/hcs/" class="md-nav__link">
         
   
   
@@ -1299,19 +1418,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../api/tables/" class="md-nav__link">
         
   
   
@@ -1327,7 +1437,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -1340,7 +1449,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../iterators/" class="md-nav__link">
+      <a href="../../api/iterators/" class="md-nav__link">
         
   
   
@@ -1437,7 +1546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/ngio/" class="md-nav__link">
+      <a href="../../api/ngio/ngio/" class="md-nav__link">
         
   
   
@@ -1465,7 +1574,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/common/" class="md-nav__link">
+      <a href="../../api/ngio/common/" class="md-nav__link">
         
   
   
@@ -1493,7 +1602,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/io_pipes/" class="md-nav__link">
+      <a href="../../api/ngio/io_pipes/" class="md-nav__link">
         
   
   
@@ -1521,7 +1630,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/iterators/" class="md-nav__link">
+      <a href="../../api/ngio/iterators/" class="md-nav__link">
         
   
   
@@ -1549,7 +1658,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/images/" class="md-nav__link">
+      <a href="../../api/ngio/images/" class="md-nav__link">
         
   
   
@@ -1577,7 +1686,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/tables/" class="md-nav__link">
+      <a href="../../api/ngio/tables/" class="md-nav__link">
         
   
   
@@ -1605,7 +1714,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/hcs/" class="md-nav__link">
+      <a href="../../api/ngio/hcs/" class="md-nav__link">
         
   
   
@@ -1633,7 +1742,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/transforms/" class="md-nav__link">
+      <a href="../../api/ngio/transforms/" class="md-nav__link">
         
   
   
@@ -1661,7 +1770,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../ngio/utils/" class="md-nav__link">
+      <a href="../../api/ngio/utils/" class="md-nav__link">
         
   
   
@@ -1866,6 +1975,86 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-table-backends" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Table Backends
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-in-memory-table-objects" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. In-Memory Table Objects
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-table-type-specifications" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Table Type Specifications
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tables-groups" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables Groups
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tables-group-attributes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tables Group Attributes
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1907,10 +2096,10 @@
     
     
       <li class="md-path__item">
-        <a href="../ome_zarr_container/" class="md-path__link">
+        <a href="./" class="md-path__link">
           
   <span class="md-ellipsis">
-    API Reference
+    Table Specifications
   </span>
 
         </a>
@@ -1932,7 +2121,81 @@
   
 
 
-<h1 id="ngio-tables-api-documentation">Ngio Tables API Documentation<a class="headerlink" href="#ngio-tables-api-documentation" title="Permanent link">&para;</a></h1>
+<h1 id="tables-overview">Tables Overview<a class="headerlink" href="#tables-overview" title="Permanent link">&para;</a></h1>
+<p>Ngio's architecture is designed to tightly integrate image and tabular data. For this purpose we developed custom specifications for serializing and deserializing tabular data into OME-Zarr containers, and semantically typed tables derived from the <a href="https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/">fractal table specification</a>.</p>
+<h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h2>
+<p>The ngio tables architectures is composed of three main components:</p>
+<h3 id="1-table-backends">1. Table Backends<a class="headerlink" href="#1-table-backends" title="Permanent link">&para;</a></h3>
+<p>A backend module is a class that can serialize tabular data into OME-Zarr containers. We currently support four on-disk file formats:</p>
+<ul>
+<li><strong>AnnData</strong>: Commonly used in single-cell genomics and was the standard table for the initial Fractal table spec.</li>
+<li><strong>Parquet</strong>: A columnar storage file format optimized for large datasets.</li>
+<li><strong>CSV</strong>: A simple text format for tabular data, easily human readable and writable.</li>
+<li><strong>JSON</strong>: A lightweight data interchange format that both readable and efficient for small tables.</li>
+</ul>
+<p>A more detailed description of the backend module can be found in the <a href="../backend/">Table Backends documentation</a>.</p>
+<h3 id="2-in-memory-table-objects">2. In-Memory Table Objects<a class="headerlink" href="#2-in-memory-table-objects" title="Permanent link">&para;</a></h3>
+<p>These are Python objects that represent the tabular data in memory. They provide a convenient interface for manipulating and analyzing the data without needing to interact directly with the underlying file format. We support the following in-memory table objects:</p>
+<ul>
+<li><strong>Pandas DataFrame</strong>: The most commonly used data structure for tabular data in Python.</li>
+<li><strong>Polars LazyFrame</strong>: A fast DataFrame implementation that allows for lazy evaluation and efficient computation on large datasets.</li>
+<li><strong>AnnData</strong>: A specialized data structure for single-cell genomics data, which goes beyond simple tabular data.</li>
+</ul>
+<p>We also provide utilities to convert between these in-memory representations in a standardized way based on the table type specifications/metadata.</p>
+<h3 id="3-table-type-specifications">3. Table Type Specifications<a class="headerlink" href="#3-table-type-specifications" title="Permanent link">&para;</a></h3>
+<p>These specifications define structured tables that standardize common table types used in image analysis. We have defined five table types so far:</p>
+<ul>
+<li><strong>Generic Tables</strong>: A flexible table type that can represent any tabular data. See more in the <a href="../table_types/generic_table/">Generic Tables documentation</a>.</li>
+<li><strong>ROI Tables</strong>: A table type specifically designed for representing Regions of Interest (ROIs) in images. See more in the <a href="../table_types/roi_table/">ROI Tables documentation</a>.</li>
+<li><strong>Masking ROI Tables</strong>: A specialized table type for representing ROIs that are associated with specific labels in a OME-Zarr label image. See more in the <a href="../table_types/masking_roi_table/">Masking ROI Tables documentation</a>.</li>
+<li><strong>Feature Tables</strong>: A table type for representing features extracted from images. This table is also associated with a specific label image. See more in the <a href="../table_types/feature_table/">Feature Tables documentation</a>.</li>
+<li><strong>Condition Tables</strong>: A table to represent experimental conditions or metadata associated with images or experiments. See more in the <a href="../table_types/condition_table/">Condition Tables documentation</a>.</li>
+</ul>
+<h2 id="tables-groups">Tables Groups<a class="headerlink" href="#tables-groups" title="Permanent link">&para;</a></h2>
+<p>Tables in OME-Zarr images are organized into groups of tables. Each group is saved in a Zarr group, and can be associated with a specific image or plate. The tables groups are:</p>
+<ul>
+<li><strong>Image Tables</strong>: These tables are a sub group of the OME-Zarr image group and contain metadata or features related only to that specific image. The <code>.zarr</code> hierarchy is based on image <a href="https://ngff.openmicroscopy.org/0.4/index.html#image-layout">specification in NGFF 0.4</a>. The subgroup structure is based on the approach of the OME-Zarr <code>labels</code> group.</li>
+</ul>
+<div class="highlight"><pre><span></span><code>image.zarr<span class="w">        </span><span class="c1"># Zarr group for a OME-Zarr image</span>
+<span class="p">|</span>
+├──<span class="w"> </span><span class="m">0</span><span class="w">             </span><span class="c1"># Zarr array for multiscale level 0</span>
+├──<span class="w"> </span>...
+├──<span class="w"> </span>N<span class="w">             </span><span class="c1"># Zarr array for multiscale level N</span>
+<span class="p">|</span>
+├──<span class="w"> </span>labels<span class="w">        </span><span class="c1"># Zarr subgroup with a list of labels associated to this image</span>
+<span class="p">|</span><span class="w">   </span>├──<span class="w"> </span>label_A<span class="w">   </span><span class="c1"># Zarr subgroup for a given label</span>
+<span class="p">|</span><span class="w">   </span>├──<span class="w"> </span>label_B<span class="w">   </span><span class="c1"># Zarr subgroup for a given label</span>
+<span class="p">|</span><span class="w">   </span>└──<span class="w"> </span>...
+<span class="p">|</span>
+└──<span class="w"> </span>tables<span class="w">        </span><span class="c1"># Zarr subgroup with a list of tables associated to this image</span>
+<span class="w">    </span>├──<span class="w"> </span>table_1<span class="w">   </span><span class="c1"># Zarr subgroup for a given table</span>
+<span class="w">    </span>├──<span class="w"> </span>table_2<span class="w">   </span><span class="c1"># Zarr subgroup for a given table</span>
+<span class="w">    </span>└──<span class="w"> </span>...
+</code></pre></div>
+<ul>
+<li><strong>Plate Tables</strong>: These tables are a sub group of the OME-Zarr plate group and contain metadata or features related only to that specific plate.</li>
+</ul>
+<div class="highlight"><pre><span></span><code>plate.zarr<span class="w">       </span><span class="c1"># Zarr group for a OME-Zarr HCS plate</span>
+<span class="p">|</span>
+├──<span class="w"> </span>A<span class="w">             </span><span class="c1"># Row A of the plate</span>
+<span class="p">|</span><span class="w">   </span>├──<span class="w"> </span><span class="m">1</span><span class="w">         </span><span class="c1"># Column 0 of row A</span>
+<span class="p">|</span><span class="w">   </span><span class="p">|</span><span class="w">   </span>├──<span class="w"> </span><span class="m">0</span><span class="w">     </span><span class="c1"># Acquisition 0 of column A1</span>
+<span class="p">|</span><span class="w">   </span><span class="p">|</span><span class="w">   </span>├──<span class="w"> </span><span class="m">1</span><span class="w">     </span><span class="c1"># Acquisition 1 of column A1</span>
+<span class="p">|</span><span class="w">   </span><span class="p">|</span><span class="w">   </span>└──<span class="w"> </span>...<span class="w">   </span><span class="c1"># Other acquisitions of column A1</span>
+...
+├──<span class="w"> </span>tables<span class="w">        </span><span class="c1"># Zarr subgroup with a list of tables associated to this plate</span>
+<span class="p">|</span><span class="w">   </span>├──<span class="w"> </span>table_1<span class="w">   </span><span class="c1"># Zarr subgroup for a given table</span>
+<span class="p">|</span><span class="w">   </span>├──<span class="w"> </span>table_2<span class="w">   </span><span class="c1"># Zarr subgroup for a given table</span>
+<span class="p">|</span><span class="w">   </span>└──<span class="w"> </span>...
+└──<span class="w"> </span>...
+</code></pre></div>
+<p>If a plate table contains per image information, the table should contain a <code>row</code>, <code>column</code>, and <code>path_in_well</code> columns.</p>
+<h2 id="tables-group-attributes">Tables Group Attributes<a class="headerlink" href="#tables-group-attributes" title="Permanent link">&para;</a></h2>
+<p>The Zarr attributes of the tables group must include the key tables, pointing to the list of all tables (this simplifies discovery of tables associated to the current OME-Zarr image or plate), as in</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;tables&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;table_1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;table_2&quot;</span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
 
 
 
@@ -1955,7 +2218,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 13:52:28 UTC">October 6, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 10, 2025 12:24:43 UTC">June 10, 2025</span>
   </span>
 
     
@@ -1965,7 +2228,7 @@
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 28, 2025 15:29:17 UTC">March 28, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="June 10, 2025 12:24:43 UTC">June 10, 2025</span>
   </span>
 
     
@@ -2024,7 +2287,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../hcs/" class="md-footer__link md-footer__link--prev" aria-label="Previous: HCS">
+          <a href="../../tutorials/hcs_exploration/" class="md-footer__link md-footer__link--prev" aria-label="Previous: HCS Plates">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2034,20 +2297,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                HCS
+                HCS Plates
               </div>
             </div>
           </a>
         
         
           
-          <a href="../iterators/" class="md-footer__link md-footer__link--next" aria-label="Next: Iterators">
+          <a href="../backend/" class="md-footer__link md-footer__link--next" aria-label="Next: Table Backends">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Iterators
+                Table Backends
               </div>
             </div>
             <div class="md-footer__button md-icon">

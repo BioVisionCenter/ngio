@@ -10,13 +10,13 @@
       
       
       
-        <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/tutorials/feature_extraction/">
+        <link rel="canonical" href="https://github.com/BioVisionCenter/ngio.git/dev/tutorials/hcs_exploration/">
       
       
-        <link rel="prev" href="../image_segmentation/">
+        <link rel="prev" href="../feature_extraction/">
       
       
-        <link rel="next" href="../hcs_exploration/">
+        <link rel="next" href="../../table_specs/overview/">
       
       
         
@@ -27,7 +27,7 @@
     
     
       
-        <title>Feature Extraction - NGIO: Next Generation File Format I/O</title>
+        <title>HCS Plates - NGIO: Next Generation File Format I/O</title>
       
     
     
@@ -84,7 +84,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#feature-extraction" class="md-skip">
+        <a href="#hcs-plates" class="md-skip">
           Skip to content
         </a>
       
@@ -124,7 +124,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Feature Extraction
+              HCS Plates
             
           </span>
         </div>
@@ -722,19 +722,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../feature_extraction/" class="md-nav__link">
         
   
   
@@ -750,7 +741,6 @@
   
 
       </a>
-      
     </li>
   
 
@@ -760,10 +750,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../hcs_exploration/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    HCS Plates
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -779,6 +796,70 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#show-whats-in-the-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Show what's in the plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregate-tables-across-all-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregate tables across all images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save-the-table-in-the-hcs-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save the table in the HCS plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-a-new-empty-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a new empty Plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1866,6 +1947,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#show-whats-in-the-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Show what's in the plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#aggregate-tables-across-all-images" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Aggregate tables across all images
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#save-the-table-in-the-hcs-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Save the table in the HCS plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#create-a-new-empty-plate" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Create a new empty Plate
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -2659,13 +2792,13 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="feature-extraction">Feature Extraction<a class="anchor-link" href="#feature-extraction">¶</a></h1><p>This sections will cover how to extract regionprops features from an image using <code>ngio</code>, <code>skimage</code>. Moreover we will also write the features to a table in the ome-zarr container.</p>
-<h1 id="step-1-open-the-ome-zarr-container">Step 1: Open the OME-Zarr Container<a class="anchor-link" href="#step-1-open-the-ome-zarr-container">¶</a></h1>
+<h1 id="hcs-plates">HCS Plates<a class="anchor-link" href="#hcs-plates">¶</a></h1><p>This is a minimal example of how to work with OME-Zarr Plates using <code>ngio</code>.</p>
+<h2 id="show-whats-in-the-plate">Show what's in the plate<a class="anchor-link" href="#show-whats-in-the-plate">¶</a></h2>
 </div>
 </div>
 </div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs">
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
+<div class="jp-Cell jp-CodeCell jp-Notebook-cell">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
@@ -2683,49 +2816,85 @@ span.linenos.special { color: #000000; background-color: #ffffc0; padding-left: 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">skimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">measure</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
 
+<span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">open_ome_zarr_plate</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">ngio.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">download_ome_zarr_dataset</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">extract_features</span><span class="p">(</span><span class="n">image</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">"""Basic feature extraction using skimage.measure.regionprops_table."""</span>
-    <span class="n">label</span> <span class="o">=</span> <span class="n">label</span><span class="o">.</span><span class="n">squeeze</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>  <span class="c1"># Remove the channel axis if present</span>
-    <span class="n">roi_feat_table</span> <span class="o">=</span> <span class="n">measure</span><span class="o">.</span><span class="n">regionprops_table</span><span class="p">(</span>
-        <span class="n">label_image</span><span class="o">=</span><span class="n">label</span><span class="p">,</span>
-        <span class="n">intensity_image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span>
-        <span class="n">properties</span><span class="o">=</span><span class="p">[</span>
-            <span class="s2">"label"</span><span class="p">,</span>
-            <span class="s2">"area"</span><span class="p">,</span>
-            <span class="s2">"mean_intensity"</span><span class="p">,</span>
-            <span class="s2">"max_intensity"</span><span class="p">,</span>
-            <span class="s2">"min_intensity"</span><span class="p">,</span>
-        <span class="p">],</span>
-    <span class="p">)</span>
-    <span class="k">return</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">roi_feat_table</span><span class="p">)</span>
+<span class="c1"># Download the dataset</span>
+<span class="n">download_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"data"</span>
+
+<span class="n">hcs_path</span> <span class="o">=</span> <span class="n">download_ome_zarr_dataset</span><span class="p">(</span><span class="s2">"CardiomyocyteTinyMip"</span><span class="p">,</span> <span class="n">download_dir</span><span class="o">=</span><span class="n">download_dir</span><span class="p">)</span>
+<span class="n">hcs_zarr</span> <span class="o">=</span> <span class="n">open_ome_zarr_plate</span><span class="p">(</span><span class="n">hcs_path</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">hcs_zarr</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Rows: </span><span class="si">{</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">rows</span><span class="si">}</span><span class="s2">, Columns: </span><span class="si">{</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">columns</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+<span class="c1"># Get all the images in the plate</span>
+<span class="n">hcs_zarr</span><span class="o">.</span><span class="n">get_images</span><span class="p">()</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-1">import numpy as np
-import pandas as pd
-from skimage import measure
+<div class="clipboard-copy-txt" id="cell-1">from pathlib import Path
 
+from ngio import open_ome_zarr_plate
+from ngio.utils import download_ome_zarr_dataset
 
-def extract_features(image: np.ndarray, label: np.ndarray) -&gt; pd.DataFrame:
-    """Basic feature extraction using skimage.measure.regionprops_table."""
-    label = label.squeeze(-1)  # Remove the channel axis if present
-    roi_feat_table = measure.regionprops_table(
-        label_image=label,
-        intensity_image=image,
-        properties=[
-            "label",
-            "area",
-            "mean_intensity",
-            "max_intensity",
-            "min_intensity",
-        ],
-    )
-    return pd.DataFrame(roi_feat_table)</div>
+# Download the dataset
+download_dir = Path(".").absolute().parent.parent / "data"
+
+hcs_path = download_ome_zarr_dataset("CardiomyocyteTinyMip", download_dir=download_dir)
+hcs_zarr = open_ome_zarr_plate(hcs_path)
+print(hcs_zarr)
+print(f"Rows: {hcs_zarr.rows}, Columns: {hcs_zarr.columns}")
+
+# Get all the images in the plate
+hcs_zarr.get_images()</div>
 </div>
 </div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>Unzipping contents of '/home/runner/work/ngio/ngio/data/20200812-CardiomyocyteDifferentiation14-Cycle1-tiny-mip.zarr.zip' to '/home/runner/work/ngio/ngio/data/tmp'
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Plate([rows x columns] (1 x 1))
+Rows: ['B'], Columns: ['03']
+</pre>
+</div>
+</div>
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[1]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>{'B/03/0': OmeZarrContainer(levels=5, labels=['nuclei'], #tables=4)}</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="aggregate-tables-across-all-images">Aggregate tables across all images<a class="anchor-link" href="#aggregate-tables-across-all-images">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2748,31 +2917,15 @@ def extract_features(image: np.ndarray, label: np.ndarray) -&gt; pd.DataFrame:
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Aggregate all table across all images</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">open_ome_zarr_container</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ngio.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">download_ome_zarr_dataset</span>
-
-<span class="c1"># Download the dataset</span>
-<span class="n">download_dir</span> <span class="o">=</span> <span class="n">Path</span><span class="p">(</span><span class="s2">"."</span><span class="p">)</span><span class="o">.</span><span class="n">absolute</span><span class="p">()</span><span class="o">.</span><span class="n">parent</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"data"</span>
-<span class="n">hcs_path</span> <span class="o">=</span> <span class="n">download_ome_zarr_dataset</span><span class="p">(</span><span class="s2">"CardiomyocyteTinyMip"</span><span class="p">,</span> <span class="n">download_dir</span><span class="o">=</span><span class="n">download_dir</span><span class="p">)</span>
-<span class="n">image_path</span> <span class="o">=</span> <span class="n">hcs_path</span> <span class="o">/</span> <span class="s2">"B"</span> <span class="o">/</span> <span class="s2">"03"</span> <span class="o">/</span> <span class="s2">"0"</span>
-
-<span class="c1"># Open the ome-zarr container</span>
-<span class="n">ome_zarr</span> <span class="o">=</span> <span class="n">open_ome_zarr_container</span><span class="p">(</span><span class="n">image_path</span><span class="p">)</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">hcs_zarr</span><span class="o">.</span><span class="n">concatenate_image_tables</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"nuclei"</span><span class="p">)</span>
+<span class="n">table</span><span class="o">.</span><span class="n">dataframe</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-2">from pathlib import Path
+<div class="clipboard-copy-txt" id="cell-2"># Aggregate all table across all images
 
-from ngio import open_ome_zarr_container
-from ngio.utils import download_ome_zarr_dataset
-
-# Download the dataset
-download_dir = Path(".").absolute().parent.parent / "data"
-hcs_path = download_ome_zarr_dataset("CardiomyocyteTinyMip", download_dir=download_dir)
-image_path = hcs_path / "B" / "03" / "0"
-
-# Open the ome-zarr container
-ome_zarr = open_ome_zarr_container(image_path)</div>
+table = hcs_zarr.concatenate_image_tables(name="nuclei")
+table.dataframe</div>
 </div>
 </div>
 </div>
@@ -2784,23 +2937,205 @@ ome_zarr = open_ome_zarr_container(image_path)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
+<pre>/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/functools.py:934: ImplicitModificationWarning: Transforming to str index.
+  return dispatch(args[0].__class__)(*args, **kw)
 </pre>
 </div>
 </div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Downloading data from 'https://zenodo.org/records/13305156/files/20200812-CardiomyocyteDifferentiation14-Cycle1_mip.zarr.zip' to file '/home/runner/work/ngio/ngio/data/20200812-CardiomyocyteDifferentiation14-Cycle1-tiny-mip.zarr.zip'.
-</pre>
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>area</th>
+<th>bbox_area</th>
+<th>equivalent_diameter</th>
+<th>max_intensity</th>
+<th>mean_intensity</th>
+<th>min_intensity</th>
+<th>standard_deviation_intensity</th>
+<th>row</th>
+<th>column</th>
+<th>path_in_well</th>
+</tr>
+<tr>
+<th>label</th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>1</th>
+<td>1360.0</td>
+<td>1664.0</td>
+<td>13.746119</td>
+<td>268.0</td>
+<td>184.579407</td>
+<td>125.0</td>
+<td>24.502481</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>2</th>
+<td>2464.0</td>
+<td>2992.0</td>
+<td>16.757685</td>
+<td>461.0</td>
+<td>273.246765</td>
+<td>132.0</td>
+<td>51.794971</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>3</th>
+<td>1968.0</td>
+<td>2688.0</td>
+<td>15.548035</td>
+<td>429.0</td>
+<td>277.291656</td>
+<td>143.0</td>
+<td>41.822422</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>4</th>
+<td>5120.0</td>
+<td>6400.0</td>
+<td>21.384073</td>
+<td>413.0</td>
+<td>279.035156</td>
+<td>118.0</td>
+<td>44.379074</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>5</th>
+<td>288.0</td>
+<td>352.0</td>
+<td>8.193409</td>
+<td>341.0</td>
+<td>243.315979</td>
+<td>147.0</td>
+<td>41.861721</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>...</th>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<th>1493</th>
+<td>1248.0</td>
+<td>1440.0</td>
+<td>13.357914</td>
+<td>385.0</td>
+<td>269.291656</td>
+<td>108.0</td>
+<td>45.967396</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1494</th>
+<td>528.0</td>
+<td>704.0</td>
+<td>10.027941</td>
+<td>475.0</td>
+<td>315.710236</td>
+<td>128.0</td>
+<td>70.174896</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1495</th>
+<td>608.0</td>
+<td>768.0</td>
+<td>10.510781</td>
+<td>377.0</td>
+<td>281.544403</td>
+<td>122.0</td>
+<td>34.698723</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1496</th>
+<td>288.0</td>
+<td>480.0</td>
+<td>8.193409</td>
+<td>356.0</td>
+<td>261.003479</td>
+<td>122.0</td>
+<td>44.835232</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1497</th>
+<td>432.0</td>
+<td>528.0</td>
+<td>9.379111</td>
+<td>454.0</td>
+<td>336.101837</td>
+<td>172.0</td>
+<td>53.799728</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>1497 rows × 10 columns</p>
 </div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>Unzipping contents of '/home/runner/work/ngio/ngio/data/20200812-CardiomyocyteDifferentiation14-Cycle1-tiny-mip.zarr.zip' to '/home/runner/work/ngio/ngio/data/tmp'
-</pre>
 </div>
 </div>
 </div>
@@ -2813,7 +3148,7 @@ ome_zarr = open_ome_zarr_container(image_path)</div>
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="step-2-setup-the-inputs">Step 2: Setup the inputs<a class="anchor-link" href="#step-2-setup-the-inputs">¶</a></h2>
+<h2 id="save-the-table-in-the-hcs-plate">Save the table in the HCS plate<a class="anchor-link" href="#save-the-table-in-the-hcs-plate">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2836,43 +3171,17 @@ ome_zarr = open_ome_zarr_container(image_path)</div>
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ngio.transforms</span><span class="w"> </span><span class="kn">import</span> <span class="n">ZoomTransform</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="c1"># Save the tabvle in the HCS plate</span>
+<span class="n">hcs_zarr</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"nuclei"</span><span class="p">,</span> <span class="n">table</span><span class="o">=</span><span class="n">table</span><span class="p">)</span>
 
-<span class="c1"># First we will need the image object and the FOVs table</span>
-<span class="n">image</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span>
-
-<span class="c1"># Get the nuclei label</span>
-<span class="n">nuclei</span> <span class="o">=</span> <span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_label</span><span class="p">(</span><span class="s2">"nuclei"</span><span class="p">)</span>
-
-<span class="c1"># In this example we the image is available at an higher resolution than the nuclei</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Image dimensions: </span><span class="si">{</span><span class="n">image</span><span class="o">.</span><span class="n">dimensions</span><span class="si">}</span><span class="s2">, pixel size: </span><span class="si">{</span><span class="n">image</span><span class="o">.</span><span class="n">pixel_size</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Nuclei dimensions: </span><span class="si">{</span><span class="n">nuclei</span><span class="o">.</span><span class="n">dimensions</span><span class="si">}</span><span class="s2">, pixel size: </span><span class="si">{</span><span class="n">nuclei</span><span class="o">.</span><span class="n">pixel_size</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-
-<span class="c1"># We need to setup a transform to resample the nuclei to the image resolution</span>
-<span class="n">zoom_transform</span> <span class="o">=</span> <span class="n">ZoomTransform</span><span class="p">(</span>
-    <span class="n">input_image</span><span class="o">=</span><span class="n">nuclei</span><span class="p">,</span>
-    <span class="n">target_image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span>
-    <span class="n">order</span><span class="o">=</span><span class="s2">"nearest"</span><span class="p">,</span>  <span class="c1"># Nearest neighbor interpolation for labels</span>
-<span class="p">)</span>
+<span class="c1"># Read the table back for sanity check</span>
+<span class="n">hcs_zarr</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="s2">"nuclei"</span><span class="p">)</span><span class="o">.</span><span class="n">dataframe</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-3">from ngio.transforms import ZoomTransform
+<div class="clipboard-copy-txt" id="cell-3"># Save the tabvle in the HCS plate
+hcs_zarr.add_table(name="nuclei", table=table)
 
-# First we will need the image object and the FOVs table
-image = ome_zarr.get_image()
-
-# Get the nuclei label
-nuclei = ome_zarr.get_label("nuclei")
-
-# In this example we the image is available at an higher resolution than the nuclei
-print(f"Image dimensions: {image.dimensions}, pixel size: {image.pixel_size}")
-print(f"Nuclei dimensions: {nuclei.dimensions}, pixel size: {nuclei.pixel_size}")
-
-# We need to setup a transform to resample the nuclei to the image resolution
-zoom_transform = ZoomTransform(
-    input_image=nuclei,
-    target_image=image,
-    order="nearest",  # Nearest neighbor interpolation for labels
-)</div>
+# Read the table back for sanity check
+hcs_zarr.get_table("nuclei").dataframe</div>
 </div>
 </div>
 </div>
@@ -2883,10 +3192,206 @@ zoom_transform = ZoomTransform(
 <div class="jp-OutputArea jp-Cell-outputArea">
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Image dimensions: Dimensions(c: 1, z: 1, y: 2160, x: 5120), pixel size: x=0.1625 y=0.1625 z=1.0 t=1.0 space_unit='micrometer' time_unit=None
-Nuclei dimensions: Dimensions(z: 1, y: 540, x: 1280), pixel size: x=0.65 y=0.65 z=1.0 t=1.0 space_unit='micrometer' time_unit=None
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
+<pre>/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/site-packages/anndata/_io/zarr.py:44: UserWarning: Writing zarr v2 data will no longer be the default in the next minor release. v3 data will be written by default. If you are explicitly setting this configuration, consider migrating to the zarr v3 file format.
+  f = open_write_group(store)
 </pre>
+</div>
+</div>
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[3]:</div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
+<div>
+<style scoped="">
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+<thead>
+<tr style="text-align: right;">
+<th></th>
+<th>area</th>
+<th>bbox_area</th>
+<th>equivalent_diameter</th>
+<th>max_intensity</th>
+<th>mean_intensity</th>
+<th>min_intensity</th>
+<th>standard_deviation_intensity</th>
+<th>row</th>
+<th>column</th>
+<th>path_in_well</th>
+</tr>
+<tr>
+<th>label</th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<th>1</th>
+<td>1360.0</td>
+<td>1664.0</td>
+<td>13.746119</td>
+<td>268.0</td>
+<td>184.579407</td>
+<td>125.0</td>
+<td>24.502481</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>2</th>
+<td>2464.0</td>
+<td>2992.0</td>
+<td>16.757685</td>
+<td>461.0</td>
+<td>273.246765</td>
+<td>132.0</td>
+<td>51.794971</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>3</th>
+<td>1968.0</td>
+<td>2688.0</td>
+<td>15.548035</td>
+<td>429.0</td>
+<td>277.291656</td>
+<td>143.0</td>
+<td>41.822422</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>4</th>
+<td>5120.0</td>
+<td>6400.0</td>
+<td>21.384073</td>
+<td>413.0</td>
+<td>279.035156</td>
+<td>118.0</td>
+<td>44.379074</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>5</th>
+<td>288.0</td>
+<td>352.0</td>
+<td>8.193409</td>
+<td>341.0</td>
+<td>243.315979</td>
+<td>147.0</td>
+<td>41.861721</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>...</th>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<th>1493</th>
+<td>1248.0</td>
+<td>1440.0</td>
+<td>13.357914</td>
+<td>385.0</td>
+<td>269.291656</td>
+<td>108.0</td>
+<td>45.967396</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1494</th>
+<td>528.0</td>
+<td>704.0</td>
+<td>10.027941</td>
+<td>475.0</td>
+<td>315.710236</td>
+<td>128.0</td>
+<td>70.174896</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1495</th>
+<td>608.0</td>
+<td>768.0</td>
+<td>10.510781</td>
+<td>377.0</td>
+<td>281.544403</td>
+<td>122.0</td>
+<td>34.698723</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1496</th>
+<td>288.0</td>
+<td>480.0</td>
+<td>8.193409</td>
+<td>356.0</td>
+<td>261.003479</td>
+<td>122.0</td>
+<td>44.835232</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+<tr>
+<th>1497</th>
+<td>432.0</td>
+<td>528.0</td>
+<td>9.379111</td>
+<td>454.0</td>
+<td>336.101837</td>
+<td>172.0</td>
+<td>53.799728</td>
+<td>B</td>
+<td>03</td>
+<td>0</td>
+</tr>
+</tbody>
+</table>
+<p>1497 rows × 10 columns</p>
+</div>
 </div>
 </div>
 </div>
@@ -2899,7 +3404,7 @@ Nuclei dimensions: Dimensions(z: 1, y: 540, x: 1280), pixel size: x=0.65 y=0.65 
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h2 id="step-3-use-the-featureextractoriterator-to-create-a-feature-table">Step 3: Use the FeatureExtractorIterator to create a feature table<a class="anchor-link" href="#step-3-use-the-featureextractoriterator-to-create-a-feature-table">¶</a></h2>
+<h2 id="create-a-new-empty-plate">Create a new empty Plate<a class="anchor-link" href="#create-a-new-empty-plate">¶</a></h2>
 </div>
 </div>
 </div>
@@ -2922,47 +3427,37 @@ Nuclei dimensions: Dimensions(z: 1, y: 540, x: 1280), pixel size: x=0.65 y=0.65 
 </div>
 </clipboard-copy>
 </div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ngio.experimental.iterators</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureExtractorIterator</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">ngio.tables</span><span class="w"> </span><span class="kn">import</span> <span class="n">FeatureTable</span>
+<div class="highlight-ipynb hl-python"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">ImageInWellPath</span><span class="p">,</span> <span class="n">create_empty_plate</span>
 
-<span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span>
-    <span class="n">input_image</span><span class="o">=</span><span class="n">image</span><span class="p">,</span>
-    <span class="n">input_label</span><span class="o">=</span><span class="n">nuclei</span><span class="p">,</span>
-    <span class="n">label_transforms</span><span class="o">=</span><span class="p">[</span><span class="n">zoom_transform</span><span class="p">],</span>
-    <span class="n">axes_order</span><span class="o">=</span><span class="p">[</span><span class="s2">"y"</span><span class="p">,</span> <span class="s2">"x"</span><span class="p">,</span> <span class="s2">"c"</span><span class="p">],</span>
+<span class="n">test_plate</span> <span class="o">=</span> <span class="n">create_empty_plate</span><span class="p">(</span>
+    <span class="n">store</span><span class="o">=</span><span class="s2">"./data/empty_plate.zarr"</span><span class="p">,</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"Test Plate"</span><span class="p">,</span>
+    <span class="n">images</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">ImageInWellPath</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="s2">"01"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"0"</span><span class="p">),</span>
+        <span class="n">ImageInWellPath</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="s2">"02"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"0"</span><span class="p">),</span>
+        <span class="n">ImageInWellPath</span><span class="p">(</span><span class="n">row</span><span class="o">=</span><span class="s2">"A"</span><span class="p">,</span> <span class="n">column</span><span class="o">=</span><span class="s2">"02"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="s2">"1"</span><span class="p">,</span> <span class="n">acquisition_id</span><span class="o">=</span><span class="mi">1</span><span class="p">),</span>
+    <span class="p">],</span>
+    <span class="n">overwrite</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">feat_table</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">image_data</span><span class="p">,</span> <span class="n">label_data</span><span class="p">,</span> <span class="n">roi</span> <span class="ow">in</span> <span class="n">iterator</span><span class="o">.</span><span class="n">iter_as_numpy</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Processing ROI: </span><span class="si">{</span><span class="n">roi</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-    <span class="n">roi_feat_table</span> <span class="o">=</span> <span class="n">extract_features</span><span class="p">(</span><span class="n">image</span><span class="o">=</span><span class="n">image_data</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">label_data</span><span class="p">)</span>
-    <span class="n">feat_table</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">roi_feat_table</span><span class="p">)</span>
-
-<span class="c1"># Concatenate all the dataframes into a single one</span>
-<span class="n">feat_table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">feat_table</span><span class="p">)</span>
-<span class="n">feat_table</span> <span class="o">=</span> <span class="n">FeatureTable</span><span class="p">(</span><span class="n">table_data</span><span class="o">=</span><span class="n">feat_table</span><span class="p">,</span> <span class="n">reference_label</span><span class="o">=</span><span class="s2">"nuclei"</span><span class="p">)</span>
-<span class="n">ome_zarr</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">"nuclei_regionprops"</span><span class="p">,</span> <span class="n">feat_table</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">test_plate</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Rows: </span><span class="si">{</span><span class="n">test_plate</span><span class="o">.</span><span class="n">rows</span><span class="si">}</span><span class="s2">, Columns: </span><span class="si">{</span><span class="n">test_plate</span><span class="o">.</span><span class="n">columns</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-4">from ngio.experimental.iterators import FeatureExtractorIterator
-from ngio.tables import FeatureTable
+<div class="clipboard-copy-txt" id="cell-4">from ngio import ImageInWellPath, create_empty_plate
 
-iterator = FeatureExtractorIterator(
-    input_image=image,
-    input_label=nuclei,
-    label_transforms=[zoom_transform],
-    axes_order=["y", "x", "c"],
+test_plate = create_empty_plate(
+    store="./data/empty_plate.zarr",
+    name="Test Plate",
+    images=[
+        ImageInWellPath(row="A", column="01", path="0"),
+        ImageInWellPath(row="A", column="02", path="0"),
+        ImageInWellPath(row="A", column="02", path="1", acquisition_id=1),
+    ],
+    overwrite=True,
 )
 
-feat_table = []
-for image_data, label_data, roi in iterator.iter_as_numpy():
-    print(f"Processing ROI: {roi}")
-    roi_feat_table = extract_features(image=image_data, label=label_data)
-    feat_table.append(roi_feat_table)
-
-# Concatenate all the dataframes into a single one
-feat_table = pd.concat(feat_table)
-feat_table = FeatureTable(table_data=feat_table, reference_label="nuclei")
-ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
+print(test_plate)
+print(f"Rows: {test_plate.rows}, Columns: {test_plate.columns}")</div>
 </div>
 </div>
 </div>
@@ -2974,73 +3469,9 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
 <div class="jp-OutputArea-child">
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
-<pre>Processing ROI: name=None slices=[z: 0.0-&gt;1.0, y: 0.0-&gt;351.0, x: 0.0-&gt;832.0] label=None space='world'
+<pre>Plate([rows x columns] (1 x 2))
+Rows: ['A'], Columns: ['01', '02']
 </pre>
-</div>
-</div>
-<div class="jp-OutputArea-child">
-<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
-<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="application/vnd.jupyter.stderr" tabindex="0">
-<pre>/opt/hostedtoolcache/Python/3.13.12/x64/lib/python3.13/site-packages/anndata/_io/zarr.py:44: UserWarning: Writing zarr v2 data will no longer be the default in the next minor release. v3 data will be written by default. If you are explicitly setting this configuration, consider migrating to the zarr v3 file format.
-  f = open_write_group(store)
-</pre>
-</div>
-</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
-</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h3 id="sanity-check-read-the-table-back">Sanity Check: Read the Table back<a class="anchor-link" href="#sanity-check-read-the-table-back">¶</a></h3>
-</div>
-</div>
-</div>
-</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell jp-CodeCell jp-Notebook-cell">
-<div class="jp-Cell-inputWrapper" tabindex="0">
-<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
-</div>
-<div class="jp-InputArea jp-Cell-inputArea">
-<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
-<div class="CodeMirror cm-s-jupyter">
-<div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-5">
-<div>
-<span class="notice" hidden="">Copied!</span>
-<svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
-<path d="M0 6.75C0 5.784.784 5 1.75 5h1.5a.75.75 0 010 1.5h-1.5a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-1.5a.75.75 0 011.5 0v1.5A1.75 1.75 0 019.25 16h-7.5A1.75 1.75 0 010 14.25v-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-<path d="M5 1.75C5 .784 5.784 0 6.75 0h7.5C15.216 0 16 .784 16 1.75v7.5A1.75 1.75 0 0114.25 11h-7.5A1.75 1.75 0 015 9.25v-7.5zm1.75-.25a.25.25 0 00-.25.25v7.5c0 .138.112.25.25.25h7.5a.25.25 0 00.25-.25v-7.5a.25.25 0 00-.25-.25h-7.5z" fill="currentColor" fill-rule="evenodd"></path>
-</svg>
-</div>
-</clipboard-copy>
-</div>
-<div class="highlight-ipynb hl-python"><pre><span></span><span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_table</span><span class="p">(</span><span class="s2">"nuclei_regionprops"</span><span class="p">)</span><span class="o">.</span><span class="n">lazy_frame</span><span class="o">.</span><span class="n">collect</span><span class="p">()</span>
-</pre></div>
-<div class="clipboard-copy-txt" id="cell-5">ome_zarr.get_table("nuclei_regionprops").lazy_frame.collect()</div>
-</div>
-</div>
-</div>
-</div>
-<div class="jp-Cell-outputWrapper">
-<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
-</div>
-<div class="jp-OutputArea jp-Cell-outputArea">
-<div class="jp-OutputArea-child jp-OutputArea-executeResult">
-<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[5]:</div>
-<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/html" tabindex="0">
-<div><style>
-.dataframe > thead > tr,
-.dataframe > tbody > tr {
-  text-align: right;
-  white-space: pre-wrap;
-}
-</style>
-<small>shape: (1_497, 5)</small><table border="1" class="dataframe"><thead><tr><th>label</th><th>area</th><th>mean_intensity-0</th><th>max_intensity-0</th><th>min_intensity-0</th></tr><tr><td>i64</td><td>f64</td><td>f64</td><td>f64</td><td>f64</td></tr></thead><tbody><tr><td>1</td><td>1360.0</td><td>184.579412</td><td>268.0</td><td>125.0</td></tr><tr><td>2</td><td>2464.0</td><td>273.246753</td><td>461.0</td><td>132.0</td></tr><tr><td>3</td><td>1968.0</td><td>277.291667</td><td>429.0</td><td>143.0</td></tr><tr><td>4</td><td>5120.0</td><td>279.035156</td><td>413.0</td><td>118.0</td></tr><tr><td>5</td><td>288.0</td><td>243.315972</td><td>341.0</td><td>147.0</td></tr><tr><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td></tr><tr><td>1493</td><td>1248.0</td><td>269.291667</td><td>385.0</td><td>108.0</td></tr><tr><td>1494</td><td>528.0</td><td>315.710227</td><td>475.0</td><td>128.0</td></tr><tr><td>1495</td><td>608.0</td><td>281.544408</td><td>377.0</td><td>122.0</td></tr><tr><td>1496</td><td>288.0</td><td>261.003472</td><td>356.0</td><td>122.0</td></tr><tr><td>1497</td><td>432.0</td><td>336.101852</td><td>454.0</td><td>172.0</td></tr></tbody></table></div>
 </div>
 </div>
 </div>
@@ -3055,7 +3486,7 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
 <div class="jp-InputPrompt jp-InputArea-prompt">In [ ]:</div><div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="CodeMirror cm-s-jupyter">
 <div class="zeroclipboard-container">
-<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-6">
+<clipboard-copy ,="" aria-label="Copy to Clipboard" for="cell-5">
 <div>
 <span class="notice" hidden="">Copied!</span>
 <svg aria-hidden="true" class="clipboard-copy-icon" data-view-component="true" height="20" version="1.1" viewbox="0 0 16 16" width="20">
@@ -3067,7 +3498,7 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
 </div>
 <div class="highlight-ipynb hl-python"><pre><span></span>
 </pre></div>
-<div class="clipboard-copy-txt" id="cell-6"></div>
+<div class="clipboard-copy-txt" id="cell-5"></div>
 </div>
 </div>
 </div>
@@ -3113,7 +3544,7 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
     <span class="md-icon" title="Created">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 28, 2025 15:29:17 UTC">March 28, 2025</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="October 6, 2025 13:52:28 UTC">October 6, 2025</span>
   </span>
 
     
@@ -3172,7 +3603,7 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../image_segmentation/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Image Segmentation">
+          <a href="../feature_extraction/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Feature Extraction">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -3182,20 +3613,20 @@ ome_zarr.add_table("nuclei_regionprops", feat_table)</div>
                 Previous
               </span>
               <div class="md-ellipsis">
-                Image Segmentation
+                Feature Extraction
               </div>
             </div>
           </a>
         
         
           
-          <a href="../hcs_exploration/" class="md-footer__link md-footer__link--next" aria-label="Next: HCS Plates">
+          <a href="../../table_specs/overview/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                HCS Plates
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">
