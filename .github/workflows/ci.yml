@@ -1,3 +1,9 @@
+# CI — primary test suite
+#
+# Scope:    Runs on every PR and push to main/tags. Uses pixi (locked environments)
+#           for fast, reproducible tests across all supported Python versions and platforms.
+# Jobs:     lint (pre-commit), check-manifest, test matrix (pixi), deploy (pip, tag-only)
+# Matrix:   PRs → ubuntu × py3.11/3.13 | main/tags → ubuntu+macos+windows × py3.11–3.14
 name: CI
 
 on:
@@ -9,7 +15,7 @@ on:
   pull_request:
   workflow_dispatch:
   schedule:
-    # run every week (for --pre release tests)
+    # run every week to catch upstream breakage early
     - cron: "0 0 * * 0"
 
 # cancel in-progress runs that use the same workflow and branch
@@ -44,34 +50,27 @@ jobs:
       - id: set-matrix
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo 'matrix={"python-version":["3.11","3.13"],"platform":["ubuntu-latest"]}' >> $GITHUB_OUTPUT
+            echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"}]' >> $GITHUB_OUTPUT
           else
-            echo 'matrix={"python-version":["3.11","3.12","3.13","3.14"],"platform":["ubuntu-latest","macos-latest","windows-latest"]}' >> $GITHUB_OUTPUT
+            echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test12","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"},{"environment":"test14","platform":"ubuntu-latest"},{"environment":"test11","platform":"macos-latest"},{"environment":"test12","platform":"macos-latest"},{"environment":"test13","platform":"macos-latest"},{"environment":"test14","platform":"macos-latest"},{"environment":"test11","platform":"windows-latest"},{"environment":"test12","platform":"windows-latest"},{"environment":"test13","platform":"windows-latest"},{"environment":"test14","platform":"windows-latest"}]' >> $GITHUB_OUTPUT
           fi
 
   test:
-    name: ${{ matrix.platform }} (${{ matrix.python-version }})
+    name: ${{ matrix.platform }} (${{ matrix.environment }})
     needs: setup
     runs-on: ${{ matrix.platform }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.setup.outputs.matrix) }}
+      matrix:
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
 
     steps:
       - uses: actions/checkout@v6
 
-      - name: 🐍 Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+      - name: 🔧 Set up pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
         with:
-          python-version: ${{ matrix.python-version }}
-          cache-dependency-path: "pyproject.toml"
-          cache: "pip"
-
-      - name: Install Dependencies
-        run: |
-          python -m pip install -U pip
-          # if running a cron job, we add the --pre flag to test against pre-releases
-          python -m pip install .[test] ${{ github.event_name == 'schedule' && '--pre' || ''  }}
+          environments: ${{ matrix.environment }}
 
       - name: Restore shared data cache
         id: cache-data
@@ -83,18 +82,18 @@ jobs:
             "${{ runner.os }}-data-"
 
       - name: 🧪 Run Tests
-        run: pytest ${{ matrix.platform != 'ubuntu-latest' && '--no-cov' || '' }}
+        run: pixi run -e ${{ matrix.environment }} pytest ${{ matrix.platform != 'ubuntu-latest' && '--no-cov' || '' }}
 
-      # If something goes wrong with --pre tests, we can open an issue in the repo
-      - name: 📝 Report --pre Failures
+      # If something goes wrong with scheduled tests, open an issue in the repo
+      - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
         uses: JasonEtco/create-an-issue@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PLATFORM: ${{ matrix.platform }}
-          PYTHON: ${{ matrix.python-version }}
+          PYTHON: ${{ matrix.environment }}
           RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] pip install --pre is failing"
+          TITLE: "[test-bot] Scheduled tests are failing"
         with:
           filename: .github/TEST_FAIL_TEMPLATE.md
           update_existing: true

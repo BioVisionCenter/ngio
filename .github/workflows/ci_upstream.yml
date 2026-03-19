@@ -1,0 +1,116 @@
+# CI (pip) — supplementary pip-based tests
+#
+# Scope:    Runs after the main CI passes on main, plus weekly. Validates what end users
+#           actually install via pip (not a pixi editable install) and tests against
+#           pre-release dependencies to catch upstream breakage early.
+# Jobs:     test-pip (stable deps), test-pip-pre (--pre deps)
+# Matrix:   ubuntu × py3.13 only (full matrix is covered by ci.yml)
+name: CI (pip)
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  schedule:
+    - cron: "0 0 * * 0"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-pip:
+    name: pip (stable)
+    runs-on: ubuntu-latest
+    # For workflow_run: only proceed if the main CI succeeded
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install -U pip
+          python -m pip install .[test]
+
+      - name: Restore shared data cache
+        uses: actions/cache@v5
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          restore-keys: |
+            "${{ runner.os }}-data-"
+
+      - name: 🧪 Run Tests
+        run: pytest --no-cov
+
+      - name: 📝 Report Failures
+        if: failure() && github.event_name == 'schedule'
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PLATFORM: ubuntu-latest
+          PYTHON: "3.13 (pip stable)"
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "[test-bot] pip stable tests are failing"
+        with:
+          filename: .github/TEST_FAIL_TEMPLATE.md
+          update_existing: true
+
+  test-pip-pre:
+    name: pip (--pre)
+    runs-on: ubuntu-latest
+    # For workflow_run: only proceed if the main CI succeeded
+    if: >
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: "pyproject.toml"
+
+      - name: Install Dependencies (pre-release)
+        run: |
+          python -m pip install -U pip
+          python -m pip install .[test] --pre
+
+      - name: Restore shared data cache
+        uses: actions/cache@v5
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          restore-keys: |
+            "${{ runner.os }}-data-"
+
+      - name: 🧪 Run Tests
+        run: pytest --no-cov
+
+      - name: 📝 Report Failures
+        if: failure()
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PLATFORM: ubuntu-latest
+          PYTHON: "3.13 (pip --pre)"
+          RUN_ID: ${{ github.run_id }}
+          TITLE: "[test-bot] pip --pre tests are failing"
+        with:
+          filename: .github/TEST_FAIL_TEMPLATE.md
+          update_existing: true
