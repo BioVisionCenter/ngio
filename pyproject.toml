@@ -81,6 +81,7 @@ dev = [
     "rich",         # https://github.com/Textualize/rich
     "ruff",
     "scikit-image",
+    "commitizen",
 ] # add anything else you like to have in your dev environment here
 
 docs = [
@@ -212,6 +213,14 @@ FO = "FO"
 # Surname
 Comparin = "Comparin"
 
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "v$version"
+version_scheme = "pep440"
+version_provider = "scm"          # reads current version from git tags; no file to mutate
+update_changelog_on_bump = false  # keep manual CHANGELOG for now
+major_version_zero = true         # 0.x bumps don't require breaking-change commits
+
 [tool.check-manifest]
 ignore = [
     ".pre-commit-config.yaml",
@@ -231,11 +240,19 @@ platforms = ["osx-arm64", "linux-64", "win-64"]
 [tool.pixi.pypi-dependencies]
 ngio = { path = ".", editable = true }
 
-[tool.pixi.feature.task-feat.dependencies]
-python = ">=3.11,<3.12"
-
 [tool.pixi.feature.dev.dependencies]
 python = ">=3.11,<3.12"
+
+[tool.pixi.feature.dev.pypi-dependencies]
+commitizen = ">=4.0"
+
+[tool.pixi.feature.dev.tasks]
+bump-patch = "cz bump --increment PATCH"
+bump-minor = "cz bump --increment MINOR"
+bump-major = "cz bump --increment MAJOR"
+bump-alpha = "cz bump --pre-release alpha"
+bump-beta  = "cz bump --pre-release beta"
+pre-commit = "pre-commit run --all-files"
 
 [tool.pixi.feature.py11.dependencies]
 python = ">=3.11,<3.12"
@@ -249,16 +266,19 @@ python = ">=3.13,<3.14"
 [tool.pixi.feature.py14.dependencies]
 python = ">=3.14,<3.15"
 
+[tool.pixi.feature.docs.tasks]
+serve_docs = "mkdocs serve"
+clean_nb_data = "rm -rf ./docs/notebooks/**/*.zarr"
+test_nb = { cmd = "jupyter-execute ./docs/notebooks/*.ipynb" }
+
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
 
-# utils envs
-task = { features = ["task-feat", "dev"], solve-group = "py11" }
 docs = { features = ["docs"], solve-group = "py11" }
 
 # test envs
-test11 = { features = ["py11", "dev", "test"], solve-group = "py11" }
+test11 = { features = ["py11", "test"], solve-group = "py11" }
 test12 = { features = ["py12", "test"], solve-group = "py12" }
 test13 = { features = ["py13", "test"], solve-group = "py13" }
 test14 = { features = ["py14", "test"], solve-group = "py14" }
@@ -266,19 +286,3 @@ test14 = { features = ["py14", "test"], solve-group = "py14" }
 # dev env
 dev = { features = ["dev", "test"], solve-group = "py11" }
 test = { features = ["test"], solve-group = "py11" }
-
-[tool.pixi.tasks]
-serve_docs = "mkdocs serve"
-run_tests = "pytest"
-clean_nb_data = "rm -rf ./docs/notebooks/**/*.zarr"
-test_nb = { cmd = "jupyter-execute ./docs/notebooks/*.ipynb" }
-test = { depends-on = ["run_tests", "clean_nb_data", "test_nb"] }
-pre_commit_install = "pre-commit install"
-
-ruff-fix-imports = "ruff check --select I --fix"
-ruff-format = { cmd = "ruff format", depends-on = ["ruff-fix-imports"] }
-
-pre-commit = { cmd = "pre-commit run --all-files", depends-on = [
-    "pre_commit_install",
-    "ruff-format",
-] }
