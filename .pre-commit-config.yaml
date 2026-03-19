@@ -8,6 +8,18 @@ ci:
   autoupdate_commit_msg: "ci(pre-commit.ci): autoupdate"
 
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: check-added-large-files
+      - id: check-case-conflict
+
   - repo: https://github.com/abravalheri/validate-pyproject
     rev: v0.24.1
     hooks:
@@ -27,17 +39,7 @@ repos:
         args: [--fix]  # may also add '--unsafe-fixes'
       - id: ruff-format
 
-  #- repo: https://github.com/pre-commit/mirrors-mypy
-  #  rev: v1.10.0
-  #  hooks:
-  #    - id: mypy
-  #      files: "^src/"
-  #      # # you have to add the things you want to type check against here
-  #      # additional_dependencies:
-  #      #   - numpy
-
   - repo: https://github.com/kynan/nbstripout
     rev: 0.8.1
     hooks:
       - id: nbstripout
-
