@@ -165,10 +165,10 @@ But you can also create a new image with slightly different metadata, for exampl
 ```python
 # Create a new image with a different shape
 new_image = ome_zarr_container.derive_image(
-    "data/new_ome.zarr", 
-    overwrite=True, 
-    shape=(16, 128, 128), 
-    pixelsize=0.65, 
+    "data/new_ome.zarr",
+    overwrite=True,
+    shape=(16, 128, 128),
+    pixelsize=0.65,
     z_spacing=1.0
 )
 ```
@@ -186,9 +186,9 @@ x = np.random.randint(0, 255, (16, 128, 128), dtype=np.uint8)
 
 # Save as OME-Zarr
 new_ome_zarr_image = create_ome_zarr_from_array(
-    store="random_ome.zarr", 
-    array=x, 
-    pixelsize=0.65, 
+    store="random_ome.zarr",
+    array=x,
+    pixelsize=0.65,
     z_spacing=1.0
 )
 ```
@@ -199,9 +199,9 @@ Alternatively, if you wanto to create an a empty OME-Zarr image, you can use the
 from ngio import create_empty_ome_zarr
 # Create an empty OME-Zarr image
 new_ome_zarr_image = create_empty_ome_zarr(
-    store="empty_ome.zarr", 
-    shape=(16, 128, 128), 
-    pixelsize=0.65, 
+    store="empty_ome.zarr",
+    shape=(16, 128, 128),
+    pixelsize=0.65,
     z_spacing=1.0
 )
 ```
@@ -234,7 +234,7 @@ In this case we need to provide a `fractal_token` to authenticate the user.
 
 ```python
 from ngio.utils import fractal_fsspec_store
- 
+
 store = fractal_fsspec_store(url="https://fractal_url...", fractal_token="**your_secret_token**")
 ome_zarr_container = open_ome_zarr_container(store)
 ```

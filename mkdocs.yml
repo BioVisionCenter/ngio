@@ -50,7 +50,7 @@ extra:
       link: "https://github.com/BioVisionCenter/ngio"
       name: NGIO on GitHub
 
-plugins: 
+plugins:
   - search
   - autorefs
   - markdown-exec
@@ -101,7 +101,7 @@ markdown_extensions:
   - toc:
       permalink: true
       toc_depth: 3
-      
+
 
 nav:
   - "NGIO: Streamlined OME-Zarr Image Analysis": index.md
@@ -125,13 +125,13 @@ nav:
     - "Overview": table_specs/overview.md
     - "Table Backends": table_specs/backend.md
     - "Table Types":
-      - "Generic Table": table_specs/table_types/generic_table.md 
+      - "Generic Table": table_specs/table_types/generic_table.md
       - "ROI Table": table_specs/table_types/roi_table.md
       - "Masking ROI Table": table_specs/table_types/masking_roi_table.md
       - "Feature Table": table_specs/table_types/feature_table.md
       - "Condition Table": table_specs/table_types/condition_table.md
       - "Add Custom Table": table_specs/table_types/custom_table.md
-  
+
   - API Reference:
     - "OmeZarrContainer": api/ome_zarr_container.md
     - "Images": api/images.md

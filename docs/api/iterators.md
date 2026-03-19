@@ -13,5 +13,5 @@
 ::: ngio.experimental.iterators.MaskedSegmentationIterator
 
 ## FeatureExtractorIterator
-     
+
 ::: ngio.experimental.iterators.FeatureExtractorIterator

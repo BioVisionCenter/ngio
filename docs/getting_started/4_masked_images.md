@@ -10,7 +10,7 @@ from ngio import open_ome_zarr_container
 from ngio.utils import download_ome_zarr_dataset
 
 # Download a sample dataset
-download_dir = Path(".").absolute() / "data" 
+download_dir = Path(".").absolute() / "data"
 hcs_path = download_ome_zarr_dataset("CardiomyocyteSmallMip", download_dir=download_dir)
 image_path = hcs_path / "B" / "03" / "0"
 

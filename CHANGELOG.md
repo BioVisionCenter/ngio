@@ -176,7 +176,7 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 
 ### Bug Fixes
 
-- Improve robustness when rounding Rois to pixel coordinates. 
+- Improve robustness when rounding Rois to pixel coordinates.
 
 ## [v0.4.1]
 
