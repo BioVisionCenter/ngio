@@ -18,6 +18,7 @@ repos:
       - id: check-merge-conflict
       - id: debug-statements
       - id: check-added-large-files
+        exclude: "pixi\\.lock"
       - id: check-case-conflict
 
   - repo: https://github.com/abravalheri/validate-pyproject
