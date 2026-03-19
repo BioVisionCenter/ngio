@@ -252,7 +252,7 @@ bump-minor = "cz bump --increment MINOR"
 bump-major = "cz bump --increment MAJOR"
 bump-alpha = "cz bump --pre-release alpha"
 bump-beta  = "cz bump --pre-release beta"
-pre-commit = "pre-commit run --all-files"
+pre-commit = "pre-commit run --all-files; git add -u"
 
 [tool.pixi.feature.py11.dependencies]
 python = ">=3.11,<3.12"
