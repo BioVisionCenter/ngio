@@ -21,25 +21,24 @@ repos:
       - id: check-case-conflict
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
+    rev: v0.25
     hooks:
       - id: validate-pyproject
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.36.2
+    rev: v1.44.0
     hooks:
       - id: typos
-        #args: [--force-exclude]  # omitting --write-changes
         args: [--force-exclude, --write-changes]
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.12.12
+    rev: v0.15.6
     hooks:
       - id: ruff
         args: [--fix]  # may also add '--unsafe-fixes'
       - id: ruff-format
 
   - repo: https://github.com/kynan/nbstripout
-    rev: 0.8.1
+    rev: 0.9.1
     hooks:
       - id: nbstripout
