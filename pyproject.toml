@@ -204,6 +204,14 @@ ngio = ["src/ngio", "*/site-packages/ngio"]
 # https://github.com/mgedmin/check-manifest#configuration
 # add files that you want check-manifest to explicitly ignore here
 # (files that are in the repo but shouldn't go in the package)
+# https://github.com/crate-ci/typos
+[tool.typos.default.extend-words]
+# Acronyms
+OME = "OME"
+FO = "FO"
+# Surname
+Comparin = "Comparin"
+
 [tool.check-manifest]
 ignore = [
     ".pre-commit-config.yaml",

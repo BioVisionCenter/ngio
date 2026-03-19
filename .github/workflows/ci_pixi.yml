@@ -1,0 +1,63 @@
+name: CI (pixi)
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    # run every week (for --pre release tests)
+    - cron: "0 0 * * 0"
+
+# cancel in-progress runs that use the same workflow and branch
+concurrency:
+  group: ci-pixi-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    # Outputs a reduced matrix for PRs, full matrix for main/tags/schedule
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"}]' >> $GITHUB_OUTPUT
+          else
+            echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test12","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"},{"environment":"test14","platform":"ubuntu-latest"},{"environment":"test11","platform":"macos-latest"},{"environment":"test12","platform":"macos-latest"},{"environment":"test13","platform":"macos-latest"},{"environment":"test14","platform":"macos-latest"},{"environment":"test11","platform":"windows-latest"},{"environment":"test12","platform":"windows-latest"},{"environment":"test13","platform":"windows-latest"},{"environment":"test14","platform":"windows-latest"}]' >> $GITHUB_OUTPUT
+          fi
+
+  test:
+    name: ${{ matrix.platform }} (${{ matrix.environment }})
+    needs: setup
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: 🔧 Set up pixi
+        uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          environments: ${{ matrix.environment }}
+
+      - name: Restore shared data cache
+        id: cache-data
+        uses: actions/cache@v5
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          restore-keys: |
+            "${{ runner.os }}-data-"
+
+      - name: 🧪 Run Tests
+        run: pixi run -e ${{ matrix.environment }} pytest ${{ matrix.platform != 'ubuntu-latest' && '--no-cov' || '' }}

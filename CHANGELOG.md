@@ -145,7 +145,7 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 
 ### Bug Fixes
 - Fix channel selection from `wavelength_id`
-- Fix table opening mode to stop wrtiting groups when opening in append mode.
+- Fix table opening mode to stop writing groups when opening in append mode.
 
 ## [v0.4.5]
 
