@@ -62,7 +62,7 @@ image.zarr        # Zarr group for a OME-Zarr image
 ```
 
 - **Plate Tables**: These tables are a sub group of the OME-Zarr plate group and contain metadata or features related only to that specific plate.
-  
+
 ```bash
 plate.zarr       # Zarr group for a OME-Zarr HCS plate
 |

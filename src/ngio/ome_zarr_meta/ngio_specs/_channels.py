@@ -91,7 +91,7 @@ def valid_hex_color(v: str) -> bool:
     Implementation source:
     https://github.com/fractal-analytics-platform/fractal-tasks-core/fractal_tasks_core/channels.py#L87
     Original authors:
-     - Tommaso Comparin <tommaso.comparin@exact-lab.it>
+     - Tommaso Comparing <tommaso.comparin@exact-lab.it>
     """
     if len(v) != 6:
         return False

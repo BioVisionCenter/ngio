@@ -62,7 +62,7 @@ test = [
     "pytest-cov",
     "scikit-image",
     "moto[server]",
-    "boto",
+    "boto3",
     "pytest_httpserver",
     "devtools",
     "s3fs",
@@ -75,7 +75,7 @@ dev = [
     "pyqt5",
     "matplotlib",
     "notebook",
-    "mypy",
+    "ty",
     "pdbpp",        # https://github.com/pdbpp/pdbpp
     "pre-commit",
     "rich",         # https://github.com/Textualize/rich
@@ -124,13 +124,11 @@ src = ["src"]
 
 # https://docs.astral.sh/ruff/rules
 [tool.ruff.lint]
-pydocstyle = { convention = "google" }
 select = [
     "E",    # style errors
     "W",    # style warnings
     "F",    # flakes
     "D",    # pydocstyle
-    "D417", # Missing argument descriptions in Docstrings
     "I",    # isort
     "UP",   # pyupgrade
     "C4",   # flake8-comprehensions
@@ -145,42 +143,49 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*.py" = ["D", "S"]
+"tests/**/*.py" = ["D"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 # https://docs.astral.sh/ruff/formatter/
 [tool.ruff.format]
 docstring-code-format = true
-skip-magic-trailing-comma = false # default is false
 
-# https://mypy.readthedocs.io/en/stable/config_file.html
-[tool.mypy]
-files = "src/**/"
-strict = true
-ignore_missing_imports = true
-disallow_any_generics = false
-disallow_subclassing_any = false
-show_error_codes = true
-pretty = true
+# https://docs.astral.sh/ty
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.rules]
+unresolved-import = "warn"
 
 # https://docs.pytest.org/
 [tool.pytest.ini_options]
-minversion = "7.0"
+minversion = "8.0"
 testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning", # required for anndata
     "ignore::UserWarning",                 # from ngio.utils._zarr_utils
-    "ignore::DeprecationWarning",          # temporary ignore deprecation warnings
+    "ignore::DeprecationWarning:fsspec",
+    "ignore::DeprecationWarning:zarr",
+    "ignore::DeprecationWarning:anndata",
+    "ignore::DeprecationWarning:dask",
 ]
 addopts = [
     "-vv",
     "--color=yes",
-    "--cov",
+    "--cov=ngio",
     "--cov-report=term-missing",
     "--cov-report=xml",
 ]
 
 # https://coverage.readthedocs.io/
+[tool.coverage.run]
+source_pkgs = ["ngio"]
+branch = true
+omit = ["*/tests/*", "src/ngio/_version.py"]
+
 [tool.coverage.report]
 show_missing = true
 exclude_lines = [
@@ -193,14 +198,31 @@ exclude_lines = [
     "pass",
 ]
 
-[tool.coverage.run]
-source = ["ngio"]
+[tool.coverage.paths]
+ngio = ["src/ngio", "*/site-packages/ngio"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 # add files that you want check-manifest to explicitly ignore here
 # (files that are in the repo but shouldn't go in the package)
+# https://github.com/crate-ci/typos
+[tool.typos.default.extend-words]
+# Acronyms
+OME = "OME"
+FO = "FO"
+# Surname
+Comparin = "Comparin"
+
 [tool.check-manifest]
-ignore = [".pre-commit-config.yaml", ".ruff_cache/**/*", "tests/**/*"]
+ignore = [
+    ".pre-commit-config.yaml",
+    ".ruff_cache/**/*",
+    ".github/**/*",
+    "docs/**/*",
+    "pixi.lock",
+    "mkdocs.yml",
+    "CHANGELOG.md",
+    "tests/**/*",
+]
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
@@ -224,6 +246,9 @@ python = ">=3.12,<3.13"
 [tool.pixi.feature.py13.dependencies]
 python = ">=3.13,<3.14"
 
+[tool.pixi.feature.py14.dependencies]
+python = ">=3.14,<3.15"
+
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
@@ -236,6 +261,7 @@ docs = { features = ["docs"], solve-group = "py11" }
 test11 = { features = ["py11", "dev", "test"], solve-group = "py11" }
 test12 = { features = ["py12", "test"], solve-group = "py12" }
 test13 = { features = ["py13", "test"], solve-group = "py13" }
+test14 = { features = ["py14", "test"], solve-group = "py14" }
 
 # dev env
 dev = { features = ["dev", "test"], solve-group = "py11" }

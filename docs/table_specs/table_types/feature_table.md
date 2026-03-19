@@ -28,7 +28,7 @@ A feature table must include the following metadata fields in the group attribut
     "region": {"path": "../labels/label_DAPI"}, // Path to the label image associated with this feature table
     // Backend metadata
     "backend": "annadata", // the backend used to store the table, e.g. "annadata", "parquet", etc..
-    "index_key": "label", 
+    "index_key": "label",
     "index_type": "int", // Either "int" or "str"
 }
 ```
