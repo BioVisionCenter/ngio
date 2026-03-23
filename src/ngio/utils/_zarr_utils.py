@@ -2,6 +2,7 @@
 
 import json
 import logging
+import warnings
 from pathlib import Path
 from typing import Literal, TypeAlias
 
@@ -21,6 +22,7 @@ from ngio.utils._errors import (
     NgioFileNotFoundError,
     NgioValueError,
 )
+from ngio.utils._warnings import NgioUserWarning
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -38,10 +40,12 @@ StoreOrGroup: TypeAlias = NgioSupportedStore | zarr.Group
 def _check_store(store) -> NgioSupportedStore:
     """Check the store and return a valid store."""
     if not isinstance(store, NgioSupportedStore):
-        logger.warning(
+        warnings.warn(
             f"Store type {type(store)} is not explicitly supported. "
             f"Supported types are: {NgioSupportedStore}. "
-            "Proceeding, but this may lead to unexpected behavior."
+            "Proceeding, but this may lead to unexpected behavior.",
+            NgioUserWarning,
+            stacklevel=2,
         )
     return store
 
@@ -506,9 +510,11 @@ def copy_group(
         _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
         return
     if not suppress_warnings:
-        logger.warning(
+        warnings.warn(
             "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
             "This will preserve some tabular data non-zarr native (parquet, and csv), "
-            "and it will be slower for large datasets."
+            "and it will be slower for large datasets.",
+            NgioUserWarning,
+            stacklevel=2,
         )
     _zarr_python_copy(src_group, dest_group)

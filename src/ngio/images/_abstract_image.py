@@ -1,6 +1,7 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
@@ -61,6 +62,7 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
 )
 from ngio.tables import RoiTable
 from ngio.utils import (
+    NgioDeprecationWarning,
     NgioFileExistsError,
     NgioValueError,
     StoreOrGroup,
@@ -989,16 +991,20 @@ def abstract_derive(
     """
     # TODO: remove in ngio 0.6
     if labels is not None:
-        logger.warning(
+        warnings.warn(
             "The 'labels' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'channels_meta' instead."
+            "ngio=0.6. Please use 'channels_meta' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         channels_meta = list(labels)
     if pixel_size is not None:
-        logger.warning(
+        warnings.warn(
             "The 'pixel_size' argument is deprecated and will be removed in "
             "ngio=0.6. Please use 'pixelsize', 'z_spacing', and 'time_spacing'"
-            "instead."
+            "instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         pixelsize = (pixel_size.y, pixel_size.x)
     # End of deprecated arguments handling

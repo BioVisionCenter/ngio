@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import warnings
 from collections.abc import Sequence
 from typing import Literal
 
@@ -42,6 +43,7 @@ from ngio.tables import (
 from ngio.utils import (
     AccessModeLiteral,
     NgioCache,
+    NgioDeprecationWarning,
     NgioError,
     NgioValueError,
     StoreOrGroup,
@@ -920,10 +922,12 @@ class OmeZarrPlate:
 
         """
         if check_type is not None:
-            logger.warning(
+            warnings.warn(
                 "The 'check_type' argument is deprecated and will be removed in "
                 "ngio=0.6. Please use 'get_table_as' instead or one of the "
-                "type specific get_*table() methods."
+                "type specific get_*table() methods.",
+                NgioDeprecationWarning,
+                stacklevel=2,
             )
         return self.tables_container.get(name=name, strict=False)
 
@@ -1223,9 +1227,11 @@ def create_empty_plate(
         overwrite (bool): Whether to overwrite the existing plate.
     """
     if version is not None:
-        logger.warning(
+        warnings.warn(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead."
+            "Please use 'ngff_version' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         ngff_version = version
     plate_meta = NgioPlateMeta.default_init(
@@ -1278,9 +1284,11 @@ def derive_ome_zarr_plate(
         overwrite (bool): Whether to overwrite the existing plate.
     """
     if version is not None:
-        logger.warning(
+        warnings.warn(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead."
+            "Please use 'ngff_version' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         ngff_version = version
 
@@ -1341,9 +1349,11 @@ def create_empty_well(
         overwrite (bool): Whether to overwrite the existing well.
     """
     if version is not None:
-        logger.warning(
+        warnings.warn(
             "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead."
+            "Please use 'ngff_version' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         ngff_version = version
     group_handler = ZarrGroupHandler(
