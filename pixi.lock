@@ -7961,8 +7961,8 @@ packages:
   requires_python: '>=3.11,!=3.14.1'
 - pypi: ./
   name: ngio
-  version: 0.5.8.dev21+gfaba764d3.d20260323
-  sha256: aa43e750de9ffa2b50fe4fa0cc60b67d368733d5a86e1870e626a88be44c8c9e
+  version: 0.5.8.dev29+g759588619.d20260323
+  sha256: 32d90cf9d2050afdcd797de28016720bbbff8ed00e5b198e58ba9a10a780d79e
   requires_dist:
   - aiohttp
   - anndata

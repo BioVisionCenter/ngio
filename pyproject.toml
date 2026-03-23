@@ -167,7 +167,6 @@ testpaths = ["tests"]
 filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning",                    # required for anndata
-    "ignore::ngio.utils.NgioUserWarning",                     # ngio internal behavioral warnings
     "ignore::anndata._warnings.ImplicitModificationWarning",  # anndata internal index coercion
     "ignore::UserWarning:anndata._io.zarr",                   # anndata zarr v2→v3 migration notice
 ]
@@ -181,9 +180,7 @@ addopts = [
 
 # https://coverage.readthedocs.io/
 [tool.coverage.run]
-source_pkgs = ["ngio"]
-branch = true
-omit = ["*/tests/*", "src/ngio/_version.py"]
+source = ["ngio"]
 
 [tool.coverage.report]
 show_missing = true
@@ -196,9 +193,6 @@ exclude_lines = [
     "raise NotImplementedError()",
     "pass",
 ]
-
-[tool.coverage.paths]
-ngio = ["src/ngio", "*/site-packages/ngio"]
 
 # https://github.com/mgedmin/check-manifest#configuration
 # add files that you want check-manifest to explicitly ignore here

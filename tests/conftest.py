@@ -6,6 +6,15 @@ import pytest
 
 from ngio.utils import download_ome_zarr_dataset
 
+
+def pytest_configure(config):
+    """Register custom warning filters."""
+    config.addinivalue_line(
+        "filterwarnings",
+        "ignore::ngio.utils._warnings.NgioUserWarning",
+    )
+
+
 zenodo_download_dir = Path(__file__).parent.parent / "data"
 os.makedirs(zenodo_download_dir, exist_ok=True)
 cardiomyocyte_tiny_source_path = download_ome_zarr_dataset(
