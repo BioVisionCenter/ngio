@@ -12,6 +12,7 @@ from ngio import (
 from ngio.images._image import ChannelSelectionModel
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.ome_zarr_meta import ChannelsMeta
 from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
@@ -134,14 +135,14 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
         store,
         shape=(10, 20, 30),
         chunks=(1, 20, 30),
-        xy_pixelsize=0.5,
+        pixelsize=0.5,
         levels=3,
         dtype="uint8",
     )
 
     assert isinstance(ome_zarr.__repr__(), str)
     assert ome_zarr.levels == 3
-    assert ome_zarr.levels_paths == ["0", "1", "2"]
+    assert ome_zarr.level_paths == ["0", "1", "2"]
     assert ome_zarr.is_3d
     assert not ome_zarr.is_time_series
     assert not ome_zarr.is_multi_channels
@@ -187,7 +188,11 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     image.consolidate(mode=array_mode)  # type: ignore
 
     # Omero-meta
-    ome_zarr.set_channel_meta(labels=["channel_x"], wavelength_id=["500"])
+    ome_zarr.set_channel_meta(
+        channel_meta=ChannelsMeta.default_init(
+            labels=["channel_x"], wavelength_id=["500"]
+        )
+    )
     image = ome_zarr.get_image()
     assert image.channel_labels == ["channel_x"]
     assert image.wavelength_ids == ["500"]
@@ -204,7 +209,6 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert channels_meta is not None
     assert channels_meta.channels[0].channel_visualisation.color == "00FF00"
 
-    ome_zarr.set_channel_percentiles()
     ome_zarr.set_channel_windows_with_percentiles()
     ome_zarr.set_channel_windows(starts_ends=[(10, 200)], min_max=[(0, 255)])
     channels_meta = ome_zarr.meta.channels_meta
@@ -273,7 +277,7 @@ def test_get_and_squeeze(tmp_path: Path):
     ome_zarr = create_empty_ome_zarr(
         store,
         shape=(1, 20, 30),
-        xy_pixelsize=0.5,
+        pixelsize=0.5,
         levels=1,
         axes_names=["c", "y", "x"],
         dtype="uint8",
@@ -342,7 +346,7 @@ def test_derive_image_and_labels(tmp_path: Path):
     ome_zarr = create_empty_ome_zarr(
         store,
         shape=(3, 20, 30),
-        xy_pixelsize=0.5,
+        pixelsize=0.5,
         levels=1,
         axes_names=["c", "y", "x"],
         dtype="uint8",

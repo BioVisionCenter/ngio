@@ -23,58 +23,58 @@ from ngio.utils import NgioValueError
         {
             "store": "test_image_yx._zarr",
             "shape": (64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "axes_names": ["y", "x"],
         },
         {
             "store": "test_image_cyx.zarr",
             "shape": (2, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "axes_names": ["c", "y", "x"],
-            "channel_labels": ["channel1", "channel2"],
+            "channels_meta": ["channel1", "channel2"],
         },
         {
             "store": "test_image_zyx.zarr",
             "shape": (3, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "z_spacing": 2.0,
             "axes_names": ["z", "y", "x"],
         },
         {
             "store": "test_image_czyx.zarr",
             "shape": (2, 3, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "z_spacing": 2.0,
             "axes_names": ["c", "z", "y", "x"],
-            "channel_labels": ["channel1", "channel2"],
+            "channels_meta": ["channel1", "channel2"],
         },
         {
             "store": "test_image_c1yx.zarr",
             "shape": (2, 1, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "z_spacing": 1.0,
             "axes_names": ["c", "z", "y", "x"],
-            "channel_labels": ["channel1", "channel2"],
+            "channels_meta": ["channel1", "channel2"],
         },
         {
             "store": "test_image_tyx.zarr",
             "shape": (4, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "time_spacing": 4.0,
             "axes_names": ["t", "y", "x"],
         },
         {
             "store": "test_image_tcyx.zarr",
             "shape": (4, 2, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "time_spacing": 4.0,
             "axes_names": ["t", "c", "y", "x"],
-            "channel_labels": ["channel1", "channel2"],
+            "channels_meta": ["channel1", "channel2"],
         },
         {
             "store": "test_image_tzyx.zarr",
             "shape": (4, 3, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "z_spacing": 2.0,
             "time_spacing": 4.0,
             "axes_names": ["t", "z", "y", "x"],
@@ -82,11 +82,11 @@ from ngio.utils import NgioValueError
         {
             "store": "test_image_tczyx.zarr",
             "shape": (4, 2, 3, 64, 64),
-            "xy_pixelsize": 0.5,
+            "pixelsize": 0.5,
             "z_spacing": 2.0,
             "time_spacing": 4.0,
             "axes_names": ["t", "c", "z", "y", "x"],
-            "channel_labels": ["channel1", "channel2"],
+            "channels_meta": ["channel1", "channel2"],
         },
     ],
 )
@@ -113,7 +113,7 @@ def test_create_fail(tmp_path: Path):
         create_ome_zarr_from_array(
             array=np.random.randint(0, 255, (64, 64), dtype="uint8"),
             store=tmp_path / "fail.zarr",
-            xy_pixelsize=0.5,
+            pixelsize=0.5,
             axes_names=["z", "y", "x"],  # should fail expected yx
             levels=1,
             overwrite=True,
@@ -123,10 +123,10 @@ def test_create_fail(tmp_path: Path):
         create_ome_zarr_from_array(
             array=np.random.randint(0, 255, (2, 64, 64), dtype="uint8"),
             store=tmp_path / "fail.zarr",
-            xy_pixelsize=0.5,
+            pixelsize=0.5,
             axes_names=["c", "y", "x"],
             levels=1,
-            channel_labels=[
+            channels_meta=[
                 "channel1",
                 "channel2",
                 "channel3",
@@ -138,7 +138,7 @@ def test_create_fail(tmp_path: Path):
         create_ome_zarr_from_array(
             array=np.random.randint(0, 255, (2, 64, 64), dtype="uint8"),
             store=tmp_path / "fail.zarr",
-            xy_pixelsize=0.5,
+            pixelsize=0.5,
             axes_names=["c", "y", "x"],
             levels=1,
             chunks=(1, 64, 64, 64),  # should fail expected 3 axes
@@ -177,7 +177,7 @@ def test_derive_from_non_dishogeneus_shapes():
     )
     ome_zarr = OmeZarrContainer(group_handler=image_handler, axes_setup=axes_setup)
     ome_zarr.derive_label("test-label-same", channels_policy="same")
-    for path in ome_zarr.levels_paths:
+    for path in ome_zarr.level_paths:
         img = ome_zarr.get_image(path=path)
         lbl = ome_zarr.get_label(name="test-label-same", path=path)
         assert img.shape == lbl.shape
@@ -234,7 +234,7 @@ def test_fail_derive_singleton():
     ]
     expected_pixel_size_x = [0.5, 1.0, 2.0, 2.0, 2.0]
     for path, shape, px_x in zip(
-        ome_zarr.levels_paths, expected_shapes, expected_pixel_size_x, strict=True
+        ome_zarr.level_paths, expected_shapes, expected_pixel_size_x, strict=True
     ):
         img = ome_zarr.get_image(path=path)
         assert img.shape == shape
@@ -281,7 +281,7 @@ def derive_from_legacy_images(tmp_path: Path):
 
     # Tes1 plain derive label
     ome_zarr.derive_label(name="my_label")
-    for level in ome_zarr.levels_paths:
+    for level in ome_zarr.level_paths:
         scale_yx = ome_zarr.get_image(path=level).dataset.scale[-2:]
         label = ome_zarr.get_label(name="my_label", path=level)
         label_scale_yx = label.dataset.scale[-2:]
