@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.5.8]
+
+### Fix
+- Change tolerance when converting Roi to pixel coordinates to avoid machine precision dependent rounding issues.
+
+### Tests
+- Improve testing for ZoomTransform.
+
 ## [v0.5.7]
 
 ### Fix
@@ -7,7 +15,7 @@
 
 ## [v0.5.6]
 
-### Fixes
+### Fix
 - Fix translation check in `_ngio_to_v04_multiscale` and `_ngio_to_v05_multiscale`: translations were incorrectly dropped when all values were negative or when positive and negative values cancelled out.
 - Fix shape compatibility check in `_check_compatibility_of_shapes`: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.
 
@@ -122,7 +130,7 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 - Standardized all deprecation warnings to indicate removal in `ngio=0.6`.
 - Deprecated `set_channel_percentiles` method, use `set_channel_windows_with_percentiles` instead.
 
-### Bug Fixes
+### Fix
 - Fix bug in `consolidate` function when using coarsening mode with non power-of-two shapes.
 - Fix HCS plate column name formatting to use standardized zero-padding (e.g., column `3` is now stored as `"03"`).
 - Fix `_stringify_column` not passing `num_digits` parameter to `_format_int_column`.
@@ -140,28 +148,26 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 
 ## [v0.4.7]
 
-### Bug Fixes
+### Fix
 - Fix bug adding time axis to masking roi tables.
-
-### Bug Fixes
 - Fix channel selection from `wavelength_id`
 - Fix table opening mode to stop writing groups when opening in append mode.
 
 ## [v0.4.5]
 
-### Bug Fixes
+### Fix
 - Pin Dask to version <2025.11 to avoid errors when writing zarr pyramids with dask (see https://github.com/dask/dask/issues/12159#issuecomment-3548421833)
 
 ## [v0.4.4]
 
-### Bug Fixes
+### Fix
 
 - Fix bug in channel visualization when using hex colors with leading '#'.
 - Remove strict range check in channel window.
 
 ## [v0.4.3]
 
-### Bug Fixes
+### Fix
 
 - Fix bug in deriving labels and image from OME-Zarr with non standard path names.
 - Add missing pillow dependency.
@@ -174,13 +180,13 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 - Make roi.to_slicing_dict(pixel_size) always require pixel_size argument for consistency with other roi methods.
 - Make PixelSize object a Pydantic model to allow for serialization.
 
-### Bug Fixes
+### Fix
 
 - Improve robustness when rounding Rois to pixel coordinates.
 
 ## [v0.4.1]
 
-### Bug Fixes
+### Fix
 - Fix bug in zoom transform when input axes contain unknown axes (e.g. virtual axes). Now unknown axes are treated as virtual axes and set to 1 in the target shape.
 
 ## [v0.4.0]
@@ -233,7 +239,7 @@ create_empty_ome_zarr(..., ngff_version="0.4")
 
 - change table backend default to `anndata_v1` for backward compatibility. This will be chaanged again when ngio `v0.2.x` is no longer supported.
 
-### Bug Fixes
+### Fix
 
 - fix [#13](https://github.com/BioVisionCenter/fractal-converters-tools/issues/13) (converters tools)
 - fix [#88](https://github.com/BioVisionCenter/ngio/issues/88)

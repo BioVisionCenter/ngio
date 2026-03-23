@@ -15,12 +15,14 @@ from ngio.utils import NgioValueError
 SliceValueType: TypeAlias = float | tuple[float | None, float | None] | slice
 
 
-def world_to_pixel(value: float, pixel_size: float, eps: float = 1e-6) -> float:
+def world_to_pixel(value: float, pixel_size: float, eps: float = 1e-2) -> float:
     raster_value = value / pixel_size
 
-    # If the value is very close to an integer, round it
-    # This ensures that we don't have floating point precision issues
-    # When loading ROIs that were originally defined in pixel coordinates
+    # Round to nearest integer if within eps, this allows to keep pixel-aligned ROIs
+    # when machine precision issues would otherwise make them slightly off.
+    # Since errors in precision are both on the value and the pixel size,
+    # the tolerance must be large enough to accommodate compounded errors,
+    # we default to 1e-2 which allows for ~1% error.
     _rounded = round(raster_value)
     if abs(_rounded - raster_value) < eps:
         return _rounded
