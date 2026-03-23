@@ -93,6 +93,5 @@ tests/_v01
 # Benchmarks
 benchmark/*
 
-# Agents files (for now let's not track them)
-AGENTS.md
-CLAUDE.md
+# Claude settings
+.claude

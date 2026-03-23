@@ -1,5 +1,6 @@
 import logging
 import math
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import TypeAlias, assert_never
 
@@ -11,7 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from ngio.common._dimensions import Dimensions
 from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
-from ngio.utils import NgioValueError
+from ngio.utils import NgioUserWarning, NgioValueError
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -144,11 +145,13 @@ def _check_list_in_slicing_tuple(
     # Complex case, we have exactly one tuple in the slicing tuple
     ax, first_tuple = list_in_slice[0]
     if len(first_tuple) > 100:
-        logger.warning(
+        warnings.warn(
             "Performance warning: "
             "Non-contiguous slicing with a tuple/list with more than 100 elements is "
             "not natively supported by zarr. This is implemented by Ngio by performing "
-            "multiple reads and stacking the result."
+            "multiple reads and stacking the result.",
+            NgioUserWarning,
+            stacklevel=2,
         )
     return ax, first_tuple
 

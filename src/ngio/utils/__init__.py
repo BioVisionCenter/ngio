@@ -14,6 +14,7 @@ from ngio.utils._errors import (
     NgioValueError,
 )
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
+from ngio.utils._warnings import NgioDeprecationWarning, NgioUserWarning
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     NgioCache,
@@ -27,11 +28,13 @@ from ngio.utils._zarr_utils import (
 __all__ = [
     "AccessModeLiteral",
     "NgioCache",
+    "NgioDeprecationWarning",
     "NgioError",
     "NgioFileExistsError",
     "NgioFileNotFoundError",
     "NgioSupportedStore",
     "NgioTableValidationError",
+    "NgioUserWarning",
     "NgioValidationError",
     "NgioValueError",
     "StoreOrGroup",

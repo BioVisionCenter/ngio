@@ -1,6 +1,7 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -36,6 +37,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import (
+    NgioDeprecationWarning,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -454,9 +456,11 @@ class ImagesContainer:
     @property
     def levels_paths(self) -> list[str]:
         """Deprecated: use 'level_paths' instead."""
-        logger.warning(
+        warnings.warn(
             "'levels_paths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'level_paths' instead."
+            "Please use 'level_paths' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         return self.level_paths
 
@@ -668,11 +672,13 @@ class ImagesContainer:
             ]
         )
         if _is_legacy:
-            logger.warning(
+            warnings.warn(
                 "The following parameters are deprecated and will be removed in "
                 "ngio=0.6: labels, wavelength_id, start, end, percentiles, "
                 "colors, active, omero_kwargs. Please use the "
-                "'channel_meta' parameter instead."
+                "'channel_meta' parameter instead.",
+                NgioDeprecationWarning,
+                stacklevel=2,
             )
             self._set_channel_meta_legacy(
                 labels=labels,
@@ -743,9 +749,11 @@ class ImagesContainer:
             start_percentile (float): The start percentile.
             end_percentile (float): The end percentile.
         """
-        logger.warning(
+        warnings.warn(
             "The 'set_channel_percentiles' method is deprecated and will be removed in "
-            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead."
+            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
+            NgioDeprecationWarning,
+            stacklevel=2,
         )
         self.set_channel_windows_with_percentiles(
             percentiles=(start_percentile, end_percentile)

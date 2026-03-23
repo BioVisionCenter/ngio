@@ -7,6 +7,10 @@
 
 ### Tests
 - Improve testing for ZoomTransform.
+- Remove broad warnings filter for all tests.
+
+### Chores
+- Replace custom logger warnings with standard Python warnings for better integration with user applications.
 
 ## [v0.5.7]
 

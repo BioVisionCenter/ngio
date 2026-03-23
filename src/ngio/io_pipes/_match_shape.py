@@ -1,11 +1,12 @@
 import logging
+import warnings
 from collections.abc import Sequence
 from enum import StrEnum
 
 import dask.array as da
 import numpy as np
 
-from ngio.utils import NgioValueError
+from ngio.utils import NgioUserWarning, NgioValueError
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -30,9 +31,11 @@ def _compute_pad_widths(
             pad_def.append((before, after))
         else:
             pad_def.append((0, 0))
-    logger.warning(
+    warnings.warn(
         f"Images have a different shape ({array_shape} vs {target_shape}). "
-        f"Resolving by padding: {pad_def}"
+        f"Resolving by padding: {pad_def}",
+        NgioUserWarning,
+        stacklevel=2,
     )
     return tuple(pad_def)
 
@@ -76,9 +79,11 @@ def _compute_trim_slices(
         else:
             slices.append(slice(0, s))
 
-    logger.warning(
+    warnings.warn(
         f"Images have a different shape ({array_shape} vs {target_shape}). "
-        f"Resolving by trimming: {slices}"
+        f"Resolving by trimming: {slices}",
+        NgioUserWarning,
+        stacklevel=2,
     )
     return tuple(slices)
 

@@ -24,7 +24,7 @@ def create_sample_ome_zarr(
     ome_zarr_container = create_empty_ome_zarr(
         store=store,
         shape=(32, 32),
-        xy_pixelsize=0.1,
+        pixelsize=0.1,
     )
     for table_name in tables:
         table_data = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6], "label": [1, 2, 3]})

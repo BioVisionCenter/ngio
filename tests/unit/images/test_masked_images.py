@@ -41,12 +41,12 @@ def test_get_masking(tmp_path: Path, shape: tuple[int, ...]):
     ome_zarr = create_ome_zarr_from_array(
         store=store,
         array=mask,
-        xy_pixelsize=0.5,
+        pixelsize=0.5,
         levels=2,
         overwrite=True,
     )
     full_res_image = ome_zarr.get_image(path="0")
-    for level_path in ome_zarr.levels_paths:
+    for level_path in ome_zarr.level_paths:
         label_name = f"label_{level_path}"
         masking_table_name = f"label_ROI_table_{level_path}"
         image = ome_zarr.get_image(path=level_path)
@@ -85,7 +85,7 @@ def test_masking(
     ome_zarr = create_ome_zarr_from_array(
         store=store,
         array=mask,
-        xy_pixelsize=0.5,
+        pixelsize=0.5,
         levels=1,
         overwrite=True,
     )

@@ -52,10 +52,10 @@ def test_image_require_axes_match(
     path1 = tmp_path / "image1.zarr"
     path2 = tmp_path / "image2.zarr"
     create_empty_ome_zarr(
-        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=0.5, levels=1
+        store=path1, shape=shape1, axes_names=axes1, pixelsize=0.5, levels=1
     )
     create_empty_ome_zarr(
-        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=0.5, levels=1
+        store=path2, shape=shape2, axes_names=axes2, pixelsize=0.5, levels=1
     )
     img1 = open_image(path1)
     img2 = open_image(path2)
@@ -84,10 +84,10 @@ def test_image_require_dimensions_match(
     path1 = tmp_path / "image1.zarr"
     path2 = tmp_path / "image2.zarr"
     create_empty_ome_zarr(
-        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=0.5, levels=1
+        store=path1, shape=shape1, axes_names=axes1, pixelsize=0.5, levels=1
     )
     create_empty_ome_zarr(
-        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=0.5, levels=1
+        store=path2, shape=shape2, axes_names=axes2, pixelsize=0.5, levels=1
     )
     img1 = open_image(path1)
     img2 = open_image(path2)
@@ -119,10 +119,10 @@ def test_image_require_can_be_rescaled(
     path1 = tmp_path / "image1.zarr"
     path2 = tmp_path / "image2.zarr"
     create_empty_ome_zarr(
-        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=1.0, levels=1
+        store=path1, shape=shape1, axes_names=axes1, pixelsize=1.0, levels=1
     )
     create_empty_ome_zarr(
-        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=xy_pixelsize, levels=1
+        store=path2, shape=shape2, axes_names=axes2, pixelsize=xy_pixelsize, levels=1
     )
     img1 = open_image(path1)
     img2 = open_image(path2)
@@ -168,10 +168,10 @@ def test_image_require_can_be_rescaled2(
     path1 = tmp_path / "image1.zarr"
     path2 = tmp_path / "image2.zarr"
     create_empty_ome_zarr(
-        store=path1, shape=shape1, axes_names=axes1, xy_pixelsize=1.0, levels=1
+        store=path1, shape=shape1, axes_names=axes1, pixelsize=1.0, levels=1
     )
     create_empty_ome_zarr(
-        store=path2, shape=shape2, axes_names=axes2, xy_pixelsize=xy_pixelsize, levels=1
+        store=path2, shape=shape2, axes_names=axes2, pixelsize=xy_pixelsize, levels=1
     )
     img1 = open_image(path1)
     img2 = open_image(path2)
@@ -205,10 +205,10 @@ def test_zoom_virtual_axes(
     path1 = tmp_path / "image1.zarr"
     path2 = tmp_path / "image2.zarr"
     create_empty_ome_zarr(
-        store=path1, shape=(3, 16, 16, 16), axes_names="czyx", xy_pixelsize=1.0
+        store=path1, shape=(3, 16, 16, 16), axes_names="czyx", pixelsize=1.0
     )
     create_empty_ome_zarr(
-        store=path2, shape=(16, 32, 32), axes_names="zyx", xy_pixelsize=0.5
+        store=path2, shape=(16, 32, 32), axes_names="zyx", pixelsize=0.5
     )
     img1 = open_image(path1)
     img2 = open_image(path2)
@@ -240,12 +240,12 @@ def test_derive_image_consistency(
         store=path1,
         shape=(3, 16, 16, 16),
         axes_names="czyx",
-        xy_pixelsize=1.0,
+        pixelsize=1.0,
         levels=["s0", "s1", "s2"],
     )
     ome_zarr_der = ome_zarr.derive_image(tmp_path / "derived_image.zarr")
     assert ome_zarr.channel_labels == ome_zarr_der.channel_labels
-    assert ome_zarr.levels_paths == ome_zarr_der.levels_paths
+    assert ome_zarr.level_paths == ome_zarr_der.level_paths
     assert ome_zarr.space_unit == ome_zarr_der.space_unit
     assert ome_zarr.time_unit == ome_zarr_der.time_unit
 
@@ -267,7 +267,7 @@ def test_consolidate_consistency(shape, factors):
         store,
         shape=shape,
         axes_names="zyx",
-        xy_pixelsize=1.0,
+        pixelsize=1.0,
         scaling_factors=factors,
         levels=3,
     )
@@ -279,7 +279,7 @@ def test_consolidate_consistency(shape, factors):
     derived_image = derived_ome_zarr.get_image()
     derived_image.consolidate()
 
-    for level_path in ome_zarr.levels_paths:
+    for level_path in ome_zarr.level_paths:
         img1 = ome_zarr.get_image(path=level_path)
         img2 = derived_ome_zarr.get_image(path=level_path)
         assert img1.shape == img2.shape, (
