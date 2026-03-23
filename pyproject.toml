@@ -166,12 +166,10 @@ minversion = "8.0"
 testpaths = ["tests"]
 filterwarnings = [
     "error",
-    "ignore::zarr.errors.ZarrUserWarning", # required for anndata
-    "ignore::UserWarning",                 # from ngio.utils._zarr_utils
-    "ignore::DeprecationWarning:fsspec",
-    "ignore::DeprecationWarning:zarr",
-    "ignore::DeprecationWarning:anndata",
-    "ignore::DeprecationWarning:dask",
+    "ignore::zarr.errors.ZarrUserWarning",                    # required for anndata
+    "ignore::ngio.utils.NgioUserWarning",                     # ngio internal behavioral warnings
+    "ignore::anndata._warnings.ImplicitModificationWarning",  # anndata internal index coercion
+    "ignore::UserWarning:anndata._io.zarr",                   # anndata zarr v2→v3 migration notice
 ]
 addopts = [
     "-vv",

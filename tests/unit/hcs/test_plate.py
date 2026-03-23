@@ -238,7 +238,6 @@ def test_tables_api(tmp_path: Path):
     test_plate.delete_table("non_existing_table", missing_ok=True)
 
 
-@pytest.mark.filterwarnings("ignore::anndata._warnings.ImplicitModificationWarning")
 def test_plate_table_aggregations(cardiomyocyte_small_mip_path: Path):
     ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_small_mip_path)
     expected_tables = [
