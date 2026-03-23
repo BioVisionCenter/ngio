@@ -51,14 +51,14 @@ def test_zoom_from_dimensions(tmp_path: Path):
         store=tmp_path / "original.zarr",
         shape=(101, 101),
         axes_names="yx",
-        xy_pixelsize=1.0,
+        pixelsize=1.0,
     ).get_image()
 
     img = create_empty_ome_zarr(
         store=tmp_path / "img.zarr",
         shape=(25, 25),
         axes_names="yx",
-        xy_pixelsize=4.0,
+        pixelsize=4.0,
     ).get_image()
 
     zoom = ZoomTransform(

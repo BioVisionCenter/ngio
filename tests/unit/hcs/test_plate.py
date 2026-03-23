@@ -213,14 +213,14 @@ def test_tables_api(tmp_path: Path):
             Roi.from_values(
                 name="roi_1", slices={"x": (0, 10), "y": (0, 10), "z": (0, 10)}
             )
-        ]  # type: ignore
+        ]
     )
     test_plate.add_table("test_roi_table", test_roi_table)
     assert test_plate.list_tables() == ["test_table", "test_roi_table"]
     assert test_plate.list_roi_tables() == ["test_roi_table"]
 
     pdt.assert_frame_equal(
-        test_plate.get_table("test_table").dataframe,  # type: ignore
+        test_plate.get_table("test_table").dataframe,
         test_df,
         check_names=False,
     )
