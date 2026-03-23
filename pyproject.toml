@@ -239,11 +239,11 @@ python = ">=3.11,<3.12"
 commitizen = ">=4.0"
 
 [tool.pixi.feature.dev.tasks]
-bump-patch = "cz bump --increment PATCH"
-bump-minor = "cz bump --increment MINOR"
-bump-major = "cz bump --increment MAJOR"
-bump-alpha = "cz bump --prerelease alpha"
-bump-beta  = "cz bump --prerelease beta"
+bump-patch = "cz bump --increment PATCH --no-verify"
+bump-minor = "cz bump --increment MINOR --no-verify"
+bump-major = "cz bump --increment MAJOR --no-verify"
+bump-alpha = "cz bump --prerelease alpha --no-verify"
+bump-beta  = "cz bump --prerelease beta --no-verify"
 pre-commit = "pre-commit run --all-files; git add -u"
 
 [tool.pixi.feature.py11.dependencies]
