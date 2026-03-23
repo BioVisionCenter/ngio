@@ -17,10 +17,10 @@ pixi shell -e dev                     # Activate dev environment (Python 3.11)
 
 ### Testing
 ```bash
-rtk pixi run -e dev pytest                          # Run all tests (dev env)
-rtk pixi run -e test11 pytest                       # Python 3.11
-rtk pixi run -e test12 pytest                       # Python 3.12
-rtk pixi run -e test13 pytest                       # Python 3.13
+pixi run -e dev pytest                          # Run all tests (dev env)
+pixi run -e test11 pytest                       # Python 3.11
+pixi run -e test12 pytest                       # Python 3.12
+pixi run -e test13 pytest                       # Python 3.13
 ```
 
 ### Linting & Formatting
