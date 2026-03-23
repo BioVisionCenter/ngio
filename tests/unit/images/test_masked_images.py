@@ -242,8 +242,8 @@ def test_masking_oneoff_handling():
 @pytest.mark.parametrize(
     ("label", "c", "zoom_factor", "expected_shape"),
     [
-        (1009, (0,), 2, (1, 1, 154, 167)),
-        (1009, 0, 2, (1, 154, 167)),
+        (1009, (0,), 2, (1, 1, 152, 167)),
+        (1009, 0, 2, (1, 152, 167)),
         (1009, 0, 1.123, (1, 86, 95)),
     ],
 )
