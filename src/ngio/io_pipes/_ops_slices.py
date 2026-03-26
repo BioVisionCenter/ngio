@@ -2,15 +2,16 @@ import logging
 import math
 import warnings
 from collections.abc import Mapping, Sequence
-from typing import TypeAlias, assert_never
+from typing import TypeAlias
 
 import dask.array as da
 import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict
+from zarr.core.chunk_grids import ChunkGrid
+from zarr.core.indexing import OrthogonalIndexer
 
 from ngio.common._dimensions import Dimensions
-from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioUserWarning, NgioValueError
 
@@ -60,15 +61,21 @@ def _slicing_tuple_boundary_check(
             if stop is not None:
                 stop = math.ceil(stop)
                 stop = max(0, min(stop, sh))
+            if start is not None and stop is not None and start > stop:
+                stop = start
             out_slicing_tuple.append(slice(start, stop, step))
         elif isinstance(sl, int):
             _int_boundary_check(sl, shape=sh)
             out_slicing_tuple.append(sl)
         elif isinstance(sl, list):
-            [_int_boundary_check(i, shape=sh) for i in sl]
+            for i in sl:
+                _int_boundary_check(i, shape=sh)
             out_slicing_tuple.append(sl)
         else:
-            assert_never(sl)
+            raise NgioValueError(
+                f"Invalid slice {sl} of type {type(sl)} in slicing tuple\n"
+                f"{slicing_tuple}. Allowed types are: int, slice or list of int."
+            )
 
     return tuple(out_slicing_tuple)
 
@@ -78,7 +85,7 @@ class SlicingOps(BaseModel):
 
     on_disk_axes: tuple[str, ...]
     on_disk_shape: tuple[int, ...]
-    on_disk_chunks: tuple[int, ...]
+    chunk_grid: ChunkGrid
     slicing_tuple: tuple[SlicingType, ...]
     model_config = ConfigDict(extra="forbid", arbitrary_types_allowed=True)
 
@@ -101,12 +108,13 @@ class SlicingOps(BaseModel):
         return tuple(in_memory_axes)
 
     def slice_chunks(self) -> set[tuple[int, ...]]:
-        """The required to read or write the slice."""
-        return compute_slice_chunks(
+        """The chunk coordinates required to read or write the slice."""
+        indexer = OrthogonalIndexer(
+            selection=self.normalized_slicing_tuple,
             shape=self.on_disk_shape,
-            chunks=self.on_disk_chunks,
-            slicing_tuple=self.normalized_slicing_tuple,
+            chunk_grid=self.chunk_grid,
         )
+        return {cc.chunk_coords for cc in indexer}
 
     def get(self, ax_name: str, normalize: bool = False) -> SlicingType:
         """Get the slicing tuple."""
@@ -129,11 +137,8 @@ def _check_list_in_slicing_tuple(
     Ngio support a single list in the slicing tuple to allow non-contiguous
     selection (main use case: selecting multiple channels).
     """
-    # Find if the is any list in the slicing tuple
-    # If there is one we need to handle it differently
     list_in_slice = [(i, s) for i, s in enumerate(slicing_tuple) if isinstance(s, list)]
     if not list_in_slice:
-        # No list in the slicing tuple
         return None, None
 
     if len(list_in_slice) > 1:
@@ -142,7 +147,7 @@ def _check_list_in_slicing_tuple(
             "is not supported yet in Ngio. Use directly the "
             "zarr.Array api to get the correct array slice."
         )
-    # Complex case, we have exactly one tuple in the slicing tuple
+    # Complex case, we have exactly one list in the slicing tuple
     ax, first_tuple = list_in_slice[0]
     if len(first_tuple) > 100:
         warnings.warn(
@@ -166,9 +171,12 @@ def _check_list_in_slicing_tuple(
 def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.ndarray:
     """Get a slice of a zarr array as a numpy array."""
     slicing_tuple = slicing_ops.normalized_slicing_tuple
-    # Find if the is any tuple in the slicing tuple
-    # If there is one we need to handle it differently
-    return zarr_array[slicing_tuple]
+    array = zarr_array[slicing_tuple]
+    if not isinstance(array, np.ndarray):
+        raise NgioValueError(
+            f"Expected numpy array from zarr slice, got {type(array)}."
+        )
+    return array
 
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
@@ -249,12 +257,10 @@ def set_slice_as_dask(
     ax, first_tuple = _check_list_in_slicing_tuple(slice_tuple)
     patch, slice_tuple = handle_int_set_as_dask(patch, slice_tuple)
     if ax is None:
-        # Base case, no tuple in the slicing tuple
-        # assert False
         da.to_zarr(arr=patch, url=zarr_array, region=slice_tuple)
         return
 
-    # Complex case, we have exactly one tuple in the slicing tuple
+    # Complex case, we have exactly one list in the slicing tuple
     assert first_tuple is not None
     for i, idx in enumerate(first_tuple):
         _sub_slice = (*slice_tuple[:ax], slice(idx, idx + 1), *slice_tuple[ax + 1 :])
@@ -271,15 +277,11 @@ def set_slice_as_dask(
 
 
 def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
-    """Try to convert a list of integers into a slice if they are contiguous.
+    """Try to convert a sequence of integers into a slice if they are contiguous.
 
-    - If the input is empty, return an empty tuple.
-    - If the input is sorted, and contains contiguous integers,
+    - If the input is sorted and contains contiguous integers,
       return a slice from the minimum to the maximum integer.
     - Otherwise, return the input as a list of integers.
-
-    This is useful for optimizing array slicing operations
-    by allowing the use of slices when possible, which can be more efficient.
     """
     if not value:
         raise NgioValueError("Ngio does not support empty sequences as slice input.")
@@ -294,10 +296,10 @@ def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
                     f"Invalid value {i} of type {type(i)} in sequence {value}"
                 ) from e
         value = _value
-    # If the input is not sorted, return it as a tuple
     max_input = max(value)
     min_input = min(value)
-    assert min_input >= 0, "Input must contain non-negative integers"
+    if min_input < 0:
+        raise NgioValueError("Input must contain non-negative integers.")
 
     if sorted(value) == list(range(min_input, max_input + 1)):
         return slice(min_input, max_input + 1)
@@ -309,17 +311,11 @@ def _remove_channel_slicing(
     slicing_dict: dict[str, SlicingInputType],
     dimensions: Dimensions,
 ) -> dict[str, SlicingInputType]:
-    """This utility function removes the channel selection from the slice kwargs.
-
-    if ignore_channel_selection is True, it will remove the channel selection
-    regardless of the dimensions. If the ignore_channel_selection is False
-    it will fail.
-    """
+    """Remove channel selection from the slicing dict for single-channel data."""
     if dimensions.is_multi_channels:
         return slicing_dict
 
-    if "c" in slicing_dict:
-        slicing_dict.pop("c", None)
+    slicing_dict.pop("c", None)
     return slicing_dict
 
 
@@ -340,8 +336,6 @@ def _check_slicing_virtual_axes(slice_: SlicingInputType) -> bool:
             return True
         if slice_.start == 0 and slice_.stop is None:
             return True
-        if slice_.start is None and slice_.stop == 0:
-            return True
         if slice_.start == 0 and slice_.stop == 1:
             return True
     if isinstance(slice_, Sequence):
@@ -361,7 +355,7 @@ def _clean_slicing_dict(
         - Validate that the axes in the slicing_dict are present in the dimensions.
         - Make sure that the slicing_dict uses the on-disk axis names.
         - Check for duplicate axis names in the slicing_dict.
-        - Clean up channel selection if the dimensions
+        - Remove channel selection if requested and data is single-channel.
     """
     clean_slicing_dict: dict[str, SlicingInputType] = {}
     for axis_name, slice_ in slicing_dict.items():
@@ -450,6 +444,6 @@ def build_slicing_ops(
     return SlicingOps(
         on_disk_axes=dimensions.axes_handler.axes_names,
         on_disk_shape=dimensions.shape,
-        on_disk_chunks=dimensions.chunks,
+        chunk_grid=dimensions.chunk_grid,
         slicing_tuple=slicing_tuple,
     )
