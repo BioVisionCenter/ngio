@@ -14,6 +14,11 @@ from ngio.ome_zarr_meta import AxesHandler, Dataset
 from ngio.ome_zarr_meta.ngio_specs import Axis
 
 
+def _make_dims(shape, chunks, dataset):
+    arr = zarr.zeros(shape=shape, chunks=chunks, dtype="uint8")
+    return Dimensions(array_metadata=arr.metadata, dataset=dataset)
+
+
 @pytest.mark.parametrize(
     "input_axes,output_axes,input_shape,output_shape,slicing_dict",
     [
@@ -39,7 +44,7 @@ def test_slicing_ops_base(
         scale=[1.0] * len(axes),
         translation=[0.0] * len(axes),
     )
-    dims = Dimensions(shape=input_shape, chunks=input_shape, dataset=ds)
+    dims = _make_dims(input_shape, input_shape, ds)
 
     slicing_ops = build_slicing_ops(
         dimensions=dims,
@@ -75,7 +80,7 @@ def test_chunk_slice():
         scale=[1.0] * len(axes),
         translation=[0.0] * len(axes),
     )
-    dims = Dimensions(shape=input_shape, chunks=chunk_shape, dataset=ds)
+    dims = _make_dims(input_shape, chunk_shape, ds)
 
     slicing_dict = {"t": 0, "c": (0, 2)}
     slicing_ops1 = build_slicing_ops(

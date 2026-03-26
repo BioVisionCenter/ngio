@@ -1,9 +1,15 @@
 import pytest
+import zarr
 
 from ngio.common import Dimensions
 from ngio.ome_zarr_meta import AxesHandler, Dataset
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioValueError
+
+
+def _make_dims(shape, chunks, dataset):
+    arr = zarr.zeros(shape=shape, chunks=chunks, dtype="uint8")
+    return Dimensions(array_metadata=arr.metadata, dataset=dataset)
 
 
 @pytest.mark.parametrize(
@@ -33,7 +39,7 @@ def test_dimensions(axes_names):
         translation=[0.0] * len(axes_names),
     )
 
-    dims = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims = _make_dims(shape, shape, ds)
 
     assert isinstance(dims.__repr__(), str)
 
@@ -76,10 +82,10 @@ def test_dimensions_error():
     )
 
     with pytest.raises(NgioValueError):
-        Dimensions(shape=shape, chunks=shape, dataset=ds)
+        _make_dims(shape, shape, ds)
 
     shape = (3, 4)
-    dims = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims = _make_dims(shape, shape, ds)
 
     assert dims.get("c", default=None) is None
     assert not dims.is_3d
@@ -99,7 +105,7 @@ def test_dimensions_checks():
         scale=[1.0] * len(axes),
         translation=[0.0] * len(axes),
     )
-    dims_ref = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims_ref = _make_dims(shape, shape, ds)
 
     # Test with rescalable dimensions
     # Axes matches, dimensions do not match, but are rescalable
@@ -112,7 +118,7 @@ def test_dimensions_checks():
         scale=[1.0, 1.0, 0.5, 0.5],
         translation=[0.0] * len(axes),
     )
-    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims_other = _make_dims(shape, shape, ds)
 
     dims_ref.require_axes_match(dims_other)
     assert dims_ref.check_if_axes_match(dims_other)
@@ -136,7 +142,7 @@ def test_dimensions_checks():
         scale=[1.0] * len(axes),
         translation=[0.0] * len(axes),
     )
-    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims_other = _make_dims(shape, shape, ds)
 
     with pytest.raises(NgioValueError):
         dims_ref.require_axes_match(dims_other)
@@ -152,10 +158,31 @@ def test_dimensions_checks():
         scale=[1.0] * len(axes),
         translation=[0.0] * len(axes),
     )
-    dims_other = Dimensions(shape=shape, chunks=shape, dataset=ds)
+    dims_other = _make_dims(shape, shape, ds)
     dims_ref.require_axes_match(dims_other)
     assert dims_ref.check_if_axes_match(dims_other)
 
     assert not dims_ref.check_if_dimensions_match(dims_other, allow_singleton=False)
     dims_ref.require_dimensions_match(dims_other, allow_singleton=True)
     assert dims_ref.check_if_dimensions_match(dims_other, allow_singleton=True)
+
+
+def test_chunk_grid():
+    axes = [Axis(name=n) for n in "czyx"]
+    shape = (3, 4, 5, 6)
+    chunks = (1, 2, 5, 6)
+    ax_handler = AxesHandler(axes=axes)
+    ds = Dataset(
+        path="0",
+        axes_handler=ax_handler,
+        scale=[1.0] * 4,
+        translation=[0.0] * 4,
+    )
+    dims = _make_dims(shape, chunks, ds)
+
+    chunk_grid = dims.chunk_grid
+    assert chunk_grid is not None
+    from zarr.core.chunk_grids import RegularChunkGrid
+
+    assert isinstance(chunk_grid, RegularChunkGrid)
+    assert chunk_grid.chunk_shape == chunks
