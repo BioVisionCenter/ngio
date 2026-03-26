@@ -7,6 +7,9 @@ but it is based on the actual metadata of the image data.
 import math
 from typing import overload
 
+from zarr.core.chunk_grids import ChunkGrid
+from zarr.core.metadata import ArrayMetadata
+
 from ngio.ome_zarr_meta import (
     AxesHandler,
 )
@@ -19,7 +22,7 @@ def _are_compatible(shape1: int, shape2: int, scaling: float) -> bool:
     """Check if shape2 is consistent with shape1 given pixel sizes.
 
     Since we only deal with shape discrepancies due to rounding, we
-    shape1, needs to be larger than shape2.
+    shape1, needs to be larger than shape2. dd
     """
     if shape1 < shape2:
         return _are_compatible(shape2, shape1, 1 / scaling)
@@ -218,34 +221,33 @@ class Dimensions:
 
     def __init__(
         self,
-        shape: tuple[int, ...],
-        chunks: tuple[int, ...],
+        array_metadata: ArrayMetadata,
         dataset: Dataset,
     ) -> None:
         """Create a Dimension object from a Zarr array.
 
         Args:
-            shape: The shape of the Zarr array.
-            chunks: The chunks of the Zarr array.
+            array_metadata: The Zarr array metadata.
             dataset: The dataset object.
         """
-        self._shape = shape
-        self._chunks = chunks
+        self._array_metadata = array_metadata
         self._axes_handler = dataset.axes_handler
         self._pixel_size = dataset.pixel_size
 
-        if len(self._shape) != len(self._axes_handler.axes):
+        if len(self._array_metadata.shape) != len(self._axes_handler.axes):
             raise NgioValueError(
                 "The number of dimensions must match the number of axes. "
                 f"Expected Axis {self._axes_handler.axes_names} but got shape "
-                f"{self._shape}."
+                f"{self._array_metadata.shape}."
             )
 
     def __str__(self) -> str:
         """Return the string representation of the object."""
         dims = ", ".join(
             f"{ax.name}: {s}"
-            for ax, s in zip(self._axes_handler.axes, self._shape, strict=True)
+            for ax, s in zip(
+                self._axes_handler.axes, self._array_metadata.shape, strict=True
+            )
         )
         return f"Dimensions({dims})"
 
@@ -266,12 +268,17 @@ class Dimensions:
     @property
     def shape(self) -> tuple[int, ...]:
         """Return the shape as a tuple."""
-        return self._shape
+        return self._array_metadata.shape
 
     @property
     def chunks(self) -> tuple[int, ...]:
         """Return the chunks as a tuple."""
-        return self._chunks
+        return self._array_metadata.chunks
+
+    @property
+    def chunk_grid(self) -> ChunkGrid:
+        """Return the chunk grid."""
+        return self._array_metadata.chunk_grid
 
     @property
     def axes(self) -> tuple[str, ...]:
@@ -332,4 +339,4 @@ class Dimensions:
         index = self.axes_handler.get_index(axis_name)
         if index is None:
             return default
-        return self._shape[index]
+        return self.shape[index]
