@@ -100,7 +100,7 @@ jobs:
 
       - name: Coverage
         if: success() && matrix.platform == 'ubuntu-latest'
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: /home/runner/work/ngio/ngio/coverage.xml
