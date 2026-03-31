@@ -45,7 +45,7 @@ To get started check out the [Quickstart Guide](https://BioVisionCenter.github.i
 
 ## Supported OME-Zarr versions
 
-Currently, ngio only supports OME-Zarr v0.4. Support for version 0.5 and higher is planned for future releases.
+ngio supports OME-Zarr v0.4/v0.5. Support for version 0.6 and higher is planned for future releases.
 
 ## Development Status
 
