@@ -3376,6 +3376,7 @@
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix AnnData reading over HTTP when directory listing is disabled: skip optional Zarr groups (<code>uns</code>, <code>obsm</code>, <code>varm</code>, etc.) that cannot be discovered without listing.</li>
+<li>Fix <code>ngff_version</code> not being propagated when deriving a plate: <code>derive_plate()</code> and <code>derive_ome_zarr_plate()</code> now default <code>ngff_version</code> to <code>None</code> and inherit the source plate's version when no version is explicitly provided.</li>
 </ul>
 <h2 id="v058">[v0.5.8]<a class="headerlink" href="#v058" title="Permanent link">&para;</a></h2>
 <h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
