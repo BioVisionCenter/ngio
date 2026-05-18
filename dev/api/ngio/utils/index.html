@@ -4007,13 +4007,7 @@ outside of the handler.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/utils/_zarr_utils.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">499</span>
 <span class="normal">500</span>
 <span class="normal">501</span>
 <span class="normal">502</span>
@@ -4034,7 +4028,13 @@ outside of the handler.</p>
 <span class="normal">517</span>
 <span class="normal">518</span>
 <span class="normal">519</span>
-<span class="normal">520</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy_group</span><span class="p">(</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">copy_group</span><span class="p">(</span>
     <span class="n">src_group</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span> <span class="n">dest_group</span><span class="p">:</span> <span class="n">zarr</span><span class="o">.</span><span class="n">Group</span><span class="p">,</span> <span class="n">suppress_warnings</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 <span class="p">):</span>
     <span class="k">if</span> <span class="n">src_group</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">zarr_format</span> <span class="o">!=</span> <span class="n">dest_group</span><span class="o">.</span><span class="n">metadata</span><span class="o">.</span><span class="n">zarr_format</span><span class="p">:</span>
