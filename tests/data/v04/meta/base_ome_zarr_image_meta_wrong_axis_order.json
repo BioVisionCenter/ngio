@@ -1,0 +1,73 @@
+{
+    "multiscales": [
+        {
+            "axes": [
+                {"name": "z", "type": "space", "unit": "micrometer"},
+                {"name": "c", "type": "channel"},
+                {"name": "y", "type": "space", "unit": "micrometer"},
+                {"name": "x", "type": "space", "unit": "micrometer"}
+            ],
+            "datasets": [
+                {
+                    "coordinateTransformations": [
+                        {"scale": [1.0, 1.0, 0.1625, 0.1625], "type": "scale"}
+                    ],
+                    "path": "0"
+                },
+                {
+                    "coordinateTransformations": [
+                        {"scale": [1.0, 1.0, 0.325, 0.325], "type": "scale"}
+                    ],
+                    "path": "1"
+                },
+                {
+                    "coordinateTransformations": [
+                        {"scale": [1.0, 1.0, 0.65, 0.65], "type": "scale"}
+                    ],
+                    "path": "2"
+                },
+                {
+                    "coordinateTransformations": [
+                        {"scale": [1.0, 1.0, 1.3, 1.3], "type": "scale"}
+                    ],
+                    "path": "3"
+                },
+                {
+                    "coordinateTransformations": [
+                        {"scale": [1.0, 1.0, 2.6, 2.6], "type": "scale"}
+                    ],
+                    "path": "4"
+                }
+            ],
+            "version": "0.4"
+        }
+    ],
+    "omero": {
+        "channels": [
+            {
+                "active": true,
+                "color": "00FFFF",
+                "label": "DAPI",
+                "wavelength_id": "A01_C01",
+                "window": {"end": 700, "max": 65535, "min": 0, "start": 0}
+            },
+            {
+                "active": true,
+                "color": "FF00FF",
+                "label": "nanog",
+                "wavelength_id": "A01_C02",
+                "window": {"end": 180, "max": 65535, "min": 0, "start": 0}
+            },
+            {
+                "active": true,
+                "color": "FFFF00",
+                "label": "Lamin B1",
+                "wavelength_id": "A02_C03",
+                "window": {"end": 1500, "max": 65535, "min": 0, "start": 0}
+            }
+        ],
+        "id": 1,
+        "name": "TBD",
+        "version": "0.4"
+    }
+}

@@ -1,0 +1,61 @@
+{
+  "multiscales": [
+    {
+      "axes": [
+        {
+          "name": "y",
+          "type": "space",
+          "unit": "micrometer"
+        },
+        {
+          "name": "x",
+          "type": "space",
+          "unit": "micrometer"
+        }
+      ],
+      "datasets": [
+        {
+          "path": "0",
+          "coordinateTransformations": [
+            {
+              "type": "scale",
+              "scale": [
+                0.5,
+                0.5
+              ]
+            }
+          ]
+        },
+        {
+          "path": "1",
+          "coordinateTransformations": [
+            {
+              "type": "scale",
+              "scale": [
+                1.0,
+                1.0
+              ]
+            }
+          ]
+        }
+      ],
+      "version": "0.4"
+    }
+  ],
+  "omero": {
+    "channels": [
+      {
+        "color": "00FFFF",
+        "window": {
+          "max": 65535.0,
+          "min": 0.0,
+          "start": 0.0,
+          "end": 65535.0
+        },
+        "label": "channel_0",
+        "wavelength_id": "channel_0",
+        "active": true
+      }
+    ]
+  }
+}

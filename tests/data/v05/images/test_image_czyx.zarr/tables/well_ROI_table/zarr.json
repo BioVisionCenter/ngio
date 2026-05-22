@@ -1,0 +1,11 @@
+{
+  "attributes": {
+    "backend": "csv",
+    "index_key": "FieldIndex",
+    "index_type": "str",
+    "table_version": "1",
+    "type": "roi_table"
+  },
+  "zarr_format": 3,
+  "node_type": "group"
+}
