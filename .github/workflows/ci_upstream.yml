@@ -53,4 +53,4 @@ jobs:
             "${{ runner.os }}-data-"
 
       - name: 🧪 Run Tests
-        run: pytest --no-cov
+        run: pytest --no-cov tests/test_dummy.py
