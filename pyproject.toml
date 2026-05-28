@@ -155,7 +155,7 @@ docstring-code-format = true
 
 # https://docs.astral.sh/ty
 [tool.ty.environment]
-python-version = "3.11"
+python = ".pixi/envs/dev"
 
 [tool.ty.rules]
 unresolved-import = "warn"
