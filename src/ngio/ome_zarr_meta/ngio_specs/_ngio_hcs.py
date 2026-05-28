@@ -12,7 +12,7 @@ from ome_zarr_models.common.plate import (
     WellInPlate,
 )
 from ome_zarr_models.common.well_types import WellImage as WellImageCommon
-from pydantic import BaseModel, SkipValidation, field_serializer
+from pydantic import BaseModel, SkipValidation, computed_field, field_serializer
 
 from ngio.ome_zarr_meta.ngio_specs._ngio_image import DefaultNgffVersion, NgffVersions
 from ngio.utils import NgioUserWarning, NgioValueError
@@ -60,7 +60,7 @@ class PlateWithVersion(PlateBase):
 class NgioWellMeta(BaseModel):
     """HCS well metadata."""
 
-    images: list[CustomWellImage]  # type: ignore (override of WellMeta04.images)
+    images: list[CustomWellImage]
     version: NgffVersions
 
     @classmethod
@@ -268,7 +268,11 @@ class NgioPlateMeta(BaseModel):
     """HCS plate metadata."""
 
     plate: PlateWithVersion
-    version: NgffVersions
+
+    @computed_field
+    @property
+    def version(self) -> NgffVersions:
+        return self.plate.version
 
     @classmethod
     def default_init(
@@ -287,7 +291,6 @@ class NgioPlateMeta(BaseModel):
                 name=name,
                 version=ngff_version,
             ),
-            version=ngff_version,
         )
 
         if images is None:
@@ -390,7 +393,7 @@ class NgioPlateMeta(BaseModel):
             name=self.plate.name,
             version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate, version=self.version), row_idx
+        return NgioPlateMeta(plate=new_plate), row_idx
 
     def add_column(self, column: str | int) -> "tuple[NgioPlateMeta, int]":
         """Add a column to the plate.
@@ -428,7 +431,7 @@ class NgioPlateMeta(BaseModel):
             name=self.plate.name,
             version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate, version=self.version), column_idx
+        return NgioPlateMeta(plate=new_plate), column_idx
 
     def add_well(
         self,
@@ -469,7 +472,7 @@ class NgioPlateMeta(BaseModel):
             name=plate.plate.name,
             version=plate.version,
         )
-        return NgioPlateMeta(plate=new_plate, version=plate.version)
+        return NgioPlateMeta(plate=new_plate)
 
     def add_acquisition(
         self,
@@ -508,7 +511,7 @@ class NgioPlateMeta(BaseModel):
             name=self.plate.name,
             version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate, version=self.version)
+        return NgioPlateMeta(plate=new_plate)
 
     def remove_well(self, row: str, column: str | int) -> "NgioPlateMeta":
         """Remove a well from the plate.
@@ -544,7 +547,7 @@ class NgioPlateMeta(BaseModel):
             name=self.plate.name,
             version=self.version,
         )
-        return NgioPlateMeta(plate=new_plate, version=self.version)
+        return NgioPlateMeta(plate=new_plate)
 
     def derive(
         self,
@@ -584,5 +587,4 @@ class NgioPlateMeta(BaseModel):
                 name=name,
                 version=ngff_version,
             ),
-            version=ngff_version,
         )
