@@ -1,7 +1,18 @@
 # Changelog
 
+## [unreleased]
+
 ### Chores
 - Harden GitHub Actions and scan workflows through `zizmor`.
+
+
+## [v0.5.12]
+
+### Fix
+- Fix loading v0.4 HCS plates where the `version` key is absent from the plate-level metadata: the v0.4. V0.4 decoder now explicitly inject the version into the plate dict before constructing `PlateWithVersion`, so missing or `None` version values no longer cause a validation error.
+
+### Refactor
+- Remove redundant `version` field from `NgioPlateMeta`: the field is now a `@computed_field` property that delegates to `self.plate.version`, eliminating the need to keep two copies of the NGFF version in sync. The public `.version` attribute and `model_dump()` output are unchanged.
 
 ## [v0.5.11]
 

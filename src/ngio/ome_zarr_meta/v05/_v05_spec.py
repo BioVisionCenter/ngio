@@ -431,7 +431,7 @@ def v05_to_ngio_plate_meta(
         NgioPlateMeta: The ngio plate metadata.
     """
     v05_plate = HCSV05(**metadata).ome.plate.model_dump()
-    return NgioPlateMeta(plate=v05_plate, version="0.5")  # type: ignore
+    return NgioPlateMeta(plate=v05_plate)
 
 
 def ngio_to_v05_well_meta(metadata: NgioWellMeta) -> dict:
