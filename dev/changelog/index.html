@@ -1747,6 +1747,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v0512" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1837,7 +1865,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores" class="md-nav__link">
+  <a href="#chores_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -1915,7 +1943,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_1" class="md-nav__link">
+  <a href="#chores_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2010,7 +2038,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_2" class="md-nav__link">
+  <a href="#chores_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2133,7 +2161,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_3" class="md-nav__link">
+  <a href="#chores_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2495,7 +2523,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#chores_4" class="md-nav__link">
+  <a href="#chores_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2713,6 +2741,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [unreleased]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Chores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v0512" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2803,7 +2859,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores" class="md-nav__link">
+  <a href="#chores_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2881,7 +2937,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_1" class="md-nav__link">
+  <a href="#chores_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -2976,7 +3032,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_2" class="md-nav__link">
+  <a href="#chores_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -3099,7 +3155,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#chores_3" class="md-nav__link">
+  <a href="#chores_4" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -3461,7 +3517,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#chores_4" class="md-nav__link">
+  <a href="#chores_5" class="md-nav__link">
     <span class="md-ellipsis">
       
         Chores
@@ -3584,6 +3640,11 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="unreleased">[unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="chores">Chores<a class="headerlink" href="#chores" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Harden GitHub Actions and scan workflows through <code>zizmor</code>.</li>
+</ul>
 <h2 id="v0512">[v0.5.12]<a class="headerlink" href="#v0512" title="Permanent link">&para;</a></h2>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3605,7 +3666,7 @@
 <li>Copy object/string-dtype zarr arrays directly when consolidating groups: dask &gt;=2025.11 raises <code>NotImplementedError</code> from auto-chunking for these dtypes, so they bypass dask and are copied via numpy.</li>
 <li>Set <code>auto_shard_zarr_v3</code> together with <code>zarr_write_format</code> on <code>anndata</code>'s global settings via a new <code>_update_anndata_global_settings</code> helper, so reading/writing tables works correctly when mixing zarr v2 and v3 in the same session on anndata 0.12.</li>
 </ul>
-<h3 id="chores">Chores<a class="headerlink" href="#chores" title="Permanent link">&para;</a></h3>
+<h3 id="chores_1">Chores<a class="headerlink" href="#chores_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Pin <code>anndata</code> to <code>&gt;=0.12.0,&lt;0.13.0</code>.</li>
 <li>Unpin <code>dask</code> (remove the <code>&lt;2025.11.0</code> upper bound introduced in v0.4.5).</li>
@@ -3626,7 +3687,7 @@
 <li>Improve testing for ZoomTransform.</li>
 <li>Remove broad warnings filter for all tests.</li>
 </ul>
-<h3 id="chores_1">Chores<a class="headerlink" href="#chores_1" title="Permanent link">&para;</a></h3>
+<h3 id="chores_2">Chores<a class="headerlink" href="#chores_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Replace custom logger warnings with standard Python warnings for better integration with user applications.</li>
 </ul>
@@ -3649,7 +3710,7 @@
 <li>New <code>Roi.update_slice(name, new_slice)</code> method: replaces the slice for an existing axis or appends a new one. Returns a new <code>Roi</code> instance.</li>
 <li>New <code>Roi.remove_slice(name)</code> method: removes the slice for a named axis. Returns a new <code>Roi</code> instance. Raises <code>NgioValueError</code> if the axis is not present.</li>
 </ul>
-<h3 id="chores_2">Chores<a class="headerlink" href="#chores_2" title="Permanent link">&para;</a></h3>
+<h3 id="chores_3">Chores<a class="headerlink" href="#chores_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Pin <code>mkdocs</code> to version &lt;2.0 to avoid build errors in CI due to breaking changes in mkdocs v2, and incompatibility with material design theme.</li>
 </ul>
@@ -3677,7 +3738,7 @@
 <li>Fix correctly setting the space and time units when creating an image.</li>
 <li>Fix minor bug in <code>set_channel_windows_with_percentiles</code> method.</li>
 </ul>
-<h3 id="chores_3">Chores<a class="headerlink" href="#chores_3" title="Permanent link">&para;</a></h3>
+<h3 id="chores_4">Chores<a class="headerlink" href="#chores_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Improve logging consistency across the codebase.</li>
 </ul>
@@ -3843,7 +3904,7 @@
 <li>allow to write as <code>anndata_v1</code> for backward compatibility with older ngio versions.</li>
 </ul>
 <h2 id="v033">[v0.3.3]<a class="headerlink" href="#v033" title="Permanent link">&para;</a></h2>
-<h3 id="chores_4">Chores<a class="headerlink" href="#chores_4" title="Permanent link">&para;</a></h3>
+<h3 id="chores_5">Chores<a class="headerlink" href="#chores_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>improve dataset download process and streamline the CI workflows</li>
 </ul>
