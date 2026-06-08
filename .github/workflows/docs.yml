@@ -16,14 +16,15 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   deploy:
     name: Deploy Docs
     runs-on: ubuntu-latest
 
     permissions:
-      contents: read
-      pages: write
+      contents: write # mike pushes the built docs to the gh-pages branch
 
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -36,23 +37,26 @@ jobs:
         with:
           environments: docs
 
-      - name: Configure Git user
+      - name: Deploy docs
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # Checkout uses persist-credentials: false; authenticate the push that
+          # mike performs to the gh-pages branch via the gh credential helper.
+          gh auth setup-git
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
-      - name: Deploy docs
-        run: |
-          VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///' | sed 's/refs\/heads\///')
-          echo "Deploying version $VERSION"
-          # Check if the version is a stable release
-          # Meaning that starts with "v" and contains only numbers and dots
-          if [[ $GITHUB_REF == refs/tags/* ]] && [[ $VERSION =~ ^v[0-9.]+$ ]]; then
-            pixi run -e docs mike deploy --push --update-aliases $VERSION stable
+          # A stable release is a tag starting with "v" and containing only
+          # numbers and dots; everything else from main publishes the dev docs.
+          VERSION="${GITHUB_REF_NAME}"
+          echo "Deploying version ${VERSION}"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" && "${VERSION}" =~ ^v[0-9.]+$ ]]; then
+            pixi run -e docs mike deploy --push --update-aliases "${VERSION}" stable
             pixi run -e docs mike set-default --push stable
-            echo "Deployed stable version $VERSION (stable)"
+            echo "Deployed stable version ${VERSION} (stable)"
 
-          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+          elif [[ "${GITHUB_REF_NAME}" == "main" ]]; then
             pixi run -e docs mike deploy --push dev
             pixi run -e docs mike set-default --push dev
             echo "Deployed development version (dev) from main"
