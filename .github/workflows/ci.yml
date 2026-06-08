@@ -96,6 +96,9 @@ jobs:
       - name: Restore/save shared data cache (trusted)
         if: github.event_name != 'pull_request'
         id: cache-data
+        # zizmor: ignore[cache-poisoning] -- restricted to trusted (non pull_request)
+        # triggers above; PR runs use the read-only restore step instead, so this
+        # cache can't be poisoned by untrusted code.
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: data/
@@ -162,4 +165,4 @@ jobs:
       - name: 🚢 Create GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release create "${{ github.ref_name }}" ./dist/* --generate-notes
+        run: gh release create "${GITHUB_REF_NAME}" ./dist/* --generate-notes
