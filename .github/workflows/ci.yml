@@ -23,23 +23,29 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.13"
-      - uses: pre-commit/action@v3.0.1
+      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   check-manifest:
     # check-manifest is a tool that checks that all files in version control are
     # included in the sdist (unless explicitly excluded)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - run: pipx run check-manifest
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - run: pipx run --spec check-manifest==0.51 check-manifest
 
   setup:
     # Outputs a reduced matrix for PRs, full matrix for main/tags/schedule
@@ -63,18 +69,37 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.setup.outputs.matrix) }}
+    permissions:
+      contents: read
+      issues: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: 🔧 Set up pixi
-        uses: prefix-dev/setup-pixi@v0.9.6
+        uses: prefix-dev/setup-pixi@1b2de7f3351f171c8b4dfeb558c639cb58ed4ec0 # v0.9.5
         with:
           environments: ${{ matrix.environment }}
 
-      - name: Restore shared data cache
+      - name: Restore shared data cache (PR — read-only)
+        if: github.event_name == 'pull_request'
+        id: cache-data-restore
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          restore-keys: |
+            "${{ runner.os }}-data-"
+
+      - name: Restore/save shared data cache (trusted)
+        if: github.event_name != 'pull_request'
         id: cache-data
-        uses: actions/cache@v5
+        # zizmor: ignore[cache-poisoning] -- restricted to trusted (non pull_request)
+        # triggers above; PR runs use the read-only restore step instead, so this
+        # cache can't be poisoned by untrusted code.
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: data/
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
@@ -87,7 +112,7 @@ jobs:
       # If something goes wrong with scheduled tests, open an issue in the repo
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
-        uses: JasonEtco/create-an-issue@v2
+        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PLATFORM: ${{ matrix.platform }}
@@ -100,7 +125,7 @@ jobs:
 
       - name: Coverage
         if: success() && matrix.platform == 'ubuntu-latest'
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354 # v6.0.1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: /home/runner/work/ngio/ngio/coverage.xml
@@ -119,16 +144,15 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.x"
-          cache: "pip"
-          cache-dependency-path: "pyproject.toml"
 
       - name: 👷 Build
         run: |
@@ -136,9 +160,9 @@ jobs:
           python -m build
 
       - name: 🚢 Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
 
-      - uses: softprops/action-gh-release@v3
-        with:
-          generate_release_notes: true
-          files: "./dist/*"
+      - name: 🚢 Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${GITHUB_REF_NAME}" ./dist/* --generate-notes

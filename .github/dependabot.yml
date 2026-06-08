@@ -8,3 +8,16 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "ci(dependabot):"
+    cooldown:
+      default-days: 7
+  - package-ecosystem: github-actions
+    directory: /.github/workflows
+    schedule:
+      interval: "quarterly"
+    cooldown:
+      default-days: 7
+    groups:
+      gha-updates:
+        applies-to: version-updates
+        patterns:
+          - '*'

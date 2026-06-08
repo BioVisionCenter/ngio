@@ -20,20 +20,28 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   test-pip:
     name: pip (stable)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
     # For workflow_run: only proceed if the main CI succeeded
     if: >
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.13"
           cache: "pip"
@@ -45,7 +53,7 @@ jobs:
           python -m pip install .[test]
 
       - name: Restore shared data cache
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: data/
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
@@ -57,7 +65,7 @@ jobs:
 
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
-        uses: JasonEtco/create-an-issue@v2
+        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PLATFORM: ubuntu-latest
@@ -71,16 +79,22 @@ jobs:
   test-pip-pre:
     name: pip (--pre)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+
     # For workflow_run: only proceed if the main CI succeeded
     if: >
       github.event_name != 'workflow_run' ||
       github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: "3.13"
           cache: "pip"
@@ -92,7 +106,7 @@ jobs:
           python -m pip install .[test] --pre
 
       - name: Restore shared data cache
-        uses: actions/cache@v5
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: data/
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
@@ -104,7 +118,7 @@ jobs:
 
       - name: 📝 Report Failures
         if: failure()
-        uses: JasonEtco/create-an-issue@v2
+        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PLATFORM: ubuntu-latest
