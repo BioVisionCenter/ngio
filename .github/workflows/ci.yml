@@ -83,7 +83,18 @@ jobs:
         with:
           environments: ${{ matrix.environment }}
 
-      - name: Restore shared data cache
+      - name: Restore shared data cache (PR — read-only)
+        if: github.event_name == 'pull_request'
+        id: cache-data-restore
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          restore-keys: |
+            "${{ runner.os }}-data-"
+
+      - name: Restore/save shared data cache (trusted)
+        if: github.event_name != 'pull_request'
         id: cache-data
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -148,7 +159,7 @@ jobs:
       - name: 🚢 Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
 
-      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
-        with:
-          generate_release_notes: true
-          files: "./dist/*"
+      - name: 🚢 Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release create "${{ github.ref_name }}" ./dist/* --generate-notes
