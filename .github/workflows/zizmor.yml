@@ -1,4 +1,7 @@
-name: GitHub Actions Security Analysis with zizmor 🌈
+# Security analysis with zizmor
+#
+# Scope:    Runs on every push and PR to main. Uses zizmor to analyze GitHub Actions workflows for security issues.
+name: GitHub Actions Security Analysis with zizmor
 
 on:
   push:
