@@ -190,6 +190,13 @@ def test_derive_label_shape_without_channel_axis():
     with pytest.raises(NgioValueError):
         ome_zarr.derive_label("lbl-same", shape=(1, 64, 64), channels_policy="same")
 
+    # A channel-less reference image: the shape is used as-is (nothing to insert),
+    # even with a non-"same" policy like the default "squeeze".
+    no_c = create_synthetic_ome_zarr(MemoryStore(), shape=(4, 64, 64))
+    label = no_c.derive_label("lbl-no-c", shape=(4, 64, 64))
+    assert "c" not in label.axes
+    assert label.shape == (4, 64, 64)
+
 
 def test_derive_from_non_dishogeneus_shapes():
     # Yes those shapes are intentionally weird
