@@ -1,6 +1,9 @@
 # Changelog
 
-## [unreleased]
+## [v0.5.13]
+
+### Fix
+- Fix `derive_label` (and `OmeZarrContainer.derive_label`) rejecting an explicit `shape` that omits the channel axis. When the reference image has a `c` axis and `channels_policy` removes or overrides it (`"squeeze"`, `"singleton"`, or an integer), the up-front shape-length check failed before the channel policy was applied. The provided shape is now normalized to the reference dimensionality before pyramid computation, so a channel-less shape (e.g. `(z, y, x)` for a `(c, z, y, x)` image) is accepted. `channels_policy="same"` still requires the full shape.
 
 ### Chores
 - Harden GitHub Actions and scan workflows through `zizmor`.
