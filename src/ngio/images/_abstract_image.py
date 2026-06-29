@@ -729,6 +729,31 @@ def _compute_pyramid_shapes(
     return _shapes_from_new_shape(ref_image=ref_image, shape=shape)
 
 
+def _normalize_shape_for_channel_policy(
+    ref_image: AbstractImage,
+    shape: Sequence[int] | None,
+    channels_policy: Literal["squeeze", "same", "singleton"] | int,
+) -> Sequence[int] | None:
+    """Insert a placeholder channel axis when the provided shape omits it.
+
+    For every channels_policy except "same", the channel axis is fully
+    determined by the policy ("squeeze" removes it, "singleton"/int overwrite
+    it), so the caller may pass a shape that omits the channel axis. Pyramid
+    computation requires a shape matching the reference dimensionality, so we
+    insert a placeholder channel dimension here; _apply_channel_policy then
+    removes or overwrites it. See issue #195.
+    """
+    if shape is None or channels_policy == "same":
+        return shape
+    channel_index = ref_image.axes_handler.get_index("c")
+    if channel_index is None:
+        return shape
+    if len(shape) == len(ref_image.shape) - 1:
+        c_size = ref_image.shape[channel_index]
+        return (*shape[:channel_index], c_size, *shape[channel_index:])
+    return shape
+
+
 def _check_len_compatibility(
     ref_shape: tuple[int, ...],
     chunks: ChunksLike,
@@ -1010,6 +1035,11 @@ def abstract_derive(
     # End of deprecated arguments handling
     ref_meta = ref_image.meta
 
+    shape = _normalize_shape_for_channel_policy(
+        ref_image=ref_image,
+        shape=shape,
+        channels_policy=channels_policy,
+    )
     shapes, scales = _compute_pyramid_shapes(
         shape=shape,
         ref_image=ref_image,

@@ -23,7 +23,6 @@ from ome_zarr_models.v05.coordinate_transformations import (
 from ome_zarr_models.v05.hcs import HCSAttrs as HCSAttrsV05
 from ome_zarr_models.v05.image import ImageAttrs as ImageAttrsV05
 from ome_zarr_models.v05.image_label import ImageLabelAttrs as ImageLabelAttrsV05
-from ome_zarr_models.v05.labels import Labels as Labels
 from ome_zarr_models.v05.labels import LabelsAttrs as LabelsAttrsV05
 from ome_zarr_models.v05.multiscales import Dataset as DatasetV05
 from ome_zarr_models.v05.multiscales import Multiscale as MultiscaleV05

@@ -161,6 +161,36 @@ def test_derive_label_channels_policy():
     assert label.dimensions.get("c") == 2
 
 
+def test_derive_label_shape_without_channel_axis():
+    # Regression test for https://github.com/BioVisionCenter/ngio/issues/195
+    # A (c, z, y, x) image should accept a label shape without the channel axis
+    # for any policy that owns the channel axis (squeeze/singleton/int).
+    store = MemoryStore()
+    ome_zarr = create_synthetic_ome_zarr(store, shape=(1, 1, 64, 64))
+
+    # Default policy is "squeeze": the channel-less shape is the saved shape.
+    label = ome_zarr.derive_label("lbl-squeeze", shape=(1, 64, 64))
+    assert "c" not in label.axes
+    assert label.shape == (1, 64, 64)
+
+    label = ome_zarr.derive_label(
+        "lbl-singleton", shape=(1, 64, 64), channels_policy="singleton"
+    )
+    assert label.dimensions.get("c") == 1
+
+    label = ome_zarr.derive_label("lbl-int", shape=(1, 64, 64), channels_policy=2)
+    assert label.dimensions.get("c") == 2
+
+    # A full-length shape with the channel axis still squeezes (no regression).
+    label = ome_zarr.derive_label("lbl-squeeze-full", shape=(1, 1, 64, 64))
+    assert "c" not in label.axes
+    assert label.shape == (1, 64, 64)
+
+    # "same" keeps the channel from the shape, so the full shape is required.
+    with pytest.raises(NgioValueError):
+        ome_zarr.derive_label("lbl-same", shape=(1, 64, 64), channels_policy="same")
+
+
 def test_derive_from_non_dishogeneus_shapes():
     # Yes those shapes are intentionally weird
     shapes = [
