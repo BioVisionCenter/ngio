@@ -19,14 +19,14 @@ def test_load_config_data_missing_file_returns_empty_dict(monkeypatch, tmp_path)
 
 def test_load_config_data_valid_json(monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
-    path.write_text('{"s3fs": {"skew_retry_marker": ["Foo"]}}')
+    path.write_text('{"s3fs": {"custom_retry_markers": ["Foo"]}}')
     monkeypatch.setenv(_ENV_VAR, str(path))
-    assert _load_config_data() == {"s3fs": {"skew_retry_marker": ["Foo"]}}
+    assert _load_config_data() == {"s3fs": {"custom_retry_markers": ["Foo"]}}
 
 
 def test_load_config_data_toml_now_unsupported(monkeypatch, tmp_path):
     path = tmp_path / "cfg.toml"
-    path.write_text('[s3fs]\nskew_retry_marker = ["Foo"]\n')
+    path.write_text('[s3fs]\ncustom_retry_markers = ["Foo"]\n')
     monkeypatch.setenv(_ENV_VAR, str(path))
     with pytest.raises(
         NgioValidationError, match="Unsupported ngio config file extension"
@@ -64,7 +64,7 @@ def test_resolve_config_path_default(monkeypatch):
 
 
 def test_s3fs_config_defaults():
-    assert S3FSConfig().skew_retry_marker == []
+    assert S3FSConfig().custom_retry_markers == []
 
 
 def test_ngio_config_defaults():

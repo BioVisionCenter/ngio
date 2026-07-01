@@ -539,21 +539,24 @@ def refresh_s3fs_config(config: NgioConfig) -> None:
     except ImportError:
         return
 
-    skew_markers = config.s3fs.skew_retry_marker if config.s3fs is not None else []
+    custom_retry_markers = (
+        config.s3fs.custom_retry_markers if config.s3fs is not None else []
+    )
 
-    def skew_retry_handler(e: Exception) -> bool:
-        """Custom s3fs retry predicate: retry the clock-skew ClientError.
+    def custom_retry_handler(e: Exception) -> bool:
+        """Custom s3fs retry predicate: retry errors matching a configured marker.
 
         Initial implementation by Paweł Rzońca @clacrow
 
-        Receives the raw botocore exception (before s3fs translates it to
-        PermissionError). Returning True makes s3fs sleep-and-retry, which re-signs
-        the request with a fresh timestamp.
+        Receives the raw exception from botocore (before s3fs translates it, e.g.
+        to PermissionError), whatever its type. Returning True makes s3fs
+        sleep-and-retry the request. The motivating use case is AWS clock-skew
+        ClientErrors (re-signing the request with a fresh timestamp fixes those),
+        but any error substring can be configured as a retry marker.
         """
-        # Substrings identifying the skew error on the botocore ClientError.
-        return any(marker in str(e) for marker in skew_markers)
+        return any(marker in str(e) for marker in custom_retry_markers)
 
-    s3fs.set_custom_error_handler(skew_retry_handler)
+    s3fs.set_custom_error_handler(custom_retry_handler)
 
 
 refresh_s3fs_config(get_config())

@@ -12,7 +12,7 @@ _DEFAULT_CONFIG_PATH = Path.home() / ".ngio_config.json"
 
 
 class S3FSConfig(BaseModel):
-    skew_retry_marker: list[str] = Field(default_factory=list)
+    custom_retry_markers: list[str] = Field(default_factory=list)
 
 
 class NgioConfig(BaseModel):
