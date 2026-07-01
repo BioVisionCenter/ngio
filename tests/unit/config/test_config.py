@@ -24,11 +24,14 @@ def test_load_config_data_valid_json(monkeypatch, tmp_path):
     assert _load_config_data() == {"s3fs": {"skew_retry_marker": ["Foo"]}}
 
 
-def test_load_config_data_valid_toml(monkeypatch, tmp_path):
+def test_load_config_data_toml_now_unsupported(monkeypatch, tmp_path):
     path = tmp_path / "cfg.toml"
     path.write_text('[s3fs]\nskew_retry_marker = ["Foo"]\n')
     monkeypatch.setenv(_ENV_VAR, str(path))
-    assert _load_config_data() == {"s3fs": {"skew_retry_marker": ["Foo"]}}
+    with pytest.raises(
+        NgioValidationError, match="Unsupported ngio config file extension"
+    ):
+        _load_config_data()
 
 
 def test_load_config_data_unsupported_extension(monkeypatch, tmp_path):
@@ -44,14 +47,6 @@ def test_load_config_data_unsupported_extension(monkeypatch, tmp_path):
 def test_load_config_data_malformed_json(monkeypatch, tmp_path):
     path = tmp_path / "cfg.json"
     path.write_text("{not valid json")
-    monkeypatch.setenv(_ENV_VAR, str(path))
-    with pytest.raises(NgioValidationError, match="Failed to parse ngio config file"):
-        _load_config_data()
-
-
-def test_load_config_data_malformed_toml(monkeypatch, tmp_path):
-    path = tmp_path / "cfg.toml"
-    path.write_text("not = [valid")
     monkeypatch.setenv(_ENV_VAR, str(path))
     with pytest.raises(NgioValidationError, match="Failed to parse ngio config file"):
         _load_config_data()

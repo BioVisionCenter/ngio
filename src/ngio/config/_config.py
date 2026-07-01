@@ -1,6 +1,5 @@
 import json
 import os
-import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -34,17 +33,15 @@ def _load_config_data() -> dict[str, Any]:
     if not path.exists():
         return {}
 
+    if path.suffix != ".json":
+        raise NgioValidationError(
+            f"Unsupported ngio config file extension '{path.suffix}' "
+            f"for {path}. Use a '.json' file."
+        )
+
     try:
-        if path.suffix == ".json":
-            return json.loads(path.read_text())
-        elif path.suffix == ".toml":
-            return tomllib.loads(path.read_text())
-        else:
-            raise NgioValidationError(
-                f"Unsupported ngio config file extension '{path.suffix}' "
-                f"for {path}. Use a '.json' or '.toml' file."
-            )
-    except (json.JSONDecodeError, tomllib.TOMLDecodeError) as e:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as e:
         raise NgioValidationError(
             f"Failed to parse ngio config file {path}: {e}"
         ) from e
