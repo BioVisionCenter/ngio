@@ -16,6 +16,7 @@ from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
+from ngio.config import NgioConfig, get_config
 from ngio.utils._cache import NgioCache
 from ngio.utils._errors import (
     NgioFileExistsError,
@@ -524,3 +525,35 @@ def copy_group(
             stacklevel=2,
         )
     _zarr_python_copy(src_group, dest_group)
+
+
+def refresh_s3fs_config(config: NgioConfig) -> None:
+    """Apply the current s3fs-related settings to s3fs's global error handler.
+
+    Safe to call repeatedly, e.g. after mutating ``get_config().s3fs``: each call
+    fully replaces s3fs's custom error handler, resetting it to a no-op when there
+    are no configured retry markers instead of leaving a stale handler in place.
+    """
+    try:
+        import s3fs
+    except ImportError:
+        return
+
+    skew_markers = config.s3fs.skew_retry_marker if config.s3fs is not None else []
+
+    def skew_retry_handler(e: Exception) -> bool:
+        """Custom s3fs retry predicate: retry the clock-skew ClientError.
+
+        Initial implementation by Paweł Rzońca @clacrow
+
+        Receives the raw botocore exception (before s3fs translates it to
+        PermissionError). Returning True makes s3fs sleep-and-retry, which re-signs
+        the request with a fresh timestamp.
+        """
+        # Substrings identifying the skew error on the botocore ClientError.
+        return any(marker in str(e) for marker in skew_markers)
+
+    s3fs.set_custom_error_handler(skew_retry_handler)
+
+
+refresh_s3fs_config(get_config())

@@ -4,17 +4,22 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
-from ngio.utils import NgioValidationError
+from ngio.utils._errors import NgioValidationError
 
 _ENV_VAR = "NGIO_CONFIG_PATH"
 _DEFAULT_CONFIG_PATH = Path.home() / ".ngio_config.json"
 
 
+class S3FSConfig(BaseModel):
+    skew_retry_marker: list[str] = Field(default_factory=list)
+
+
 class NgioConfig(BaseModel):
     """Global configuration for ngio."""
 
+    s3fs: S3FSConfig | None = None
     model_config = ConfigDict(validate_assignment=True)
 
 

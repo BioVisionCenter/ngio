@@ -23,6 +23,7 @@ from ngio.utils._zarr_utils import (
     ZarrGroupHandler,
     copy_group,
     open_group_wrapper,
+    refresh_s3fs_config,
 )
 
 __all__ = [
@@ -45,4 +46,5 @@ __all__ = [
     "list_ome_zarr_datasets",
     "open_group_wrapper",
     "print_datasets_infos",
+    "refresh_s3fs_config",
 ]
