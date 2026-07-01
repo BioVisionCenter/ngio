@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.13"
       - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
@@ -86,7 +86,7 @@ jobs:
       - name: Restore shared data cache (PR — read-only)
         if: github.event_name == 'pull_request'
         id: cache-data-restore
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: data/
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
@@ -99,7 +99,7 @@ jobs:
         # zizmor: ignore[cache-poisoning] -- restricted to trusted (non pull_request)
         # triggers above; PR runs use the read-only restore step instead, so this
         # cache can't be poisoned by untrusted code.
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: data/
           key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
@@ -150,7 +150,7 @@ jobs:
           persist-credentials: false
 
       - name: 🐍 Set up Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.x"
 
