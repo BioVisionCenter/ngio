@@ -28,7 +28,13 @@ def _running_on_github_ci() -> bool:
 # Drop this exception together with the CI matrix override.
 _FORCE_MACOS_STORE_TESTS = os.getenv("GITHUB_HEAD_REF") == "feat/ngio-settings"
 
-if sys.platform == "darwin" and _running_on_github_ci() and not _FORCE_MACOS_STORE_TESTS:
+_skip_macos_store_tests = (
+    sys.platform == "darwin"
+    and _running_on_github_ci()
+    and not _FORCE_MACOS_STORE_TESTS
+)
+
+if _skip_macos_store_tests:
     # The store tests require local servers which seem to have issues on macOS CI.
     # Skip the whole module in this case.
     pytestmark = pytest.skip(
