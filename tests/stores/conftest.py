@@ -1,7 +1,5 @@
 # conftest.py
-import os
 import socket
-import sys
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -17,30 +15,6 @@ class _NoListingHTTPHandler(SimpleHTTPRequestHandler):
 
     def log_message(self, format, *args):
         pass
-
-
-def _running_on_github_ci() -> bool:
-    return os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("CI") == "true"
-
-
-# NOTE(temporary): force the store tests ON for the feat/ngio-settings PR so the full
-# CI matrix actually exercises the aiomoto server-mode harness on macOS (see ci.yml).
-# Drop this exception together with the CI matrix override.
-_FORCE_MACOS_STORE_TESTS = os.getenv("GITHUB_HEAD_REF") == "feat/ngio-settings"
-
-_skip_macos_store_tests = (
-    sys.platform == "darwin"
-    and _running_on_github_ci()
-    and not _FORCE_MACOS_STORE_TESTS
-)
-
-if _skip_macos_store_tests:
-    # The store tests require local servers which seem to have issues on macOS CI.
-    # Skip the whole module in this case.
-    pytestmark = pytest.skip(
-        reason="Integration tests (local servers) are skipped on macOS CI",
-        allow_module_level=True,
-    )
 
 
 @pytest.fixture

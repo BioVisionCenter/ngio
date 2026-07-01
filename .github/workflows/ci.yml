@@ -55,11 +55,7 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          # NOTE(temporary): feat/ngio-settings runs the FULL cross-OS matrix on PRs to
-          # validate the aiomoto server-mode test harness on macOS/Windows. Remove the
-          # `&& github.head_ref != feat/ngio-settings` exception (leaving the plain
-          # pull_request check) before or after merging this branch.
-          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.head_ref }}" != "feat/ngio-settings" ]]; then
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"}]' >> $GITHUB_OUTPUT
           else
             echo 'matrix=[{"environment":"test11","platform":"ubuntu-latest"},{"environment":"test12","platform":"ubuntu-latest"},{"environment":"test13","platform":"ubuntu-latest"},{"environment":"test14","platform":"ubuntu-latest"},{"environment":"test11","platform":"macos-latest"},{"environment":"test12","platform":"macos-latest"},{"environment":"test13","platform":"macos-latest"},{"environment":"test14","platform":"macos-latest"},{"environment":"test11","platform":"windows-latest"},{"environment":"test12","platform":"windows-latest"},{"environment":"test13","platform":"windows-latest"},{"environment":"test14","platform":"windows-latest"}]' >> $GITHUB_OUTPUT
