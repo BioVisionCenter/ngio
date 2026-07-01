@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.5.14]
+
+### Feature
+- Add a global `NgioConfig` / `get_config()` configuration system, loaded from `~/.ngio_config.json` by default or a path set via the `NGIO_CONFIG_PATH` env var (`.json` or `.toml`). Both are exported from the top-level `ngio` package.
+- Add configurable s3fs clock-skew retry handling: `NgioConfig.s3fs.skew_retry_marker` lists error substrings that trigger a retry via a custom `s3fs.set_custom_error_handler`, applied through the new `ngio.utils.refresh_s3fs_config()`.
+
 ## [v0.5.13]
 
 ### Fix
