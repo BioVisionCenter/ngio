@@ -2159,7 +2159,7 @@ pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span
 <p>Coverage is reported automatically. The full CI matrix covers <code>test11</code>, <code>test12</code>, <code>test13</code>, <code>test14</code> across Linux, macOS, and Windows.</p>
 <hr />
 <h2 id="linting-formatting">Linting &amp; Formatting<a class="headerlink" href="#linting-formatting" title="Permanent link">&para;</a></h2>
-<div class="highlight"><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>pre-commit<span class="w">               </span><span class="c1"># run all hooks on all files</span>
+<div class="highlight"><pre><span></span><code>pixi<span class="w"> </span>run<span class="w"> </span>lint<span class="w">                     </span><span class="c1"># run all hooks on all files</span>
 </code></pre></div>
 <p>This runs Ruff (lint + format), <code>typos</code> (spell check), YAML/TOML validation, and notebook output stripping. Hooks also run automatically on <code>git commit</code>.</p>
 <hr />
@@ -2175,7 +2175,7 @@ docs: update contributing guide
 <ol>
 <li>Fork the repo and create a branch from <code>main</code>.</li>
 <li>Make your changes with tests where relevant.</li>
-<li>Run <code>pixi run pre-commit</code> and ensure all checks pass.</li>
+<li>Run <code>pixi run lint</code> and ensure all checks pass.</li>
 <li>Open a PR against <code>main</code> with a clear description of what and why.</li>
 </ol>
 <p>CI will run the full test matrix and linters automatically.</p>
@@ -2210,7 +2210,7 @@ pixi<span class="w"> </span>run<span class="w"> </span>bump-alpha<span class="w"
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="March 19, 2026 14:53:36 UTC">March 19, 2026</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-date" title="July 3, 2026 16:03:21 UTC">July 3, 2026</span>
   </span>
 
     
