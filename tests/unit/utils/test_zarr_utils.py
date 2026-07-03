@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import Literal
 
 import dask
 import dask.delayed
@@ -193,6 +194,52 @@ def test_remote_storage():
     assert isinstance(handler.get_array("0"), zarr.Array)
     assert isinstance(handler.get_group("labels"), zarr.Group)
     assert not handler.is_listable
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_is_group_listable(monkeypatch: pytest.MonkeyPatch, zarr_format: Literal[2, 3]):
+    from zarr.storage import MemoryStore
+
+    from ngio.utils._zarr_utils import is_group_listable
+
+    group = zarr.create_group(store=MemoryStore(), zarr_format=zarr_format)
+    labels = group.create_group("labels")
+    assert is_group_listable(group)
+    assert is_group_listable(labels)
+
+    # A genuinely empty group still lists its own metadata document
+    empty_group = zarr.create_group(store=MemoryStore(), zarr_format=zarr_format)
+    assert is_group_listable(empty_group)
+
+    # zarr >= 3.1.6 swallows listing errors on some stores and yields an
+    # empty listing instead; the group's metadata document is then missing
+    async def _empty_list_dir(prefix: str):
+        return
+        yield
+
+    monkeypatch.setattr(group.store, "list_dir", _empty_list_dir)
+    assert not is_group_listable(group)
+
+    async def _raising_list_dir(prefix: str):
+        raise FileNotFoundError(prefix)
+        yield
+
+    monkeypatch.setattr(group.store, "list_dir", _raising_list_dir)
+    assert not is_group_listable(group)
+
+
+def test_fsspec_copy_refuses_unlistable_source(tmp_path: Path):
+    from ngio.utils._zarr_utils import _fsspec_copy
+
+    src_path = tmp_path / "empty_src"
+    src_path.mkdir()
+    dest_path = tmp_path / "dest"
+
+    with pytest.raises(NgioValueError):
+        _fsspec_copy(LocalStore(src_path), "", LocalStore(dest_path), "")
+
+    # Nothing was written to the destination
+    assert not dest_path.exists() or not any(dest_path.iterdir())
 
 
 @pytest.mark.parametrize(
