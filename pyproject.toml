@@ -246,7 +246,7 @@ bump-minor = "cz bump --increment MINOR --no-verify"
 bump-major = "cz bump --increment MAJOR --no-verify"
 bump-alpha = "cz bump --prerelease alpha --no-verify"
 bump-beta  = "cz bump --prerelease beta --no-verify"
-pre-commit = "pre-commit run --all-files; git add -u"
+lint = "pre-commit run --all-files"
 
 [tool.pixi.feature.py11.dependencies]
 python = ">=3.11,<3.12"
