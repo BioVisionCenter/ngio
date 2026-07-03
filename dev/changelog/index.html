@@ -1747,6 +1747,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#v0514" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [v0.5.14]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.14]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v0513" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1943,7 +1982,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
+  <a href="#tests_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Tests
@@ -2752,6 +2791,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#v0514" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        [v0.5.14]
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.14]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feature
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v0513" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2948,7 +3026,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
+  <a href="#tests_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Tests
@@ -3662,6 +3740,16 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="v0514">[v0.5.14]<a class="headerlink" href="#v0514" title="Permanent link">&para;</a></h2>
+<h3 id="feature">Feature<a class="headerlink" href="#feature" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add a global <code>NgioConfig</code> / <code>get_config()</code> configuration system, loaded from <code>~/.ngio_config.json</code> by default or a path set via the <code>NGIO_CONFIG_PATH</code> env var (<code>.json</code> file). Both are exported from the top-level <code>ngio</code> package.</li>
+<li>Add configurable s3fs retry handling: <code>NgioConfig.s3fs.custom_retry_markers</code> lists error substrings that trigger a retry via a custom <code>s3fs.set_custom_error_handler</code>, applied through the new <code>ngio.utils.refresh_s3fs_config()</code>. The motivating use case is AWS clock-skew errors, but any error substring can be configured.</li>
+</ul>
+<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Migrate the S3 store test harness from a <code>moto[server]</code> subprocess to <a href="https://github.com/owenlamont/aiomoto"><code>aiomoto</code></a> in server mode (<code>aiomoto[pandas]</code> in the <code>test</code> extra). This also fixes a CI import crash on Python 3.13/3.14: <code>aiomoto</code> caps <code>aiobotocore</code>/<code>moto</code> and floors <code>s3fs</code>, so the universal (multi-platform) solve no longer backtracks <code>s3fs</code> to the ancient <code>0.4.2</code> (which lacks <code>set_custom_error_handler</code> and crashed <code>import ngio</code> at module load). CSV and Parquet table backends now round-trip on the S3 store under the mock.</li>
+</ul>
 <h2 id="v0513">[v0.5.13]<a class="headerlink" href="#v0513" title="Permanent link">&para;</a></h2>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3708,7 +3796,7 @@
 <ul>
 <li>Change tolerance when converting Roi to pixel coordinates to avoid machine precision dependent rounding issues.</li>
 </ul>
-<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<h3 id="tests_1">Tests<a class="headerlink" href="#tests_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Improve testing for ZoomTransform.</li>
 <li>Remove broad warnings filter for all tests.</li>
