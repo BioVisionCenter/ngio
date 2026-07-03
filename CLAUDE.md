@@ -15,8 +15,8 @@ dev pytest                        # tests (dev)
 test11 pytest                     # Python 3.11
 test12 pytest                     # 3.12
 test13 pytest                     # 3.13
-dev pre-commit run --all-files    # lint/format
-dev ty .                          # type check (Ruff ty)
+dev lint                          # lint/format (pre-commit hooks)
+dev ty check                      # type check (Ruff ty)
 docs serve_docs                   # docs preview
 test_nb                      # run notebooks
 ```

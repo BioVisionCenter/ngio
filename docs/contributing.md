@@ -45,7 +45,7 @@ Coverage is reported automatically. The full CI matrix covers `test11`, `test12`
 ## Linting & Formatting
 
 ```bash
-pixi run pre-commit               # run all hooks on all files
+pixi run lint                     # run all hooks on all files
 ```
 
 This runs Ruff (lint + format), `typos` (spell check), YAML/TOML validation, and notebook output stripping. Hooks also run automatically on `git commit`.
@@ -70,7 +70,7 @@ docs: update contributing guide
 
 1. Fork the repo and create a branch from `main`.
 2. Make your changes with tests where relevant.
-3. Run `pixi run pre-commit` and ensure all checks pass.
+3. Run `pixi run lint` and ensure all checks pass.
 4. Open a PR against `main` with a clear description of what and why.
 
 CI will run the full test matrix and linters automatically.

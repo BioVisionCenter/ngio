@@ -13,6 +13,7 @@ from filelock import BaseFileLock, FileLock
 from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
 from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
+from zarr.core.sync import sync
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
@@ -413,31 +414,36 @@ def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
     return separator
 
 
-def is_group_listable(group: zarr.Group) -> bool:
-    """Check if a Zarr group is listable.
+async def _collect_list_dir(store: Store, prefix: str) -> list[str]:
+    return [key async for key in store.list_dir(prefix)]
 
-    A group is considered listable if it contains at least one array or subgroup.
+
+def is_group_listable(group: zarr.Group) -> bool:
+    """Check whether a Zarr group's contents can actually be enumerated.
+
+    A group that was successfully opened must have its own metadata document
+    (``zarr.json`` / ``.zgroup``) in the store, so a directory listing that
+    does not contain it means the store cannot truly list this path (e.g. an
+    HTTP host with no directory index, where zarr silently yields an empty
+    listing). A genuinely empty group still lists its metadata document.
 
     Args:
         group (zarr.Group): The Zarr group to check.
 
     Returns:
-        bool: True if the group is listable, False otherwise.
+        bool: True if the group's contents can be enumerated, False otherwise.
     """
-    if not group.store.supports_listing:
-        # If the store does not support listing
-        # then for sure it is not listable
+    store = group.store
+    if not store.supports_listing:
         return False
+    meta_key = "zarr.json" if group.metadata.zarr_format == 3 else ".zgroup"
     try:
-        next(group.keys())
-        return True
-    except StopIteration:
-        # Group is listable but empty
-        return True
-    except Exception as _:
+        keys = sync(_collect_list_dir(store, group.path))
+    except Exception:
         # Some stores may raise errors when listing
         # consider those not listable
         return False
+    return meta_key in keys
 
 
 def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
@@ -464,7 +470,13 @@ def _fsspec_copy(
 ):
     src_mapper = _get_mapper(src_fs, src_path)
     dest_mapper = _get_mapper(dest_fs, dest_path)
-    for key in src_mapper.keys():
+    keys = list(src_mapper.keys())
+    if not ({".zgroup", "zarr.json"} & set(keys)):
+        raise NgioValueError(
+            "Source listing did not return the group's metadata document; "
+            "the store cannot be listed reliably, refusing to copy."
+        )
+    for key in keys:
         dest_mapper[key] = src_mapper[key]
 
 
