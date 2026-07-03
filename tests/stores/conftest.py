@@ -1,14 +1,11 @@
 # conftest.py
-import os
 import socket
-import subprocess
-import sys
 import threading
-import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 import boto3
 import pytest
+from aiomoto import mock_aws
 
 
 class _NoListingHTTPHandler(SimpleHTTPRequestHandler):
@@ -20,96 +17,21 @@ class _NoListingHTTPHandler(SimpleHTTPRequestHandler):
         pass
 
 
-def _running_on_github_ci() -> bool:
-    return os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("CI") == "true"
+@pytest.fixture
+def moto_s3_server():
+    """Mock S3 backend via aiomoto in server mode.
 
-
-if sys.platform == "darwin" and _running_on_github_ci():
-    # The store tests require local servers which seem to have issues on macOS CI.
-    # Skip the whole module in this case.
-    pytestmark = pytest.skip(
-        reason="Integration tests (local servers) are skipped on macOS CI",
-        allow_module_level=True,
-    )
-
-
-def _wait_for_port(proc, host, port, timeout=20):
-    """Wait until a TCP port starts accepting connections, or the process dies."""
-    start = time.time()
-    while time.time() - start < timeout:
-        # bail out early if the process crashed
-        if proc.poll() is not None:
-            raise RuntimeError("moto server process exited early")
-
-        try:
-            with socket.create_connection((host, port), timeout=0.5):
-                return
-        except OSError:
-            time.sleep(0.2)
-
-    raise RuntimeError(f"Port {port} did not open in time")
-
-
-@pytest.fixture(scope="session")
-def moto_s3_server(tmp_path_factory):
-    host = "127.0.0.1"
-    port = 5005
-
-    log_dir = tmp_path_factory.mktemp("moto_logs")
-    log_file = log_dir / "server.log"
-
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-    # only start S3 service f
-    env["MOTO_SERVICE"] = "s3"
-
-    # NOTE: no "s3" argument here anymore
-    cmd = [
-        sys.executable,
-        "-m",
-        "moto.server",
-        "-p",
-        str(port),
-    ]
-
-    with log_file.open("wb") as lf:
-        proc = subprocess.Popen(
-            cmd,
-            stdout=lf,
-            stderr=subprocess.STDOUT,
-            env=env,
-        )
-
-    try:
-        _wait_for_port(proc, host, port, timeout=20)
-    except Exception as e:
-        proc.terminate()
-        try:
-            proc.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-        log_text = log_file.read_text(errors="replace")
-        raise RuntimeError(
-            f"Failed to start moto server: {e}\n--- moto log ---\n{log_text}"
-        ) from e
-
-    s3_endpoint_url = f"http://{host}:{port}"
+    ``server_mode=True`` starts an in-process Moto server and injects
+    ``AWS_ENDPOINT_URL`` (plus dummy ``test`` credentials and the ``us-east-1``
+    region), so both boto3 and s3fs discover it automatically — no subprocess,
+    no hardcoded port. The Moto backend is shared between the synchronous boto3
+    client used here and the aiobotocore backend that s3fs drives under the hood.
+    """
     bucket_name = "s3-ci-test-bucket"
-    s3 = boto3.client(
-        "s3",
-        region_name="us-east-1",
-        aws_access_key_id="test",
-        aws_secret_access_key="test",
-        endpoint_url=s3_endpoint_url,
-    )
-    s3.create_bucket(Bucket=bucket_name)
-    yield {"endpoint_url": s3_endpoint_url, "bucket_name": bucket_name}
-
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
+    with mock_aws(server_mode=True) as ctx:
+        s3 = boto3.client("s3")
+        s3.create_bucket(Bucket=bucket_name)
+        yield {"endpoint_url": ctx.server_endpoint, "bucket_name": bucket_name}
 
 
 def _find_free_port(host="127.0.0.1"):

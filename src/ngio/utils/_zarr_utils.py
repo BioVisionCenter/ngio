@@ -16,6 +16,7 @@ from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
+from ngio.config import NgioConfig, get_config
 from ngio.utils._cache import NgioCache
 from ngio.utils._errors import (
     NgioFileExistsError,
@@ -524,3 +525,38 @@ def copy_group(
             stacklevel=2,
         )
     _zarr_python_copy(src_group, dest_group)
+
+
+def refresh_s3fs_config(config: NgioConfig) -> None:
+    """Apply the current s3fs-related settings to s3fs's global error handler.
+
+    Safe to call repeatedly, e.g. after mutating ``get_config().s3fs``: each call
+    fully replaces s3fs's custom error handler, resetting it to a no-op when there
+    are no configured retry markers instead of leaving a stale handler in place.
+    """
+    try:
+        import s3fs
+    except ImportError:
+        return
+
+    custom_retry_markers = (
+        config.s3fs.custom_retry_markers if config.s3fs is not None else []
+    )
+
+    def custom_retry_handler(e: Exception) -> bool:
+        """Custom s3fs retry predicate: retry errors matching a configured marker.
+
+        Initial implementation by Paweł Rzońca @clacrow
+
+        Receives the raw exception from botocore (before s3fs translates it, e.g.
+        to PermissionError), whatever its type. Returning True makes s3fs
+        sleep-and-retry the request. The motivating use case is AWS clock-skew
+        ClientErrors (re-signing the request with a fresh timestamp fixes those),
+        but any error substring can be configured as a retry marker.
+        """
+        return any(marker in str(e) for marker in custom_retry_markers)
+
+    s3fs.set_custom_error_handler(custom_retry_handler)
+
+
+refresh_s3fs_config(get_config())

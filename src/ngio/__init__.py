@@ -10,6 +10,7 @@ __author__ = "Lorenzo Cerrone"
 __email__ = "lorenzo.cerrone@uzh.ch"
 
 from ngio.common import Dimensions, Roi, RoiSlice
+from ngio.config import NgioConfig, get_config
 from ngio.hcs import (
     OmeZarrPlate,
     OmeZarrWell,
@@ -48,6 +49,7 @@ __all__ = [
     "ImageInWellPath",
     "Label",
     "NgffVersions",
+    "NgioConfig",
     "NgioSupportedStore",
     "OmeZarrContainer",
     "OmeZarrPlate",
@@ -61,6 +63,7 @@ __all__ = [
     "create_empty_well",
     "create_ome_zarr_from_array",
     "create_synthetic_ome_zarr",
+    "get_config",
     "open_image",
     "open_label",
     "open_ome_zarr_container",
