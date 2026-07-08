@@ -80,9 +80,7 @@ async def aretry_call(
     return await fn()
 
 
-def retry_call(
-    fn: Callable[[], T], policy: RetryConfig, *, op_name: str = ""
-) -> T:
+def retry_call(fn: Callable[[], T], policy: RetryConfig, *, op_name: str = "") -> T:
     """Call `fn()` retrying retryable errors according to the policy."""
     for attempt in range(1, policy.max_retries + 1):
         try:
