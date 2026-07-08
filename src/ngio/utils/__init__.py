@@ -14,6 +14,7 @@ from ngio.utils._errors import (
     NgioValueError,
 )
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
+from ngio.utils._retry import retry_io
 from ngio.utils._warnings import NgioDeprecationWarning, NgioUserWarning
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
@@ -47,4 +48,5 @@ __all__ = [
     "open_group_wrapper",
     "print_datasets_infos",
     "refresh_s3fs_config",
+    "retry_io",
 ]

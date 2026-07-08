@@ -23,6 +23,32 @@ test_nb                      # run notebooks
 
 ## Config
 - Python: 3.11–3.14
-- Ruff: line length 88, Google docstrings, `D401` ignored, docstrings off in `tests/`
 - Versioning: VCS via `hatch-vcs` (git tags, no hardcoded versions)
 - Coverage: branch coverage; omits `tests/`, `src/ngio/_version.py`
+
+## Code Style
+
+- Ruff: line length 88, target py311
+- Google-style docstrings, rendered by mkdocstrings/Griffe as Markdown (disabled for tests):
+  - Inline code uses single backticks (`` `None` ``), never RST double backticks
+  - Don't restate types in prose — they live in the signature (`channel: The channel to load.`, not `channel (int): ...`)
+  - Sections: `Args`, `Returns`, `Raises`, `Example`, `Note`
+  - One-line summary, blank line, then body
+  - Code examples in fenced ` ```python ` blocks, not `>>>` doctests
+  - Terse: behavior and edge cases only, don't restate the signature
+- Type checking via `ty`
+- Internal modules prefixed with `_`
+- Spell check via typos — false positives go in `_typos.toml`
+- Pydantic v2: `@field_validator` before `@classmethod`
+
+## Changelog
+
+- Follow the format in `CHANGELOG.md`
+- **Always** update `CHANGELOG.md` when making code changes — add entries under the current `## [vX.Y.Z]` section (or create one if missing).
+- Use these subsections (omit empty ones):
+  - `### Features` — new user-visible behaviour
+  - `### Fix` — bug fixes
+  - `### API Breaking Changes` — anything that breaks existing call sites (include before/after example)
+  - `### Chores` — internal refactors, dependency bumps, CI changes
+  - `### Documentation` — doc-only changes
+- One bullet per logical change; use backticks for identifiers.
