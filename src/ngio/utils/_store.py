@@ -9,21 +9,12 @@ isinstance-checking stores.
 from __future__ import annotations
 
 import asyncio
-import builtins
 import json
 import logging
 import warnings
-from collections.abc import (
-    AsyncGenerator,
-    AsyncIterator,
-    Awaitable,
-    Callable,
-    Iterable,
-    MutableMapping,
-)
 from itertools import starmap
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import fsspec
 from zarr.abc.store import ByteRequest, Store
@@ -37,6 +28,16 @@ from ngio.utils._retry import aretry_call
 from ngio.utils._warnings import NgioUserWarning
 
 if TYPE_CHECKING:
+    import builtins
+    from collections.abc import (
+        AsyncGenerator,
+        AsyncIterator,
+        Awaitable,
+        Callable,
+        Iterable,
+        MutableMapping,
+    )
+
     from zarr.abc.buffer import Buffer
     from zarr.core.buffer import BufferPrototype
 
@@ -74,14 +75,6 @@ class NgioStore(WrapperStore[Store]):
                 "The store is already an NgioStore. Use NgioStore.ensure() "
                 "to wrap stores idempotently."
             )
-        if not isinstance(store, _KNOWN_STORES):
-            warnings.warn(
-                f"Store type {type(store)} is not explicitly supported. "
-                f"Supported types are: {_KNOWN_STORES}. "
-                "Proceeding, but this may lead to unexpected behavior.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
         super().__init__(store)
         if retry is None:
             retry = get_config().io_retry.model_copy(deep=True)
@@ -103,12 +96,22 @@ class NgioStore(WrapperStore[Store]):
         Delegates the normalization to zarr (`str`/`Path` become a
         `LocalStore` or, for URIs, an `FsspecStore`; `dict` becomes a
         `MemoryStore` sharing the dict; `FSMap` becomes an `FsspecStore`).
-        An existing `NgioStore` is returned unchanged.
+        An existing `NgioStore` is returned unchanged. Unlike `ensure`, this
+        warns for store types ngio does not explicitly support, so it is the
+        entry point for user-provided stores.
         """
         if isinstance(store, NgioStore):
             return store
         if not isinstance(store, Store):
             store = sync(make_store(store, mode=mode))
+        if not isinstance(store, _KNOWN_STORES):
+            warnings.warn(
+                f"Store type {type(store)} is not explicitly supported. "
+                f"Supported types are: {_KNOWN_STORES}. "
+                "Proceeding, but this may lead to unexpected behavior.",
+                NgioUserWarning,
+                stacklevel=2,
+            )
         return cls(store, retry=retry)
 
     @classmethod
@@ -166,8 +169,11 @@ class NgioStore(WrapperStore[Store]):
         return None
 
     @property
-    def memory_dict(self) -> MutableMapping[str, Buffer]:
+    def memory_dict(self) -> MutableMapping[str, Any]:
         """Return the backing dict of an in-memory store.
+
+        The table backends stash non-Buffer values (e.g. raw pyarrow tables)
+        in this mapping, hence the `Any` value type.
 
         Raises:
             NgioValueError: If the store is not in-memory.
@@ -195,9 +201,7 @@ class NgioStore(WrapperStore[Store]):
         logger.warning(f"Cannot determine full URL for store type {type(store)}.")
         return None
 
-    def sync_fs_and_path(
-        self, path: str = ""
-    ) -> tuple[fsspec.AbstractFileSystem, str]:
+    def sync_fs_and_path(self, path: str = "") -> tuple[fsspec.AbstractFileSystem, str]:
         """Return a synchronous fsspec filesystem and full path for `path`.
 
         Raises:

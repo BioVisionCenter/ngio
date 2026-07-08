@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pickle
 from collections import Counter
-from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,6 +15,8 @@ from zarr.core.sync import sync
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, WrapperStore, ZipStore
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from zarr.abc.buffer import Buffer
     from zarr.abc.store import ByteRequest
     from zarr.core.buffer import BufferPrototype
@@ -109,11 +110,16 @@ class TestFromAny:
         with pytest.raises(NgioValueError, match="already an NgioStore"):
             NgioStore(store)
 
-    def test_exotic_store_warns(self):
+    def test_exotic_store_warns_via_from_any(self):
         exotic = WrapperStore(MemoryStore())
         with pytest.warns(NgioUserWarning, match="not explicitly supported"):
-            store = NgioStore(exotic)
+            store = NgioStore.from_any(exotic)
         assert store.store_type == "other"
+
+    def test_exotic_store_no_warning_via_ensure(self, recwarn):
+        store = NgioStore.ensure(WrapperStore(MemoryStore()))
+        assert store.store_type == "other"
+        assert len(recwarn) == 0
 
 
 class TestServices:

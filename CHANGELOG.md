@@ -17,6 +17,7 @@
 - `copy_group` now raises an error when the source listing does not contain the group's metadata document, instead of silently producing an empty copy from a non-listable store.
 
 ### Chores
+- Centralize concrete-store dispatch behind `NgioStore` services: `ZarrGroupHandler.full_url`, the file-lock path resolution, `copy_group`'s fsspec fast path, `is_group_listable`, and the pyarrow/anndata table backends no longer isinstance-check store types or reach into store internals (`store.root`/`store.fs`/`store._store_dict`). The JSON table backend and table metadata writes now go through the handler's `load_attrs`/`write_attrs` instead of raw `.attrs` access. One behavior note: AnnData fsspec writes now use a synchronous clone of the store's filesystem (as the pyarrow paths already did) instead of the store's own, possibly async, filesystem instance.
 - Harden GitHub Actions and scan workflows through `zizmor`.
 - Rename the `pre-commit` pixi dev task to `lint`: the old name shadowed the `pre-commit` binary in `pixi run`, and its trailing `git add -u` silently staged the working tree and masked hook failures in the task's exit code.
 

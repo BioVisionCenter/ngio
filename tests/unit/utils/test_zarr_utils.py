@@ -229,6 +229,7 @@ def test_is_group_listable(monkeypatch: pytest.MonkeyPatch, zarr_format: Literal
 
 
 def test_fsspec_copy_refuses_unlistable_source(tmp_path: Path):
+    from ngio.utils import NgioStore
     from ngio.utils._zarr_utils import _fsspec_copy
 
     src_path = tmp_path / "empty_src"
@@ -236,7 +237,9 @@ def test_fsspec_copy_refuses_unlistable_source(tmp_path: Path):
     dest_path = tmp_path / "dest"
 
     with pytest.raises(NgioValueError):
-        _fsspec_copy(LocalStore(src_path), "", LocalStore(dest_path), "")
+        _fsspec_copy(
+            NgioStore(LocalStore(src_path)), "", NgioStore(LocalStore(dest_path)), ""
+        )
 
     # Nothing was written to the destination
     assert not dest_path.exists() or not any(dest_path.iterdir())

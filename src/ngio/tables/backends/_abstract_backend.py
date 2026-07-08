@@ -198,7 +198,7 @@ class AbstractTableBackend(ABC):
         if metadata is None:
             metadata = {}
 
-        attrs = self._group_handler.reopen_group().attrs.asdict()
+        attrs = self._group_handler.load_attrs()
         # This is required by anndata to identify the format
         if "encoding-type" in attrs:
             metadata["encoding-type"] = attrs["encoding-type"]

@@ -3,7 +3,7 @@ from anndata import AnnData
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
-from zarr.storage import FsspecStore, LocalStore, MemoryStore
+from zarr.storage import MemoryStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._anndata_utils import (
@@ -15,7 +15,7 @@ from ngio.tables.backends._utils import (
     convert_polars_to_anndata,
     normalize_anndata,
 )
-from ngio.utils import NgioValueError, copy_group
+from ngio.utils import NgioStore, NgioValueError, copy_group
 
 
 class AnnDataBackend(AbstractTableBackend):
@@ -53,28 +53,27 @@ class AnnDataBackend(AbstractTableBackend):
         return self.load_as_anndata()
 
     def _write_to_local_store(
-        self, store: LocalStore, path: str, table: AnnData
+        self, store: NgioStore, path: str, table: AnnData
     ) -> None:
         """Write the AnnData table to a LocalStore."""
-        store_path = f"{store.root}/{path}"
-        table.write_zarr(store_path)
+        url = store.full_url(path)
+        if url is None:
+            raise NgioValueError(
+                f"Cannot resolve a local path for store {store} at {path}."
+            )
+        table.write_zarr(url)
 
     def _write_to_fsspec_store(
-        self, store: FsspecStore, path: str, table: AnnData
+        self, store: NgioStore, path: str, table: AnnData
     ) -> None:
         """Write the AnnData table to a FsspecStore."""
-        full_url = f"{store.path}/{path}"
-        fs = store.fs
-        mapper = fs.get_mapper(full_url)
-        table.write_zarr(mapper)
+        table.write_zarr(store.get_mapper(path))
 
-    def _write_to_memory_store(
-        self, store: MemoryStore, path: str, table: AnnData
-    ) -> None:
+    def _write_to_memory_store(self, table: AnnData) -> None:
         """Write the AnnData table to a MemoryStore."""
-        store = MemoryStore()
-        table.write_zarr(store)
-        anndata_group = zarr.open_group(store, mode="r")
+        scratch_store = MemoryStore()
+        table.write_zarr(scratch_store)
+        anndata_group = zarr.open_group(scratch_store, mode="r")
         copy_group(
             anndata_group,
             self._group_handler._group,
@@ -96,26 +95,22 @@ class AnnDataBackend(AbstractTableBackend):
         """Serialize the table from an AnnData object."""
         # Make sure to use the correct zarr format
         _update_anndata_global_settings(self._group_handler.zarr_format)
-        store = self._group_handler.store
+        store = NgioStore.ensure(self._group_handler.store)
         path = self._group_handler.group.path
-        if isinstance(store, LocalStore):
+        if store.store_type == "local":
             self._write_to_local_store(
                 store,
                 path,
                 table,
             )
-        elif isinstance(store, FsspecStore):
+        elif store.store_type == "fsspec":
             self._write_to_fsspec_store(
                 store,
                 path,
                 table,
             )
-        elif isinstance(store, MemoryStore):
-            self._write_to_memory_store(
-                store,
-                path,
-                table,
-            )
+        elif store.store_type == "memory":
+            self._write_to_memory_store(table)
         else:
             raise NgioValueError(
                 f"Ngio does not support writing an AnnData table to a "
