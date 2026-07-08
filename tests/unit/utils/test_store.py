@@ -288,6 +288,40 @@ class TestStoreBehavior:
         assert sync(store.getsize("zarr.json")) > 0
 
 
+class TestRetryEndToEnd:
+    """Retry through the full ngio stack, driven by the global config."""
+
+    def test_handler_retries_via_global_config(self, monkeypatch):
+        from ngio.config import get_config
+        from ngio.utils import ZarrGroupHandler
+
+        monkeypatch.setattr(get_config(), "io_retry", _RETRY)
+        flaky = FlakyMemoryStore(fail_times=1)
+        handler = ZarrGroupHandler(store=flaky, mode="a")
+        handler.write_attrs({"marker": 3})
+        assert handler.load_attrs() == {"marker": 3}
+        assert flaky.attempts["get"] > flaky.fail_times
+
+    def test_handler_fails_without_retry_config(self):
+        from ngio.utils import ZarrGroupHandler
+
+        flaky = FlakyMemoryStore(fail_times=1)
+        with pytest.raises(OSError, match="flaky"):
+            ZarrGroupHandler(store=flaky, mode="a")
+
+    def test_user_group_is_rewrapped(self, tmp_path):
+        from ngio.utils import ZarrGroupHandler
+
+        group = zarr.open_group(store=tmp_path / "user.zarr", mode="a")
+        assert not isinstance(group.store, NgioStore)
+        handler = ZarrGroupHandler(store=group, mode="a")
+        assert isinstance(handler.group.store, NgioStore)
+        # and it is not double wrapped when passed around again
+        handler2 = ZarrGroupHandler(store=handler.group, mode="a")
+        assert isinstance(handler2.group.store, NgioStore)
+        assert not isinstance(handler2.group.store._store, NgioStore)
+
+
 class TestMakeStoreCompat:
     """Canary for zarr's private make_store: fails loudly on a zarr bump."""
 

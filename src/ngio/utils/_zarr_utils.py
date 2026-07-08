@@ -13,7 +13,7 @@ from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
 from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
-from zarr.storage import FsspecStore, LocalStore, MemoryStore
+from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
 from ngio.config import NgioConfig, get_config
 from ngio.utils._cache import NgioCache
@@ -32,35 +32,37 @@ AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # but to make sure we can handle the store correctly
 # we need to be more restrictive
 NgioSupportedStore: TypeAlias = (
-    str | Path | fsspec.mapping.FSMap | FsspecStore | MemoryStore | dict | LocalStore
+    str
+    | Path
+    | fsspec.mapping.FSMap
+    | FsspecStore
+    | MemoryStore
+    | dict
+    | LocalStore
+    | ZipStore
+    | NgioStore
 )
 GenericStore: TypeAlias = NgioSupportedStore | Store
 StoreOrGroup: TypeAlias = NgioSupportedStore | zarr.Group
 
 
-def _check_store(store) -> NgioSupportedStore:
-    """Check the store and return a valid store."""
-    if not isinstance(store, NgioSupportedStore):
-        warnings.warn(
-            f"Store type {type(store)} is not explicitly supported. "
-            f"Supported types are: {NgioSupportedStore}. "
-            "Proceeding, but this may lead to unexpected behavior.",
-            NgioUserWarning,
-            stacklevel=2,
-        )
-    return store
-
-
 def _check_group(
     group: zarr.Group, mode: AccessModeLiteral | None = None
 ) -> zarr.Group:
-    """Check the group and return a valid group."""
+    """Check the group and return a valid group backed by an NgioStore."""
     if group.read_only and mode not in [None, "r"]:
         raise NgioValueError(f"The group is read only. Cannot open in mode {mode}.")
 
-    if mode == "r" and not group.read_only:
-        # let's make sure we don't accidentally write to the group
-        group = zarr.open_group(store=group.store, path=group.path, mode="r")
+    needs_read_only_reopen = mode == "r" and not group.read_only
+    if not isinstance(group.store, NgioStore) or needs_read_only_reopen:
+        ngio_store = NgioStore.from_any(group.store)
+        reopen_mode = "r" if (mode == "r" or group.read_only) else "r+"
+        group = zarr.open_group(
+            store=ngio_store,
+            path=group.path,
+            mode=reopen_mode,
+            zarr_format=group.metadata.zarr_format,
+        )
     return group
 
 
@@ -71,6 +73,10 @@ def open_group_wrapper(
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
+    The group is always opened on an `NgioStore`, so every store IO call
+    (including dask-worker chunk reads/writes) honors the configured
+    `io_retry` policy.
+
     Args:
         store (StoreOrGroup): The store or group to open.
         mode (AccessModeLiteral): The mode to open the group in.
@@ -80,14 +86,12 @@ def open_group_wrapper(
         zarr.Group: The opened Zarr group.
     """
     if isinstance(store, zarr.Group):
-        group = _check_group(store, mode)
-        _check_store(group.store)
-        return group
+        return _check_group(store, mode)
 
     try:
-        _check_store(store)
         mode = mode if mode is not None else "a"
-        group = zarr.open_group(store=store, mode=mode, zarr_format=zarr_format)
+        ngio_store = NgioStore.from_any(store, mode=mode)
+        group = zarr.open_group(store=ngio_store, mode=mode, zarr_format=zarr_format)
 
     except FileExistsError as e:
         raise NgioFileExistsError(
@@ -143,14 +147,14 @@ class ZarrGroupHandler:
         )
 
     @property
-    def store(self) -> Store:
+    def store(self) -> NgioStore:
         """Return the store of the group."""
-        return self._group.store
+        return NgioStore.ensure(self._group.store)
 
     @property
     def full_url(self) -> str | None:
         """Return the store path."""
-        return NgioStore.ensure(self.store).full_url(self.group.path)
+        return self.store.full_url(self.group.path)
 
     @property
     def zarr_format(self) -> Literal[2, 3]:
@@ -173,11 +177,11 @@ class ZarrGroupHandler:
                 "Please set cache=False to use the lock mechanism."
             )
 
-        local_root = NgioStore.ensure(self.store).local_root
+        local_root = self.store.local_root
         if local_root is None:
             raise NgioValueError(
                 "The store needs to be a LocalStore to use the lock mechanism. "
-                f"Instead, got {self.store.__class__.__name__}."
+                f"Instead, got a {self.store.store_type} store."
             )
 
         store_path = local_root / self.group.path

@@ -20,12 +20,15 @@ from ngio.utils import (
 
 @pytest.mark.parametrize("cache", [True, False])
 def test_group_handler_creation(tmp_path: Path, cache: bool):
+    from ngio.utils import NgioStore
+
     store = tmp_path / "test_group_handler_creation.zarr"
     handler = ZarrGroupHandler(store=store, cache=cache, mode="a")
 
     _store = handler.group.store
-    assert isinstance(_store, LocalStore)
-    assert Path(_store.root.as_posix()) == store
+    assert isinstance(_store, NgioStore)
+    assert isinstance(_store._store, LocalStore)
+    assert _store.local_root == store
     assert handler.use_cache == cache
 
     attrs = handler.load_attrs()
@@ -58,11 +61,19 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
 
 
 def test_group_handler_from_group(tmp_path: Path):
+    from ngio.utils import NgioStore
+
     store = tmp_path / "test_group_handler_from_group.zarr"
     group = zarr.group(store=store, overwrite=True)
 
     handler = ZarrGroupHandler(store=group, cache=True, mode="a")
-    assert handler.group == group
+    # The group is reopened on an NgioStore wrapping the original store,
+    # so compare path and underlying store rather than group identity.
+    assert isinstance(handler.group.store, NgioStore)
+    assert handler.group.store._store == group.store
+    assert handler.group.path == group.path
+    group.attrs["marker"] = 1
+    assert handler.load_attrs() == {"marker": 1}
 
 
 def test_group_handler_delete(tmp_path: Path):
