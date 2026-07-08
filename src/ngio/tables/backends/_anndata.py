@@ -15,7 +15,7 @@ from ngio.tables.backends._utils import (
     convert_polars_to_anndata,
     normalize_anndata,
 )
-from ngio.utils import NgioStore, NgioValueError, copy_group
+from ngio.utils import NgioStore, NgioValueError, copy_group, retry_io
 
 
 class AnnDataBackend(AbstractTableBackend):
@@ -52,10 +52,15 @@ class AnnDataBackend(AbstractTableBackend):
         """Load the table as an AnnData object."""
         return self.load_as_anndata()
 
+    @retry_io
     def _write_to_local_store(
         self, store: NgioStore, path: str, table: AnnData
     ) -> None:
-        """Write the AnnData table to a LocalStore."""
+        """Write the AnnData table to a LocalStore.
+
+        AnnData writes its own zarr hierarchy directly to the path, bypassing
+        the (retrying) `NgioStore`, so the `io_retry` policy is applied here.
+        """
         url = store.full_url(path)
         if url is None:
             raise NgioValueError(
@@ -63,10 +68,15 @@ class AnnDataBackend(AbstractTableBackend):
             )
         table.write_zarr(url)
 
+    @retry_io
     def _write_to_fsspec_store(
         self, store: NgioStore, path: str, table: AnnData
     ) -> None:
-        """Write the AnnData table to a FsspecStore."""
+        """Write the AnnData table to a FsspecStore.
+
+        AnnData writes through a raw fsspec mapper, bypassing the (retrying)
+        `NgioStore`, so the `io_retry` policy is applied here.
+        """
         table.write_zarr(store.get_mapper(path))
 
     def _write_to_memory_store(self, table: AnnData) -> None:

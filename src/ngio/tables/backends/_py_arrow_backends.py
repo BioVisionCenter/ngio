@@ -12,7 +12,7 @@ from polars import LazyFrame
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._utils import normalize_pandas_df, normalize_polars_lf
-from ngio.utils import NgioStore, NgioValueError
+from ngio.utils import NgioStore, NgioValueError, retry_io
 
 
 class PyArrowBackend(AbstractTableBackend):
@@ -89,8 +89,14 @@ class PyArrowBackend(AbstractTableBackend):
         """Load the table from a zip store."""
         raise NotImplementedError("Zip store loading is not implemented yet.")
 
+    @retry_io
     def _load_pyarrow_dataset(self) -> pa_ds.Dataset:
-        """Load the table as a pyarrow Dataset."""
+        """Load the table as a pyarrow Dataset.
+
+        This IO bypasses the zarr store, so the `io_retry` policy is applied
+        here. Retry covers the eager dataset/schema construction; lazy scans
+        performed later (e.g. through a polars `LazyFrame`) are not retried.
+        """
         store = NgioStore.ensure(self._group_handler.store)
         path = self._group_handler.group.path
         if store.store_type == "local":
@@ -175,8 +181,13 @@ class PyArrowBackend(AbstractTableBackend):
         """Write the table to a zip store."""
         raise NotImplementedError("Writing to zip store is not implemented yet.")
 
+    @retry_io
     def _write_pyarrow_dataset(self, dataset: pa.Table) -> None:
-        """Write the table from a pyarrow Dataset."""
+        """Write the table from a pyarrow Dataset.
+
+        This IO bypasses the zarr store, so the `io_retry` policy is
+        applied here.
+        """
         store = NgioStore.ensure(self._group_handler.store)
         path = self._group_handler.group.path
         if store.store_type == "local":

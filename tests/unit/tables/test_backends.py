@@ -299,3 +299,90 @@ def test_round_trip(index_label: str | None, index_type: str):
         pd.testing.assert_series_equal(
             datafame[column], test_table[column], check_index=True
         )
+
+
+def _retry_policy():
+    from ngio.config import ConstantBackoff, RetryConfig
+
+    return RetryConfig(
+        max_retries=2,
+        retry_on=["OSError"],
+        backoff=ConstantBackoff(delay_s=0.0, jitter=False),
+    )
+
+
+def test_parquet_backend_retries_flaky_load(tmp_path: Path, monkeypatch):
+    import ngio.tables.backends._py_arrow_backends as pab
+    from ngio.config import get_config
+
+    store = tmp_path / "test_parquet_retry.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+    backend = ParquetTableBackend()
+    backend.set_group_handler(handler)
+    test_table = pd.DataFrame({"a": [1, 2, 3]})
+    backend.write(test_table, metadata={})
+
+    monkeypatch.setattr(get_config(), "io_retry", _retry_policy())
+    calls = {"n": 0}
+    real_dataset = pab.pa_ds.dataset
+
+    def flaky_dataset(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("flaky parquet read")
+        return real_dataset(*args, **kwargs)
+
+    monkeypatch.setattr(pab.pa_ds, "dataset", flaky_dataset)
+    loaded = backend.load_as_pandas_df()
+    assert loaded["a"].tolist() == [1, 2, 3]
+    assert calls["n"] == 2
+
+
+def test_parquet_backend_retries_flaky_write(tmp_path: Path, monkeypatch):
+    import ngio.tables.backends._py_arrow_backends as pab
+    from ngio.config import get_config
+
+    store = tmp_path / "test_parquet_retry_write.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+    backend = ParquetTableBackend()
+    backend.set_group_handler(handler)
+
+    monkeypatch.setattr(get_config(), "io_retry", _retry_policy())
+    calls = {"n": 0}
+    real_write = pab.pa_parquet.write_table
+
+    def flaky_write(*args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("flaky parquet write")
+        return real_write(*args, **kwargs)
+
+    monkeypatch.setattr(pab.pa_parquet, "write_table", flaky_write)
+    backend.write(pd.DataFrame({"a": [1, 2, 3]}), metadata={})
+    assert calls["n"] == 2
+    assert backend.load_as_pandas_df()["a"].tolist() == [1, 2, 3]
+
+
+def test_anndata_backend_retries_flaky_write(tmp_path: Path, monkeypatch):
+    from ngio.config import get_config
+
+    store = tmp_path / "test_anndata_retry.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+    backend = AnnDataBackend()
+    backend.set_group_handler(handler)
+    obs = pd.DataFrame({"a": [1, 2, 3]}, index=pd.Index(["x", "y", "z"]))
+    table = ad.AnnData(obs=obs)
+
+    monkeypatch.setattr(get_config(), "io_retry", _retry_policy())
+    calls = {"n": 0}
+    real_write = ad.AnnData.write_zarr
+
+    def flaky_write(self, *args, **kwargs):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise OSError("flaky anndata write")
+        return real_write(self, *args, **kwargs)
+
+    monkeypatch.setattr(ad.AnnData, "write_zarr", flaky_write)
+    backend.write(table, metadata={})
+    assert calls["n"] == 2

@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Mapping
 
 import pytest
 
@@ -171,6 +172,70 @@ class TestARetryCall:
         with pytest.raises(ValueError, match="nope"):
             asyncio.run(aretry_call(fn.async_call, policy))
         assert fn.calls == 1
+
+
+class _FakeHTTPMapper(Mapping):
+    def __init__(self, errors: list[Exception | None]):
+        self.errors = errors
+        self.calls = 0
+
+    def get(self, key, default=None):
+        error = self.errors[min(self.calls, len(self.errors) - 1)]
+        self.calls += 1
+        if error is not None:
+            raise error
+        return b"{}"
+
+    def __getitem__(self, key):
+        raise KeyError(key)
+
+    def __iter__(self):
+        return iter(())
+
+    def __len__(self):
+        return 0
+
+
+def _client_error(status: int) -> Exception:
+    from aiohttp import ClientResponseError, RequestInfo
+    from multidict import CIMultiDict, CIMultiDictProxy
+    from yarl import URL
+
+    request_info = RequestInfo(
+        url=URL("http://x"),
+        method="GET",
+        headers=CIMultiDictProxy(CIMultiDict()),
+        real_url=URL("http://x"),
+    )
+    return ClientResponseError(request_info=request_info, history=(), status=status)
+
+
+class TestFractalProbeRetry:
+    @pytest.fixture(autouse=True)
+    def _no_sleep(self, monkeypatch):
+        monkeypatch.setattr(retry_mod, "_sleep", lambda _: None)
+
+    def test_transient_http_error_retried(self, monkeypatch):
+        from ngio.utils._fractal_fsspec_store import _probe_key
+
+        config = NgioConfig()
+        config.io_retry = _policy(retry_on=["ClientResponseError"])
+        monkeypatch.setattr(retry_mod, "get_config", lambda: config)
+        mapper = _FakeHTTPMapper([_client_error(503), None])
+        assert _probe_key(mapper, "http://x", ".zgroup", None) == b"{}"
+        assert mapper.calls == 2
+
+    def test_auth_error_never_retried_even_in_blanket_mode(self, monkeypatch):
+        from ngio.utils._fractal_fsspec_store import _probe_key
+
+        config = NgioConfig()
+        with pytest.warns(UserWarning):
+            config.io_retry = _policy(retry_all_errors=True)
+        monkeypatch.setattr(retry_mod, "get_config", lambda: config)
+        mapper = _FakeHTTPMapper([_client_error(401)])
+        with pytest.raises(NgioValueError, match="fractal_token"):
+            _probe_key(mapper, "http://x", ".zgroup", None)
+        assert mapper.calls == 1
 
 
 class TestRetryIODecorator:
