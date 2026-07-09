@@ -35,7 +35,9 @@ def test_condition_table_copy_with_none(tmp_path: Path, source_backend: str):
     dst = open_tables_container(tmp_path / "dest.zarr", mode="a")
 
     df = pd.DataFrame({"condition": ["cond_a", None]})
-    src.add(name="condition", table=ConditionTable(table_data=df), backend=source_backend)
+    src.add(
+        name="condition", table=ConditionTable(table_data=df), backend=source_backend
+    )
 
     # get_table + add_table analogue (add re-writes with the default anndata backend).
     copied_table = src.get("condition")
