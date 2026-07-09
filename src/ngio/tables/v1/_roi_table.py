@@ -189,6 +189,13 @@ def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFr
         data.append(row)
 
     dataframe = pd.DataFrame(data)
+    if dataframe.empty:
+        # No ROIs: build an empty frame that still carries the ROI schema so an
+        # empty ROI table round-trips instead of losing its columns.
+        dataframe = pd.DataFrame(
+            {col: pd.Series(dtype="float64") for col in REQUIRED_COLUMNS}
+        )
+        dataframe.index.name = index_key
     dataframe = normalize_pandas_df(dataframe, index_key=index_key)
     return dataframe
 
@@ -346,9 +353,10 @@ class GenericRoiTableV1(AbstractBaseTable):
             return None
 
         if self._table_backend is None:
-            raise NgioValueError(
-                "The table does not have a DataFrame in memory nor a backend."
-            )
+            # No backend and no in-memory data: this is an empty ROI table.
+            self._rois = RoiDictWrapper([])
+            self._table_data = self._rois.to_dataframe(index_key=self.index_key)
+            return None
 
         table_data, rois = _table_to_rois(
             self._table_backend.load(),
