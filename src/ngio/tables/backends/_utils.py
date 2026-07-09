@@ -123,13 +123,17 @@ def _check_for_mixed_types(series: pd.Series) -> None:
     Args:
         series (pd.Series): The pandas Series to check.
 
+    Missing values (None/NaN) are ignored, so a column of a single type plus
+    missing entries is not considered mixed.
+
     Raises:
         NgioTableValidationError: If the column has mixed types.
     """
-    if series.apply(type).nunique() > 1:  # type: ignore (type lint fails here)
+    non_null = series.dropna()
+    if non_null.apply(type).nunique() > 1:
         raise NgioTableValidationError(
             f"Column {series.name} has mixed types: "
-            f"{series.apply(type).unique()}. "  # type: ignore (type lint fails here)
+            f"{non_null.apply(type).unique()}. "
             "Type of all elements must be the same."
         )
 
@@ -140,18 +144,27 @@ def _check_for_supported_types(series: pd.Series) -> Literal["str", "int", "nume
     Args:
         series (pd.Series): The pandas Series to check.
 
+    Missing values (None/NaN) are ignored: a string column that also contains
+    missing entries (or is entirely missing) is still classified as "str", since
+    AnnData serializes such columns natively (as a categorical with NaN).
+
     Returns:
         Literal["str", "int", "numeric"]: The type category of the series.
 
     Raises:
         NgioTableValidationError: If the column has unsupported types.
     """
-    if ptypes.is_string_dtype(series):
-        return "str"
     if ptypes.is_integer_dtype(series):
         return "int"
     if ptypes.is_numeric_dtype(series):
         return "numeric"
+    # String-like columns (object/str/category), possibly with missing values.
+    # is_string_dtype is unreliable for object columns that contain None and for
+    # the category dtype produced by an AnnData round trip, so classify from the
+    # non-null contents instead.
+    non_null = series.dropna()
+    if non_null.empty or all(isinstance(value, str) for value in non_null):
+        return "str"
     raise NgioTableValidationError(
         f"Column {series.name} has unsupported type: {series.dtype}."
         " Supported types are string and numerics."

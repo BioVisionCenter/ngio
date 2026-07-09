@@ -193,6 +193,36 @@ def test_convert_pandas_to_polars_roundtrip():
         pdt.assert_series_equal(df[column], df_back[column], check_index=False)
 
 
+def test_convert_pandas_to_anndata_string_with_missing():
+    """A string column with missing values must convert (as AnnData supports it)."""
+    df = pd.DataFrame({"id": ["1", "2"], "condition": ["cond_a", None]})
+
+    adata = convert_pandas_to_anndata(df, index_key="id")
+
+    assert "condition" in adata.obs.columns
+    df_back = convert_anndata_to_pandas(adata, index_key="id", reset_index=True)
+    # AnnData normalizes string+missing to a categorical with NaN for the missing.
+    assert df_back["condition"].tolist()[0] == "cond_a"
+    assert pd.isna(df_back["condition"]).tolist() == [False, True]
+
+
+def test_convert_pandas_to_anndata_all_missing_string():
+    """An all-missing (object) column must convert as a string column."""
+    df = pd.DataFrame({"id": ["1", "2"], "condition": [None, None]}, dtype=object)
+
+    adata = convert_pandas_to_anndata(df, index_key="id")
+
+    assert "condition" in adata.obs.columns
+
+
+def test_convert_pandas_to_anndata_rejects_mixed_types():
+    """A genuinely mixed column (no missing) must still be rejected."""
+    df = pd.DataFrame({"id": ["1", "2"], "mixed": ["a", 1.0]})
+
+    with pytest.raises(NgioTableValidationError):
+        convert_pandas_to_anndata(df, index_key="id")
+
+
 def test_other_conversions():
     """Test the conversion of a polars DataFrame to an AnnData object."""
     lf = sample_polars_lf().collect()
