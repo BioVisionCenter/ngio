@@ -474,6 +474,11 @@ def write_table(
 
     """
     handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
+    # Materialize the data from the current backend (or in-memory) before swapping
+    # to the new backend, mirroring TablesContainer.add. Without this, a table just
+    # opened from another store (lazy, no in-memory data) would have its backend
+    # replaced by the empty destination and consolidate would write nothing.
+    table.set_table_data()
     table.set_backend(
         handler=handler,
         backend=backend,

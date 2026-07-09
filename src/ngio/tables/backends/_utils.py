@@ -81,6 +81,13 @@ def _validate_cast_index_dtype_df(
         # Nothing to do
         return pandas_df
 
+    if len(pandas_df.index) == 0 and index_type in ("str", "int"):
+        # Empty table: the index has no values to validate, so casting always
+        # succeeds. This lets empty tables be normalized without a spurious
+        # "index must be of X type" error.
+        target = str if index_type == "str" else int
+        return pandas_df.set_index(pandas_df.index.astype(target))
+
     if index_type == "str":
         if ptypes.is_integer_dtype(pandas_df.index):
             # Convert the int index to string is generally safe
@@ -123,13 +130,17 @@ def _check_for_mixed_types(series: pd.Series) -> None:
     Args:
         series (pd.Series): The pandas Series to check.
 
+    Missing values (None/NaN) are ignored, so a column of a single type plus
+    missing entries is not considered mixed.
+
     Raises:
         NgioTableValidationError: If the column has mixed types.
     """
-    if series.apply(type).nunique() > 1:  # type: ignore (type lint fails here)
+    non_null = series.dropna()
+    if non_null.apply(type).nunique() > 1:
         raise NgioTableValidationError(
             f"Column {series.name} has mixed types: "
-            f"{series.apply(type).unique()}. "  # type: ignore (type lint fails here)
+            f"{non_null.apply(type).unique()}. "
             "Type of all elements must be the same."
         )
 
@@ -140,18 +151,27 @@ def _check_for_supported_types(series: pd.Series) -> Literal["str", "int", "nume
     Args:
         series (pd.Series): The pandas Series to check.
 
+    Missing values (None/NaN) are ignored: a string column that also contains
+    missing entries (or is entirely missing) is still classified as "str", since
+    AnnData serializes such columns natively (as a categorical with NaN).
+
     Returns:
         Literal["str", "int", "numeric"]: The type category of the series.
 
     Raises:
         NgioTableValidationError: If the column has unsupported types.
     """
-    if ptypes.is_string_dtype(series):
-        return "str"
     if ptypes.is_integer_dtype(series):
         return "int"
     if ptypes.is_numeric_dtype(series):
         return "numeric"
+    # String-like columns (object/str/category), possibly with missing values.
+    # is_string_dtype is unreliable for object columns that contain None and for
+    # the category dtype produced by an AnnData round trip, so classify from the
+    # non-null contents instead.
+    non_null = series.dropna()
+    if non_null.empty or all(isinstance(value, str) for value in non_null):
+        return "str"
     raise NgioTableValidationError(
         f"Column {series.name} has unsupported type: {series.dtype}."
         " Supported types are string and numerics."
@@ -374,9 +394,11 @@ def convert_pandas_to_anndata(
     if x_df.dtypes.nunique() > 1:
         x_df = x_df.astype("float64")
 
-    if x_df.empty:
+    if x_df.shape[1] == 0:
         # If there are no numeric columns, create an empty array
-        # to avoid AnnData failing to create the object
+        # to avoid AnnData failing to create the object. Note: we check the number
+        # of columns rather than DataFrame.empty, since .empty is also True for a
+        # frame with columns but zero rows (an empty table), which must keep its X.
         x_df = np.zeros((len(obs_df), 0), dtype="float64")
 
     return AnnData(X=x_df, obs=obs_df)

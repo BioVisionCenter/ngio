@@ -33,6 +33,40 @@ def test_generic_df_table(tmp_path: Path, backend: str):
     loaded_table.load_as_anndata()
 
 
+@pytest.mark.parametrize(
+    "src_backend, dst_backend",
+    # anndata -> json is unsupported (json cannot serialize an AnnData object);
+    # the other combinations exercise both lazy-load paths.
+    [("json", "json"), ("json", "anndata"), ("anndata", "anndata")],
+)
+def test_write_table_from_opened_table(
+    tmp_path: Path, src_backend: str, dst_backend: str
+):
+    """write_table on a lazily-opened table must copy its data, not write empty.
+
+    Mirrors a table copy done via the low-level write_table API: open a table from
+    one store (its data is loaded lazily) and write it to another store.
+    """
+    src_store = tmp_path / "src.zarr"
+    dst_store = tmp_path / "dst.zarr"
+    test_df = pd.DataFrame({"a": [1, 2, 3], "b": [4, 5, 6]})
+
+    write_table(
+        store=src_store, table=GenericTable(table_data=test_df), backend=src_backend
+    )
+
+    # Freshly opened -> table_data is loaded lazily (not yet materialized).
+    loaded_table = open_table(store=src_store)
+    write_table(store=dst_store, table=loaded_table, backend=dst_backend)
+
+    copied = open_table(store=dst_store).dataframe
+    assert set(copied.columns) == {"a", "b"}
+    for column in ["a", "b"]:
+        pd.testing.assert_series_equal(
+            copied[column], test_df[column], check_index=False, check_dtype=False
+        )
+
+
 @pytest.mark.parametrize("backend", ["anndata"])
 def test_generic_anndata_table(tmp_path: Path, backend: str):
     store = tmp_path / "test.zarr"
