@@ -60,6 +60,7 @@ dependencies = [
 test = [
     "pytest",
     "pytest-cov",
+    "pytest-xdist",
     "scikit-image",
     "boto3",
     "pytest_httpserver",

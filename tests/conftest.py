@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path
 
 import pytest
+from filelock import FileLock
 
 from ngio.utils import download_ome_zarr_dataset
 
@@ -24,9 +25,14 @@ def _download_dataset(name: str) -> Path:
 
     Called lazily from session fixtures so that test collection never
     blocks on the network; with a warm cache no network access happens.
+    The file lock serializes concurrent pytest-xdist workers on a cold
+    cache, and `re_unzip=False` skips re-extracting an existing dataset.
     """
     os.makedirs(ZENODO_DOWNLOAD_DIR, exist_ok=True)
-    return download_ome_zarr_dataset(name, download_dir=ZENODO_DOWNLOAD_DIR)
+    with FileLock(ZENODO_DOWNLOAD_DIR / f"{name}.lock"):
+        return download_ome_zarr_dataset(
+            name, download_dir=ZENODO_DOWNLOAD_DIR, re_unzip=False
+        )
 
 
 @pytest.fixture(scope="session")
