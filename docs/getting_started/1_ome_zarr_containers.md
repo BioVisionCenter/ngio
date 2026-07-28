@@ -3,25 +3,13 @@
 Let's see how to open and explore an OME-Zarr image using `ngio`:
 
 ```python exec="true" source="material-block" session="get_started"
-from pathlib import Path
-from ngio import open_ome_zarr_container
-from ngio.utils import download_ome_zarr_dataset
-
-# Download a sample dataset
-download_dir = Path("./data")
-download_dir = Path(".").absolute() / "data" # markdown-exec: hide
-hcs_path = download_ome_zarr_dataset("CardiomyocyteSmallMip", download_dir=download_dir)
-image_path = hcs_path / "B" / "03" / "0"
-
-# Open the OME-Zarr container
-ome_zarr_container = open_ome_zarr_container(image_path)
+--8<-- "docs/snippets/getting_started/get_started.py:setup"
 ```
 
 The `OME-Zarr Container` in is your entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
 
-```pycon exec="true" source="console" session="get_started"
->>> ome_zarr_container
->>> print(ome_zarr_container) # markdown-exec: hide
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:print_container"
 ```
 
 The `OME-Zarr Container` will be the starting point for all your image processing tasks.
@@ -50,39 +38,33 @@ Examples of the OME-Zarr metadata access:
 
 === "Number of Resolution Levels"
     Show the number of resolution levels:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.levels # Show the number of resolution levels
-    >>> print(ome_zarr_container.levels) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:levels"
     ```
 
 === "Available Paths"
     Show the paths to all available resolution levels:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.level_paths # Show the paths to all available images
-    >>> print(ome_zarr_container.level_paths) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:level_paths"
     ```
 
 === "Dimensionality"
     Show if the image is 2D or 3D:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.is_3d # Get if the image is 3D
-    >>> print(ome_zarr_container.is_3d) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:is_3d"
     ```
     or if the image is a time series:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.is_time_series # Get if the image is a time series
-    >>> print(ome_zarr_container.is_time_series) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:is_time_series"
     ```
 
 === "Full Metadata Object"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> metadata = ome_zarr_container.meta
-    >>> print(metadata) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:metadata"
     ```
     The metadata object contains all the information about the image, for example, the channel labels:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> metadata.channels_meta.channel_labels
-    >>> print(metadata.channels_meta.channel_labels) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:channel_labels"
     ```
 
 ## Modifying metadata

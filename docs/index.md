@@ -27,7 +27,7 @@ Ngio's mission is to streamline working with OME-Zarr files by providing a simpl
 
 ## Getting Started
 
-Refer to the [Getting Started](getting_started/0_quickstart.md) guide to integrate ngio into your workflows. We also provide a collection of [Tutorials](tutorials/image_processing.ipynb) to help you get up and running quickly.
+Refer to the [Getting Started](getting_started/0_quickstart.md) guide to integrate ngio into your workflows. We also provide a collection of [Tutorials](tutorials/image_processing.md) to help you get up and running quickly.
 For more advanced usage and API documentation, see our [API Reference](api/ome_zarr_container.md).
 
 ## Supported OME-Zarr versions

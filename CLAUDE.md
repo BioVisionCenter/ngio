@@ -18,8 +18,26 @@ test13 pytest                     # 3.13
 dev lint                          # lint/format (pre-commit hooks)
 dev ty check                      # type check (Ruff ty)
 docs serve_docs                   # docs preview
-test_nb                      # run notebooks
+docs build_docs                   # build the site
+docs test_snippets                # run every docs snippet script standalone
+docs clean_docs_data              # drop generated ./data/*.zarr stores
 ```
+
+## Docs snippets
+Executed code on the docs pages lives in real Python scripts under `docs/snippets/`,
+not in the markdown. A page includes a named section via `pymdownx.snippets`:
+
+````markdown
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:levels"
+```
+````
+
+- Sections are delimited by `# --8<-- [start:name]` / `# --8<-- [end:name]`.
+- Use `source="material-block"` (not `block`) and `html="1"` for figure blocks.
+- One script per session; each must run standalone from the repo root.
+- Sections repeat their imports so each rendered block stands alone (hence the
+  `docs/snippets/**` ruff per-file-ignores).
 
 ## Config
 - Python: 3.11–3.14

@@ -52,25 +52,15 @@ Please report installation problems by opening an issue on our [GitHub repositor
 Let's start by downloading a sample OME-Zarr dataset to work with.
 
 ```python exec="true" source="material-block" session="quickstart"
-from pathlib import Path
-from ngio.utils import download_ome_zarr_dataset
-
-# Download a sample dataset
-download_dir = Path("./data")
-download_dir = Path(".").absolute() / "data" # markdown-exec: hide
-hcs_path = download_ome_zarr_dataset("CardiomyocyteSmallMip", download_dir=download_dir)
-image_path = hcs_path / "B" / "03" / "0"
+--8<-- "docs/snippets/getting_started/quickstart.py:setup"
 ```
 
 ## Open an OME-Zarr image
 
 Let's start by opening an OME-Zarr file and inspecting its contents.
 
-```pycon exec="true" source="console" session="quickstart"
->>> from ngio import open_ome_zarr_container
->>> ome_zarr_container = open_ome_zarr_container(image_path)
->>> ome_zarr_container
->>> print(ome_zarr_container) # markdown-exec: hide
+```python exec="true" source="material-block" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:open_container"
 ```
 
 ### What is the OME-Zarr container?
@@ -93,7 +83,7 @@ To learn how to work with the `OME-Zarr Container` object, but also with the ima
 
 Also, checkout our jupyer notebook tutorials for more examples:
 
-- [Image Processing](../tutorials/image_processing.ipynb): Learn how to perform simple image processing operations.
-- [Image Segmentation](../tutorials/image_segmentation.ipynb): Learn how to create new labels from images.
-- [Feature Extraction](../tutorials/feature_extraction.ipynb): Learn how to extract features from images.
-- [HCS Exploration](../tutorials/hcs_exploration.ipynb): Learn how to explore high-content screening data using ngio.
+- [Image Processing](../tutorials/image_processing.md): Learn how to perform simple image processing operations.
+- [Image Segmentation](../tutorials/image_segmentation.md): Learn how to create new labels from images.
+- [Feature Extraction](../tutorials/feature_extraction.md): Learn how to extract features from images.
+- [HCS Exploration](../tutorials/hcs_exploration.md): Learn how to explore high-content screening data using ngio.

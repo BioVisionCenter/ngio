@@ -147,6 +147,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
+# Doc snippets are split into sections that are rendered as standalone code blocks,
+# so each section repeats the imports it needs.
+"docs/snippets/**/*.py" = ["D", "E402", "F811", "I001"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -262,8 +265,32 @@ python = ">=3.14,<3.15"
 
 [tool.pixi.feature.docs.tasks]
 serve_docs = "mkdocs serve"
-clean_nb_data = "rm -rf ./docs/notebooks/**/*.zarr"
-test_nb = { cmd = "jupyter-execute ./docs/notebooks/*.ipynb" }
+build_docs = "mkdocs build"
+# Only drops the generated stores; the downloaded archives stay cached in ./data.
+clean_docs_data = "rm -rf ./data/*.zarr"
+snip_quickstart = "python docs/snippets/getting_started/quickstart.py > /dev/null"
+snip_get_started = "python docs/snippets/getting_started/get_started.py > /dev/null"
+snip_masked_images = "python docs/snippets/getting_started/masked_images.py > /dev/null"
+snip_hcs = "python docs/snippets/getting_started/hcs.py > /dev/null"
+snip_create_ome_zarr = "python docs/snippets/tutorials/create_ome_zarr.py > /dev/null"
+snip_image_processing = "python docs/snippets/tutorials/image_processing.py > /dev/null"
+snip_image_segmentation = "python docs/snippets/tutorials/image_segmentation.py > /dev/null"
+snip_feature_extraction = "python docs/snippets/tutorials/feature_extraction.py > /dev/null"
+snip_hcs_exploration = "python docs/snippets/tutorials/hcs_exploration.py > /dev/null"
+# Must stay sequential: `download_ome_zarr_dataset` stages every extraction through a
+# single shared `<download_dir>/tmp` that it wipes on entry, so two scripts downloading
+# at once clobber each other. (`depends-on` would run them in parallel.)
+test_snippets = """
+python docs/snippets/getting_started/quickstart.py > /dev/null &&
+python docs/snippets/getting_started/get_started.py > /dev/null &&
+python docs/snippets/getting_started/masked_images.py > /dev/null &&
+python docs/snippets/getting_started/hcs.py > /dev/null &&
+python docs/snippets/tutorials/create_ome_zarr.py > /dev/null &&
+python docs/snippets/tutorials/image_processing.py > /dev/null &&
+python docs/snippets/tutorials/image_segmentation.py > /dev/null &&
+python docs/snippets/tutorials/feature_extraction.py > /dev/null &&
+python docs/snippets/tutorials/hcs_exploration.py > /dev/null
+"""
 
 
 [tool.pixi.environments]

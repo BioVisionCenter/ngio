@@ -8,6 +8,13 @@
 - Apply the `io_retry` policy to the IO paths that bypass the zarr store: the pyarrow table backend's dataset load/write, the AnnData backend's direct local/fsspec writes, and the `fractal_fsspec_store` metadata probe (where 401 auth failures are translated to `NgioValueError` inside the retried call, so they are never retried — even in blanket mode).
 
 ### Documentation
+- Move every executed docs code block out of the markdown and into real Python scripts under `docs/snippets/`, included via `pymdownx.snippets` (`--8<-- "path.py:section"`) and executed by `markdown-exec`. The snippet scripts are linted and formatted by ruff and each one runs standalone from the repo root (`pixi run -e docs test_snippets`). This prepares the docs for the migration to Zensical, which does not support `mkdocs-jupyter`'s `execute: true`.
+- Convert the five tutorial notebooks (`docs/tutorials/*.ipynb`) to markdown pages backed by snippet scripts, and drop the `mkdocs-jupyter` plugin. Fixes carried over in the conversion: the notebooks computed `download_dir` relative to their own directory (which resolved outside the repo once executed from the repo root), and several `create_ome_zarr_from_array`/`add_table` calls lacked `overwrite=True`, so a second build failed.
+- Convert all `pycon` console blocks to plain `python` blocks. The old `>>> expr` plus hidden `>>> print(expr)` pair collapses to a single visible `print(expr)`, so each expression is evaluated once instead of twice and no lines are hidden from the reader.
+- Replace `mkdocs-include-markdown-plugin` in `docs/changelog.md` with a `pymdownx.snippets` include, and drop the plugin.
+- Fix `3_tables.md` showing `masking_table.get_label(1)` while executing `get_label(100)`; the page now shows the call it runs.
+- Remove the dangling `favicon: images/favicon.ico` from `mkdocs.yml` (`docs/images/` does not exist).
+- Replace the stale `clean_nb_data` / `test_nb` pixi tasks, which pointed at a nonexistent `docs/notebooks/`, with `build_docs`, `clean_docs_data`, and per-script `snip_*` tasks aggregated by `test_snippets`.
 - Add a "Configuration" getting-started page documenting the config file location (`~/.ngio/ngio_config.json` / `NGIO_CONFIG_PATH`), the `io_retry` policy (fields, backoff strategies, marker matching, snapshot-at-open vs read-at-call semantics), and its relationship to the lower-level `s3fs.custom_retry_markers` mechanism. `NgioConfig`, `RetryConfig`, and `get_config` are now listed in the top-level API reference.
 
 ### Fix

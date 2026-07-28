@@ -9,60 +9,47 @@ ngio provides a high-level API to access the image data at different resolution 
 
 === "Highest Resolution Image"
     By default, the `get_image` method returns the highest resolution image:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.get_image() # Get the highest resolution image
-    >>> print(ome_zarr_container.get_image()) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_image_default"
     ```
 
 === "Specific Pyramid Level"
     To get a specific pyramid level, you can use the `path` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.get_image(path="1") # Get a specific pyramid level
-    >>> print(ome_zarr_container.get_image(path="1")) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_image_by_path"
     ```
     This will return the image at the specified pyramid level.
 
 === "Specific Resolution"
     If you want to get an image with a specific pixel size, you can use the `pixel_size` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio import PixelSize
-    >>> pixel_size = PixelSize(x=0.65, y=0.65, z=1.0)
-    >>> ome_zarr_container.get_image(pixel_size=pixel_size)
-    >>> image = ome_zarr_container.get_image(pixel_size=pixel_size) # markdown-exec: hide
-    >>> print(image) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_image_by_pixel_size"
     ```
 
 === "Nearest Resolution"
     By default the pixels must match exactly the requested pixel size. If you want to get the nearest resolution, you can use the `strict` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio import PixelSize
-    >>> pixel_size = PixelSize(x=0.60, y=0.60, z=1.0)
-    >>> ome_zarr_container.get_image(pixel_size=pixel_size, strict=False)
-    >>> image = ome_zarr_container.get_image(pixel_size=pixel_size, strict=False) # markdown-exec: hide
-    >>> print(image) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_image_nearest"
     ```
     This will return the image with the nearest resolution to the requested pixel size.
 
 Similarly to the `OME-Zarr Container`, the `Image` object provides a high-level API to access the image metadata.
 
 === "Dimensions"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> image.dimensions
-    >>> print(image.dimensions) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_dimensions"
     ```
     The `dimensions` attribute returns a object with the image dimensions for each axis.
 
 === "Pixel Size"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> image.pixel_size
-    >>> print(image.pixel_size) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_pixel_size"
     ```
     The `pixel_size` attribute returns the pixel size for each axis.
 
 === "On disk array infos"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> image.shape, image.dtype, image.chunks
-    >>> print(image.shape, image.dtype, image.chunks) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_array_info"
     ```
     The `axes` attribute returns the order of the axes in the image.
 
@@ -71,34 +58,26 @@ Similarly to the `OME-Zarr Container`, the `Image` object provides a high-level 
 Once you have the `Image` object, you can access the image data as a:
 
 === "Numpy Array"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> data = image.get_as_numpy() # Get the image as a numpy array
-    >>> data.shape, data.dtype
-    >>> print(data.shape, data.dtype) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_as_numpy"
     ```
 
 === "Dask Array"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> dask_array = image.get_as_dask() # Get the image as a dask array
-    >>> dask_array
-    >>> print(dask_array) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_as_dask"
     ```
 
 === "Legacy"
     A generic `get_array` method is still available for backwards compatibility.
 
-    ```pycon exec="true" source="console" session="get_started"
-    >>> data = image.get_array(mode="numpy") # Get the image as a numpy or dask or delayed object
-    >>> data.shape, data.dtype
-    >>> print(data.shape, data.dtype) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:image_get_array_legacy"
     ```
 
 The `get_as_*` can also be used to slice the image data, and query specific axes in specific orders:
 
-```pycon exec="true" source="console" session="get_started"
->>> image_slice = image.get_as_numpy(channel_selection="DAPI", x=slice(0, 128), axes_order=["t", "z", "y", "x", "c"]) # Get a specific channel and axes order
->>> image_slice.shape
->>> print(image_slice.shape) # markdown-exec: hide
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:image_slice"
 ```
 
 If you want to edit the image data, you can use the `set_array` method:
@@ -112,16 +91,7 @@ The `set_array` method can be used to set the image data from a numpy array, das
 A minimal example of how to use the `get_array` and `set_array` methods:
 
 ```python exec="true" source="material-block" session="get_started"
-# Get the image data as a numpy array
-data = image.get_as_numpy(channel_selection="DAPI", x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
-
-# Modify the image data
-some_function = lambda x: x # markdown-exec: hide
-data = some_function(data)
-
-# Set the modified image data
-image.set_array(data, channel_selection="DAPI", x=slice(0, 128), y=slice(0, 128), axes_order=["z", "y", "x", "c"])
-image.consolidate() # Consolidate the changes to all resolution levels, see below for more details
+--8<-- "docs/snippets/getting_started/get_started.py:set_array_example"
 ```
 
 !!! important
@@ -135,11 +105,8 @@ image.consolidate() # Consolidate the changes to all resolution levels, see belo
 
 To read or write a specific region of the image defined in world coordinates, you can use the `Roi` object.
 
-```pycon exec="true" source="console" session="get_started"
->>> from ngio import Roi
->>> roi = Roi.from_values(slices={"x": (34.1, 321.6), "y": (10, 330)}, name=None) # Define a ROI in world coordinates
->>> image.get_roi_as_numpy(roi) # Get the image data in the ROI as a numpy array
->>> print(image.get_roi_as_numpy(roi).shape) # markdown-exec: hide
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:roi_slicing"
 ```
 
 ## Labels
@@ -151,48 +118,35 @@ be accessed and manipulated in the same way.
 
 Now let's see what labels are available in our image:
 
-```pycon exec="true" source="console" session="get_started"
-# List all available labels
->>> ome_zarr_container.list_labels() # Available labels
->>> print(ome_zarr_container.list_labels()) # markdown-exec: hide
->>> print("") # markdown-exec: hide
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:list_labels"
 ```
 
 We have `4` labels available in our image. Let's see how to access them:
 
 === "Highest Resolution Label"
     By default, the `get_label` method returns the highest resolution label:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.get_label("nuclei") # Get the highest resolution label
-    >>> print(ome_zarr_container.get_label("nuclei")) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_label_default"
     ```
 
 === "Specific Pyramid Level"
     To get a specific pyramid level, you can use the `path` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.get_label("nuclei", path="1") # Get a specific pyramid level
-    >>> print(ome_zarr_container.get_label("nuclei", path="1")) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_label_by_path"
     ```
     This will return the label at the specified pyramid level.
 
 === "Specific Resolution"
     If you want to get a label with a specific pixel size, you can use the `pixel_size` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio import PixelSize
-    >>> pixel_size = PixelSize(x=0.65, y=0.65, z=1.0)
-    >>> ome_zarr_container.get_label("nuclei", pixel_size=pixel_size)
-    >>> label_nuclei = ome_zarr_container.get_label("nuclei", pixel_size=pixel_size) # markdown-exec: hide
-    >>> print(label_nuclei) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_label_by_pixel_size"
     ```
 
 === "Nearest Resolution"
     By default the pixels must match exactly the requested pixel size. If you want to get the nearest resolution, you can use the `strict` parameter:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio import PixelSize
-    >>> pixel_size = PixelSize(x=0.60, y=0.60, z=1.0)
-    >>> ome_zarr_container.get_label("nuclei", pixel_size=pixel_size, strict=False)
-    >>> label_nuclei = ome_zarr_container.get_label("nuclei", pixel_size=pixel_size, strict=False) # markdown-exec: hide
-    >>> print(label_nuclei) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:get_label_nearest"
     ```
     This will return the label with the nearest resolution to the requested pixel size.
 
@@ -204,9 +158,8 @@ Data access and manipulation for `Labels` is similar to `Images`. You can use th
 
 Often, you might want to create a new label based on an existing image. You can do this using the `derive_label` method:
 
-```pycon exec="true" source="console" session="get_started"
->>> new_label = ome_zarr_container.derive_label("new_label", overwrite=True) # Derive a new label
->>> print(new_label) # markdown-exec: hide
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:derive_label"
 ```
 
 This will create a new label with the same dimensions as the original image (without channels) and compatible metadata.

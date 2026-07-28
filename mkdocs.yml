@@ -5,9 +5,13 @@ repo_name: "ngio"
 repo_url: "https://github.com/BioVisionCenter/ngio"
 copyright: "Copyright &copy; 2024-, BioVisionCenter UZH"
 
+# The snippet scripts are executed into the docs via pymdownx.snippets, which reads
+# them from the filesystem. They are not pages, so keep them out of the built site.
+exclude_docs: |
+  snippets/
+
 theme:
   name: material
-  favicon: images/favicon.ico
   #logo: logos/logo_white.png
   icon:
     repo: fontawesome/brands/github
@@ -54,7 +58,6 @@ plugins:
   - search
   - autorefs
   - markdown-exec
-  - include-markdown
   - mkdocstrings:
       handlers:
         python:
@@ -88,13 +91,14 @@ plugins:
   - git-committers:
       repository: BioVisionCenter/ngio
       branch: main
-  - mkdocs-jupyter:
-      execute: true
 
 markdown_extensions:
   - admonition
   - pymdownx.details
   - pymdownx.superfences
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
   - md_in_html
   - pymdownx.tabbed:
       alternate_style: true
@@ -116,11 +120,11 @@ nav:
     - getting_started/7_configuration.md
 
   - Tutorials:
-    - tutorials/create_ome_zarr.ipynb
-    - tutorials/image_processing.ipynb
-    - tutorials/image_segmentation.ipynb
-    - tutorials/feature_extraction.ipynb
-    - tutorials/hcs_exploration.ipynb
+    - tutorials/create_ome_zarr.md
+    - tutorials/image_processing.md
+    - tutorials/image_segmentation.md
+    - tutorials/feature_extraction.md
+    - tutorials/hcs_exploration.md
 
   - Table Specifications:
     - "Overview": table_specs/overview.md
