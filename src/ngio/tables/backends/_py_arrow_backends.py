@@ -9,12 +9,10 @@ import pyarrow.parquet as pa_parquet
 from pandas import DataFrame
 from polars import DataFrame as PolarsDataFrame
 from polars import LazyFrame
-from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
 from ngio.tables.backends._abstract_backend import AbstractTableBackend
 from ngio.tables.backends._utils import normalize_pandas_df, normalize_polars_lf
-from ngio.utils import NgioValueError
-from ngio.utils._zarr_utils import _make_sync_fs
+from ngio.utils import NgioStore, NgioValueError, retry_io
 
 
 class PyArrowBackend(AbstractTableBackend):
@@ -62,26 +60,22 @@ class PyArrowBackend(AbstractTableBackend):
             "FsspecStore, or MemoryStore, or ZipStore."
         )
 
-    def _load_from_local_store(self, store: LocalStore, path: str) -> pa_ds.Dataset:
+    def _load_from_local_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
         """Load the table from a directory store."""
-        root_path = store.root
-        table_path = f"{root_path}/{path}/{self.table_name}"
+        table_path = f"{store.full_url()}/{path}/{self.table_name}"
         dataset = pa_ds.dataset(table_path, format=self.table_format)
         return dataset
 
-    def _load_from_fsspec_store(self, store: FsspecStore, path: str) -> pa_ds.Dataset:
+    def _load_from_fsspec_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
         """Load the table from an FS store."""
-        table_path = f"{store.path}/{path}/{self.table_name}"
-        fs = _make_sync_fs(store.fs)
+        fs, table_path = store.sync_fs_and_path(f"{path}/{self.table_name}")
         dataset = pa_ds.dataset(table_path, format=self.table_format, filesystem=fs)
         return dataset
 
-    def _load_from_in_memory_store(
-        self, store: MemoryStore, path: str
-    ) -> pa_ds.Dataset:
+    def _load_from_in_memory_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
         """Load the table from an in-memory store."""
         table_path = f"{path}/{self.table_name}"
-        table = store._store_dict.get(table_path, None)
+        table = store.memory_dict.get(table_path, None)
         if table is None:
             raise NgioValueError(
                 f"Table {self.table_name} not found in the in-memory store at "
@@ -91,21 +85,27 @@ class PyArrowBackend(AbstractTableBackend):
         dataset = pa_ds.dataset(table)
         return dataset
 
-    def _load_from_zip_store(self, store: ZipStore, path: str) -> pa_ds.Dataset:
+    def _load_from_zip_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
         """Load the table from a zip store."""
         raise NotImplementedError("Zip store loading is not implemented yet.")
 
+    @retry_io
     def _load_pyarrow_dataset(self) -> pa_ds.Dataset:
-        """Load the table as a pyarrow Dataset."""
-        store = self._group_handler.store
+        """Load the table as a pyarrow Dataset.
+
+        This IO bypasses the zarr store, so the `io_retry` policy is applied
+        here. Retry covers the eager dataset/schema construction; lazy scans
+        performed later (e.g. through a polars `LazyFrame`) are not retried.
+        """
+        store = NgioStore.ensure(self._group_handler.store)
         path = self._group_handler.group.path
-        if isinstance(store, LocalStore):
+        if store.store_type == "local":
             return self._load_from_local_store(store, path)
-        elif isinstance(store, FsspecStore):
+        elif store.store_type == "fsspec":
             return self._load_from_fsspec_store(store, path)
-        elif isinstance(store, MemoryStore):
+        elif store.store_type == "memory":
             return self._load_from_in_memory_store(store, path)
-        elif isinstance(store, ZipStore):
+        elif store.store_type == "zip":
             return self._load_from_zip_store(store, path)
         self._raise_store_type_not_supported()
 
@@ -155,45 +155,48 @@ class PyArrowBackend(AbstractTableBackend):
             )
 
     def _write_to_local_store(
-        self, store: LocalStore, path: str, table: pa.Table
+        self, store: NgioStore, path: str, table: pa.Table
     ) -> None:
         """Write the table to a directory store."""
-        root_path = store.root
-        table_path = f"{root_path}/{path}/{self.table_name}"
+        table_path = f"{store.full_url()}/{path}/{self.table_name}"
         self._write_to_stream(table_path, table)
 
     def _write_to_fsspec_store(
-        self, store: FsspecStore, path: str, table: pa.Table
+        self, store: NgioStore, path: str, table: pa.Table
     ) -> None:
         """Write the table to an FS store."""
-        table_path = f"{store.path}/{path}/{self.table_name}"
-        fs = _make_sync_fs(store.fs)
+        fs, table_path = store.sync_fs_and_path(f"{path}/{self.table_name}")
         fs = pa_fs.PyFileSystem(pa_fs.FSSpecHandler(fs))
         with fs.open_output_stream(table_path) as out_stream:
             self._write_to_stream(out_stream, table)
 
     def _write_to_in_memory_store(
-        self, store: MemoryStore, path: str, table: pa.Table
+        self, store: NgioStore, path: str, table: pa.Table
     ) -> None:
         """Write the table to an in-memory store."""
         table_path = f"{path}/{self.table_name}"
-        store._store_dict[table_path] = table
+        store.memory_dict[table_path] = table
 
-    def _write_to_zip_store(self, store: ZipStore, path: str, table: pa.Table) -> None:
+    def _write_to_zip_store(self, store: NgioStore, path: str, table: pa.Table) -> None:
         """Write the table to a zip store."""
         raise NotImplementedError("Writing to zip store is not implemented yet.")
 
+    @retry_io
     def _write_pyarrow_dataset(self, dataset: pa.Table) -> None:
-        """Write the table from a pyarrow Dataset."""
-        store = self._group_handler.store
+        """Write the table from a pyarrow Dataset.
+
+        This IO bypasses the zarr store, so the `io_retry` policy is
+        applied here.
+        """
+        store = NgioStore.ensure(self._group_handler.store)
         path = self._group_handler.group.path
-        if isinstance(store, LocalStore):
+        if store.store_type == "local":
             return self._write_to_local_store(store=store, path=path, table=dataset)
-        elif isinstance(store, FsspecStore):
+        elif store.store_type == "fsspec":
             return self._write_to_fsspec_store(store=store, path=path, table=dataset)
-        elif isinstance(store, MemoryStore):
+        elif store.store_type == "memory":
             return self._write_to_in_memory_store(store=store, path=path, table=dataset)
-        elif isinstance(store, ZipStore):
+        elif store.store_type == "zip":
             return self._write_to_zip_store(store=store, path=path, table=dataset)
         self._raise_store_type_not_supported()
 

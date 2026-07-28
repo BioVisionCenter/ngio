@@ -1,7 +1,37 @@
+from collections.abc import Mapping
+from typing import Any
+
 import fsspec.implementations.http
 from aiohttp import ClientResponseError
 
-from ngio.utils import NgioValueError
+from ngio.utils._errors import NgioValueError
+from ngio.utils._retry import retry_io
+
+
+@retry_io
+def _probe_key(
+    store: Mapping[str, Any], url: str, key: str, fractal_token: str | None
+) -> bytes | None:
+    """Fetch a metadata key, translating auth failures into ngio errors.
+
+    The 401 translation happens inside the retried call so an auth failure
+    surfaces as an `NgioValueError` immediately and is never retried, while
+    transient HTTP errors remain retryable under the `io_retry` policy.
+    """
+    try:
+        return store.get(key)
+    except ClientResponseError as e:
+        if e.status == 401 and fractal_token is None:
+            raise NgioValueError(
+                "No auto token is provided. You need a valid "
+                f"'fractal_token' to access: {url}."
+            ) from e
+        elif e.status == 401 and fractal_token is not None:
+            raise NgioValueError(
+                f"The 'fractal_token' provided is invalid for: {url}."
+            ) from e
+        else:
+            raise e
 
 
 def fractal_fsspec_store(
@@ -17,22 +47,9 @@ def fractal_fsspec_store(
 
     possible_keys = [".zgroup", ".zarray"]
     for key in possible_keys:
-        try:
-            value = store.get(key)
-            if value is not None:
-                break
-        except ClientResponseError as e:
-            if e.status == 401 and fractal_token is None:
-                raise NgioValueError(
-                    "No auto token is provided. You need a valid "
-                    f"'fractal_token' to access: {url}."
-                ) from e
-            elif e.status == 401 and fractal_token is not None:
-                raise NgioValueError(
-                    f"The 'fractal_token' provided is invalid for: {url}."
-                ) from e
-            else:
-                raise e
+        value = _probe_key(store, url, key, fractal_token)
+        if value is not None:
+            break
     else:
         raise NgioValueError(
             f"Store {url} can not be read. Possible problems are: \n"

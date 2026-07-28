@@ -91,3 +91,29 @@ def test_s3_store_derive_to_memory_store(moto_s3_server: dict) -> None:
     other_store = {}
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
     check_ome_zarr(derived_ome_zarr, supported_backends=MEMORY_STORE_SUPPORTED_BACKENDS)
+
+
+def test_s3_store_with_retry_enabled(moto_s3_server: dict, monkeypatch) -> None:
+    """Full round-trip with an active retry policy: no behavior change."""
+    from ngio.config import ConstantBackoff, RetryConfig, get_config
+
+    monkeypatch.setattr(
+        get_config(),
+        "io_retry",
+        RetryConfig(
+            max_retries=2,
+            retry_on=["ServerTimeoutError", "ClientError"],
+            backoff=ConstantBackoff(delay_s=0.01, jitter=False),
+        ),
+    )
+    endpoint_url, bucket_name = (
+        moto_s3_server["endpoint_url"],
+        moto_s3_server["bucket_name"],
+    )
+    store = get_s3_mapper(
+        endpoint_url, bucket_name=bucket_name, zarr_path=random_zarr_path()
+    )
+    ome_zarr = create_sample_ome_zarr(
+        store=store, supported_backends=S3_STORE_SUPPORTED_BACKENDS
+    )
+    check_ome_zarr(ome_zarr, supported_backends=S3_STORE_SUPPORTED_BACKENDS)

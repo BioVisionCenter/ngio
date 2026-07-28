@@ -10,7 +10,7 @@ __author__ = "Lorenzo Cerrone"
 __email__ = "lorenzo.cerrone@uzh.ch"
 
 from ngio.common import Dimensions, Roi, RoiSlice
-from ngio.config import NgioConfig, get_config
+from ngio.config import NgioConfig, RetryConfig, get_config
 from ngio.hcs import (
     OmeZarrPlate,
     OmeZarrWell,
@@ -55,6 +55,7 @@ __all__ = [
     "OmeZarrPlate",
     "OmeZarrWell",
     "PixelSize",
+    "RetryConfig",
     "Roi",
     "RoiSlice",
     "StoreOrGroup",

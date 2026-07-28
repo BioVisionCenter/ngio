@@ -113,6 +113,7 @@ nav:
     - getting_started/4_masked_images.md
     - getting_started/5_hcs.md
     - getting_started/6_iterators.md
+    - getting_started/7_configuration.md
 
   - Tutorials:
     - tutorials/create_ome_zarr.ipynb

@@ -1,6 +1,5 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
-import json
 import logging
 import warnings
 from pathlib import Path
@@ -13,7 +12,6 @@ from filelock import BaseFileLock, FileLock
 from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
 from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
-from zarr.core.sync import sync
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
@@ -24,6 +22,7 @@ from ngio.utils._errors import (
     NgioFileNotFoundError,
     NgioValueError,
 )
+from ngio.utils._store import NgioStore
 from ngio.utils._warnings import NgioUserWarning
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -33,35 +32,37 @@ AccessModeLiteral = Literal["r", "r+", "w", "w-", "a"]
 # but to make sure we can handle the store correctly
 # we need to be more restrictive
 NgioSupportedStore: TypeAlias = (
-    str | Path | fsspec.mapping.FSMap | FsspecStore | MemoryStore | dict | LocalStore
+    str
+    | Path
+    | fsspec.mapping.FSMap
+    | FsspecStore
+    | MemoryStore
+    | dict
+    | LocalStore
+    | ZipStore
+    | NgioStore
 )
 GenericStore: TypeAlias = NgioSupportedStore | Store
 StoreOrGroup: TypeAlias = NgioSupportedStore | zarr.Group
 
 
-def _check_store(store) -> NgioSupportedStore:
-    """Check the store and return a valid store."""
-    if not isinstance(store, NgioSupportedStore):
-        warnings.warn(
-            f"Store type {type(store)} is not explicitly supported. "
-            f"Supported types are: {NgioSupportedStore}. "
-            "Proceeding, but this may lead to unexpected behavior.",
-            NgioUserWarning,
-            stacklevel=2,
-        )
-    return store
-
-
 def _check_group(
     group: zarr.Group, mode: AccessModeLiteral | None = None
 ) -> zarr.Group:
-    """Check the group and return a valid group."""
+    """Check the group and return a valid group backed by an NgioStore."""
     if group.read_only and mode not in [None, "r"]:
         raise NgioValueError(f"The group is read only. Cannot open in mode {mode}.")
 
-    if mode == "r" and not group.read_only:
-        # let's make sure we don't accidentally write to the group
-        group = zarr.open_group(store=group.store, path=group.path, mode="r")
+    needs_read_only_reopen = mode == "r" and not group.read_only
+    if not isinstance(group.store, NgioStore) or needs_read_only_reopen:
+        ngio_store = NgioStore.from_any(group.store)
+        reopen_mode = "r" if (mode == "r" or group.read_only) else "r+"
+        group = zarr.open_group(
+            store=ngio_store,
+            path=group.path,
+            mode=reopen_mode,
+            zarr_format=group.metadata.zarr_format,
+        )
     return group
 
 
@@ -72,6 +73,10 @@ def open_group_wrapper(
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
+    The group is always opened on an `NgioStore`, so every store IO call
+    (including dask-worker chunk reads/writes) honors the configured
+    `io_retry` policy.
+
     Args:
         store (StoreOrGroup): The store or group to open.
         mode (AccessModeLiteral): The mode to open the group in.
@@ -81,14 +86,12 @@ def open_group_wrapper(
         zarr.Group: The opened Zarr group.
     """
     if isinstance(store, zarr.Group):
-        group = _check_group(store, mode)
-        _check_store(group.store)
-        return group
+        return _check_group(store, mode)
 
     try:
-        _check_store(store)
         mode = mode if mode is not None else "a"
-        group = zarr.open_group(store=store, mode=mode, zarr_format=zarr_format)
+        ngio_store = NgioStore.from_any(store, mode=mode)
+        group = zarr.open_group(store=ngio_store, mode=mode, zarr_format=zarr_format)
 
     except FileExistsError as e:
         raise NgioFileExistsError(
@@ -144,23 +147,14 @@ class ZarrGroupHandler:
         )
 
     @property
-    def store(self) -> Store:
+    def store(self) -> NgioStore:
         """Return the store of the group."""
-        return self._group.store
+        return NgioStore.ensure(self._group.store)
 
     @property
     def full_url(self) -> str | None:
         """Return the store path."""
-        if isinstance(self.store, LocalStore):
-            return (self.store.root / self.group.path).as_posix()
-        elif isinstance(self.store, FsspecStore):
-            return f"{self.store.path}/{self.group.path}"
-        elif isinstance(self.store, ZipStore):
-            return (self.store.path / self.group.path).as_posix()
-        elif isinstance(self.store, MemoryStore):
-            return None
-        logger.warning(f"Cannot determine full URL for store type {type(self.store)}.")
-        return None
+        return self.store.full_url(self.group.path)
 
     @property
     def zarr_format(self) -> Literal[2, 3]:
@@ -183,13 +177,14 @@ class ZarrGroupHandler:
                 "Please set cache=False to use the lock mechanism."
             )
 
-        if not isinstance(self.store, LocalStore):
+        local_root = self.store.local_root
+        if local_root is None:
             raise NgioValueError(
                 "The store needs to be a LocalStore to use the lock mechanism. "
-                f"Instead, got {self.store.__class__.__name__}."
+                f"Instead, got a {self.store.store_type} store."
             )
 
-        store_path = Path(self.store.root) / self.group.path
+        store_path = local_root / self.group.path
         _lock_path = store_path.with_suffix(".lock")
         _lock = FileLock(_lock_path, timeout=10)
         return _lock_path, _lock
@@ -414,10 +409,6 @@ def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
     return separator
 
 
-async def _collect_list_dir(store: Store, prefix: str) -> list[str]:
-    return [key async for key in store.list_dir(prefix)]
-
-
 def is_group_listable(group: zarr.Group) -> bool:
     """Check whether a Zarr group's contents can actually be enumerated.
 
@@ -433,12 +424,12 @@ def is_group_listable(group: zarr.Group) -> bool:
     Returns:
         bool: True if the group's contents can be enumerated, False otherwise.
     """
-    store = group.store
+    store = NgioStore.ensure(group.store)
     if not store.supports_listing:
         return False
     meta_key = "zarr.json" if group.metadata.zarr_format == 3 else ".zgroup"
     try:
-        keys = sync(_collect_list_dir(store, group.path))
+        keys = store.list_dir_collected(group.path)
     except Exception:
         # Some stores may raise errors when listing
         # consider those not listable
@@ -446,30 +437,14 @@ def is_group_listable(group: zarr.Group) -> bool:
     return meta_key in keys
 
 
-def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
-    fs_dict = json.loads(fs.to_json())
-    fs_dict["asynchronous"] = False
-    return fsspec.AbstractFileSystem.from_json(json.dumps(fs_dict))
-
-
-def _get_mapper(store: LocalStore | FsspecStore, path: str):
-    if isinstance(store, LocalStore):
-        fs = fsspec.filesystem("file")
-        full_path = (store.root / path).as_posix()
-    else:
-        fs = _make_sync_fs(store.fs)
-        full_path = f"{store.path}/{path}"
-    return fs.get_mapper(full_path)
-
-
 def _fsspec_copy(
-    src_fs: LocalStore | FsspecStore,
+    src_store: NgioStore,
     src_path: str,
-    dest_fs: LocalStore | FsspecStore,
+    dest_store: NgioStore,
     dest_path: str,
 ):
-    src_mapper = _get_mapper(src_fs, src_path)
-    dest_mapper = _get_mapper(dest_fs, dest_path)
+    src_mapper = src_store.get_mapper(src_path)
+    dest_mapper = dest_store.get_mapper(dest_path)
     keys = list(src_mapper.keys())
     if not ({".zgroup", "zarr.json"} & set(keys)):
         raise NgioValueError(
@@ -523,10 +498,11 @@ def copy_group(
 
     if dest_group.read_only:
         raise NgioValueError("Destination group is read only, cannot copy.")
-    if isinstance(src_group.store, LocalStore | FsspecStore) and isinstance(
-        dest_group.store, LocalStore | FsspecStore
-    ):
-        _fsspec_copy(src_group.store, src_group.path, dest_group.store, dest_group.path)
+    src_store = NgioStore.ensure(src_group.store)
+    dest_store = NgioStore.ensure(dest_group.store)
+    fs_types = ("local", "fsspec")
+    if src_store.store_type in fs_types and dest_store.store_type in fs_types:
+        _fsspec_copy(src_store, src_group.path, dest_store, dest_group.path)
         return
     if not suppress_warnings:
         warnings.warn(

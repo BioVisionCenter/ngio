@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from ngio.config import NgioConfig, get_config
+from ngio.config import (
+    ConstantBackoff,
+    ExponentialBackoff,
+    LinearBackoff,
+    NgioConfig,
+    RetryConfig,
+    get_config,
+)
 from ngio.config._config import (
     _DEFAULT_CONFIG_PATH,
     _ENV_VAR,
@@ -9,7 +16,7 @@ from ngio.config._config import (
     _load_config_data,
     _resolve_config_path,
 )
-from ngio.utils import NgioValidationError
+from ngio.utils import NgioUserWarning, NgioValidationError
 
 
 def test_load_config_data_missing_file_returns_empty_dict(monkeypatch, tmp_path):
@@ -79,3 +86,77 @@ def test_ngio_config_validate_assignment_rejects_invalid_type():
 
 def test_get_config_singleton_identity():
     assert get_config() is get_config()
+
+
+def test_retry_config_defaults():
+    retry = RetryConfig()
+    assert retry.max_retries == 0
+    assert retry.backoff == ExponentialBackoff()
+    assert retry.retry_on == []
+    assert retry.retry_all_errors is False
+
+
+def test_ngio_config_default_io_retry():
+    assert NgioConfig().io_retry == RetryConfig()
+
+
+def test_retry_config_from_json(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text(
+        '{"io_retry": {"max_retries": 3, '
+        '"backoff": {"strategy": "linear", "delay_s": 0.5}, '
+        '"retry_on": ["OSError", "Timeout"]}}'
+    )
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.io_retry.max_retries == 3
+    assert config.io_retry.backoff == LinearBackoff(delay_s=0.5)
+    assert config.io_retry.retry_on == ["OSError", "Timeout"]
+
+
+def test_retry_config_rejects_negative_max_retries():
+    with pytest.raises(ValidationError):
+        RetryConfig(max_retries=-1)
+
+
+@pytest.mark.parametrize("field", ["delay_s", "max_delay_s"])
+@pytest.mark.parametrize(
+    "backoff_cls", [ConstantBackoff, LinearBackoff, ExponentialBackoff]
+)
+def test_backoff_rejects_negative_delays(backoff_cls, field):
+    with pytest.raises(ValidationError):
+        backoff_cls(**{field: -0.1})
+
+
+def test_backoff_unknown_strategy_rejected():
+    with pytest.raises(ValidationError):
+        RetryConfig.model_validate({"backoff": {"strategy": "fibonacci"}})
+
+
+def test_retry_config_blanket_mode_warns():
+    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+        RetryConfig(retry_all_errors=True)
+
+
+def test_retry_on_and_blanket_mode_mutually_exclusive():
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        RetryConfig(retry_on=["OSError"], retry_all_errors=True)
+
+
+def test_retry_on_assignment_rejected_in_blanket_mode():
+    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+        retry = RetryConfig(retry_all_errors=True)
+    with pytest.raises(ValidationError, match="mutually exclusive"):
+        retry.retry_on = ["OSError"]
+
+
+def test_retry_config_blanket_mode_warns_on_assignment():
+    retry = RetryConfig()
+    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+        retry.retry_all_errors = True
+
+
+def test_retry_config_no_warning_by_default(recwarn):
+    RetryConfig()
+    RetryConfig(max_retries=5, retry_on=["OSError"])
+    assert len(recwarn) == 0
