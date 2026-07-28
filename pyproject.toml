@@ -175,9 +175,9 @@ filterwarnings = [
 addopts = [
     "-vv",
     "--color=yes",
-    "--cov=ngio",
-    "--cov-report=term-missing",
-    "--cov-report=xml",
+]
+markers = [
+    "network: test requires internet access (deselect with '-m \"not network\"')",
 ]
 
 # https://coverage.readthedocs.io/

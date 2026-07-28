@@ -15,29 +15,6 @@ from ngio.experimental.iterators import (
 from ngio.utils import NgioValueError
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
 def test_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: str):
     # Base test only the API, not the actual segmentation logic
     path = images_all_versions[zarr_name]
@@ -75,29 +52,6 @@ def test_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: 
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
 def test_masked_segmentation_iterator(
     images_all_versions: dict[str, Path], zarr_name: str
 ):
@@ -134,29 +88,6 @@ def test_masked_segmentation_iterator(
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
 def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name: str):
     # Base test only the API, not the actual segmentation logic
     path = images_all_versions[zarr_name]
@@ -189,29 +120,6 @@ def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
 def test_features_iterator(images_all_versions: dict[str, Path], zarr_name: str):
     # Base test only the API, not the actual segmentation logic
     path = images_all_versions[zarr_name]

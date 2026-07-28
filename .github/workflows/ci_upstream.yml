@@ -61,7 +61,7 @@ jobs:
             "${{ runner.os }}-data-"
 
       - name: 🧪 Run Tests
-        run: pytest --no-cov
+        run: pytest
 
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
@@ -114,7 +114,7 @@ jobs:
             "${{ runner.os }}-data-"
 
       - name: 🧪 Run Tests
-        run: pytest --no-cov
+        run: pytest
 
       - name: 📝 Report Failures
         if: failure()

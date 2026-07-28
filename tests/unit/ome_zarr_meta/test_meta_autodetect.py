@@ -44,6 +44,19 @@ def _well_attrs(version: str) -> dict:
     return ZarrGroupHandler(store=store, mode="r").load_attrs()
 
 
+def _assert_rejected(decoder, attrs, **kwargs):
+    """Assert that a decoder refuses the given attrs.
+
+    The autodetect loop treats any exception as "not this version", so the
+    exact exception type is deliberately not part of the contract.
+    """
+    try:
+        decoder(attrs, **kwargs)
+    except Exception:
+        return
+    pytest.fail("decoder unexpectedly accepted attrs of another version")
+
+
 @pytest.mark.parametrize("attrs_version", ["0.4", "0.5"])
 def test_image_decoders_are_version_exclusive(attrs_version):
     attrs = _image_attrs(attrs_version)
@@ -52,8 +65,7 @@ def test_image_decoders_are_version_exclusive(attrs_version):
             meta = decoder(attrs, axes_setup=None)
             assert meta.version == attrs_version
         else:
-            with pytest.raises(Exception):
-                decoder(attrs, axes_setup=None)
+            _assert_rejected(decoder, attrs, axes_setup=None)
 
 
 @pytest.mark.parametrize("attrs_version", ["0.4", "0.5"])
@@ -63,8 +75,7 @@ def test_plate_decoders_are_version_exclusive(attrs_version):
         if decoder_version == attrs_version:
             assert decoder(attrs).version == attrs_version
         else:
-            with pytest.raises(Exception):
-                decoder(attrs)
+            _assert_rejected(decoder, attrs)
 
 
 @pytest.mark.parametrize("attrs_version", ["0.4", "0.5"])
@@ -74,5 +85,4 @@ def test_well_decoders_are_version_exclusive(attrs_version):
         if decoder_version == attrs_version:
             assert decoder(attrs).version == attrs_version
         else:
-            with pytest.raises(Exception):
-                decoder(attrs)
+            _assert_rejected(decoder, attrs)

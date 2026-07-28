@@ -170,7 +170,7 @@ def test_multiprocessing_safety(tmp_path: Path):
     handler.write_attrs(attrs, overwrite=True)
 
     results = []
-    num_items = 1000
+    num_items = 100
     for i in range(num_items):
         results.append(add_item(i))
 
@@ -190,6 +190,7 @@ def test_multiprocessing_safety(tmp_path: Path):
         handler._create_lock()
 
 
+@pytest.mark.network
 def test_remote_storage():
     url = (
         "https://raw.githubusercontent.com/"

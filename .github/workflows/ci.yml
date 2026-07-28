@@ -107,7 +107,7 @@ jobs:
             "${{ runner.os }}-data-"
 
       - name: 🧪 Run Tests
-        run: pixi run -e ${{ matrix.environment }} pytest ${{ matrix.platform != 'ubuntu-latest' && '--no-cov' || '' }}
+        run: pixi run -e ${{ matrix.environment }} pytest ${{ matrix.platform == 'ubuntu-latest' && '--cov=ngio --cov-report=xml' || '' }}
 
       # If something goes wrong with scheduled tests, open an issue in the repo
       - name: 📝 Report Failures
