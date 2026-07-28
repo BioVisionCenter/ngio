@@ -171,3 +171,45 @@ def test_cat_async_api(tmp_path: Path):
         )
     )
     assert isinstance(concatenate_table, GenericTable)
+
+
+def test_cat_eager_lazy_index_parity(tmp_path: Path):
+    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1"])
+    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+
+    extras = [{"column1": "value1"}, {"column1": "value2"}]
+    eager_df = concatenate_image_tables_as(
+        [ome_zarr_1, ome_zarr_2],
+        extras=extras,
+        name="table1",
+        table_cls=GenericTable,
+        index_key="Index",
+        mode="eager",
+    ).dataframe
+    lazy_df = concatenate_image_tables_as(
+        [ome_zarr_1, ome_zarr_2],
+        extras=extras,
+        name="table1",
+        table_cls=GenericTable,
+        index_key="Index",
+        mode="lazy",
+    ).dataframe
+
+    assert eager_df.index.name == "Index"
+    assert lazy_df.index.name == "Index"
+    # every row must get a unique index derived from extras + original index
+    assert eager_df.index.is_unique
+    assert lazy_df.index.is_unique
+    assert sorted(eager_df.index) == sorted(lazy_df.index)
+
+    async_lazy_df = asyncio.run(
+        concatenate_image_tables_as_async(
+            [ome_zarr_1, ome_zarr_2],
+            extras=extras,
+            name="table1",
+            table_cls=GenericTable,
+            index_key="Index",
+            mode="lazy",
+        )
+    ).dataframe
+    assert sorted(async_lazy_df.index) == sorted(eager_df.index)

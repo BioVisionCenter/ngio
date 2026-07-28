@@ -40,13 +40,9 @@ class PixelSize(BaseModel):
     def __eq__(self, other) -> bool:
         """Check if two pixel sizes are equal."""
         if not isinstance(other, PixelSize):
-            raise TypeError("Can only compare PixelSize with PixelSize.")
+            return NotImplemented
 
-        if (
-            self.time_unit is not None
-            and other.time_unit is None
-            and self.time_unit != other.time_unit
-        ):
+        if self.time_unit != other.time_unit:
             return False
 
         if self.space_unit != other.space_unit:
