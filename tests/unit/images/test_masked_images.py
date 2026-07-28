@@ -248,10 +248,10 @@ def test_masking_oneoff_handling():
     ],
 )
 def test_real_mask(
-    cardiomyocyte_small_mip_path: Path, label, c, zoom_factor, expected_shape
+    cardiomyocyte_small_mip_image_path: Path, label, c, zoom_factor, expected_shape
 ):
     # Test on a real example
-    path = cardiomyocyte_small_mip_path / "B" / "03" / "0"
+    path = cardiomyocyte_small_mip_image_path
     ome_zarr = open_ome_zarr_container(path)
     masked_image = ome_zarr.get_masked_image("nuclei")
     image_data = masked_image.get_roi_masked_as_numpy(

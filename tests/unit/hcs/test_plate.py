@@ -19,9 +19,8 @@ from ngio.tables import GenericTable, RoiTable
 from ngio.utils import NgioValueError
 
 
-def test_open_real_ome_zarr_plate(cardiomyocyte_tiny_path: Path):
-    cardiomyocyte_tiny_path = cardiomyocyte_tiny_path
-    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_tiny_path)
+def test_open_real_ome_zarr_plate(cardiomyocyte_tiny_path_readonly: Path):
+    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_tiny_path_readonly)
 
     assert isinstance(ome_zarr_plate.__repr__(), str)
     assert ome_zarr_plate.columns == ["03"]
@@ -101,8 +100,10 @@ def test_create_and_edit_plate_path_normalization(tmp_path: Path):
     assert test_plate.images_paths() == ["B/03/0_mip", "B/03/1_illumination_correction"]
 
 
-def test_derive_plate_from_ome_zarr(cardiomyocyte_tiny_path: Path, tmp_path: Path):
-    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_tiny_path)
+def test_derive_plate_from_ome_zarr(
+    cardiomyocyte_tiny_path_readonly: Path, tmp_path: Path
+):
+    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_tiny_path_readonly)
     test_plate = ome_zarr_plate.derive_plate(
         tmp_path / "test_plate.zarr", keep_acquisitions=True
     )
@@ -301,8 +302,8 @@ def test_tables_api(tmp_path: Path):
     test_plate.delete_table("non_existing_table", missing_ok=True)
 
 
-def test_plate_table_aggregations(cardiomyocyte_small_mip_path: Path):
-    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_small_mip_path)
+def test_plate_table_aggregations(cardiomyocyte_small_mip_path_readonly: Path):
+    ome_zarr_plate = open_ome_zarr_plate(cardiomyocyte_small_mip_path_readonly)
     expected_tables = [
         "FOV_ROI_table",
         "nuclei_ROI_table",

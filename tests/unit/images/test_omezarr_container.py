@@ -44,8 +44,10 @@ class IdentityTransform:
         return array
 
 
-def test_open_ome_zarr_container(images_all_versions: dict[str, Path], zarr_name: str):
-    path = images_all_versions[zarr_name]
+def test_open_ome_zarr_container(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     whole_image_roi = ome_zarr.build_image_roi_table().get("image")

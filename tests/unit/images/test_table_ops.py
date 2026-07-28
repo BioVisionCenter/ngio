@@ -33,9 +33,19 @@ def create_sample_ome_zarr(
     return ome_zarr_container
 
 
-def test_list_sync_api(tmp_path: Path):
+@pytest.fixture(scope="module")
+def sample_ome_zarrs(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> tuple[OmeZarrContainer, OmeZarrContainer]:
+    """Two containers with tables, shared by all (read-only) tests here."""
+    tmp_path = tmp_path_factory.mktemp("table_ops")
     ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
     ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+    return ome_zarr_1, ome_zarr_2
+
+
+def test_list_sync_api(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     assert list_image_tables([ome_zarr_1, ome_zarr_2], mode="common") == ["table1"]
     assert list_image_tables([ome_zarr_1, ome_zarr_2], mode="all") == [
@@ -44,9 +54,8 @@ def test_list_sync_api(tmp_path: Path):
     ]
 
 
-def test_list_async_api(tmp_path: Path):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+def test_list_async_api(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     assert asyncio.run(
         list_image_tables_async([ome_zarr_1, ome_zarr_2], mode="common")
@@ -69,10 +78,9 @@ def test_list_async_api(tmp_path: Path):
     ],
 )
 def test_cat_sync_api(
-    tmp_path: Path, table: str, mode: Literal["eager", "lazy"], strict: bool
+    sample_ome_zarrs, table: str, mode: Literal["eager", "lazy"], strict: bool
 ):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     extras1 = {"column1": "value1"}
     extras2 = {"column1": "value2"}
@@ -105,9 +113,8 @@ def test_cat_sync_api(
         assert df.shape == (6, 4), df.shape
 
 
-def test_cat_as_sync(tmp_path: Path):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+def test_cat_as_sync(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     extras1 = {"column1": "value1"}
     extras2 = {"column1": "value2"}
@@ -122,9 +129,8 @@ def test_cat_as_sync(tmp_path: Path):
     assert isinstance(concatenated_table, GenericTable)
 
 
-def test_set_index(tmp_path: Path):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+def test_set_index(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     extras1 = {"column1": "value1"}
     extras2 = {"column1": "value2"}
@@ -141,9 +147,8 @@ def test_set_index(tmp_path: Path):
     assert df.index.name == "Index"
 
 
-def test_cat_async_api(tmp_path: Path):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+def test_cat_async_api(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     extras1 = {"column1": "value1"}
     extras2 = {"column1": "value2"}
@@ -173,9 +178,8 @@ def test_cat_async_api(tmp_path: Path):
     assert isinstance(concatenate_table, GenericTable)
 
 
-def test_cat_eager_lazy_index_parity(tmp_path: Path):
-    ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1"])
-    ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
+def test_cat_eager_lazy_index_parity(sample_ome_zarrs):
+    ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
     extras = [{"column1": "value1"}, {"column1": "value2"}]
     eager_df = concatenate_image_tables_as(

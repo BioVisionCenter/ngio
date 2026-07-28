@@ -88,9 +88,11 @@ def test_masked_segmentation_iterator(
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+def test_img_processing_iterator(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
     image = ome_zarr.get_image()
     t_ome_zarr = ome_zarr.derive_image(store=MemoryStore())
@@ -120,9 +122,11 @@ def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-def test_features_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+def test_features_iterator(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     image = ome_zarr.get_image()

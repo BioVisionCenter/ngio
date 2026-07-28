@@ -57,6 +57,46 @@ def cardiomyocyte_small_mip_path(
     return dest_path
 
 
+@pytest.fixture
+def cardiomyocyte_small_mip_image_path(
+    tmp_path: Path, cardiomyocyte_small_mip_source_path: Path
+) -> Path:
+    """A fresh copy of the single image `B/03/0` of the small-mip plate.
+
+    Much cheaper than copying the whole plate; use for tests that write to
+    one image only.
+    """
+    source = cardiomyocyte_small_mip_source_path / "B" / "03" / "0"
+    dest_path = tmp_path / "cardiomyocyte_small_mip_image"
+    shutil.copytree(source, dest_path)
+    return dest_path
+
+
+@pytest.fixture(scope="session")
+def cardiomyocyte_tiny_path_readonly(
+    tmp_path_factory: pytest.TempPathFactory, cardiomyocyte_tiny_source_path: Path
+) -> Path:
+    """One shared session-wide copy of the tiny plate — for read-only tests."""
+    dest_path = (
+        tmp_path_factory.mktemp("cardio_tiny_ro") / cardiomyocyte_tiny_source_path.stem
+    )
+    shutil.copytree(cardiomyocyte_tiny_source_path, dest_path)
+    return dest_path
+
+
+@pytest.fixture(scope="session")
+def cardiomyocyte_small_mip_path_readonly(
+    tmp_path_factory: pytest.TempPathFactory, cardiomyocyte_small_mip_source_path: Path
+) -> Path:
+    """One shared session-wide copy of the small-mip plate — for read-only tests."""
+    dest_path = (
+        tmp_path_factory.mktemp("cardio_mip_ro")
+        / cardiomyocyte_small_mip_source_path.stem
+    )
+    shutil.copytree(cardiomyocyte_small_mip_source_path, dest_path)
+    return dest_path
+
+
 # One entry per (NGFF version, axes combination) in tests/data/{v04,v05}/images
 ALL_IMAGE_ZARR_NAMES = [
     f"{version}/test_image_{axes}.zarr"
@@ -71,9 +111,7 @@ def zarr_name(request: pytest.FixtureRequest) -> str:
     return request.param
 
 
-@pytest.fixture
-def images_all_versions(tmp_path: Path) -> dict[str, Path]:
-    dest_base = tmp_path / "all_versions" / "images"
+def _copy_images_all_versions(dest_base: Path) -> dict[str, Path]:
     dest_base.mkdir(parents=True, exist_ok=True)
     paths = {}
     for version in ["v04", "v05"]:
@@ -84,3 +122,21 @@ def images_all_versions(tmp_path: Path) -> dict[str, Path]:
         for file in dest.glob("*.zarr"):
             paths[f"{version}/{file.name}"] = file
     return paths
+
+
+@pytest.fixture
+def images_all_versions(tmp_path: Path) -> dict[str, Path]:
+    """A fresh per-test copy of the test images — for tests that write."""
+    return _copy_images_all_versions(tmp_path / "all_versions" / "images")
+
+
+@pytest.fixture(scope="session")
+def images_all_versions_readonly(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> dict[str, Path]:
+    """One shared session-wide copy of the test images.
+
+    Use only in tests that never write to the images (a stray write would
+    leak into every later test of the session).
+    """
+    return _copy_images_all_versions(tmp_path_factory.mktemp("images_all_versions"))

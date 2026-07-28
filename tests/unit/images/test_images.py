@@ -8,8 +8,8 @@ from ngio.transforms import ZoomTransform
 from ngio.utils import NgioValueError
 
 
-def test_open_image(images_all_versions: dict[str, Path], zarr_name: str):
-    path = images_all_versions[zarr_name]
+def test_open_image(images_all_versions_readonly: dict[str, Path], zarr_name: str):
+    path = images_all_versions_readonly[zarr_name]
     image = open_image(path)
     assert isinstance(image, Image)
 
