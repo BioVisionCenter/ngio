@@ -131,9 +131,17 @@ def _copy_images_all_versions(dest_base: Path) -> dict[str, Path]:
 
 
 @pytest.fixture
-def images_all_versions(tmp_path: Path) -> dict[str, Path]:
-    """A fresh per-test copy of the test images — for tests that write."""
-    return _copy_images_all_versions(tmp_path / "all_versions" / "images")
+def single_image_copy(tmp_path: Path, zarr_name: str) -> Path:
+    """A fresh per-test copy of one test image — for tests that write to it.
+
+    Composes with the `zarr_name` parametrization (or an explicit
+    `@pytest.mark.parametrize("zarr_name", ...)` override).
+    """
+    version, name = zarr_name.split("/")
+    source = TEST_DATA_DIR / version / "images" / name
+    dest = tmp_path / version / name
+    shutil.copytree(source, dest)
+    return dest
 
 
 @pytest.fixture(scope="session")
