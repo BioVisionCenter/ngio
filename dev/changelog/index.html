@@ -320,6 +320,8 @@
       
         
       
+        
+      
     
     
     
@@ -548,6 +550,34 @@
     
   
     6. Iterators
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/7_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
   
 
     
@@ -1826,6 +1856,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tests" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2333,7 +2374,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -2909,6 +2950,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#tests" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3416,7 +3468,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3835,6 +3887,13 @@
 <ul>
 <li>Add a global <code>NgioConfig</code> / <code>get_config()</code> configuration system, loaded from <code>~/.ngio_config.json</code> by default or a path set via the <code>NGIO_CONFIG_PATH</code> env var (<code>.json</code> file). Both are exported from the top-level <code>ngio</code> package.</li>
 <li>Add configurable s3fs retry handling: <code>NgioConfig.s3fs.custom_retry_markers</code> lists error substrings that trigger a retry via a custom <code>s3fs.set_custom_error_handler</code>, applied through the new <code>ngio.utils.refresh_s3fs_config()</code>. The motivating use case is AWS clock-skew errors, but any error substring can be configured.</li>
+<li>Add a configurable IO retry policy: <code>NgioConfig.io_retry</code> (<code>RetryConfig</code>) with <code>max_retries</code> (default <code>0</code>, never retry), a backoff strategy (<code>ConstantBackoff</code>, <code>LinearBackoff</code>, or <code>ExponentialBackoff</code>, each with <code>delay_s</code>, <code>max_delay_s</code>, <code>jitter</code>), and error matching via <code>retry_on</code> substrings (matched against <code>"ExceptionName: message"</code>) or the discouraged blanket <code>retry_all_errors</code> flag, which emits an <code>NgioUserWarning</code> and is mutually exclusive with <code>retry_on</code>. Ngio's own <code>NgioError</code>s are never retried. Retry helpers live in <code>ngio.utils._retry</code>; the public <code>ngio.utils.retry_io</code> decorator reads the global config at call time.</li>
+<li>Add <code>ngio.utils.NgioStore</code>, a picklable zarr <code>WrapperStore</code> that applies the <code>io_retry</code> policy to every store IO call (the policy snapshot travels with the store into dask task graphs) and centralizes store-type dispatch behind uniform services (<code>store_type</code>, <code>full_url</code>, <code>sync_fs_and_path</code>, <code>get_mapper</code>, <code>local_root</code>, <code>memory_dict</code>, <code>list_dir_collected</code>, <code>NgioStore.from_any</code>/<code>ensure</code>). Every group ngio opens (<code>open_group_wrapper</code> / <code>ZarrGroupHandler</code>) is now backed by an <code>NgioStore</code>, so the <code>io_retry</code> policy applies to all zarr IO — metadata, pixel data, and lazy dask reads/writes executed on workers (the policy snapshot pickles with the store into the task graph). User-provided <code>zarr.Group</code>s are transparently reopened on a wrapped store; <code>ZipStore</code> is now an explicitly supported store type (it previously warned).</li>
+<li>Apply the <code>io_retry</code> policy to the IO paths that bypass the zarr store: the pyarrow table backend's dataset load/write, the AnnData backend's direct local/fsspec writes, and the <code>fractal_fsspec_store</code> metadata probe (where 401 auth failures are translated to <code>NgioValueError</code> inside the retried call, so they are never retried — even in blanket mode).</li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add a "Configuration" getting-started page documenting the config file location (<code>~/.ngio/ngio_config.json</code> / <code>NGIO_CONFIG_PATH</code>), the <code>io_retry</code> policy (fields, backoff strategies, marker matching, snapshot-at-open vs read-at-call semantics), and its relationship to the lower-level <code>s3fs.custom_retry_markers</code> mechanism. <code>NgioConfig</code>, <code>RetryConfig</code>, and <code>get_config</code> are now listed in the top-level API reference.</li>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>
@@ -3848,6 +3907,7 @@
 </ul>
 <h3 id="chores">Chores<a class="headerlink" href="#chores" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Centralize concrete-store dispatch behind <code>NgioStore</code> services: <code>ZarrGroupHandler.full_url</code>, the file-lock path resolution, <code>copy_group</code>'s fsspec fast path, <code>is_group_listable</code>, and the pyarrow/anndata table backends no longer isinstance-check store types or reach into store internals (<code>store.root</code>/<code>store.fs</code>/<code>store._store_dict</code>). The JSON table backend and table metadata writes now go through the handler's <code>load_attrs</code>/<code>write_attrs</code> instead of raw <code>.attrs</code> access. One behavior note: AnnData fsspec writes now use a synchronous clone of the store's filesystem (as the pyarrow paths already did) instead of the store's own, possibly async, filesystem instance.</li>
 <li>Harden GitHub Actions and scan workflows through <code>zizmor</code>.</li>
 <li>Rename the <code>pre-commit</code> pixi dev task to <code>lint</code>: the old name shadowed the <code>pre-commit</code> binary in <code>pixi run</code>, and its trailing <code>git add -u</code> silently staged the working tree and masked hook failures in the task's exit code.</li>
 </ul>
@@ -4020,7 +4080,7 @@
 <li>Fix HCS plate column name formatting to use standardized zero-padding (e.g., column <code>3</code> is now stored as <code>"03"</code>).</li>
 <li>Fix <code>_stringify_column</code> not passing <code>num_digits</code> parameter to <code>_format_int_column</code>.</li>
 </ul>
-<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Fix incorrect and incomplete docstrings across the codebase:</li>
 <li><code>compute_masking_roi</code>: Added Args/Returns, fixed description (supports 2D, 3D, 4D).</li>
