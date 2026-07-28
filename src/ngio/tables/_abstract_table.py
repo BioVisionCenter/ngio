@@ -10,7 +10,6 @@ from anndata import AnnData
 
 from ngio.tables.backends import (
     BackendMeta,
-    DefaultTableBackend,
     ImplementedTableBackends,
     TableBackend,
     TableBackendProtocol,
@@ -72,10 +71,14 @@ class AbstractBaseTable(ABC):
         ...
 
     @property
-    def backend_name(self) -> str | None:
-        """Return the name of the backend."""
+    def backend_name(self) -> str:
+        """Return the name of the backend.
+
+        If no backend is attached yet, the backend name stored in the
+        table metadata is returned.
+        """
         if self._table_backend is None:
-            return None
+            return self._meta.backend
         return self._table_backend.backend_name()
 
     @property
@@ -148,9 +151,11 @@ class AbstractBaseTable(ABC):
     def _load_backend(
         meta: BackendMeta,
         handler: ZarrGroupHandler,
-        backend: TableBackend,
+        backend: TableBackend | None,
     ) -> TableBackendProtocol:
         """Create a new ROI table from a Zarr group handler."""
+        if backend is None:
+            backend = meta.backend
         if isinstance(backend, str):
             return ImplementedTableBackends().get_backend(
                 backend_name=backend,
@@ -204,14 +209,29 @@ class AbstractBaseTable(ABC):
     def set_backend(
         self,
         handler: ZarrGroupHandler | None = None,
-        backend: TableBackend = DefaultTableBackend,
+        backend: TableBackend | None = None,
     ) -> None:
-        """Set the backend of the table."""
+        """Set the backend of the table.
+
+        If `backend` is `None`, the backend stored in the table metadata
+        is used.
+
+        If no handler is provided and the table is not yet attached to a
+        Zarr group, a string `backend` is only recorded as the table's
+        preferred backend; the backend is instantiated when the table is
+        written (e.g. by `add_table`).
+        """
         if handler is None:
             if self._table_backend is None:
+                if backend is None:
+                    return None
+                if isinstance(backend, str):
+                    backends = ImplementedTableBackends()
+                    self._meta.backend = backends.normalize_backend_name(backend)
+                    return None
                 raise NgioValueError(
-                    "No backend set for the table yet. "
-                    "A ZarrGroupHandler must be provided."
+                    "A ZarrGroupHandler must be provided to attach a "
+                    "backend instance to the table."
                 )
             handler = self._table_backend.group_handler
 
@@ -222,6 +242,7 @@ class AbstractBaseTable(ABC):
             backend=backend,
         )
         self._table_backend = _backend
+        self._meta.backend = _backend.backend_name()
 
     @classmethod
     def _from_handler(
@@ -233,8 +254,6 @@ class AbstractBaseTable(ABC):
         """Create a new ROI table from a Zarr group handler."""
         meta = meta_model(**handler.load_attrs())
         table = cls(meta=meta)
-        if backend is None:
-            backend = meta.backend
         table.set_backend(handler=handler, backend=backend)
         return table
 

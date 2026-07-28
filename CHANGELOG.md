@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fix
+- `add_table` (`OmeZarrContainer`, `OmeZarrPlate`, `TablesContainer.add`) and `write_table` now preserve the input table's backend instead of always rewriting with the default `anndata_v1` backend ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). The `backend` parameter now defaults to `None`, meaning "use the table's own backend" (`meta.backend`, which is `anndata_v1` for tables created in memory); pass a backend name explicitly to convert. Supporting changes: `Table.backend_name` now falls back to `meta.backend` instead of returning `None` for in-memory tables, `set_backend(backend=...)` can declare a backend preference (with early name validation and alias normalization) on a table not yet attached to a store, and passing `backend=None` no longer raises. **Behavior change**: copying a table stored with a non-default backend (e.g. `parquet`/`csv`/`json`) via `get_table` + `add_table` now keeps that backend on the destination.
 - Fix the broken run link in the scheduled-CI failure issue (`.github/TEST_FAIL_TEMPLATE.md`). The template interpolated `{{ repo }}`, which is the `@actions/github` context object `{ owner, repo }` rather than a string, so `JasonEtco/create-an-issue` rendered it as `[object Object]` (e.g. `https://github.com/[object Object]/actions/runs/...`). It now uses `{{ repo.owner }}/{{ repo.repo }}`.
 
 ## [v0.5.14]

@@ -8,7 +8,6 @@ import polars as pl
 
 from ngio.tables.backends import (
     BackendMeta,
-    DefaultTableBackend,
     TableBackend,
     TabularData,
 )
@@ -91,14 +90,12 @@ class Table(Protocol):
     def set_backend(
         self,
         handler: ZarrGroupHandler | None = None,
-        backend: TableBackend = DefaultTableBackend,
+        backend: TableBackend | None = None,
     ) -> None:
         """Set the backend store and path for the table.
 
-        Either a handler or a backend must be provided.
-
-        If the handler in none it will be inferred from the backend.
-        If the backend is none, it will be inferred from the group attrs
+        If the handler is `None` it will be inferred from the current backend.
+        If the backend is `None`, the table's own backend is preserved.
         """
         ...
 
@@ -361,7 +358,7 @@ class TablesContainer:
         self,
         name: str,
         table: Table,
-        backend: TableBackend = DefaultTableBackend,
+        backend: TableBackend | None = None,
         overwrite: bool = False,
     ) -> None:
         """Add a table to the group.
@@ -369,7 +366,8 @@ class TablesContainer:
         Args:
             name: The name of the table.
             table: The table object to add.
-            backend: The backend to use for writing the table.
+            backend: The backend to use for writing the table. If `None`
+                (default), the table's own backend is preserved.
             overwrite: Whether to overwrite an existing table with the same name.
         """
         existing_tables = self._get_tables_list()
@@ -457,7 +455,7 @@ def open_table_as(
 def write_table(
     store: StoreOrGroup,
     table: Table,
-    backend: TableBackend = DefaultTableBackend,
+    backend: TableBackend | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "a",
 ) -> None:
@@ -469,6 +467,7 @@ def write_table(
         store (StoreOrGroup): The Zarr store or group to write the table to.
         table (Table): The table to write.
         backend (TableBackend): The backend to use for writing the table.
+            If `None` (default), the table's own backend is preserved.
         cache (bool): Whether to use caching for the Zarr group handler.
         mode (AccessModeLiteral): The access mode to use for the Zarr group handler.
 

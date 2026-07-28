@@ -31,7 +31,6 @@ from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.tables import (
     ConditionTable,
-    DefaultTableBackend,
     FeatureTable,
     GenericRoiTable,
     MaskingRoiTable,
@@ -835,10 +834,13 @@ class OmeZarrContainer:
         self,
         name: str,
         table: Table,
-        backend: TableBackend = DefaultTableBackend,
+        backend: TableBackend | None = None,
         overwrite: bool = False,
     ) -> None:
-        """Add a table to the image."""
+        """Add a table to the image.
+
+        If `backend` is `None` (default), the table's own backend is preserved.
+        """
         self.tables_container.add(
             name=name, table=table, backend=backend, overwrite=overwrite
         )

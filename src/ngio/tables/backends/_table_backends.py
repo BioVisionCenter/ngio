@@ -162,6 +162,16 @@ class ImplementedTableBackends:
         """Return the available table backends."""
         return list(self._implemented_backends.keys())
 
+    def normalize_backend_name(self, backend_name: str) -> str:
+        """Resolve a backend name or alias to its canonical name.
+
+        Raises:
+            NgioValueError: If the backend name is not implemented.
+        """
+        if backend_name not in self._implemented_backends:
+            raise NgioValueError(f"Table backend {backend_name} not implemented.")
+        return self._implemented_backends[backend_name].backend_name()
+
     def get_backend(
         self,
         *,

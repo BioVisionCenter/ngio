@@ -2,6 +2,7 @@ from pathlib import Path
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 import pytest
 
 from ngio import (
@@ -13,6 +14,7 @@ from ngio.images._image import ChannelSelectionModel
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.ome_zarr_meta import ChannelsMeta
+from ngio.tables import GenericTable
 from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
@@ -353,6 +355,25 @@ def test_derive_image_and_labels(tmp_path: Path):
     )
     derived_ome_zarr = ome_zarr.derive_image(tmp_path / "derived.zarr")
     _ = derived_ome_zarr.derive_label("derived_label")
+
+
+def test_add_table_preserves_backend(tmp_path: Path):
+    # Testing for #207
+    ome_zarr = create_synthetic_ome_zarr(
+        tmp_path / "src.zarr",
+        shape=(3, 20, 30),
+        levels=1,
+        axes_names=["c", "y", "x"],
+    )
+    table = GenericTable(table_data=pd.DataFrame({"a": [1, 2, 3]}))
+    ome_zarr.add_table("parquet_table", table, backend="parquet")
+
+    dst_ome_zarr = create_empty_ome_zarr(
+        tmp_path / "dst.zarr", shape=(3, 20, 30), pixelsize=0.5
+    )
+    loaded_table = ome_zarr.get_table("parquet_table")
+    dst_ome_zarr.add_table("parquet_table", loaded_table)
+    assert dst_ome_zarr.get_table("parquet_table").backend_name == "parquet"
 
 
 def test_derive_copy_labels_and_tables(tmp_path: Path):
