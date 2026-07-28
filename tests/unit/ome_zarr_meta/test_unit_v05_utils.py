@@ -35,15 +35,11 @@ def _base_multiscale(name="image") -> dict:
         "datasets": [
             {
                 "path": "0",
-                "coordinateTransformations": [
-                    {"type": "scale", "scale": [1.0, 1.0]}
-                ],
+                "coordinateTransformations": [{"type": "scale", "scale": [1.0, 1.0]}],
             },
             {
                 "path": "1",
-                "coordinateTransformations": [
-                    {"type": "scale", "scale": [2.0, 2.0]}
-                ],
+                "coordinateTransformations": [{"type": "scale", "scale": [2.0, 2.0]}],
             },
         ],
         "name": name,
@@ -97,9 +93,7 @@ def test_image_round_trip():
     ngio_image_2 = v05_to_ngio_image_meta(output_attrs, axes_setup=AxesSetup())
 
     assert ngio_image_2.name == ngio_image.name
-    for ds_1, ds_2 in zip(
-        ngio_image.datasets, ngio_image_2.datasets, strict=True
-    ):
+    for ds_1, ds_2 in zip(ngio_image.datasets, ngio_image_2.datasets, strict=True):
         assert ds_1.path == ds_2.path
         assert ds_1.scale == ds_2.scale
         assert ds_1.translation == ds_2.translation
@@ -136,9 +130,7 @@ def test_image_non_string_axis_unit_is_stringified():
 
 def test_image_global_coordinate_transformations():
     multiscale = _base_multiscale()
-    multiscale["coordinateTransformations"] = [
-        {"type": "scale", "scale": [2.0, 2.0]}
-    ]
+    multiscale["coordinateTransformations"] = [{"type": "scale", "scale": [2.0, 2.0]}]
     ngio_image = v05_to_ngio_image_meta(
         _image_attrs(multiscales=[multiscale]), axes_setup=AxesSetup()
     )
@@ -173,9 +165,7 @@ def test_label_round_trip():
     output_attrs = ngio_to_v05_label_meta(ngio_label)
     ngio_label_2 = v05_to_ngio_label_meta(output_attrs, axes_setup=AxesSetup())
 
-    for ds_1, ds_2 in zip(
-        ngio_label.datasets, ngio_label_2.datasets, strict=True
-    ):
+    for ds_1, ds_2 in zip(ngio_label.datasets, ngio_label_2.datasets, strict=True):
         assert ds_1.path == ds_2.path
         assert ds_1.scale == ds_2.scale
     assert ngio_label.image_label == ngio_label_2.image_label
