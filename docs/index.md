@@ -1,66 +1,119 @@
-ngio is a Python library designed to simplify bioimage analysis workflows, offering an intuitive interface for working with OME-Zarr files.
+---
+description: ngio is a Python library for OME-Zarr bioimage analysis, with an object-based API for images, labels, tables, ROIs and HCS plates.
+---
 
-## What is Ngio?
+# ngio
 
-Ngio is built for the [OME-Zarr](https://ngff.openmicroscopy.org/) file format, a modern, cloud-optimized format for biological imaging data. OME-Zarr stores large, multi-dimensional microscopy images and metadata in an efficient and scalable way.
+**A Python library for OME-Zarr bioimage analysis.**
 
-Ngio's mission is to streamline working with OME-Zarr files by providing a simple, object-based API for opening, exploring, and manipulating OME-Zarr images and high-content screening (HCS) plates. It also offers comprehensive support for labels, tables and regions of interest (ROIs), making it easy to extract and analyze specific regions in your data.
+ngio gives you an object-based API for [OME-Zarr](https://ngff.openmicroscopy.org/) — the
+cloud-optimised format for large, multi-dimensional microscopy data. Open an image,
+reach for the resolution level you need, work with labels, tables and regions of
+interest, and scale the same code from one field of view to a whole plate.
 
-## Key Features
+## Installation
 
-### 🔍 Simple Object-Based API
+=== "pip"
 
-- Easily open, explore, and manipulate OME-Zarr images and HCS plates
-- Create and derive new images and labels with minimal boilerplate code
+    ```bash
+    pip install ngio
+    ```
 
-### 📊 Rich Tables and Regions of Interest (ROI) Support
+=== "mamba/conda"
 
-- Tight integration with [tabular data](https://biovisioncenter.github.io/ngio/stable/table_specs/overview/)
-- Extract and analyze specific regions of interest
-- Store measurements and other metadata in the OME-Zarr container
-- Extensible & modular allowing users to define custom table schemas and on disk serialization
+    ```bash
+    mamba install -c conda-forge ngio
+    ```
 
-### 🔄 Scalable Data Processing
+## ngio in 30 seconds
 
-- Powerful iterators for building scalable and generalizable image processing pipelines
-- Extensible mapping mechanism for custom parallelization strategies
+```python
+from ngio import open_ome_zarr_container
 
-## Getting Started
+# Open a container and inspect what is inside
+ome_zarr = open_ome_zarr_container("path/to/image.zarr")
+print(ome_zarr)  # levels, labels and tables at a glance
 
-Refer to the [Getting Started](getting_started/0_quickstart.md) guide to integrate ngio into your workflows. We also provide a collection of [Tutorials](tutorials/image_processing.md) to help you get up and running quickly.
-For more advanced usage and API documentation, see our [API Reference](api/ome_zarr_container.md).
+# Grab the highest-resolution image and read a channel as numpy
+image = ome_zarr.get_image()
+data = image.get_as_numpy(channel_selection="DAPI")
+
+# Slice by a region of interest, in world coordinates
+roi = ome_zarr.get_table("FOV_ROI_table").get("FOV_1")
+patch = image.get_roi_as_numpy(roi)
+```
+
+Every code block in these docs is executed when the site is built, so what you read is
+what actually runs.
+
+## Where to go next
+
+<div class="grid cards" markdown>
+
+-   :material-rocket-launch:{ .lg .middle } **Getting Started**
+
+    ---
+
+    Install ngio and work through the core objects: containers, images and labels,
+    tables, masked images and HCS plates.
+
+    [:octicons-arrow-right-24: Quickstart](getting_started/0_quickstart.md)
+
+-   :material-school:{ .lg .middle } **Tutorials**
+
+    ---
+
+    End-to-end walkthroughs: create an OME-Zarr, process and segment images, extract
+    features, and explore a plate.
+
+    [:octicons-arrow-right-24: Browse tutorials](tutorials/create_ome_zarr.md)
+
+-   :material-table:{ .lg .middle } **Table Specifications**
+
+    ---
+
+    The on-disk spec for ROI, masking ROI, feature, condition and generic tables, and
+    the backends that store them.
+
+    [:octicons-arrow-right-24: Read the spec](table_specs/overview.md)
+
+-   :material-api:{ .lg .middle } **API Reference**
+
+    ---
+
+    Generated reference for every public class and function, with type annotations and
+    source links.
+
+    [:octicons-arrow-right-24: Open the reference](api/ome_zarr_container.md)
+
+</div>
+
+## Key features
+
+- **Simple object-based API** — open, explore and manipulate OME-Zarr images and HCS
+  plates; derive new images and labels with minimal boilerplate.
+- **Rich tables and ROI support** — tight integration with [tabular
+  data](table_specs/overview.md), extensible table schemas, and measurements stored
+  alongside the image.
+- **Scalable processing** — iterators for building pipelines that generalise from a
+  single ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
 
 ## Supported OME-Zarr versions
 
-Ngio supports OME-Zarr v0.4 and v0.5, with Zarr v2 and v3 storage formats.
+ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
+v0.6 and later is planned.
 
-## Development Status
+## Citing ngio
 
-!!! warning
-    Ngio is under active development and is not yet stable. The API is subject to change, and bugs and breaking changes are expected.
-    We follow [Semantic Versioning](https://semver.org/). Which means for 0.x releases potentially breaking changes can be introduced in minor releases.
+If ngio contributes to work you publish, please cite it. See
+[`CITATION.cff`](https://github.com/BioVisionCenter/ngio/blob/main/CITATION.cff) in the
+repository for the current citation metadata.
 
-### Available Features
+## Project
 
-- ✅ OME-Zarr metadata handling and validation
-- ✅ Image and label access across pyramid levels
-- ✅ ROI and table support
-- ✅ Image processing iterators
-- ✅ Streaming from remote sources
-- ✅ Documentation and examples
-
-### Upcoming Features
-
-- Enhanced performance optimizations (parallel iterators, optimized io strategies)
-
-## Contributors
-
-Ngio is developed at the [BioVisionCenter](https://www.biovisioncenter.uzh.ch/en.html), University of Zurich, by [@lorenzocerrone](https://github.com/lorenzocerrone) and [@jluethi](https://github.com/jluethi).
-
-## License
-
-Ngio is released under the BSD-3-Clause License. See [LICENSE](https://github.com/BioVisionCenter/ngio/blob/main/LICENSE) for details.
-
-## Repository
-
-Visit our [GitHub repository](https://github.com/BioVisionCenter/ngio) for the latest code, issues, and contributions.
+ngio is developed at the [BioVisionCenter](https://www.biovisioncenter.uzh.ch/en.html),
+University of Zurich, by [@lorenzocerrone](https://github.com/lorenzocerrone) and
+[@jluethi](https://github.com/jluethi). It is released under the BSD-3-Clause
+[licence](https://github.com/BioVisionCenter/ngio/blob/main/LICENSE), and developed in the
+open on [GitHub](https://github.com/BioVisionCenter/ngio) — issues and contributions
+welcome.

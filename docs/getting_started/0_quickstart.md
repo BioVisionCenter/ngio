@@ -1,6 +1,10 @@
+---
+description: Install ngio and open your first OME-Zarr container in a few lines of Python.
+---
+
 # Quickstart
 
-Ngio is a Python package that provides a simple and intuitive API for reading and writing data to and from OME-Zarr. This guide will walk you through the basics of using `ngio` to read and write data.
+ngio is a Python package that provides a simple and intuitive API for reading and writing data to and from OME-Zarr. This guide will walk you through the basics of using `ngio` to read and write data.
 
 ## Installation
 
@@ -34,7 +38,7 @@ Ngio is a Python package that provides a simple and intuitive API for reading an
 
     1. Clone the repository:
     ```bash
-    git clone https://github.com/fractal-analytics-platform/ngio.git
+    git clone https://github.com/BioVisionCenter/ngio.git
     cd ngio
     ```
 
@@ -45,7 +49,7 @@ Ngio is a Python package that provides a simple and intuitive API for reading an
 
 ### Troubleshooting
 
-Please report installation problems by opening an issue on our [GitHub repository](https://github.com/fractal-analytics-platform/ngio).
+Please report installation problems by opening an issue on our [GitHub repository](https://github.com/BioVisionCenter/ngio).
 
 ## Setup some test data
 
@@ -81,7 +85,7 @@ To learn how to work with the `OME-Zarr Container` object, but also with the ima
 - [Masked Images/Labels](4_masked_images.md): To know more on how to work with masked image data.
 - [HCS Plates](5_hcs.md): To know more on how to work with HCS plate data.
 
-Also, checkout our jupyer notebook tutorials for more examples:
+For worked end-to-end examples, see the tutorials:
 
 - [Image Processing](../tutorials/image_processing.md): Learn how to perform simple image processing operations.
 - [Image Segmentation](../tutorials/image_segmentation.md): Learn how to create new labels from images.

@@ -6,7 +6,7 @@ Feature tables can optionally include metadata to specify the type of features s
 
 - `measurement`: A quantitative measurement of the object, such as area, perimeter, or intensity.
 - `categorical`: A categorical feature of the object, such as a classification label or a type.
-- `metadata`: Additional free-from columns that can be used to store any other information about the object, but that should not be used for analysis/classification purposes.
+- `metadata`: Additional free-form columns that can be used to store any other information about the object, but that should not be used for analysis/classification purposes.
 
 These feature types inform casting of the values when serialising a table and can be used in downstream analysis to select specific subsets of features. The feature type can be explicitly specified in the feature table metadata. Alternatively, if a column is not specified, we apply the following casting rules:
 
@@ -27,7 +27,7 @@ A feature table must include the following metadata fields in the group attribut
     "table_version": "1",
     "region": {"path": "../labels/label_DAPI"}, // Path to the label image associated with this feature table
     // Backend metadata
-    "backend": "annadata", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "label",
     "index_type": "int", // Either "int" or "str"
 }

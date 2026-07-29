@@ -1,8 +1,12 @@
+---
+description: "Work with high-content screening plates: rows, columns, acquisitions, wells and images."
+---
+
 # 5. HCS Plates
 
-Ngio provides a simple interface for high-content screening (HCS) plates. An HCS plate is a collection of OME-Zarr images organized in a grid-like structure. Each plates contains columns and rows, and each well in the plate is identified by its row and column indices. Each well can contain multiple images, and each image can belong to a different acquisition.
+ngio provides a simple interface for high-content screening (HCS) plates. An HCS plate is a collection of OME-Zarr images organized in a grid-like structure. Each plate contains columns and rows, and each well in the plate is identified by its row and column indices. Each well can contain multiple images, and each image can belong to a different acquisition.
 
-The HCS plate is represented by the `OmeZarrPlate` class.
+The HCS plate is represented by the [`OmeZarrPlate`][ngio.OmeZarrPlate] class.
 
 Let's open an `OmeZarrPlate` object.
 
@@ -56,7 +60,7 @@ The `OmeZarrPlate` object provides multiple methods to retrieve the path to the 
 
 ## Getting the images
 
-The `OmeZarrPlate` object provides a method to get the image objects in a well. The method `get_well_images` takes the row and column indices of the well and returns a list of `OmeZarrContainer` objects.
+The `OmeZarrPlate` object provides a method to get the image objects in a well. The method `get_well_images` takes the row and column indices of the well and returns a list of [`OmeZarrContainer`][ngio.OmeZarrContainer] objects.
 
 === "All Images"
     Get all images in the plate:
@@ -88,7 +92,7 @@ The `OmeZarrPlate` object provides a method to get the image objects in a well. 
 
 ## Creating a plate
 
-Ngio provides a utility function to create a plate.
+ngio provides a utility function to create a plate.
 
 The first step is to create a list of `ImageInWellPath` objects. Each `ImageInWellPath` object contains the path to the image and the corresponding well.
 
@@ -132,3 +136,9 @@ You can add images or remove images
         No data will be removed from the store. If an image is saved in the store it will remain there.
         Also the metadata will only be removed from the plate.well metadata. The number of columns and rows will not be updated.
         This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_remove_image` method instead.
+
+## Next steps
+
+- [Iterators](6_iterators.md) — build pipelines that scale across a plate.
+- [HCS Exploration tutorial](../tutorials/hcs_exploration.md) — a worked example on real plate data.
+- [HCS API reference](../api/hcs.md) — `OmeZarrPlate` and `OmeZarrWell`.

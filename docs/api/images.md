@@ -1,3 +1,7 @@
+---
+description: API reference for the Image and Label objects.
+---
+
 # Images Like: API Documentation
 
 ## Open an Image

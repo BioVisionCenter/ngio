@@ -1,3 +1,7 @@
+---
+description: Explore an HCS plate, aggregate tables across images, and create a new plate.
+---
+
 # HCS Plates
 
 This is a minimal example of how to work with OME-Zarr Plates using `ngio`.
@@ -29,3 +33,8 @@ This is a minimal example of how to work with OME-Zarr Plates using `ngio`.
 ```python exec="true" source="material-block" session="hcs_exploration"
 --8<-- "docs/snippets/tutorials/hcs_exploration.py:create_plate"
 ```
+
+## Next steps
+
+- [HCS Plates](../getting_started/5_hcs.md) — the plate API in depth.
+- [HCS API reference](../api/hcs.md) — `OmeZarrPlate` and `OmeZarrWell`.

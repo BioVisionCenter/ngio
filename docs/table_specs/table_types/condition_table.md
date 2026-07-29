@@ -21,7 +21,7 @@ A condition table must include the following metadata fields in the group attrib
     "type": "condition_table",
     "table_version": "1",
     // Backend metadata
-    "backend": "csv", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "csv", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "index", // The default index key for the condition table, which is used to identify each row.
     "index_type": "int" // Either "int" or "str"
 }

@@ -1,3 +1,7 @@
+---
+description: API reference for OmeZarrPlate and OmeZarrWell.
+---
+
 # HCS API Documentation
 
 ## Open a Plate

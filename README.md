@@ -49,8 +49,8 @@ ngio supports OME-Zarr v0.4/v0.5. Support for version 0.6 and higher is planned 
 
 ## Development Status
 
-ngio is under active development and is not yet stable. The API is subject to change, and bugs and breaking changes are expected.
-We follow [Semantic Versioning](https://semver.org/). Which means for 0.x releases potentially breaking changes can be introduced in minor releases.
+ngio follows [Semantic Versioning](https://semver.org/): from 1.0 onwards the public API is
+stable, and breaking changes are reserved for major releases.
 
 ### Available Features
 

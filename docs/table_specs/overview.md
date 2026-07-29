@@ -1,10 +1,14 @@
+---
+description: "The ngio table architecture: backends, in-memory objects and type specifications."
+---
+
 # Tables Overview
 
-Ngio's architecture is designed to tightly integrate image and tabular data. For this purpose we developed custom specifications for serializing and deserializing tabular data into OME-Zarr containers, and semantically typed tables derived from the [fractal table specification](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+ngio's architecture is designed to tightly integrate image and tabular data. For this purpose we developed custom specifications for serializing and deserializing tabular data into OME-Zarr containers, and semantically typed tables derived from the [fractal table specification](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
 
 ## Architecture
 
-The ngio tables architectures is composed of three main components:
+The ngio tables architecture is composed of three main components:
 
 ### 1. Table Backends
 
@@ -13,7 +17,7 @@ A backend module is a class that can serialize tabular data into OME-Zarr contai
 - **AnnData**: Commonly used in single-cell genomics and was the standard table for the initial Fractal table spec.
 - **Parquet**: A columnar storage file format optimized for large datasets.
 - **CSV**: A simple text format for tabular data, easily human readable and writable.
-- **JSON**: A lightweight data interchange format that both readable and efficient for small tables.
+- **JSON**: A lightweight data interchange format that is both readable and efficient for small tables.
 
 A more detailed description of the backend module can be found in the [Table Backends documentation](backend.md).
 

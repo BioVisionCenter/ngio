@@ -1,3 +1,7 @@
+---
+description: Segment an OME-Zarr image per field of view, then repeat within a mask.
+---
+
 # Image Segmentation
 
 This is a minimal tutorial on how to use ngio for image segmentation.
@@ -14,7 +18,7 @@ We will first implement a very simple function to segment an image. We will use 
 --8<-- "docs/snippets/tutorials/image_segmentation.py:segmentation_fn"
 ```
 
-## Step 2: Open the OmeZarr container
+## Step 2: Open the OME-Zarr container
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:open_container"
@@ -58,3 +62,8 @@ the masked image rather than the original one.
 ```python exec="true" html="1" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:plot_masked_segmentation"
 ```
+
+## Next steps
+
+- [Feature Extraction](feature_extraction.md) — measure the objects you just segmented.
+- [Masked Images and Labels](../getting_started/4_masked_images.md) — read data object-by-object.

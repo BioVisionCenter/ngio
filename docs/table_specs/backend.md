@@ -1,3 +1,7 @@
+---
+description: "On-disk table backends: anndata, parquet, csv and json."
+---
+
 # Table Backends
 
 In ngio we implemented four different table backends. Each table backend is a python class that can serialize tabular data into OME-Zarr containers.
@@ -13,7 +17,7 @@ AnnData is a widely used format in single-cell genomics, and can natively store 
 
 The following normalization steps are applied to each table before saving it to the AnnData backend:
 
-- We separate the table in two parts: The floating point columns are casted to `float32` and stored as `X` in the AnnData object, while the categorical, boolean, and integer columns are stored as `obs`.
+- We separate the table in two parts: The floating point columns are cast to `float32` and stored as `X` in the AnnData object, while the categorical, boolean, and integer columns are stored as `obs`.
 - The index column is cast to a string, and is stored in the `obs` index.
 - The index column name must match the `index_key` specified in the metadata.
 
@@ -22,7 +26,7 @@ AnnData backend metadata:
 ```json
 {
     // Backend metadata
-    "backend": "annadata", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "index", // The default index key for the table, which is used to identify each row.
     "index_type": "str", // Either "int" or "str"
 }
@@ -47,7 +51,7 @@ Parquet backend metadata:
 ```json
 {
     // Backend metadata
-    "backend": "parquet", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "parquet", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "index", // The default index key for the table, which is used to identify each row.
     "index_type": "int", // Either "int" or "str"
 }
@@ -71,7 +75,7 @@ The CSV backend in ngio follows closely the same specifications as the Parquet b
 ```json
 {
     // Backend metadata
-    "backend": "csv", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "csv", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "index", // The default index key for the table, which is used to identify each row.
     "index_type": "int", // Either "int" or "str"
 }
@@ -95,7 +99,7 @@ JSON backend metadata:
 ```json
 {
     // Backend metadata
-    "backend": "json", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "json", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "index", // The default index key for the table, which is used to identify each row.
     "index_type": "int" // Either "int" or "str"
 }

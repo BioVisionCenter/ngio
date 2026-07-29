@@ -1,3 +1,7 @@
+---
+description: Read and write image data object-by-object using a segmentation as a mask.
+---
+
 # 4. Masked Images and Labels
 
 Masked images (or labels) are images that are masked by an instance segmentation mask.
@@ -32,7 +36,7 @@ The two most notable exceptions are the `get_roi_as_numpy` (or `get_roi_as_dask`
 --8<-- "docs/snippets/getting_started/masked_images.py:plot_masked_roi"
 ```
 
-Additionally we can used the `zoom_factor` argument to get more context around the ROI.
+Additionally we can use the `zoom_factor` argument to get more context around the ROI.
 For example we can zoom out the ROI by a factor of `2`:
 
 ```python exec="true" source="material-block" session="masked_images"
@@ -70,10 +74,15 @@ We can also use the `set_roi_masked` method to set the masked data for a specifi
 
 ## Masked Labels
 
-The `MaskedLabel` class is a subclass of `Label` and provides the same functionality as the `MaskedImage` class.
+The `MaskedLabel` class is a subclass of [`Label`][ngio.Label] and provides the same functionality as the `MaskedImage` class.
 
 The `MaskedLabel` class can be used to create a masked label from an `OME-Zarr Container` object using the `get_masked_label` method.
 
 ```python exec="true" source="material-block" session="masked_images"
 --8<-- "docs/snippets/getting_started/masked_images.py:get_masked_label"
 ```
+
+## Next steps
+
+- [HCS Plates](5_hcs.md) — scale up from a single image to a whole plate.
+- [Iterators](6_iterators.md) — process every object or region without writing the loop yourself.

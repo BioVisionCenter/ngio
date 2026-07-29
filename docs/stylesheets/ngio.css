@@ -1,0 +1,460 @@
+/* ══════════════════════════════════════════════════════════════════════════
+   ngio — theme layer for Zensical
+   Lives at docs/stylesheets/ngio.css, registered via extra_css in mkdocs.yml
+   (Zensical reads mkdocs.yml natively).
+
+   Nothing here touches Zensical's HTML. It re-points the theme's own CSS
+   variables and adds a small number of component-level rules. Everything
+   degrades to the stock theme if a rule stops matching after an upgrade.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Space Grotesk is the display face; theme.font in mkdocs.yml only manages the
+   text and code families (IBM Plex Sans / JetBrains Mono), so it loads here. */
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap");
+
+/* ── 1. Typography ──────────────────────────────────────────────────────────
+   Text and code families are set via theme.font in mkdocs.yml so the theme
+   preloads them; the :root fallback keeps this stylesheet self-contained. */
+:root {
+  --md-text-font: "IBM Plex Sans";
+  --md-code-font: "JetBrains Mono";
+  --ngio-display-font: "Space Grotesk", "IBM Plex Sans", sans-serif;
+}
+
+/* ── 2. Palette ─────────────────────────────────────────────────────────────
+   These are Zensical's own variable names (see assets/stylesheets/*/palette.css).
+   Overriding them re-colours the whole site — header, nav, links, admonitions,
+   footer, search — without any selector surgery. */
+
+[data-md-color-scheme="default"] {
+  /* Light teal #22a699 — sits between the green ngio's own site runs on and
+     the teal the BioVisionCenter's converters-tools docs use, so it reads as
+     the same family as both. This is NOT a stock Material palette entry, so
+     the values below are what carry the brand; theme.palette in config only
+     needs to pick the nearest stock name for the toggle to behave. */
+  --ngio-accent: #22a699;
+  --ngio-accent-ink: #16695f;   /* clears AA as body-copy link colour */
+  --ngio-accent-soft: #e4f4f2;
+  --ngio-accent-2: #94dad4;     /* the mark's aqua apex */
+  --ngio-accent-2-ink: #0f4c45; /* hover / active */
+
+  /* semantic fills */
+  --ngio-blue: #2e6fd6;
+  --ngio-green: #4cae4f;
+  --ngio-magenta: #c2185b;
+  --ngio-amber: #ffaa00;
+  /* AA-safe text variants for code and inline use on light surfaces */
+  --ngio-blue-t: #2559b0;
+  --ngio-green-t: #357a38;
+  --ngio-magenta-t: #a81050;
+  --ngio-amber-t: #8a5d00;
+
+  --md-default-bg-color: #f9fafa;
+  --md-default-fg-color: #101619;
+  --md-default-fg-color--light: #5b6569;
+  --md-default-fg-color--lighter: #a3abad;
+  --md-default-fg-color--lightest: #e3e6e6;
+
+  --md-typeset-color: #253034;
+  --md-typeset-a-color: var(--ngio-accent-ink);
+  --md-typeset-table-color: #e3e6e6;
+
+  --md-primary-fg-color: var(--ngio-accent);
+  --md-primary-fg-color--light: #4cc0b3;
+  --md-primary-fg-color--dark: var(--ngio-accent-ink);
+  --md-primary-bg-color: #f9fafa;
+
+  --md-accent-fg-color: var(--ngio-accent-2-ink);
+  --md-accent-fg-color--transparent: #22a6991a;
+
+  --md-code-bg-color: #f2f4f4;
+  --md-code-fg-color: #253034;
+  --md-code-hl-comment-color: #5b6569;
+  --md-code-hl-keyword-color: var(--ngio-magenta-t);
+  --md-code-hl-string-color: var(--ngio-green-t);
+  --md-code-hl-function-color: var(--ngio-blue-t);
+  --md-code-hl-number-color: var(--ngio-amber-t);
+  --md-code-hl-constant-color: var(--ngio-amber-t);
+  --md-code-hl-name-color: #253034;
+  --md-code-hl-operator-color: #5b6569;
+  --md-code-hl-punctuation-color: #5b6569;
+
+  --md-footer-bg-color: #f9fafa;
+  --md-footer-bg-color--dark: #eff1f1;
+
+  --ngio-line: #e3e6e6;
+  --ngio-line-strong: #cfd4d4;
+  --ngio-surface: #ffffff;
+  --ngio-sunk: #eff1f1;
+  --ngio-on-accent: #ffffff;
+  --ngio-accent-fill: var(--ngio-accent-ink);
+}
+
+[data-md-color-scheme="slate"] {
+  --ngio-accent: #6cc8be;
+  --ngio-accent-ink: #8fd8d0;
+  --ngio-accent-soft: #123330;
+  --ngio-accent-2: #abe4dc;
+  --ngio-accent-2-ink: #abe4dc;
+
+  --ngio-blue: #7fa6ff;
+  --ngio-green: #71c174;
+  --ngio-magenta: #f06090;
+  --ngio-amber: #ffc845;
+  --ngio-blue-t: var(--ngio-blue);
+  --ngio-green-t: var(--ngio-green);
+  --ngio-magenta-t: var(--ngio-magenta);
+  --ngio-amber-t: var(--ngio-amber);
+
+  --md-default-bg-color: #0b1113;
+  --md-default-fg-color: #e6edee;
+  --md-default-fg-color--light: #808d90;
+  --md-default-fg-color--lighter: #58656a;
+  --md-default-fg-color--lightest: #1d272a;
+
+  --md-typeset-color: #c2ccce;
+  --md-typeset-a-color: var(--ngio-accent);
+  --md-typeset-table-color: #1d272a;
+
+  --md-primary-fg-color: var(--ngio-accent);
+  --md-primary-fg-color--light: #8fd8d0;
+  --md-primary-fg-color--dark: #1f9389;
+  --md-primary-bg-color: #0b1113;
+
+  --md-accent-fg-color: var(--ngio-accent-2);
+  --md-accent-fg-color--transparent: #6cc8be1a;
+
+  --md-code-bg-color: #0f1618;
+  --md-code-fg-color: #c2ccce;
+  --md-code-hl-comment-color: #808d90;
+  --md-code-hl-keyword-color: var(--ngio-magenta);
+  --md-code-hl-string-color: var(--ngio-green);
+  --md-code-hl-function-color: var(--ngio-blue);
+  --md-code-hl-number-color: var(--ngio-amber);
+  --md-code-hl-constant-color: var(--ngio-amber);
+  --md-code-hl-name-color: #c2ccce;
+  --md-code-hl-operator-color: #808d90;
+  --md-code-hl-punctuation-color: #808d90;
+
+  --md-footer-bg-color: #0b1113;
+  --md-footer-bg-color--dark: #0f1618;
+
+  --ngio-line: #1d272a;
+  --ngio-line-strong: #2a3639;
+  --ngio-surface: #131b1e;
+  --ngio-sunk: #0f1618;
+  --ngio-on-accent: #06211e;
+  --ngio-accent-fill: var(--ngio-accent);
+}
+
+/* ── 3. Display type ─────────────────────────────────────────────────────── */
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4,
+.md-header__title,
+.md-nav__title {
+  font-family: var(--ngio-display-font);
+  letter-spacing: -0.022em;
+}
+
+.md-typeset h1 {
+  font-weight: 600;
+  font-size: 2.6rem;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+  color: var(--md-default-fg-color);
+}
+
+/* Section rules: every h2 opens with a hairline, which is what gives the
+   long landing page its rhythm. */
+.md-typeset h2 {
+  font-weight: 600;
+  font-size: 1.5rem;
+  margin-top: 2.6rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid var(--ngio-line);
+}
+
+.md-typeset h3 {
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+/* First paragraph after the h1 is the page lede. */
+.md-typeset h1 + p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  color: var(--md-default-fg-color);
+  max-width: 42ch;
+  text-wrap: pretty;
+}
+
+.md-typeset p,
+.md-typeset li {
+  text-wrap: pretty;
+}
+
+/* ── 4. Header and tabs ──────────────────────────────────────────────────── */
+.md-header {
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color);
+  box-shadow: none;
+  border-bottom: 1px solid var(--ngio-line);
+}
+
+.md-header__button.md-logo :is(img, svg) {
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.md-tabs {
+  background: var(--md-default-bg-color);
+  color: var(--md-default-fg-color--light);
+  border-bottom: 1px solid var(--ngio-line);
+}
+
+.md-tabs__link {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 1;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-tabs__item--active .md-tabs__link {
+  color: var(--md-default-fg-color);
+  box-shadow: inset 0 -2px 0 var(--md-primary-fg-color);
+}
+
+/* ── 5. Sidebar ──────────────────────────────────────────────────────────── */
+.md-nav {
+  font-size: 0.72rem;
+}
+
+.md-nav__link {
+  border-radius: 7px;
+  padding: 0.3rem 0.6rem;
+}
+
+.md-nav__link--active,
+.md-nav__link[data-md-state="blur"]:hover {
+  background: var(--ngio-accent-soft);
+  color: var(--md-accent-fg-color);
+}
+
+/* Top-level section labels read as eyebrows, not links. */
+.md-nav--primary > .md-nav__list > .md-nav__item--nested > .md-nav__link {
+  font-family: var(--md-code-font), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--md-default-fg-color--light);
+}
+
+/* Table of contents: hairline rail. */
+.md-nav--secondary .md-nav__link {
+  border-left: 2px solid var(--ngio-line);
+  border-radius: 0;
+  padding-left: 0.6rem;
+}
+
+.md-nav--secondary .md-nav__link--active {
+  border-left-color: var(--md-primary-fg-color);
+  background: none;
+}
+
+/* ── 6. Code blocks ──────────────────────────────────────────────────────── */
+.md-typeset pre > code,
+.md-typeset .highlight {
+  border-radius: 10px;
+}
+
+.md-typeset .highlight {
+  border: 1px solid var(--ngio-line);
+  overflow: hidden;
+}
+
+.md-typeset code {
+  border: 1px solid var(--ngio-line);
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+  font-size: 0.84em;
+}
+
+.md-typeset pre > code {
+  border: 0;
+  line-height: 1.75;
+}
+
+/* The `result` blocks produced by the executed snippets read as terminal
+   output rather than as more prose. */
+.md-typeset .result {
+  margin-top: -0.6rem;
+  border: 1px solid var(--ngio-line);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  background: var(--ngio-sunk);
+  font-family: var(--md-code-font), monospace;
+  font-size: 0.72rem;
+  padding: 0.7rem 0.9rem;
+}
+
+.md-typeset .result::before {
+  content: "OUT";
+  display: block;
+  margin-bottom: 0.4rem;
+  font-size: 0.58rem;
+  letter-spacing: 0.09em;
+  color: var(--md-default-fg-color--light);
+}
+
+/* ── 7. Content tabs (pip / mamba / source) ──────────────────────────────── */
+.md-typeset .tabbed-set > .tabbed-labels {
+  box-shadow: none;
+  border-bottom: 1px solid var(--ngio-line);
+}
+
+.md-typeset .tabbed-labels > label {
+  font-family: var(--md-code-font), monospace;
+  font-size: 0.68rem;
+  font-weight: 400;
+}
+
+.md-typeset .tabbed-labels > label > [href]:first-child {
+  color: inherit;
+}
+
+/* ── 8. Grid cards ───────────────────────────────────────────────────────── */
+.md-typeset .grid.cards > ul > li {
+  border: 1px solid var(--ngio-line);
+  border-radius: 12px;
+  background: var(--ngio-surface);
+  padding: 1.1rem;
+  transition:
+    border-color 180ms,
+    box-shadow 180ms,
+    transform 180ms;
+}
+
+.md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--md-primary-fg-color);
+  box-shadow:
+    0 1px 2px rgb(16 22 25 / 5%),
+    0 8px 24px -12px rgb(16 22 25 / 16%);
+  transform: translateY(-2px);
+}
+
+.md-typeset .grid.cards > ul > li > hr {
+  display: none;
+}
+
+.md-typeset .grid.cards > ul > li > p:first-child strong {
+  font-family: var(--ngio-display-font);
+  font-weight: 600;
+  font-size: 0.86rem;
+}
+
+.md-typeset .grid.cards .twemoji.lg svg,
+.md-typeset .grid.cards .twemoji svg {
+  fill: var(--md-primary-fg-color);
+}
+
+/* ── 9. Admonitions ──────────────────────────────────────────────────────── */
+.md-typeset .admonition,
+.md-typeset details {
+  border: 1px solid var(--ngio-line);
+  border-left: 3px solid var(--md-primary-fg-color);
+  border-radius: 0 10px 10px 0;
+  box-shadow: none;
+  background: var(--ngio-surface);
+  font-size: 0.76rem;
+}
+
+.md-typeset .admonition-title,
+.md-typeset summary {
+  font-family: var(--ngio-display-font);
+  font-weight: 600;
+  background: transparent;
+}
+
+.md-typeset .admonition-title::before,
+.md-typeset summary::before {
+  background-color: var(--md-primary-fg-color);
+}
+
+/* ── 10. mkdocstrings API reference ──────────────────────────────────────── */
+.md-typeset .doc-heading {
+  font-family: var(--md-code-font), monospace;
+  font-weight: 500;
+  border-top: 1px solid var(--ngio-line);
+  padding-top: 1rem;
+}
+
+.md-typeset .doc-symbol {
+  border-radius: 5px;
+  background: var(--ngio-accent-soft);
+  color: var(--md-accent-fg-color);
+}
+
+.md-typeset .doc-signature {
+  border: 1px solid var(--ngio-line);
+  border-radius: 10px;
+}
+
+.md-typeset .doc-contents .autorefs-internal {
+  border-bottom: 1px dotted var(--md-primary-fg-color);
+  text-decoration: none;
+}
+
+.md-typeset details.mkdocstrings-source {
+  border-left-width: 1px;
+  border-left-color: var(--ngio-line);
+  border-radius: 10px;
+  background: var(--ngio-sunk);
+}
+
+/* ── 11. Glossary abbreviations ──────────────────────────────────────────── */
+.md-typeset abbr[title] {
+  border-bottom: 1px dotted var(--md-default-fg-color--light);
+  cursor: help;
+  text-decoration: none;
+}
+
+/* ── 12. Footer ──────────────────────────────────────────────────────────── */
+.md-footer {
+  border-top: 1px solid var(--ngio-line);
+}
+
+.md-footer-meta {
+  background: var(--md-footer-bg-color);
+  color: var(--md-default-fg-color--light);
+}
+
+.md-footer__link {
+  border: 1px solid var(--ngio-line);
+  border-radius: 12px;
+  padding: 0.9rem 1rem;
+  opacity: 1;
+}
+
+.md-footer__link:hover {
+  border-color: var(--md-primary-fg-color);
+}
+
+.md-footer__title {
+  font-family: var(--ngio-display-font);
+  background: none;
+}
+
+.md-copyright {
+  color: var(--md-default-fg-color--light);
+}
+
+/* ── 13. Search button ───────────────────────────────────────────────────── */
+.md-search__button {
+  border: 1px solid var(--ngio-line-strong);
+  border-radius: 8px;
+  background: var(--ngio-surface);
+  color: var(--md-default-fg-color--light);
+  font-size: 0.7rem;
+}

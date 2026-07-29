@@ -1,6 +1,10 @@
+---
+description: Configure ngio via ngio_config.json, including the io_retry policy.
+---
+
 # Configuration
 
-Ngio has a small global configuration object that controls cross-cutting IO behavior. It is loaded once at import time from a JSON file and is accessible programmatically.
+ngio has a small global configuration object that controls cross-cutting IO behavior. It is loaded once at import time from a JSON file and is accessible programmatically.
 
 ## The config file
 
@@ -48,7 +52,7 @@ Fields:
 - `retry_on`: a list of substrings matched against `"ExceptionName: message"`. An error is retried only if at least one marker matches, so you can match either an exception class name (`"TimeoutError"`) or a message fragment (`"RequestTimeTooSkewed"`).
 - `retry_all_errors`: retry every error. This is **discouraged** — it also retries errors that will never succeed (permissions, missing keys, bugs), multiplying the time to failure. Enabling it emits an `NgioUserWarning`, and it is mutually exclusive with `retry_on`. Prefer narrowing `retry_on` to the specific transient errors you observe.
 
-Ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never retried, in any mode.
+ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never retried, in any mode.
 
 ### Semantics worth knowing
 
@@ -61,3 +65,8 @@ Ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never ret
 `s3fs.custom_retry_markers` is a separate, lower-level mechanism: it registers an error handler inside `s3fs` itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew `RequestTimeTooSkewed` errors). Apply changes at runtime with `ngio.utils.refresh_s3fs_config(get_config())`.
 
 The two mechanisms are complementary and independent: `s3fs` retries individual S3 requests inside a single ngio IO call, while `io_retry` retries the whole ngio IO call. If both are enabled and their triggers overlap, an error can be retried at both layers, so the effective number of attempts is multiplicative — keep the two configurations narrow.
+
+## Next steps
+
+- [Quickstart](0_quickstart.md) — if you have not opened a container yet.
+- [Contributing](../contributing.md) — set up a development environment.

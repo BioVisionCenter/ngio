@@ -1,3 +1,7 @@
+---
+description: "The OME-Zarr container object: inspect and modify metadata, derive and create images, and open remote stores."
+---
+
 # 1. OME-Zarr Container
 
 Let's see how to open and explore an OME-Zarr image using `ngio`:
@@ -6,7 +10,7 @@ Let's see how to open and explore an OME-Zarr image using `ngio`:
 --8<-- "docs/snippets/getting_started/get_started.py:setup"
 ```
 
-The `OME-Zarr Container` in is your entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
+The `OME-Zarr Container` is your entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:print_container"
@@ -175,7 +179,7 @@ new_ome_zarr_image = create_ome_zarr_from_array(
 )
 ```
 
-Alternatively, if you wanto to create an a empty OME-Zarr image, you can use the `create_empty_ome_zarr` function:
+Alternatively, if you want to create an empty OME-Zarr image, you can use the `create_empty_ome_zarr` function:
 
 ```python
 from ngio import create_empty_ome_zarr
@@ -198,6 +202,7 @@ For publicly available OME-Zarr containers, you can just use the `open_ome_zarr_
 For example, to open a remote OME-Zarr container hosted on a github repository:
 
 ```python
+from ngio import open_ome_zarr_container
 from ngio.utils import fractal_fsspec_store
 
 url = (
@@ -215,8 +220,14 @@ For fractal users, the `fractal_fsspec_store` function can be used to open priva
 In this case we need to provide a `fractal_token` to authenticate the user.
 
 ```python
+from ngio import open_ome_zarr_container
 from ngio.utils import fractal_fsspec_store
 
 store = fractal_fsspec_store(url="https://fractal_url...", fractal_token="**your_secret_token**")
 ome_zarr_container = open_ome_zarr_container(store)
 ```
+
+## Next steps
+
+- [Images and Labels](2_images.md) — read and write pixel data.
+- [Tables](3_tables.md) — ROIs, features and measurements stored alongside the image.

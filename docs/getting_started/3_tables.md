@@ -1,6 +1,10 @@
+---
+description: "Load and create ngio tables: ROI, masking ROI, feature and generic tables."
+---
+
 # 3. Tables
 
-Tables are not part of the core OME-Zarr specification but can be used in ngio to store measurements, features, regions of interest (ROIs), and other tabular data. Ngio follows the [Fractal's Table Spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+Tables are not part of the core OME-Zarr specification but can be used in ngio to store measurements, features, regions of interest (ROIs), and other tabular data. ngio follows the [Fractal's Table Spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
 
 ## Getting a table
 
@@ -18,7 +22,7 @@ We can list all available tables and load a specific table:
 --8<-- "docs/snippets/getting_started/get_started.py:list_tables"
 ```
 
-Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_roi_table`, as well as untyped `generic_table`.
+ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_roi_table`, as well as untyped `generic_table`.
 
 === "ROI Table"
     ROI tables can be used to store arbitrary regions of interest (ROIs) in the image.
@@ -101,7 +105,7 @@ Tables (differently from Images and Labels) can be purely in memory objects, and
 
 === "Creating a Generic Table"
     Sometimes you might want to create a table that doesn't fit into the `ROI`, `Masking ROI`, or `Feature` categories.
-    In this case, you can use the `GenericTable` class, which allows you to store any tabular data.
+    In this case, you can use the [`GenericTable`][ngio.tables.GenericTable] class, which allows you to store any tabular data.
     It can be created from a pandas `Dataframe`:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:create_generic_table"
@@ -111,3 +115,9 @@ Tables (differently from Images and Labels) can be purely in memory objects, and
     --8<-- "docs/snippets/getting_started/get_started.py:generic_table_from_anndata"
     ```
     The `GenericTable` class allows you to store any tabular data, and is a flexible way to work with tables in ngio.
+
+## Next steps
+
+- [Masked Images and Labels](4_masked_images.md) — use masking ROI tables to read per-object data.
+- [Table Specifications](../table_specs/overview.md) — the on-disk format behind these tables.
+- [Tables API reference](../api/tables.md) — the table classes and backends.

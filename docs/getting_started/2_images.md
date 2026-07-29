@@ -1,8 +1,12 @@
+---
+description: "Read and write OME-Zarr pixel data: resolution levels, numpy and dask access, slicing, and labels."
+---
+
 # 2. Images and Labels
 
 ## Images
 
-In order to start working with the image data, we need to instantiate an `Image` object.
+In order to start working with the image data, we need to instantiate an [`Image`][ngio.Image] object.
 ngio provides a high-level API to access the image data at different resolution levels and pixel sizes.
 
 ### Getting an image
@@ -43,7 +47,7 @@ Similarly to the `OME-Zarr Container`, the `Image` object provides a high-level 
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:image_dimensions"
     ```
-    The `dimensions` attribute returns a object with the image dimensions for each axis.
+    The `dimensions` attribute returns an object with the image dimensions for each axis.
 
 === "Pixel Size"
     ```python exec="true" source="material-block" session="get_started"
@@ -107,7 +111,7 @@ A minimal example of how to use the `get_array` and `set_array` methods:
 
 ### World coordinates slicing
 
-To read or write a specific region of the image defined in world coordinates, you can use the `Roi` object.
+To read or write a specific region of the image defined in world coordinates, you can use the [`Roi`][ngio.Roi] object.
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:roi_slicing"
@@ -168,3 +172,9 @@ Often, you might want to create a new label based on an existing image. You can 
 
 This will create a new label with the same dimensions as the original image (without channels) and compatible metadata.
 If you want to create a new label with slightly different metadata see [API Reference](../api/images.md).
+
+## Next steps
+
+- [Tables](3_tables.md) — use ROIs to slice the image data you just learned to read.
+- [Masked Images and Labels](4_masked_images.md) — work object-by-object using a segmentation.
+- [Images API reference](../api/images.md) — every method on `Image` and `Label`.

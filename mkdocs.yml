@@ -6,7 +6,10 @@ site_url: "https://biovisioncenter.github.io/ngio/"
 site_description: "A Python library for processing OME-Zarr images"
 repo_name: "ngio"
 repo_url: "https://github.com/BioVisionCenter/ngio"
-copyright: "Copyright &copy; 2024-, BioVisionCenter UZH"
+copyright: "Copyright &copy; 2024-2026, BioVisionCenter UZH"
+# GitHub's default branch here is `main`. Zensical would otherwise derive
+# `edit/master/docs` (config.py:439-453) and every edit link would 404.
+edit_uri: edit/main/docs/
 
 # The snippet scripts are executed into the docs via pymdownx.snippets, which reads them
 # from the filesystem rather than from the page tree.
@@ -18,47 +21,70 @@ exclude_docs: |
 
 theme:
   name: material
-  #logo: logos/logo_white.png
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   icon:
     repo: fontawesome/brands/github
+  # Space Grotesk (display face) is loaded from ngio.css; theme.font only
+  # manages the text and code families.
+  font:
+    text: IBM Plex Sans
+    code: JetBrains Mono
+  # The real brand palette lives in stylesheets/ngio.css as variable overrides;
+  # config only picks the nearest stock name so the toggle behaves.
   palette:
     # Palette toggle for light mode
     - scheme: default
-      # primary: green
+      primary: teal
+      accent: teal
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
 
     # Palette toggle for dark mode
     - scheme: slate
-      # primary: teal
-      # accent: light-green
+      primary: teal
+      accent: teal
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
+  # Only flags Zensical's templates actually read are listed. Previously enabled but
+  # absent from zensical/templates/, i.e. dead config: navigation.instant, toc.follow,
+  # search.suggest, search.share.
   features:
-    - content.tooltips
-    - content.tabs.link
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
     - content.code.annotate
-    - navigation.instant
-    - navigation.instant.progress
-    - navigation.sections
-    - navigation.path
-    - navigation.indexes
+    - content.tabs.link
+    - content.tooltips
     - navigation.footer
-    #- toc.integrate
-    - toc.follow
-    - search.suggest
-    - search.share
+    - navigation.indexes
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+
+extra_css:
+  - stylesheets/ngio.css
 
 extra:
+  homepage: https://biovisioncenter.github.io/ngio/
   version:
     provider: mike
   social:
     - icon: fontawesome/brands/github
       link: "https://github.com/BioVisionCenter/ngio"
-      name: NGIO on GitHub
+      name: ngio on GitHub
+    - icon: fontawesome/brands/python
+      link: "https://pypi.org/project/ngio/"
+      name: ngio on PyPI
+    - icon: fontawesome/solid/microscope
+      link: "https://www.biovisioncenter.uzh.ch/en.html"
+      name: BioVisionCenter, University of Zurich
 
 plugins:
   - search
@@ -93,44 +119,75 @@ plugins:
             show_symbol_type_heading: true
             show_symbol_type_toc: true
 
+# IMPORTANT: declaring this key REPLACES Zensical's ~30 defaults rather than extending
+# them (zensical/config.py:656 — `config.get("markdown_extensions", DEFAULT_...)`), so
+# everything we rely on must be listed here explicitly. Omitting `tables` is what once
+# made pipe tables render as literal `|---|` text; omitting `attr_list` silently broke
+# `content.code.annotate`, and omitting `abbr` broke `content.tooltips`.
+# Deliberately NOT restored from Zensical's defaults:
+#   pymdownx.smartsymbols — rewrites `<--` to an arrow, and every snippet include
+#     contains `--8<--`; not worth the risk for the gain.
+#   pymdownx.caret / tilde — turn `^x^` / `~x~` into super/subscript, a latent trap in
+#     prose about array axes and dtypes.
+#   pymdownx.magiclink — changes how bare URLs render across existing pages.
+#   pymdownx.arithmatex — no maths in these docs.
 markdown_extensions:
-  # MkDocs silently enabled `tables` (and toc/fenced_code) by default; Zensical does not,
-  # so it must be listed explicitly or the static pipe tables in docs/table_specs/**
-  # render as literal `|---|` text. Note this does NOT help exec-block output: Zensical
-  # runs no block-level Markdown over it, which is why those blocks emit HTML instead.
-  - tables
+  - abbr                  # glossary tooltips (with content.tooltips)
   - admonition
+  - attr_list             # grid cards, code annotations, link attributes
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
   - pymdownx.details
-  - pymdownx.superfences
+  # NB: zensical.extensions.emoji, not material.extensions.emoji — mkdocs-material is
+  # not installed since the Zensical migration.
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:zensical.extensions.emoji.to_svg
+      emoji_index: !!python/name:zensical.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
   - pymdownx.snippets:
       base_path: ["."]
       check_paths: true
-  - md_in_html
+      auto_append:
+        - docs/_glossary.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - pymdownx.tabbed:
       alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - toc:
       permalink: true
       toc_depth: 3
 
 
 nav:
-  - "NGIO: Streamlined OME-Zarr Image Analysis": index.md
+  - Home: index.md
   - Getting Started:
-    - getting_started/0_quickstart.md
-    - getting_started/1_ome_zarr_containers.md
-    - getting_started/2_images.md
-    - getting_started/3_tables.md
-    - getting_started/4_masked_images.md
-    - getting_started/5_hcs.md
-    - getting_started/6_iterators.md
-    - getting_started/7_configuration.md
+    - "Quickstart": getting_started/0_quickstart.md
+    - "OME-Zarr Containers": getting_started/1_ome_zarr_containers.md
+    - "Images and Labels": getting_started/2_images.md
+    - "Tables": getting_started/3_tables.md
+    - "Masked Images and Labels": getting_started/4_masked_images.md
+    - "HCS Plates": getting_started/5_hcs.md
+    - "Iterators": getting_started/6_iterators.md
+    - "Configuration": getting_started/7_configuration.md
 
   - Tutorials:
-    - tutorials/create_ome_zarr.md
-    - tutorials/image_processing.md
-    - tutorials/image_segmentation.md
-    - tutorials/feature_extraction.md
-    - tutorials/hcs_exploration.md
+    - "Create an OME-Zarr": tutorials/create_ome_zarr.md
+    - "Image Processing": tutorials/image_processing.md
+    - "Image Segmentation": tutorials/image_segmentation.md
+    - "Feature Extraction": tutorials/feature_extraction.md
+    - "HCS Exploration": tutorials/hcs_exploration.md
 
   - Table Specifications:
     - "Overview": table_specs/overview.md

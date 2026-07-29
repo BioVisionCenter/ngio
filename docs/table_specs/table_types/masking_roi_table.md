@@ -21,7 +21,7 @@ A ROI table must include the following metadata fields in the group attributes:
     "table_version": "1",
     "region": {"path": "../labels/label_DAPI"}, // Path to the label image associated with this masking ROI table
     // Backend metadata
-    "backend": "annadata", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "label", // The default index key for the ROI table, which is used to identify each ROI.
     "index_type": "int", // Either "int" or "str"
 }

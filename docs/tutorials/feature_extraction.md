@@ -1,6 +1,10 @@
+---
+description: Extract regionprops features and store them as an ngio feature table.
+---
+
 # Feature Extraction
 
-This sections will cover how to extract regionprops features from an image using `ngio`, `skimage`. Moreover we will also write the features to a table in the ome-zarr container.
+This tutorial covers extracting regionprops features from an image with `ngio` and `skimage`, and writing them back as a table in the OME-Zarr container. Moreover we will also write the features to a table in the ome-zarr container.
 
 ## Step 1: Open the OME-Zarr Container
 
@@ -33,3 +37,8 @@ This sections will cover how to extract regionprops features from an image using
 ```python exec="true" html="1" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:read_table_back"
 ```
+
+## Next steps
+
+- [HCS Exploration](hcs_exploration.md) — aggregate feature tables across a plate.
+- [Table Specifications](../table_specs/overview.md) — how feature tables are stored.

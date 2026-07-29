@@ -1,3 +1,7 @@
+---
+description: Apply a Gaussian blur eagerly, lazily with dask, and through an ngio iterator.
+---
+
 # Image Processing
 
 This is a minimal example of how to use the `ngio` library for applying some basic image processing techniques.
@@ -16,15 +20,15 @@ We will first create a simple function to apply gaussian blur to an image. This 
 --8<-- "docs/snippets/tutorials/image_processing.py:gaussian_blur"
 ```
 
-## Step 2: Open the OmeZarr container
+## Step 2: Open the OME-Zarr container
 
 ```python exec="true" source="material-block" session="image_processing"
 --8<-- "docs/snippets/tutorials/image_processing.py:open_container"
 ```
 
-## Step 3: Create a new empty omeZarr container
+## Step 3: Create a new empty OME-Zarr container
 
-ngio provide a simple way to "derive" a new container from an existing one. This is useful when you want to apply some processing to an image and save the results in a new container that
+ngio provides a simple way to "derive" a new container from an existing one. This is useful when you want to apply some processing to an image and save the results in a new container that
 preserves the original metadata and dimensions (unless explicitly changed when deriving).
 
 ```python exec="true" source="material-block" session="image_processing"
@@ -53,10 +57,15 @@ Sometimes we want to apply some simple processing to larger than memory images. 
 --8<-- "docs/snippets/tutorials/image_processing.py:dask_blur"
 ```
 
-## Step 6. Image Processing Iterators
+## Step 6: Image Processing Iterators
 
 `ngio` provides an alternative way to process large images using iterators. This API is not meant to replace `dask` but to provide a simple way to iterate over arbitrary regions, moreover it provides a simple way to implement default broadcasting behaviors.
 
 ```python exec="true" source="material-block" session="image_processing"
 --8<-- "docs/snippets/tutorials/image_processing.py:iterators"
 ```
+
+## Next steps
+
+- [Image Segmentation](image_segmentation.md) — turn images into labels.
+- [Iterators](../getting_started/6_iterators.md) — the iterator concepts behind Step 6.

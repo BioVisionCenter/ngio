@@ -20,7 +20,7 @@ A ROI table must include the following metadata fields in the group attributes:
     "type": "roi_table",
     "table_version": "1",
     // Backend metadata
-    "backend": "annadata", // the backend used to store the table, e.g. "annadata", "parquet", etc..
+    "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "FieldIndex", // The default index key for the ROI table, which is used to identify each ROI.
     "index_type": "str", // Either "int" or "str"
 }

@@ -1,3 +1,7 @@
+---
+description: API reference for opening and creating OME-Zarr containers.
+---
+
 # OmeZarrContainer: API Documentation
 
 ## Open an OME-Zarr Container
