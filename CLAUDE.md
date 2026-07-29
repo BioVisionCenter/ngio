@@ -36,6 +36,19 @@ not in the markdown. A page includes a named section via `pymdownx.snippets`:
 - Sections are delimited by `# --8<-- [start:name]` / `# --8<-- [end:name]`.
 - Use `source="material-block"` (not `block`) and `html="1"` for figure blocks.
 - One script per session; each must run standalone from the repo root.
+- **Every page must bind its own state.** The site is built by Zensical, which gives each
+  page a fresh markdown-exec session — a page cannot use a variable bound on another page.
+  Pages 2 and 3 of the getting-started guide therefore include the silent
+  `reopen_container` / `reopen_image` sections at the top (hidden, no `source=`).
+- **Printing a table? Call the `print_table` helper, with `html="1"` on the fence.**
+  `.to_markdown()` does not work: Zensical does not run block-level Markdown over
+  markdown-exec output, so a pipe table stays literal `|---|` text (static pipe tables in
+  `.md` sources are fine). `print_table` emits `to_html()` and strips the
+  `class="dataframe"` / `border` attributes pandas adds, because every theme table rule —
+  and the JS that adds the horizontal-scroll wrapper — is gated on `table:not([class])`.
+- Always build with `--clean --strict` (what `build_docs` does). Plain `zensical build`
+  exits 0 and reports "No issues found" even when a code block raised, and it will serve
+  cached HTML from a previous broken build.
 - Sections repeat their imports so each rendered block stands alone (hence the
   `docs/snippets/**` ruff per-file-ignores).
 

@@ -1,12 +1,18 @@
 site_name: "NGIO: Next Generation File Format I/O"
-site_url: "https://github.com/BioVisionCenter/ngio.git"
+# The published docs root (mike serves versions beneath it, e.g. /ngio/stable/).
+# This was previously the git clone URL, which produced wrong canonical links and, under
+# Zensical, a bogus /BioVisionCenter/ngio.git/ base path when serving locally.
+site_url: "https://biovisioncenter.github.io/ngio/"
 site_description: "A Python library for processing OME-Zarr images"
 repo_name: "ngio"
 repo_url: "https://github.com/BioVisionCenter/ngio"
 copyright: "Copyright &copy; 2024-, BioVisionCenter UZH"
 
-# The snippet scripts are executed into the docs via pymdownx.snippets, which reads
-# them from the filesystem. They are not pages, so keep them out of the built site.
+# The snippet scripts are executed into the docs via pymdownx.snippets, which reads them
+# from the filesystem rather than from the page tree.
+# NOTE: Zensical does not honour `exclude_docs`, so the .py files are still copied into
+# the built site as static assets (they are not rendered as pages). Harmless — they are
+# already public in the repo — but that is why they show up under site/snippets/.
 exclude_docs: |
   snippets/
 
@@ -86,13 +92,13 @@ plugins:
             signature_crossrefs: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
-  - git-revision-date-localized:
-      enable_creation_date: true
-  - git-committers:
-      repository: BioVisionCenter/ngio
-      branch: main
 
 markdown_extensions:
+  # MkDocs silently enabled `tables` (and toc/fenced_code) by default; Zensical does not,
+  # so it must be listed explicitly or the static pipe tables in docs/table_specs/**
+  # render as literal `|---|` text. Note this does NOT help exec-block output: Zensical
+  # runs no block-level Markdown over it, which is why those blocks emit HTML instead.
+  - tables
   - admonition
   - pymdownx.details
   - pymdownx.superfences

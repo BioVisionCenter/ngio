@@ -26,6 +26,10 @@ This sections will cover how to extract regionprops features from an image using
 
 ### Sanity Check: Read the Table back
 
-```python exec="true" source="material-block" session="feature_extraction"
+```python exec="true" session="feature_extraction"
+--8<-- "docs/snippets/tutorials/feature_extraction.py:table_helpers"
+```
+
+```python exec="true" html="1" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:read_table_back"
 ```

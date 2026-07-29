@@ -7,6 +7,10 @@ ngio provides a high-level API to access the image data at different resolution 
 
 ### Getting an image
 
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:reopen_container"
+```
+
 === "Highest Resolution Image"
     By default, the `get_image` method returns the highest resolution image:
     ```python exec="true" source="material-block" session="get_started"

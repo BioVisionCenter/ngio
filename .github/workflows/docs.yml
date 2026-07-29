@@ -2,7 +2,12 @@
 #
 # Scope:    Runs on push to main (deploys dev alias) and version tags (deploys stable).
 #           Uses the pixi docs environment for reproducible builds.
-# Jobs:     deploy (mike + mkdocs)
+# Jobs:     deploy (mike + zensical)
+#
+# Note:     The docs are built by Zensical, and versioned with the Zensical maintainers'
+#           fork of mike (installed from git via the pixi docs feature, since it is not
+#           published to PyPI). The mike CLI and the gh-pages layout are unchanged, so
+#           already-published versions stay browsable.
 name: Docs
 
 on:
@@ -36,6 +41,12 @@ jobs:
         uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
         with:
           environments: docs
+
+      # `mike deploy` builds the site itself, but its internal build is not strict:
+      # `zensical build` exits 0 even when a markdown-exec code block raises, which
+      # would publish tracebacks. Build once up front with --strict to fail fast.
+      - name: 🔍 Verify docs build
+        run: pixi run -e docs build_docs
 
       - name: Deploy docs
         env:

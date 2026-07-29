@@ -6,6 +6,14 @@ Tables are not part of the core OME-Zarr specification but can be used in ngio t
 
 We can list all available tables and load a specific table:
 
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:reopen_container"
+```
+
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:reopen_image"
+```
+
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:list_tables"
 ```
@@ -52,7 +60,10 @@ Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
 
 === "Features Table"
     Features tables are used to store measurements and are indexed by the label id
-    ```python exec="true" source="material-block" session="get_started"
+    ```python exec="true" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:table_helpers"
+    ```
+    ```python exec="true" html="1" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:feature_table"
     ```
 

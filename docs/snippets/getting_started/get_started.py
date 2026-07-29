@@ -41,6 +41,29 @@ def print_figure(fig: Figure) -> None:
 
 # --8<-- [end:plot_helpers]
 
+# --8<-- [start:table_helpers]
+import pandas as pd
+
+
+def print_table(df: pd.DataFrame) -> None:
+    """Print a DataFrame as HTML that the docs theme will style.
+
+    Markdown is not an option here: Zensical does not run block-level Markdown over
+    markdown-exec output, so a pipe table would stay literal text. The theme styles
+    only `table:not([class])` — and its JS only wraps such tables in a horizontal
+    scroll container — while pandas tags its output `class="dataframe"`, so the class
+    and the presentational border are stripped.
+    """
+    # A named index (here the label id) is real data, so promote it to a column: pandas
+    # otherwise renders it as a second, near-empty header row.
+    if df.index.name is not None:
+        df = df.reset_index()
+    html = df.to_html(index=False, border=0, float_format="{:.2f}".format)
+    print(html.replace(' class="dataframe"', ""))
+
+
+# --8<-- [end:table_helpers]
+
 # ---------------------------------------------------------------------------
 # 1. OME-Zarr Container
 # ---------------------------------------------------------------------------
@@ -59,6 +82,33 @@ image_path = hcs_path / "B" / "03" / "0"
 # Open the OME-Zarr container
 ome_zarr_container = open_ome_zarr_container(image_path)
 # --8<-- [end:setup]
+
+# Zensical gives every page its own markdown-exec session, so a page cannot see state
+# bound by an earlier page. The two sections below are included (hidden, no `source=`)
+# at the top of 2_images.md and 3_tables.md to re-bind what those pages need. They
+# print nothing, so they render as empty. `re_unzip=False` reuses the already-extracted
+# store rather than re-extracting it, which would race with the other pages.
+
+# --8<-- [start:reopen_container]
+from pathlib import Path
+
+from ngio import open_ome_zarr_container
+from ngio.utils import download_ome_zarr_dataset
+
+download_dir = Path("./data").absolute()
+hcs_path = download_ome_zarr_dataset(
+    "CardiomyocyteSmallMip", download_dir=download_dir, re_unzip=False
+)
+ome_zarr_container = open_ome_zarr_container(hcs_path / "B" / "03" / "0")
+# --8<-- [end:reopen_container]
+
+# --8<-- [start:reopen_image]
+from ngio import PixelSize
+
+image = ome_zarr_container.get_image(
+    pixel_size=PixelSize(x=0.60, y=0.60, z=1.0), strict=False
+)
+# --8<-- [end:reopen_image]
 
 # --8<-- [start:print_container]
 print(ome_zarr_container)
@@ -334,7 +384,7 @@ print_figure(fig)
 # Get a feature table
 feature_table = ome_zarr_container.get_table("regionprops_DAPI")
 # only show the first 5 rows
-print(feature_table.dataframe.head(5).to_markdown())
+print_table(feature_table.dataframe.head(5))
 # --8<-- [end:feature_table]
 
 # --8<-- [start:create_roi_table]
