@@ -2,9 +2,11 @@
 description: Explore an HCS plate, aggregate tables across images, and create a new plate.
 ---
 
-# HCS Plates
+# HCS exploration
 
-This is a minimal example of how to work with OME-Zarr Plates using `ngio`.
+Open an OME-Zarr plate with `ngio`, see what it contains, aggregate a table across every
+image in it, and write the result back to the plate. The last section creates a new empty
+plate from scratch.
 
 ## Show what's in the plate
 
@@ -28,7 +30,7 @@ This is a minimal example of how to work with OME-Zarr Plates using `ngio`.
 --8<-- "docs/snippets/tutorials/hcs_exploration.py:save_table"
 ```
 
-## Create a new empty Plate
+## Create a new empty plate
 
 ```python exec="true" source="material-block" session="hcs_exploration"
 --8<-- "docs/snippets/tutorials/hcs_exploration.py:create_plate"
@@ -36,5 +38,5 @@ This is a minimal example of how to work with OME-Zarr Plates using `ngio`.
 
 ## Next steps
 
-- [HCS Plates](../getting_started/5_hcs.md) — the plate API in depth.
+- [HCS plates](../getting_started/5_hcs.md) — the plate API in depth.
 - [HCS API reference](../api/hcs.md) — `OmeZarrPlate` and `OmeZarrWell`.

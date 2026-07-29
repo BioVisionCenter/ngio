@@ -2,15 +2,111 @@
 description: "The OME-Zarr container object: inspect and modify metadata, derive and create images, and open remote stores."
 ---
 
-# 1. OME-Zarr Container
+# 1. OME-Zarr containers
 
-Let's see how to open and explore an OME-Zarr image using `ngio`:
+**Open an OME-Zarr image and explore what it holds.**
+
+The `OME-Zarr Container` is your entry point to working with OME-Zarr images. It gives you
+high-level access to the metadata, images, labels and tables in a store.
+
+<!-- Figure 01 — the object model -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 412" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f1t f1d">
+  <title id="f1t">The objects inside an OME-Zarr container</title>
+  <desc id="f1d">An OmeZarrContainer branches into a multiscale image made of one Image per resolution level, a labels container holding named multiscale labels, and a tables container holding typed tables.</desc>
+
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5">
+    <path d="M192 204H208M208 68V340M208 68H216M208 204H216M208 340H216"></path>
+    <path d="M424 68H440M440 32V104M440 32H456M440 68H456M440 104H456"></path>
+    <path d="M424 204H440M440 168V240M440 168H456M440 204H456M440 240H456"></path>
+    <path d="M424 340H440M440 304V376M440 304H456M440 340H456M440 376H456"></path>
+  </g>
+
+  <rect x="8" y="176" width="184" height="56" rx="8" style="fill:var(--ngio-surface);stroke:var(--ngio-accent)" stroke-width="1.5"></rect>
+  <text x="24" y="200" style="font-family:'JetBrains Mono',monospace;font-size:12.5px;fill:var(--md-default-fg-color)">OmeZarrContainer</text>
+  <text x="24" y="219" style="font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;fill:var(--md-default-fg-color--light)">the store, opened</text>
+
+  <rect x="216" y="8" width="416" height="120" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+  <rect x="216" y="144" width="416" height="120" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+  <rect x="216" y="280" width="416" height="120" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">
+    <text x="232" y="28">IMAGE · PIXEL DATA</text>
+    <text x="232" y="164">LABELS · SEGMENTATIONS</text>
+    <text x="232" y="300">TABLES · MEASUREMENTS AND ROIS</text>
+  </g>
+
+  <rect x="232" y="36" width="184" height="64" rx="8" style="fill:var(--ngio-surface);stroke:var(--ngio-line-strong)"></rect>
+  <g style="fill:var(--ngio-blue)">
+    <rect x="246" y="55" width="10" height="7" rx="1.5"></rect>
+    <rect x="246" y="64" width="17" height="8" rx="1.5"></rect>
+    <rect x="246" y="74" width="26" height="8" rx="1.5"></rect>
+  </g>
+  <text x="286" y="64" style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">MultiscaleImage</text>
+  <text x="286" y="82" style="font-family:'IBM Plex Sans',sans-serif;font-size:11px;fill:var(--md-default-fg-color--light)">several resolutions</text>
+
+  <rect x="232" y="172" width="184" height="64" rx="8" style="fill:var(--ngio-surface);stroke:var(--ngio-line-strong)"></rect>
+  <rect x="246.5" y="194.5" width="25" height="19" rx="3" style="fill:var(--ngio-sunk);stroke:var(--ngio-line-strong)"></rect>
+  <ellipse cx="254" cy="200" rx="3.4" ry="3" style="fill:var(--ngio-green)"></ellipse>
+  <ellipse cx="264" cy="207" rx="4.2" ry="3.6" style="fill:var(--ngio-green)"></ellipse>
+  <ellipse cx="253" cy="209" rx="2.6" ry="2.2" style="fill:var(--ngio-green)"></ellipse>
+  <text x="286" y="200" style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">LabelsContainer</text>
+  <text x="286" y="218" style="font-family:'IBM Plex Sans',sans-serif;font-size:11px;fill:var(--md-default-fg-color--light)">masks, by name</text>
+
+  <rect x="232" y="308" width="184" height="64" rx="8" style="fill:var(--ngio-surface);stroke:var(--ngio-line-strong)"></rect>
+  <rect x="246.75" y="330.75" width="24.5" height="18.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
+  <path d="M246 337h26M255 330v20M264 330v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
+  <text x="286" y="336" style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">TablesContainer</text>
+  <text x="286" y="354" style="font-family:'IBM Plex Sans',sans-serif;font-size:11px;fill:var(--md-default-fg-color--light)">tables, by name</text>
+
+  <g style="fill:var(--ngio-surface);stroke:var(--ngio-line)">
+    <rect x="456" y="18" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="54" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="90" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="154" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="190" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="290" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="326" width="168" height="28" rx="6"></rect>
+    <rect x="456" y="362" width="168" height="28" rx="6"></rect>
+  </g>
+  <rect x="456" y="226" width="168" height="28" rx="6" fill="none" style="stroke:var(--ngio-line-strong)" stroke-dasharray="4 4"></rect>
+
+  <g style="fill:var(--ngio-blue)">
+    <rect x="470" y="27" width="10" height="10" rx="2"></rect>
+    <rect x="470" y="63" width="10" height="10" rx="2"></rect>
+    <rect x="470" y="99" width="10" height="10" rx="2"></rect>
+  </g>
+  <g style="fill:var(--ngio-green)">
+    <rect x="470" y="162" width="4" height="3" rx="1"></rect>
+    <rect x="470" y="166" width="7" height="3" rx="1"></rect>
+    <rect x="470" y="170" width="11" height="3" rx="1"></rect>
+    <rect x="470" y="198" width="4" height="3" rx="1"></rect>
+    <rect x="470" y="202" width="7" height="3" rx="1"></rect>
+    <rect x="470" y="206" width="11" height="3" rx="1"></rect>
+  </g>
+  <g style="fill:var(--ngio-magenta)">
+    <rect x="470" y="299" width="10" height="10" rx="2"></rect>
+    <rect x="470" y="335" width="10" height="10" rx="2"></rect>
+    <rect x="470" y="371" width="10" height="10" rx="2"></rect>
+  </g>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:11.5px;fill:var(--md-default-fg-color)">
+    <text x="490" y="36">Image · level 0</text>
+    <text x="490" y="72">Image · level 1</text>
+    <text x="490" y="108">Image · level 2 …</text>
+    <text x="490" y="172">Label · nuclei</text>
+    <text x="490" y="208">Label · cells</text>
+    <text x="490" y="308">RoiTable</text>
+    <text x="490" y="344">FeatureTable</text>
+    <text x="490" y="380">MaskingRoiTable</text>
+  </g>
+  <text x="470" y="244" style="font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;fill:var(--md-default-fg-color--light)">… any number of labels</text>
+        </svg>
+</div>
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:setup"
 ```
-
-The `OME-Zarr Container` is your entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:print_container"
@@ -22,9 +118,7 @@ The `OME-Zarr Container` will be the starting point for all your image processin
 
 ### What is the OME-Zarr container?
 
-The `OME-Zarr Container` in ngio is your entry point to working with OME-Zarr images.
-
-It provides:
+The `OME-Zarr Container` gives you:
 
 - **OME-Zarr overview**: get an overview of the OME-Zarr file, including the number of image levels, list of labels, and tables available.
 - **Image access**: get access to the images at different resolution levels and pixel sizes.
@@ -34,19 +128,19 @@ It provides:
 
 ### What is the OME-Zarr container not?
 
-The `OME-Zarr Container` object does not allow the user to interact with the image data directly. For that, we need to use the `Image`, `Label`, and `Table` objects.
+The `OME-Zarr Container` object does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
 
 ## OME-Zarr overview
 
-Examples of the OME-Zarr metadata access:
+Examples of accessing the OME-Zarr metadata:
 
-=== "Number of Resolution Levels"
+=== "Number of resolution levels"
     Show the number of resolution levels:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:levels"
     ```
 
-=== "Available Paths"
+=== "Available paths"
     Show the paths to all available resolution levels:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:level_paths"
@@ -62,7 +156,7 @@ Examples of the OME-Zarr metadata access:
     --8<-- "docs/snippets/getting_started/get_started.py:is_time_series"
     ```
 
-=== "Full Metadata Object"
+=== "Full metadata object"
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:metadata"
     ```
@@ -73,31 +167,31 @@ Examples of the OME-Zarr metadata access:
 
 ## Modifying metadata
 
-ngio provides methods to modify the image metadata, such as channel labels, colors, display windows, axes names, and units.
+ngio provides methods to modify the image metadata, such as channel labels, colours, display windows, axes names, and units.
 
 ### Channel metadata
 
-You can update channel labels, colors, and display windows:
+You can update channel labels, colours, and display windows:
 
-=== "Channel Labels"
+=== "Channel labels"
     Update the labels (names) of the channels:
     ```python
     >>> ome_zarr_container.set_channel_labels(["DAPI", "GFP", "RFP"])
     ```
 
-=== "Channel Colors"
-    Update the display colors of the channels (hex format):
+=== "Channel colours"
+    Update the display colours of the channels (hex format):
     ```python
     >>> ome_zarr_container.set_channel_colors(["0000FF", "00FF00", "FF0000"])
     ```
 
-=== "Channel Windows"
+=== "Channel windows"
     Update the display windows (start/end values) for each channel:
     ```python
     >>> ome_zarr_container.set_channel_windows([(0, 255), (0, 1000), (0, 500)])
     ```
 
-=== "Channel Windows from Percentiles"
+=== "Channel windows from percentiles"
     Automatically compute display windows based on data percentiles:
     ```python
     >>> ome_zarr_container.set_channel_windows_with_percentiles(percentiles=(0.1, 99.9))
@@ -107,13 +201,13 @@ You can update channel labels, colors, and display windows:
 
 You can update the axes names and units:
 
-=== "Axes Names"
+=== "Axes names"
     Rename the axes in the metadata:
     ```python
     >>> ome_zarr_container.set_axes_names(["t", "c", "z", "y", "x"])
     ```
 
-=== "Axes Units"
+=== "Axes units"
     Set the space and time units:
     ```python
     >>> ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
@@ -134,7 +228,7 @@ You can set the name of the image in the metadata:
 
 To access images, labels, and tables, you can use the `get_image`, `get_label`, and `get_table` methods of the `OME-Zarr Container` object.
 
-A variety of examples and additional information can be found in the [Images and Labels](./2_images.md), and [Tables](./3_tables.md) sections.
+A variety of examples and additional information can be found in the [Images and labels](./2_images.md), and [Tables](./3_tables.md) sections.
 
 ## Creating derived images
 
@@ -197,9 +291,9 @@ This will create an empty OME-Zarr image with the specified shape and pixel size
 ## Opening remote OME-Zarr containers
 
 You can use `ngio` to open remote OME-Zarr containers.
-For publicly available OME-Zarr containers, you can just use the `open_ome_zarr_container` function with a URL.
+For publicly available OME-Zarr containers, use the `open_ome_zarr_container` function with a URL.
 
-For example, to open a remote OME-Zarr container hosted on a github repository:
+For example, to open a remote OME-Zarr container hosted on a GitHub repository:
 
 ```python
 from ngio import open_ome_zarr_container
@@ -216,8 +310,8 @@ store = fractal_fsspec_store(url=url)
 ome_zarr_container = open_ome_zarr_container(store)
 ```
 
-For fractal users, the `fractal_fsspec_store` function can be used to open private OME-Zarr containers.
-In this case we need to provide a `fractal_token` to authenticate the user.
+For Fractal users, the `fractal_fsspec_store` function can be used to open private OME-Zarr containers.
+In this case you need to provide a `fractal_token` to authenticate.
 
 ```python
 from ngio import open_ome_zarr_container
@@ -229,5 +323,5 @@ ome_zarr_container = open_ome_zarr_container(store)
 
 ## Next steps
 
-- [Images and Labels](2_images.md) — read and write pixel data.
+- [Images and labels](2_images.md) — read and write pixel data.
 - [Tables](3_tables.md) — ROIs, features and measurements stored alongside the image.

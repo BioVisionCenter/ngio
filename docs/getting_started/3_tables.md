@@ -4,11 +4,15 @@ description: "Load and create ngio tables: ROI, masking ROI, feature and generic
 
 # 3. Tables
 
-Tables are not part of the core OME-Zarr specification but can be used in ngio to store measurements, features, regions of interest (ROIs), and other tabular data. ngio follows the [Fractal's Table Spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+**Keep ROIs, features and measurements alongside the image.**
+
+Tables are not part of the core OME-Zarr specification, but ngio uses them to store regions
+of interest (ROIs), per-object measurements and other tabular data next to the pixel data.
+The on-disk layout follows [Fractal's table spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
 
 ## Getting a table
 
-We can list all available tables and load a specific table:
+List all available tables and load a specific one:
 
 ```python exec="true" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:reopen_container"
@@ -24,9 +28,9 @@ We can list all available tables and load a specific table:
 
 ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_roi_table`, as well as untyped `generic_table`.
 
-=== "ROI Table"
+=== "ROI table"
     ROI tables can be used to store arbitrary regions of interest (ROIs) in the image.
-    Here for example we will load the `FOV_ROI_table` that contains the microscope field of view (FOV) ROIs:
+    For example, load the `FOV_ROI_table`, which contains the microscope field of view (FOV) ROIs:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:roi_table_get"
     ```
@@ -46,7 +50,7 @@ ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     --8<-- "docs/snippets/getting_started/get_started.py:plot_fov_roi_crop"
     ```
 
-=== "Masking ROI Table"
+=== "Masking ROI table"
     Masking ROIs are a special type of ROIs that can be used to store ROIs for masked objects in the image.
     The `nuclei_ROI_table` contains the masks for the `nuclei` label in the image, and is indexed by the label id.
     ```python exec="true" source="material-block" session="get_started"
@@ -60,10 +64,10 @@ ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     ```python exec="true" html="1" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:plot_masking_roi_crop"
     ```
-    See [4. Masked Images and Labels](./4_masked_images.md) for more details on how to use the masking ROIs to load masked data.
+    See [4. Masked images and labels](./4_masked_images.md) for more details on how to use the masking ROIs to load masked data.
 
-=== "Features Table"
-    Features tables are used to store measurements and are indexed by the label id
+=== "Feature table"
+    Feature tables are used to store measurements and are indexed by the label id
     ```python exec="true" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:table_helpers"
     ```
@@ -73,9 +77,9 @@ ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
 
 ## Creating a table
 
-Tables (differently from Images and Labels) can be purely in memory objects, and don't need to be saved on disk.
+Tables (unlike images and labels) can be purely in-memory objects, and don't need to be saved on disk.
 
-=== "Creating a ROI Table"
+=== "Creating a ROI table"
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:create_roi_table"
     ```
@@ -85,39 +89,37 @@ Tables (differently from Images and Labels) can be purely in memory objects, and
     ```
     The `build_image_roi_table` method will create a ROI table with a single ROI that covers the whole image.
     This table is not associated with the image and is purely in memory.
-    If we want to save it to disk, we can use the `add_table` method:
+    To save it to disk, use the `add_table` method:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:add_roi_table"
     ```
 
-=== "Creating a Masking ROI Table"
-    Similarly to the ROI table, we can create a masking ROI table on-the-fly:
-    Let's for example create a masking ROI table for the `nuclei` label:
+=== "Creating a masking ROI table"
+    As with the ROI table, you can create a masking ROI table on the fly, here for the `nuclei` label:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:build_masking_roi_table"
     ```
 
-=== "Creating a Feature Table"
+=== "Creating a feature table"
     Feature tables can be created from a pandas `Dataframe`:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:create_feature_table"
     ```
 
-=== "Creating a Generic Table"
+=== "Creating a generic table"
     Sometimes you might want to create a table that doesn't fit into the `ROI`, `Masking ROI`, or `Feature` categories.
     In this case, you can use the [`GenericTable`][ngio.tables.GenericTable] class, which allows you to store any tabular data.
     It can be created from a pandas `Dataframe`:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:create_generic_table"
     ```
-    Or from an "AnnData" object:
+    Or from an `AnnData` object:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:generic_table_from_anndata"
     ```
-    The `GenericTable` class allows you to store any tabular data, and is a flexible way to work with tables in ngio.
 
 ## Next steps
 
-- [Masked Images and Labels](4_masked_images.md) — use masking ROI tables to read per-object data.
-- [Table Specifications](../table_specs/overview.md) — the on-disk format behind these tables.
+- [Masked images and labels](4_masked_images.md) — use masking ROI tables to read per-object data.
+- [Table specifications](../table_specs/overview.md) — the on-disk format behind these tables.
 - [Tables API reference](../api/tables.md) — the table classes and backends.

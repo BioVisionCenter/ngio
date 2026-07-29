@@ -2,16 +2,15 @@
 description: How custom table types fit into the ngio table architecture, and what to use until the extension API is documented.
 ---
 
-# Add a Custom Table
+# Add a custom table
 
-ngio allows users to define custom tables that can be used to store any kind of tabular
-data. Custom tables are flexible and can be used to represent any kind of data that does
-not fit into the predefined table types.
+A custom table is a table type you define yourself, for data that does not fit any of the
+predefined types.
 
 !!! note "Extension API not yet documented"
 
     The mechanism for registering a custom table type is public but not yet documented in
-    full. Until it is, [Generic Tables](generic_table.md) are the supported way to store
+    full. Until it is, [generic tables](generic_table.md) are the supported way to store
     arbitrary tabular data — they accept any pandas `DataFrame` or `AnnData` object and
     round-trip through every [backend](../backend.md).
 
@@ -21,6 +20,6 @@ not fit into the predefined table types.
 
 ## See also
 
-- [Tables Overview](../overview.md) — the three-component table architecture.
-- [Generic Tables](generic_table.md) — the untyped fallback.
+- [Tables overview](../overview.md) — the three-component table architecture.
+- [Generic tables](generic_table.md) — the untyped fallback.
 - [Tables API reference](../../api/tables.md) — `TablesContainer` and the table classes.

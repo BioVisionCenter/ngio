@@ -1,4 +1,7 @@
-site_name: "NGIO: Next Generation File Format I/O"
+# Describes the library, not the format. The old value expanded NGFF ("next
+# generation file format"), which names OME-Zarr rather than ngio, and title-cased
+# a project that styles itself lowercase everywhere else.
+site_name: "ngio: OME-Zarr bioimage analysis for Python"
 # The published docs root (mike serves versions beneath it, e.g. /ngio/stable/).
 # This was previously the git clone URL, which produced wrong canonical links and, under
 # Zensical, a bogus /BioVisionCenter/ngio.git/ base path when serving locally.
@@ -170,37 +173,41 @@ markdown_extensions:
       toc_depth: 3
 
 
+# Nav labels are sentence case, like every other heading and title on the site.
+# Initialisms (OME-Zarr, HCS, ROI, API) keep their capitals; the common nouns
+# beside them do not. "Code of Conduct" is the exception: that is the proper
+# name of the Contributor Covenant document, not a description.
 nav:
   - Home: index.md
-  - Getting Started:
+  - Getting started:
     - "Quickstart": getting_started/0_quickstart.md
-    - "OME-Zarr Containers": getting_started/1_ome_zarr_containers.md
-    - "Images and Labels": getting_started/2_images.md
+    - "OME-Zarr containers": getting_started/1_ome_zarr_containers.md
+    - "Images and labels": getting_started/2_images.md
     - "Tables": getting_started/3_tables.md
-    - "Masked Images and Labels": getting_started/4_masked_images.md
-    - "HCS Plates": getting_started/5_hcs.md
+    - "Masked images and labels": getting_started/4_masked_images.md
+    - "HCS plates": getting_started/5_hcs.md
     - "Iterators": getting_started/6_iterators.md
     - "Configuration": getting_started/7_configuration.md
 
   - Tutorials:
-    - "Create an OME-Zarr": tutorials/create_ome_zarr.md
-    - "Image Processing": tutorials/image_processing.md
-    - "Image Segmentation": tutorials/image_segmentation.md
-    - "Feature Extraction": tutorials/feature_extraction.md
-    - "HCS Exploration": tutorials/hcs_exploration.md
+    - "Create an OME-Zarr image": tutorials/create_ome_zarr.md
+    - "Image processing": tutorials/image_processing.md
+    - "Image segmentation": tutorials/image_segmentation.md
+    - "Feature extraction": tutorials/feature_extraction.md
+    - "HCS exploration": tutorials/hcs_exploration.md
 
-  - Table Specifications:
+  - Table specifications:
     - "Overview": table_specs/overview.md
-    - "Table Backends": table_specs/backend.md
-    - "Table Types":
-      - "Generic Table": table_specs/table_types/generic_table.md
-      - "ROI Table": table_specs/table_types/roi_table.md
-      - "Masking ROI Table": table_specs/table_types/masking_roi_table.md
-      - "Feature Table": table_specs/table_types/feature_table.md
-      - "Condition Table": table_specs/table_types/condition_table.md
-      - "Add Custom Table": table_specs/table_types/custom_table.md
+    - "Table backends": table_specs/backend.md
+    - "Table types":
+      - "Generic table": table_specs/table_types/generic_table.md
+      - "ROI table": table_specs/table_types/roi_table.md
+      - "Masking ROI table": table_specs/table_types/masking_roi_table.md
+      - "Feature table": table_specs/table_types/feature_table.md
+      - "Condition table": table_specs/table_types/condition_table.md
+      - "Add a custom table": table_specs/table_types/custom_table.md
 
-  - API Reference:
+  - API reference:
     - "OmeZarrContainer": api/ome_zarr_container.md
     - "Images": api/images.md
     - "HCS": api/hcs.md
@@ -219,5 +226,5 @@ nav:
     - changelog.md
 
   - Contributing:
-    - "Contributing Guide": contributing.md
+    - "Contributing guide": contributing.md
     - "Code of Conduct": code_of_conduct.md

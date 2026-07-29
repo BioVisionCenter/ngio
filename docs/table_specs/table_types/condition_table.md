@@ -1,10 +1,14 @@
-# Condition Table
+---
+description: "Condition table: a flexible table type for experimental conditions and metadata."
+---
 
-A condition table is a simple table that can be used to represent experimental conditions or metadata associated with images or experiments. It is a flexible table type that can be used to store any kind of metadata related to the images or experiments.
+# Condition table
+
+A condition table represents experimental conditions or metadata associated with images or experiments. It is a flexible table type, so it can hold any kind of metadata about them.
 
 Example condition table:
 
-| Cell Type | Drug     | Dose |
+| Cell type | Drug     | Dose |
 |-----------|-----------|------|
 | A         | Drug A   | 10   |
 | A         | Drug B   | 20   |

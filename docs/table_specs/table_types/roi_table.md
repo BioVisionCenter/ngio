@@ -1,12 +1,16 @@
-# ROI Table
+---
+description: "ROI table: axis-aligned bounding boxes in the image space."
+---
 
-A ROI table defines regions of space which are axes-aligned bounding boxes in the image space.
+# ROI table
 
-ROI tables can be used for several purposes, such as:
+A ROI table defines regions of space which are axis-aligned bounding boxes in the image space.
 
-- Storing information about the Microscope Field of View (FOV).
+ROI tables serve several purposes, such as:
+
+- Storing information about the microscope field of view (FOV).
 - Storing arbitrary regions of interest (ROIs).
-- Use them as masks for other processes, such as segmentation or feature extraction.
+- Acting as masks for other processes, such as segmentation or feature extraction.
 
 ## Specifications
 
@@ -37,4 +41,4 @@ Additionally, each ROI can include the following optional columns:
 - `x_micrometer_original`, `y_micrometer_original` and `z_micrometer_original` which are the original coordinates of the ROI in micrometers. These are typically used when the data is saved in different coordinates during conversion, e.g. to avoid overwriting data from overlapping ROIs.
 - `translation_x`, `translation_y` and `translation_z`, which are used during registration of multiplexing acquisitions.
 
-The user can also add additional columns to the ROI table, but these columns will not be exposed in the ROI table API.
+You can add further columns to the ROI table, but they are not exposed in the ROI table API.

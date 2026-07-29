@@ -1,6 +1,10 @@
-# Feature Tables
+---
+description: "Feature table: per-object measurements tied to a label image."
+---
 
-A feature table is a table type for representing per object features in an image. Each row in a feature table corresponds to a specific label in the label image.
+# Feature tables
+
+A feature table is a table type for representing per-object features in an image. Each row in a feature table corresponds to a specific label in the label image.
 
 Feature tables can optionally include metadata to specify the type of features stored in each column:
 
@@ -8,7 +12,7 @@ Feature tables can optionally include metadata to specify the type of features s
 - `categorical`: A categorical feature of the object, such as a classification label or a type.
 - `metadata`: Additional free-form columns that can be used to store any other information about the object, but that should not be used for analysis/classification purposes.
 
-These feature types inform casting of the values when serialising a table and can be used in downstream analysis to select specific subsets of features. The feature type can be explicitly specified in the feature table metadata. Alternatively, if a column is not specified, we apply the following casting rules:
+These feature types inform casting of the values when serialising a table and can be used in downstream analysis to select specific subsets of features. The feature type can be explicitly specified in the feature table metadata. Alternatively, if a column is not specified, ngio applies the following casting rules:
 
 - If the column contains only numeric values, it is considered a `measurement`.
 - If the column contains string or boolean values, it is considered a `categorical`.

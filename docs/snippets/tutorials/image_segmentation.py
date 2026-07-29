@@ -28,11 +28,42 @@ def random_label_cmap(n_labels: int = 1000, seed: int = 0) -> ListedColormap:
 
 
 def print_figure(fig: Figure) -> None:
-    """Print a figure as inline SVG, for markdown-exec `html` blocks."""
+    """Print a figure as inline SVG, for markdown-exec `html` blocks.
+
+    Recolours every bit of chrome to one sentinel, then swaps that sentinel for
+    a theme variable in the emitted markup. The figure therefore follows the
+    light/dark toggle rather than baking black text on white into the page.
+    This only works because the SVG is inline: an `<img src>` would be a
+    separate document and would not see the site's custom properties.
+
+    The `.ngio-figure` wrapper is what the stylesheet keys on to strip the
+    `OUT` terminal-output treatment that `.result` applies by default.
+    """
+    ink = "#5b6569"
+    for ax in fig.axes:
+        ax.tick_params(colors=ink, which="both")
+        for spine in ax.spines.values():
+            spine.set_edgecolor(ink)
+        for text in (ax.title, ax.xaxis.label, ax.yaxis.label):
+            text.set_color(ink)
+        for label in ax.get_xticklabels() + ax.get_yticklabels():
+            label.set_color(ink)
+        if ax.get_legend() is not None:
+            for text in ax.get_legend().get_texts():
+                text.set_color(ink)
+    for text in fig.texts:
+        text.set_color(ink)
+
     buffer = StringIO()
-    fig.savefig(buffer, format="svg")
+    fig.savefig(buffer, format="svg", transparent=True)
     plt.close(fig)
-    print(buffer.getvalue())
+
+    # Drop matplotlib's XML declaration and DOCTYPE — they are meaningless
+    # inside an HTML body, and the figure is being embedded, not served.
+    svg = buffer.getvalue()
+    svg = svg[svg.index("<svg") :]
+    svg = svg.replace(ink, "var(--md-default-fg-color--light)")
+    print(f'<div class="ngio-figure">{svg}</div>')
 
 
 # --8<-- [end:plot_helpers]

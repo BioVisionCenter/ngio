@@ -2,11 +2,13 @@
 description: Extract regionprops features and store them as an ngio feature table.
 ---
 
-# Feature Extraction
+# Feature extraction
 
-This tutorial covers extracting regionprops features from an image with `ngio` and `skimage`, and writing them back as a table in the OME-Zarr container. Moreover we will also write the features to a table in the ome-zarr container.
+Measure regionprops features from a segmented image with `ngio` and `skimage`, and write
+them back as a feature table in the OME-Zarr container. By the end the container holds a
+table with one row per label, ready to be read back or aggregated across a plate.
 
-## Step 1: Open the OME-Zarr Container
+## Step 1: open the OME-Zarr container
 
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:extract_features"
@@ -16,19 +18,19 @@ This tutorial covers extracting regionprops features from an image with `ngio` a
 --8<-- "docs/snippets/tutorials/feature_extraction.py:open_container"
 ```
 
-## Step 2: Setup the inputs
+## Step 2: set up the inputs
 
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:setup_transform"
 ```
 
-## Step 3: Use the FeatureExtractorIterator to create a feature table
+## Step 3: use the FeatureExtractorIterator to create a feature table
 
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:extract"
 ```
 
-### Sanity Check: Read the Table back
+### Sanity check: read the table back
 
 ```python exec="true" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:table_helpers"
@@ -40,5 +42,5 @@ This tutorial covers extracting regionprops features from an image with `ngio` a
 
 ## Next steps
 
-- [HCS Exploration](hcs_exploration.md) — aggregate feature tables across a plate.
-- [Table Specifications](../table_specs/overview.md) — how feature tables are stored.
+- [HCS exploration](hcs_exploration.md) — aggregate feature tables across a plate.
+- [Table specifications](../table_specs/overview.md) — how feature tables are stored.

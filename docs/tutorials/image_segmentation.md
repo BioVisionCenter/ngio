@@ -2,13 +2,15 @@
 description: Segment an OME-Zarr image per field of view, then repeat within a mask.
 ---
 
-# Image Segmentation
+# Image segmentation
 
-This is a minimal tutorial on how to use ngio for image segmentation.
+Segment an OME-Zarr image with `ngio` and `skimage`, one field of view at a time, and
+write the result back as a label. The second half repeats the segmentation inside a mask,
+so it only runs where you want it to.
 
-## Step 1: Setup
+## Step 1: set up
 
-We will first implement a very simple function to segment an image. We will use skimage to do this.
+Start with a function that segments an image, using `skimage` to do the work.
 
 ```python exec="true" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:plot_helpers"
@@ -18,15 +20,15 @@ We will first implement a very simple function to segment an image. We will use 
 --8<-- "docs/snippets/tutorials/image_segmentation.py:segmentation_fn"
 ```
 
-## Step 2: Open the OME-Zarr container
+## Step 2: open the OME-Zarr container
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:open_container"
 ```
 
-## Step 3: Segment the image
+## Step 3: segment the image
 
-For this example, we will not segment the image all at once. Instead we will iterate over the image FOVs and segment them one by one.
+Rather than segmenting the image all at once, iterate over its FOVs and segment them one by one.
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:segment"
@@ -38,11 +40,11 @@ For this example, we will not segment the image all at once. Instead we will ite
 --8<-- "docs/snippets/tutorials/image_segmentation.py:plot_segmentation"
 ```
 
-## Step 4: Masked image segmentation
+## Step 4: masked image segmentation
 
-In this example we will use a mask to restrict the segmentation to certain areas of the image.
-In this case we will create a simple mask for illustration purposes, but in a real case scenario the mask could come
-from another segmentation mask.
+Now use a mask to restrict the segmentation to certain areas of the image. Here you create
+the mask by hand for illustration, but in a real pipeline it would usually come from
+another segmentation.
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:create_mask"
@@ -65,5 +67,5 @@ the masked image rather than the original one.
 
 ## Next steps
 
-- [Feature Extraction](feature_extraction.md) — measure the objects you just segmented.
-- [Masked Images and Labels](../getting_started/4_masked_images.md) — read data object-by-object.
+- [Feature extraction](feature_extraction.md) — measure the objects you just segmented.
+- [Masked images and labels](../getting_started/4_masked_images.md) — read data object-by-object.

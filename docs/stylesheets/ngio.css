@@ -19,10 +19,30 @@
   --md-text-font: "IBM Plex Sans";
   --md-code-font: "JetBrains Mono";
   --ngio-display-font: "Space Grotesk", "IBM Plex Sans", sans-serif;
+
+  /* Motion. Short and understated — a card lifts 2px on hover and that is the
+     extent of it. Routed through a variable so the reduce block below can
+     neutralise every transition in one place. */
+  --ngio-duration: 180ms;
+  --ngio-ease: cubic-bezier(0.2, 0, 0.2, 1);
+
+  /* Measure. Body copy is capped narrow on purpose; at these widths ragged
+     last lines show, hence `text-wrap: pretty` wherever prose runs. */
+  --ngio-measure-lede: 42ch;
+  --ngio-measure-prose: 66ch;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ngio-duration: 1ms;
+  }
 }
 
 /* ── 2. Palette ─────────────────────────────────────────────────────────────
-   These are Zensical's own variable names (see assets/stylesheets/*/palette.css).
+   These are Zensical's own variable names (see its palette.css, per scheme).
+   NB: do not write that path with a glob — the `*` followed by `/` closes this
+   comment early, and everything after it becomes a garbage selector that eats
+   the whole light-scheme block below. That is exactly what used to happen.
    Overriding them re-colours the whole site — header, nav, links, admonitions,
    footer, search — without any selector surgery. */
 
@@ -79,15 +99,28 @@
   --md-code-hl-operator-color: #5b6569;
   --md-code-hl-punctuation-color: #5b6569;
 
-  --md-footer-bg-color: #f9fafa;
-  --md-footer-bg-color--dark: #eff1f1;
-
   --ngio-line: #e3e6e6;
   --ngio-line-strong: #cfd4d4;
   --ngio-surface: #ffffff;
   --ngio-sunk: #eff1f1;
   --ngio-on-accent: #ffffff;
   --ngio-accent-fill: var(--ngio-accent-ink);
+
+  /* Chrome — the header, the tabs and the footer meta bar. It is deliberately
+     NOT the page colour: content is paper, chrome is a different level, and the
+     page is framed by the same tone top and bottom.
+     Light sinks below the page; dark lifts above it. See the slate block. */
+  --ngio-chrome: var(--ngio-sunk);
+  --ngio-chrome-field: var(--ngio-surface); /* search pill, inverted vs chrome */
+
+  /* Aliases for parity with the design system's portable token file. Nothing
+     here uses them; they exist so a stylesheet written against those names
+     resolves instead of computing to the guaranteed-invalid value — a missing
+     --ngio-code-bg silently blanked a search field during the header work. */
+  --ngio-paper: var(--md-default-bg-color);
+  --ngio-ink: var(--md-default-fg-color);
+  --ngio-faint: var(--md-default-fg-color--light);
+  --ngio-code-bg: var(--md-code-bg-color);
 }
 
 [data-md-color-scheme="slate"] {
@@ -136,15 +169,25 @@
   --md-code-hl-operator-color: #808d90;
   --md-code-hl-punctuation-color: #808d90;
 
-  --md-footer-bg-color: #0b1113;
-  --md-footer-bg-color--dark: #0f1618;
-
   --ngio-line: #1d272a;
   --ngio-line-strong: #2a3639;
   --ngio-surface: #131b1e;
   --ngio-sunk: #0f1618;
   --ngio-on-accent: #06211e;
   --ngio-accent-fill: var(--ngio-accent);
+
+  /* Chrome inverts here, and the reason is magnitude rather than direction:
+     --ngio-sunk (#0f1618) sits only four or five RGB steps off the page
+     (#0b1113), which is not a visible level change, whereas --ngio-surface
+     (#131b1e) is. Note sunk is *lighter* than the page in this scheme — the
+     rule is "chrome is a different level", not "chrome is darker". */
+  --ngio-chrome: var(--ngio-surface);
+  --ngio-chrome-field: var(--ngio-sunk);
+
+  --ngio-paper: var(--md-default-bg-color);
+  --ngio-ink: var(--md-default-fg-color);
+  --ngio-faint: var(--md-default-fg-color--light);
+  --ngio-code-bg: var(--md-code-bg-color);
 }
 
 /* ── 3. Display type ─────────────────────────────────────────────────────── */
@@ -156,6 +199,12 @@
 .md-nav__title {
   font-family: var(--ngio-display-font);
   letter-spacing: -0.022em;
+}
+
+/* The header title is the wordmark, not a heading — it takes the wordmark's
+   own tracking, which is tighter than the heading scale's. */
+.md-header__title {
+  letter-spacing: -0.025em;
 }
 
 .md-typeset h1 {
@@ -186,7 +235,7 @@
   font-size: 1.1rem;
   line-height: 1.5;
   color: var(--md-default-fg-color);
-  max-width: 42ch;
+  max-width: var(--ngio-measure-lede);
   text-wrap: pretty;
 }
 
@@ -195,12 +244,24 @@
   text-wrap: pretty;
 }
 
-/* ── 4. Header and tabs ──────────────────────────────────────────────────── */
+/* Prose runs to a narrow measure. Scoped to top-level paragraphs so it does
+   not squeeze copy that is already inside a constrained box — cards, table
+   cells, admonitions — or push figures and tables off their own width. */
+.md-typeset > p {
+  max-width: var(--ngio-measure-prose);
+}
+
+/* ── 4. Header and tabs ──────────────────────────────────────────────────────
+   Chrome sits on its own level, not on the page colour. The step between the
+   two surfaces is small by design (about 1.08:1), so the edge is carrying most
+   of the separation — which is why it takes --ngio-line-strong rather than the
+   hairline. `box-shadow: none` is load-bearing: it defeats the theme's
+   .md-header--shadow, and this system has exactly one shadow, on card hover. */
 .md-header {
-  background: var(--md-default-bg-color);
+  background: var(--ngio-chrome);
   color: var(--md-default-fg-color);
   box-shadow: none;
-  border-bottom: 1px solid var(--ngio-line);
+  border-bottom: 1px solid var(--ngio-line-strong);
 }
 
 .md-header__button.md-logo :is(img, svg) {
@@ -208,10 +269,60 @@
   width: 1.5rem;
 }
 
+/* ── The header wordmark ──────────────────────────────────────────────────
+   Zensical renders `site_name` as the header title, which is the descriptive
+   string we want in <title> and in search results but not in the lockup. The
+   lockup is the wordmark: lowercase `ngio` with an accent `i`.
+
+   That needs three separately-coloured pieces out of one text node, and the
+   only ways to get markup are a `custom_dir` override — which means vendoring
+   a 69-line generated partial against an unpinned pre-1.0 dependency — or
+   pseudo-elements. `.md-header__topic` is a flex container and `.md-ellipsis`
+   a flex item, so between them they give four ordered slots; three is enough.
+
+   The site name is collapsed with `font-size: 0` rather than hidden, because
+   `visibility: hidden` and `opacity: 0` both keep the string's full width and
+   push the trailing `o` to the far end of the flex line. Zeroing the size also
+   keeps the name in the accessibility tree, so screen readers still get the
+   real site name; the cost is that the decorative `ngio` may be announced
+   alongside it, which is the lesser of the two problems.
+
+   Scoped to :first-child on purpose. The second .md-header__topic is the page
+   title that slides in on scroll; restyling it breaks the scrolled state. */
+.md-header__topic:first-child .md-ellipsis {
+  font-size: 0;
+  flex-grow: 0;
+}
+
+.md-header__topic:first-child .md-ellipsis::before,
+.md-header__topic:first-child .md-ellipsis::after,
+.md-header__topic:first-child::before {
+  font-family: var(--ngio-display-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  color: var(--md-default-fg-color);
+}
+
+.md-header__topic:first-child::before {
+  content: "ng";
+}
+
+.md-header__topic:first-child .md-ellipsis::before {
+  content: "i";
+  /* --ngio-accent-fill already switches per scheme: the darkened ink in light,
+     the raw accent in dark. Using it keeps the `i` legible in both. */
+  color: var(--ngio-accent-fill);
+}
+
+.md-header__topic:first-child .md-ellipsis::after {
+  content: "o";
+}
+
 .md-tabs {
-  background: var(--md-default-bg-color);
+  background: var(--ngio-chrome);
   color: var(--md-default-fg-color--light);
-  border-bottom: 1px solid var(--ngio-line);
+  border-bottom: 1px solid var(--ngio-line-strong);
 }
 
 .md-tabs__link {
@@ -221,9 +332,19 @@
   color: var(--md-default-fg-color--light);
 }
 
+/* The active tab's 2px underline sits on the chrome/content boundary, so the
+   edge is doing navigation work rather than just being a line. */
 .md-tabs__item--active .md-tabs__link {
   color: var(--md-default-fg-color);
   box-shadow: inset 0 -2px 0 var(--md-primary-fg-color);
+}
+
+/* Zensical draws its own `border-bottom: .05rem solid var(--md-default-fg-color)`
+   on the active tab, which stacks under the inset above — two underlines, the
+   lower one near-black in light and near-white in dark. The box-shadow is the
+   underline here. */
+.md-tabs__item--active {
+  border-bottom: 0;
 }
 
 /* ── 5. Sidebar ──────────────────────────────────────────────────────────── */
@@ -236,8 +357,7 @@
   padding: 0.3rem 0.6rem;
 }
 
-.md-nav__link--active,
-.md-nav__link[data-md-state="blur"]:hover {
+.md-nav__link--active {
   background: var(--ngio-accent-soft);
   color: var(--md-accent-fg-color);
 }
@@ -308,6 +428,57 @@
   color: var(--md-default-fg-color--light);
 }
 
+/* A rendered figure is not terminal output, even though markdown-exec delivers
+   it through the same `.result` wrapper. Strip the terminal treatment back off
+   when the wrapper holds a figure, so the image reads as an image.
+   Where :has() is unsupported the figure simply keeps the OUT label — the old
+   behaviour, and the reason this is written as a subtraction. */
+.md-typeset .result:has(> .ngio-figure) {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  padding: 0;
+}
+
+.md-typeset .result:has(> .ngio-figure)::before {
+  content: none;
+}
+
+/* The SVG carries its own intrinsic size from matplotlib; cap it to the column
+   and let it scale down on narrow viewports. */
+.md-typeset .ngio-figure svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ── 6b. Diagrams ────────────────────────────────────────────────────────────
+   The explanatory diagrams are authored as inline SVG in the Markdown rather
+   than as files in docs/assets/. That is deliberate: an `<img src>` is a
+   separate document and cannot see these custom properties, so it would need
+   two files and would still not follow the palette toggle. Inline, the shapes
+   reference --ngio-blue / --ngio-green / --ngio-magenta and re-colour with the
+   scheme for free.
+
+   The semantic mapping is load-bearing and consistent across all six figures:
+   blue = image data, green = labels, magenta = tables and ROIs, teal = ngio
+   itself. A greyscale cell field on a dark ground means real pixel data — that
+   field is deliberately fixed rather than tokenised, because a micrograph does
+   not invert with the site theme.
+
+   The figures set their own type inline, so there are no text rules here; only
+   the margin and the width, which the SVGs depend on since they carry a
+   viewBox and no intrinsic size. */
+.md-typeset .ngio-diagram {
+  margin: 1.6em 0;
+}
+
+.md-typeset .ngio-diagram svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 /* ── 7. Content tabs (pip / mamba / source) ──────────────────────────────── */
 .md-typeset .tabbed-set > .tabbed-labels {
   box-shadow: none;
@@ -331,17 +502,27 @@
   background: var(--ngio-surface);
   padding: 1.1rem;
   transition:
-    border-color 180ms,
-    box-shadow 180ms,
-    transform 180ms;
+    border-color var(--ngio-duration) var(--ngio-ease),
+    box-shadow var(--ngio-duration) var(--ngio-ease),
+    transform var(--ngio-duration) var(--ngio-ease);
 }
 
+/* The one shadow in the system, and the only place elevation appears. */
 .md-typeset .grid.cards > ul > li:hover {
   border-color: var(--md-primary-fg-color);
   box-shadow:
     0 1px 2px rgb(16 22 25 / 5%),
     0 8px 24px -12px rgb(16 22 25 / 16%);
   transform: translateY(-2px);
+}
+
+/* Shortening the duration is not enough — an instant 2px jump is exactly the
+   movement the preference asks us not to make. The border and shadow still
+   change, so the card is still legibly hovered. */
+@media (prefers-reduced-motion: reduce) {
+  .md-typeset .grid.cards > ul > li:hover {
+    transform: none;
+  }
 }
 
 .md-typeset .grid.cards > ul > li > hr {
@@ -359,9 +540,20 @@
   fill: var(--md-primary-fg-color);
 }
 
-/* ── 9. Admonitions ──────────────────────────────────────────────────────── */
-.md-typeset .admonition,
-.md-typeset details {
+/* ── 9. Admonitions ──────────────────────────────────────────────────────────
+   Admonitions are deliberately NOT colour-coded by severity: every kind gets
+   the same accent left border. If something is dangerous, the title says so.
+
+   The doubled [class] is load-bearing, not a typo. Zensical colours each type
+   with `.md-typeset .admonition.note` (0,3,0) and
+   `.md-typeset .note > .admonition-title::before` (0,3,1), both of which
+   outrank a plain `.md-typeset .admonition` (0,2,0) no matter what order the
+   files load in. Without the bump the translucent blue tint and blue icon
+   survive — which also breaks the "no transparency anywhere" rule. Repeating
+   the attribute selector clears their specificity for every type at once,
+   instead of enumerating a dozen type classes that Zensical may add to. */
+.md-typeset .admonition[class][class],
+.md-typeset details[class][class] {
   border: 1px solid var(--ngio-line);
   border-left: 3px solid var(--md-primary-fg-color);
   border-radius: 0 10px 10px 0;
@@ -377,9 +569,16 @@
   background: transparent;
 }
 
-.md-typeset .admonition-title::before,
-.md-typeset summary::before {
+.md-typeset [class][class] > .admonition-title::before,
+.md-typeset [class][class] > summary::before {
   background-color: var(--md-primary-fg-color);
+}
+
+/* ::after is the disclosure chevron on a collapsible `details`, and Zensical
+   colours it per type as well. */
+.md-typeset [class][class] > .admonition-title::after,
+.md-typeset [class][class] > summary::after {
+  color: var(--md-primary-fg-color);
 }
 
 /* ── 10. mkdocstrings API reference ──────────────────────────────────────── */
@@ -420,13 +619,15 @@
   text-decoration: none;
 }
 
-/* ── 12. Footer ──────────────────────────────────────────────────────────── */
+/* ── 12. Footer ──────────────────────────────────────────────────────────────
+   The meta bar takes the same chrome tone as the header, which is what closes
+   the frame: chrome top and bottom, paper between. Matching edge weight too. */
 .md-footer {
-  border-top: 1px solid var(--ngio-line);
+  border-top: 1px solid var(--ngio-line-strong);
 }
 
 .md-footer-meta {
-  background: var(--md-footer-bg-color);
+  background: var(--ngio-chrome);
   color: var(--md-default-fg-color--light);
 }
 
@@ -450,11 +651,25 @@
   color: var(--md-default-fg-color--light);
 }
 
-/* ── 13. Search button ───────────────────────────────────────────────────── */
+/* ── 13. Search button ───────────────────────────────────────────────────────
+   The field is inverted against the chrome it sits on — surface on a sunk bar
+   in light, sunk on a lifted bar in dark — so it reads as something you can
+   type into rather than as a hole in the header. Zensical's modern theme
+   renders this control as a <button>; it emits no .md-search__form/__input. */
 .md-search__button {
   border: 1px solid var(--ngio-line-strong);
   border-radius: 8px;
-  background: var(--ngio-surface);
+  background: var(--ngio-chrome-field);
   color: var(--md-default-fg-color--light);
   font-size: 0.7rem;
+}
+
+/* Not optional. Zensical's own :hover is (0,2,0) and beats the rule above
+   whatever the source order, flipping the pill to a mid-grey slab. Match its
+   specificity to keep the field a field; the accent border is the hover cue. */
+.md-search__button:hover,
+.md-search__button:focus {
+  background: var(--ngio-chrome-field);
+  border-color: var(--ngio-accent);
+  color: var(--md-default-fg-color);
 }

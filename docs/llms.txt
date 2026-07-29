@@ -12,36 +12,36 @@ reach images and labels (`get_image`, `get_label`), tables (`get_table`), masked
 (`get_masked_image`) and, for plates, `open_ome_zarr_plate`. Every code example in these
 docs is executed when the site is built, so the outputs shown are real.
 
-## Getting Started
+## Getting started
 
 - [Quickstart](https://biovisioncenter.github.io/ngio/stable/getting_started/0_quickstart/): Installation and opening your first OME-Zarr container.
-- [OME-Zarr Containers](https://biovisioncenter.github.io/ngio/stable/getting_started/1_ome_zarr_containers/): The container object, metadata inspection and modification, deriving and creating images, and remote stores.
-- [Images and Labels](https://biovisioncenter.github.io/ngio/stable/getting_started/2_images/): Selecting resolution levels by path or pixel size, reading as numpy or dask, slicing, writing with set_array and consolidate, and working with labels.
+- [OME-Zarr containers](https://biovisioncenter.github.io/ngio/stable/getting_started/1_ome_zarr_containers/): The container object, metadata inspection and modification, deriving and creating images, and remote stores.
+- [Images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/2_images/): Selecting resolution levels by path or pixel size, reading as numpy or dask, slicing, writing with set_array and consolidate, and working with labels.
 - [Tables](https://biovisioncenter.github.io/ngio/stable/getting_started/3_tables/): Listing and loading ROI, masking ROI and feature tables, and creating new tables in memory or on disk.
-- [Masked Images and Labels](https://biovisioncenter.github.io/ngio/stable/getting_started/4_masked_images/): Label-indexed access to image regions, zoom_factor, and masked read/write operations.
-- [HCS Plates](https://biovisioncenter.github.io/ngio/stable/getting_started/5_hcs/): Plate structure, rows, columns and acquisitions, retrieving images, and creating plates.
+- [Masked images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/4_masked_images/): Label-indexed access to image regions, zoom_factor, and masked read/write operations.
+- [HCS plates](https://biovisioncenter.github.io/ngio/stable/getting_started/5_hcs/): Plate structure, rows, columns and acquisitions, retrieving images, and creating plates.
 - [Iterators](https://biovisioncenter.github.io/ngio/stable/getting_started/6_iterators/): The four iterators for building scalable processing pipelines.
 - [Configuration](https://biovisioncenter.github.io/ngio/stable/getting_started/7_configuration/): The ngio config file and the io_retry policy.
 
 ## Tutorials
 
-- [Create an OME-Zarr](https://biovisioncenter.github.io/ngio/stable/tutorials/create_ome_zarr/): Convert a numpy array to OME-Zarr and add a ROI table.
-- [Image Processing](https://biovisioncenter.github.io/ngio/stable/tutorials/image_processing/): Gaussian blur applied eagerly, lazily with dask, and via an iterator.
-- [Image Segmentation](https://biovisioncenter.github.io/ngio/stable/tutorials/image_segmentation/): Otsu segmentation per field of view, and masked segmentation.
-- [Feature Extraction](https://biovisioncenter.github.io/ngio/stable/tutorials/feature_extraction/): regionprops features written back as a feature table.
-- [HCS Exploration](https://biovisioncenter.github.io/ngio/stable/tutorials/hcs_exploration/): Aggregating tables across a plate and creating an empty plate.
+- [Create an OME-Zarr image](https://biovisioncenter.github.io/ngio/stable/tutorials/create_ome_zarr/): Convert a numpy array to OME-Zarr and add a ROI table.
+- [Image processing](https://biovisioncenter.github.io/ngio/stable/tutorials/image_processing/): Gaussian blur applied eagerly, lazily with dask, and via an iterator.
+- [Image segmentation](https://biovisioncenter.github.io/ngio/stable/tutorials/image_segmentation/): Otsu segmentation per field of view, and masked segmentation.
+- [Feature extraction](https://biovisioncenter.github.io/ngio/stable/tutorials/feature_extraction/): regionprops features written back as a feature table.
+- [HCS exploration](https://biovisioncenter.github.io/ngio/stable/tutorials/hcs_exploration/): Aggregating tables across a plate and creating an empty plate.
 
-## Table Specifications
+## Table specifications
 
 - [Overview](https://biovisioncenter.github.io/ngio/stable/table_specs/overview/): The table architecture — backends, in-memory objects and type specs — and the on-disk group layout.
-- [Table Backends](https://biovisioncenter.github.io/ngio/stable/table_specs/backend/): The anndata, parquet, csv and json backends and their metadata.
-- [ROI Table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/roi_table/): Required and optional columns for ROI tables.
-- [Masking ROI Table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/masking_roi_table/): ROI tables indexed by label id.
-- [Feature Table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/feature_table/): Measurement tables indexed by label id.
-- [Condition Table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/condition_table/): Experimental condition metadata.
-- [Generic Table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/generic_table/): Untyped fallback tables.
+- [Table backends](https://biovisioncenter.github.io/ngio/stable/table_specs/backend/): The anndata, parquet, csv and json backends and their metadata.
+- [ROI table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/roi_table/): Required and optional columns for ROI tables.
+- [Masking ROI table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/masking_roi_table/): ROI tables indexed by label id.
+- [Feature table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/feature_table/): Measurement tables indexed by label id.
+- [Condition table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/condition_table/): Experimental condition metadata.
+- [Generic table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/generic_table/): Untyped fallback tables.
 
-## API Reference
+## API reference
 
 - [OmeZarrContainer](https://biovisioncenter.github.io/ngio/stable/api/ome_zarr_container/): open_ome_zarr_container, create_empty_ome_zarr, create_ome_zarr_from_array.
 - [Images](https://biovisioncenter.github.io/ngio/stable/api/images/): Image and Label objects and their accessors.

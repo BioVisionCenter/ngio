@@ -50,7 +50,7 @@ what actually runs.
 
 <div class="grid cards" markdown>
 
--   :material-rocket-launch:{ .lg .middle } **Getting Started**
+-   :material-rocket-launch:{ .lg .middle } **Getting started**
 
     ---
 
@@ -68,7 +68,7 @@ what actually runs.
 
     [:octicons-arrow-right-24: Browse tutorials](tutorials/create_ome_zarr.md)
 
--   :material-table:{ .lg .middle } **Table Specifications**
+-   :material-table:{ .lg .middle } **Table specifications**
 
     ---
 
@@ -77,7 +77,7 @@ what actually runs.
 
     [:octicons-arrow-right-24: Read the spec](table_specs/overview.md)
 
--   :material-api:{ .lg .middle } **API Reference**
+-   :material-api:{ .lg .middle } **API reference**
 
     ---
 
@@ -90,9 +90,9 @@ what actually runs.
 
 ## Key features
 
-- **Simple object-based API** — open, explore and manipulate OME-Zarr images and HCS
+- **Object-based API** — open, explore and manipulate OME-Zarr images and HCS
   plates; derive new images and labels with minimal boilerplate.
-- **Rich tables and ROI support** — tight integration with [tabular
+- **Tables and ROIs** — tight integration with [tabular
   data](table_specs/overview.md), extensible table schemas, and measurements stored
   alongside the image.
 - **Scalable processing** — iterators for building pipelines that generalise from a

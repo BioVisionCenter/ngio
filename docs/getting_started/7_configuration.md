@@ -4,11 +4,11 @@ description: Configure ngio via ngio_config.json, including the io_retry policy.
 
 # Configuration
 
-ngio has a small global configuration object that controls cross-cutting IO behavior. It is loaded once at import time from a JSON file and is accessible programmatically.
+ngio has a small global configuration object that controls cross-cutting IO behaviour. It is loaded once at import time from a JSON file and is accessible programmatically.
 
 ## The config file
 
-By default ngio looks for `~/.ngio/ngio_config.json`. You can point it somewhere else with the `NGIO_CONFIG_PATH` environment variable. Only `.json` files are supported. A missing file simply means all defaults.
+By default ngio looks for `~/.ngio/ngio_config.json`. You can point it somewhere else with the `NGIO_CONFIG_PATH` environment variable. Only `.json` files are supported. A missing file means all defaults.
 
 ```json
 {

@@ -1,8 +1,12 @@
-# Generic Tables
+---
+description: "Generic table: the untyped table for arbitrary tabular data."
+---
 
-A generic table is a flexible table type that can represent any tabular data. It is not tied to any specific domain or use case, making it suitable for a wide range of custom applications.
+# Generic tables
 
-Generic tables can be used as a safe fallback when trying to read a table that does not match any other specific table type.
+A generic table is a flexible table type that can represent any tabular data. It is not tied to any specific domain or use case, which makes it suitable for a wide range of custom applications.
+
+Generic tables are also the safe fallback when you read a table that does not match any other table type.
 
 ## Specifications
 
