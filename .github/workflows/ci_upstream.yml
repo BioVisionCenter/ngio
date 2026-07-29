@@ -56,12 +56,12 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: data/
-          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          key: "${{ runner.os }}-data-${{ hashFiles('src/ngio/utils/_datasets.py') }}"
           restore-keys: |
-            "${{ runner.os }}-data-"
+            ${{ runner.os }}-data-
 
       - name: 🧪 Run Tests
-        run: pytest --no-cov
+        run: pytest -n 4 --durations=10
 
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
@@ -109,12 +109,12 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: data/
-          key: "${{ runner.os }}-data-${{ hashFiles('tests/conftest.py') }}"
+          key: "${{ runner.os }}-data-${{ hashFiles('src/ngio/utils/_datasets.py') }}"
           restore-keys: |
-            "${{ runner.os }}-data-"
+            ${{ runner.os }}-data-
 
       - name: 🧪 Run Tests
-        run: pytest --no-cov
+        run: pytest -n 4 --durations=10
 
       - name: 📝 Report Failures
         if: failure()

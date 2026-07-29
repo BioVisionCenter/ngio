@@ -7,10 +7,9 @@ from ngio import create_empty_well, open_ome_zarr_well
 from ngio.utils import NgioValueError
 
 
-def test_open_real_ome_zarr_well(cardiomyocyte_tiny_path: Path):
-    cardiomyocyte_tiny_path = cardiomyocyte_tiny_path
-    cardiomyocyte_tiny_path = cardiomyocyte_tiny_path / "B" / "03"
-    ome_zarr_well = open_ome_zarr_well(cardiomyocyte_tiny_path)
+def test_open_real_ome_zarr_well(cardiomyocyte_tiny_path_readonly: Path):
+    well_path = cardiomyocyte_tiny_path_readonly / "B" / "03"
+    ome_zarr_well = open_ome_zarr_well(well_path)
     assert isinstance(ome_zarr_well.__repr__(), str)
     assert ome_zarr_well.paths() == ["0"]
     assert ome_zarr_well.acquisition_ids == []

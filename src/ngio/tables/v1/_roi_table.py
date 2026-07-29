@@ -210,6 +210,10 @@ class RoiDictWrapper:
             name = roi.name
             if name in self._rois_by_name:
                 name = f"{name}_{uuid4().hex[:8]}"
+                if roi.name is not None:
+                    # keep the roi's own name in sync so the rename
+                    # survives serialization
+                    roi = roi.model_copy(update={"name": name})
             self._rois_by_name[name] = roi
             if roi.label is not None:
                 self._rois_by_label[roi.label] = roi
@@ -374,6 +378,10 @@ class GenericRoiTableV1(AbstractBaseTable):
         If the ROIs are not loaded, load them from the table.
         """
         if self._rois is None:
+            if self._table_data is None and self._table_backend is None:
+                # No backend and no in-memory data: this is an empty ROI table.
+                self._rois = RoiDictWrapper([])
+                return
             self._rois = RoiDictWrapper.from_dataframe(
                 self.dataframe, required_columns=self._required_columns
             )

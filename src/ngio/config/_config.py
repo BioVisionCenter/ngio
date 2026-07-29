@@ -152,9 +152,23 @@ def _load_config_data() -> dict[str, Any]:
         ) from e
 
 
-_config = NgioConfig.model_validate(_load_config_data())
+_config: NgioConfig | None = None
 
 
 def get_config() -> NgioConfig:
-    """Return the global ngio configuration singleton."""
+    """Return the global ngio configuration singleton.
+
+    The configuration is loaded lazily on first access, so setting
+    `NGIO_CONFIG_PATH` before the first call is honored even if ngio
+    was imported earlier.
+    """
+    global _config
+    if _config is None:
+        _config = NgioConfig.model_validate(_load_config_data())
     return _config
+
+
+def _reset_config() -> None:
+    """Drop the cached configuration so the next `get_config` reloads it."""
+    global _config
+    _config = None

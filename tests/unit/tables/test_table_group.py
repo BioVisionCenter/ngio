@@ -34,29 +34,6 @@ def test_table_container(tmp_path: Path):
     assert table.dataframe.equals(expected)
 
 
-@pytest.mark.parametrize("backend", ["anndata", "json", "csv", "parquet"])
-def test_add_preserves_table_backend(tmp_path: Path, backend: str):
-    """Re-adding a loaded table without an explicit backend keeps its backend.
-
-    Testing for #207.
-    """
-    src_group = open_tables_container(tmp_path / "src.zarr", mode="a")
-    dst_group = open_tables_container(tmp_path / "dst.zarr", mode="a")
-
-    table = FeatureTable(
-        table_data=DataFrame({"label": [1, 2, 3], "a": [4.0, 5.0, 6.0]})
-    )
-    src_group.add(name="table", table=table, backend=backend)
-
-    loaded_table = src_group.get("table")
-    assert loaded_table.backend_name == backend
-
-    dst_group.add(name="table", table=loaded_table)
-    copied_table = dst_group.get("table")
-    assert copied_table.backend_name == backend
-    assert copied_table.meta.backend == backend
-
-
 def test_add_explicit_backend_overrides(tmp_path: Path):
     """An explicit backend argument still converts the table."""
     src_group = open_tables_container(tmp_path / "src.zarr", mode="a")

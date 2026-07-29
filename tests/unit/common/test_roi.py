@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from ngio import PixelSize
 from ngio.common import Roi, RoiSlice
@@ -571,3 +572,44 @@ def test_rois_union(
     assert union.get("y") == expected_union.get("y")
     assert union.get("z") == expected_union.get("z")
     assert union.get("t") == expected_union.get("t")
+
+
+def test_roi_join_preserves_label_zero():
+    roi_a = Roi.from_values(name="a", slices={"x": (0, 2), "y": (0, 2)}, label=0)
+    roi_b = Roi.from_values(name="b", slices={"x": (1, 2), "y": (1, 2)})
+
+    intersection = roi_a.intersection(roi_b)
+    assert intersection is not None
+    assert intersection.label == 0
+
+    union = roi_a.union(roi_b)
+    assert union.label == 0
+
+
+def test_roi_join_preserves_empty_name():
+    roi_a = Roi.from_values(name="", slices={"x": (0, 2), "y": (0, 2)})
+    roi_b = Roi.from_values(name=None, slices={"x": (1, 2), "y": (1, 2)})
+
+    intersection = roi_a.intersection(roi_b)
+    assert intersection is not None
+    assert intersection.name == ""
+
+
+def test_roi_sym_ops_axis_order_is_deterministic():
+    roi_a = Roi.from_values(name="a", slices={"z": (0, 2), "y": (0, 2), "x": (0, 2)})
+    roi_b = Roi.from_values(name="b", slices={"y": (1, 2), "x": (1, 2), "t": (0, 1)})
+
+    intersection = roi_a.intersection(roi_b)
+    assert intersection is not None
+    assert [s.axis_name for s in intersection.slices] == ["z", "y", "x", "t"]
+
+    union = roi_a.union(roi_b)
+    assert [s.axis_name for s in union.slices] == ["z", "y", "x", "t"]
+
+
+def test_roi_from_values_validates_fields():
+    with pytest.raises(ValidationError):
+        Roi.from_values(name="r", slices={"x": (0, 1), "y": (0, 1)}, label=-1)
+
+    with pytest.raises(ValidationError):
+        Roi.from_values(name="r", slices={"x": (0, 1)})

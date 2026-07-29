@@ -17,7 +17,7 @@ class _NoListingHTTPHandler(SimpleHTTPRequestHandler):
         pass
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def moto_s3_server():
     """Mock S3 backend via aiomoto in server mode.
 
@@ -26,6 +26,9 @@ def moto_s3_server():
     region), so both boto3 and s3fs discover it automatically — no subprocess,
     no hardcoded port. The Moto backend is shared between the synchronous boto3
     client used here and the aiobotocore backend that s3fs drives under the hood.
+
+    Session-scoped: starting/stopping the server costs ~4s per test. Tests
+    isolate from each other by writing to `random_zarr_path()` keys.
     """
     bucket_name = "s3-ci-test-bucket"
     with mock_aws(server_mode=True) as ctx:

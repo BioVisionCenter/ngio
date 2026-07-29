@@ -9,7 +9,10 @@ from ngio.io_pipes._ops_slices import (
     set_slice_as_dask,
     set_slice_as_numpy,
 )
-from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
+from ngio.io_pipes._ops_slices_utils import (
+    check_elem_intersection,
+    check_if_regions_overlap,
+)
 from ngio.ome_zarr_meta import AxesHandler, Dataset
 from ngio.ome_zarr_meta.ngio_specs import Axis
 
@@ -110,3 +113,10 @@ def test_chunk_slice():
     assert check_if_regions_overlap(
         [slicing_ops1.normalized_slicing_tuple, slicing_ops2.normalized_slicing_tuple]
     )
+
+
+def test_check_elem_intersection_step_not_implemented():
+    with pytest.raises(NotImplementedError):
+        check_elem_intersection(slice(0, 5, 2), slice(1, 3))
+    with pytest.raises(NotImplementedError):
+        check_elem_intersection(slice(1, 3), slice(0, 5, 2))

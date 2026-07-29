@@ -187,15 +187,16 @@ class AxesSetup(BaseModel):
                 "The number of axes names cannot be greater than the "
                 "number of canonical axes."
             )
-        canonical_order = list(canonical_order)
         chanonical_axes = canonical_axes_order()
+        # Canonical names always claim their own slot; non-canonical names
+        # fill the remaining slots right-aligned.
+        free_slots = [c_ax for c_ax in canonical_order if c_ax not in set(axes_names)]
         axes_mapping = {}
         for ax in reversed(axes_names):
-            c_ax = canonical_order.pop()
             if ax in chanonical_axes:
                 axes_mapping[ax] = ax
             else:
-                axes_mapping[c_ax] = ax
+                axes_mapping[free_slots.pop()] = ax
         return cls(**axes_mapping)
 
     def canonical_map(self) -> dict[str, str]:

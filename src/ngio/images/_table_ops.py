@@ -32,7 +32,7 @@ def _reindex_dataframe(
         index_cols.append(old_index)
     dataframe.index = dataframe[index_cols].astype(str).agg("_".join, axis=1)
 
-    if index_key is None:
+    if index_key is not None:
         dataframe.index.name = index_key
     return dataframe
 
@@ -58,16 +58,25 @@ def _add_const_columns_pl(
     dataframe: pl.LazyFrame,
     new_cols: dict[str, str],
     index_key: str | None = None,
+    table_index_key: str | None = None,
 ) -> pl.LazyFrame:
     dataframe = dataframe.with_columns(
         [pl.lit(value, dtype=pl.String()).alias(col) for col, value in new_cols.items()]
     )
 
     if index_key is not None:
+        # Mirror the pandas path: the new index hashes the extras columns
+        # plus the table's original index column (when present).
+        index_cols = list(new_cols.keys())
+        if (
+            table_index_key is not None
+            and table_index_key in dataframe.collect_schema().names()
+        ):
+            index_cols.append(table_index_key)
         dataframe = dataframe.with_columns(
             [
                 pl.concat_str(
-                    [pl.col(col) for col in new_cols.keys()],
+                    [pl.col(col).cast(pl.String()) for col in index_cols],
                     separator="_",
                 ).alias(index_key)
             ]
@@ -105,6 +114,7 @@ def _pl_concat(
             dataframe=table.table.lazy_frame,
             new_cols=table.extras,
             index_key=index_key,
+            table_index_key=table.table.meta.index_key,
         )
         dataframes.append(polars_ls)
 
@@ -301,6 +311,7 @@ async def _concatenate_image_tables_async(
             image=image,
             name=name,
             extra=extra,
+            mode=mode,
             strict=strict,
         )
         tasks.append(task)

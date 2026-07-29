@@ -38,7 +38,7 @@ def _join_roi_names(name1: str | None, name2: str | None) -> str | None:
         if name1 == name2:
             return name1
         return f"{name1}:{name2}"
-    return name1 or name2
+    return name1 if name1 is not None else name2
 
 
 def _join_roi_labels(label1: int | None, label2: int | None) -> int | None:
@@ -46,7 +46,7 @@ def _join_roi_labels(label1: int | None, label2: int | None) -> int | None:
         if label1 == label2:
             return label1
         raise NgioValueError("Cannot join ROIs with different labels")
-    return label1 or label2
+    return label1 if label1 is not None else label2
 
 
 class RoiSlice(BaseModel):
@@ -323,9 +323,7 @@ class Roi(BaseModel):
         _slices = []
         for axis, _slice in slices.items():
             _slices.append(RoiSlice.from_value(axis_name=axis, value=_slice))
-        return cls.model_construct(
-            name=name, slices=_slices, label=label, space=space, **kwargs
-        )
+        return cls(name=name, slices=_slices, label=label, space=space, **kwargs)
 
     def __getitem__(self, key):
         """Allow dict-like access to slices by axis name."""
@@ -372,7 +370,10 @@ class Roi(BaseModel):
     ) -> list[RoiSlice] | None:
         self_axis_dict = {s.axis_name: s for s in self_slices}
         other_axis_dict = {s.axis_name: s for s in other_slices}
-        common_axis_names = self_axis_dict.keys() | other_axis_dict.keys()
+        # self's axis order first, then axes only present in other
+        common_axis_names = list(self_axis_dict) + [
+            name for name in other_axis_dict if name not in self_axis_dict
+        ]
         new_slices = []
         for axis_name in common_axis_names:
             slice_a = self_axis_dict.get(axis_name)

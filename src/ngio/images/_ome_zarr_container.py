@@ -79,7 +79,7 @@ def _try_get_label_container(
             axes_setup=axes_setup,
             ngff_version=ngff_version,
         )
-    except FileNotFoundError:
+    except (NgioError, FileNotFoundError):
         return None
 
 
