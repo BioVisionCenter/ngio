@@ -8,11 +8,14 @@ import s3fs
 from ngio import OmeZarrContainer, create_empty_ome_zarr
 from ngio.tables import FeatureTable
 
-TEST_IMAGE = np.ones((3, 5, 64, 64), dtype=np.uint16)
-TEST_LABEL = np.zeros((5, 64, 64), dtype=np.uint16)
-TEST_LABEL[0, 10:30, 10:30] = 1
-TEST_LABEL[0, 35:55, 35:55] = 2
-TEST_LABEL[0, 20:40, 40:60] = 3
+# Kept deliberately small: every store-matrix test round-trips this image
+# (plus a label and four table backends) through mocked remote stores, so
+# the object count directly drives CI runtime.
+TEST_IMAGE = np.ones((3, 2, 32, 32), dtype=np.uint16)
+TEST_LABEL = np.zeros((2, 32, 32), dtype=np.uint16)
+TEST_LABEL[0, 5:15, 5:15] = 1
+TEST_LABEL[0, 17:27, 17:27] = 2
+TEST_LABEL[0, 10:20, 20:30] = 3
 
 TEST_TABLE = pd.DataFrame(
     {
@@ -108,10 +111,10 @@ def create_sample_ome_zarr(
     """Create a sample OME-Zarr structure in the given store for testing."""
     ome_zarr = create_empty_ome_zarr(
         store=store,
-        shape=(3, 5, 64, 64),
+        shape=TEST_IMAGE.shape,
         pixelsize=(0.65, 0.65),
         channels_meta=["Channel 1", "Channel 2", "Channel 3"],
-        levels=3,
+        levels=2,
         axes_names=["c", "z", "y", "x"],
     )
     ome_zarr = set_to_image(ome_zarr)

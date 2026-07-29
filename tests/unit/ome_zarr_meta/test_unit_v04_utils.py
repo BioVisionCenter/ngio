@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from ome_zarr_models.v04.image import ImageAttrs as ImageAttrsV04
 from ome_zarr_models.v04.image_label import ImageLabelAttrs as LabelAttrsV04
@@ -15,9 +16,11 @@ from ngio.ome_zarr_meta.v04._v04_spec import (
     v04_to_ngio_well_meta,
 )
 
+META_DIR = Path(__file__).parents[2] / "data" / "v04" / "meta"
+
 
 def test_image_round_trip():
-    path = "tests/data/v04/meta/base_ome_zarr_image_meta.json"
+    path = META_DIR / "base_ome_zarr_image_meta.json"
     with open(path) as f:
         input_metadata = json.load(f)
 
@@ -28,7 +31,7 @@ def test_image_round_trip():
 
 
 def test_label_round_trip():
-    path = "tests/data/v04/meta/base_ome_zarr_label_meta.json"
+    path = META_DIR / "base_ome_zarr_label_meta.json"
     with open(path) as f:
         metadata = json.load(f)
 
@@ -39,7 +42,7 @@ def test_label_round_trip():
 
 
 def test_well_meta():
-    path = "tests/data/v04/meta/base_ome_zarr_well_meta.json"
+    path = META_DIR / "base_ome_zarr_well_meta.json"
     with open(path) as f:
         metadata = json.load(f)
 
@@ -51,7 +54,7 @@ def test_well_meta():
 
 
 def test_well_meta_path_normalization():
-    path = "tests/data/v04/meta/ome_zarr_well_path_normalization_meta.json"
+    path = META_DIR / "ome_zarr_well_path_normalization_meta.json"
     with open(path) as f:
         metadata = json.load(f)
 

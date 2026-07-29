@@ -299,7 +299,11 @@ def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
     # If the input is not sorted, return it as a tuple
     max_input = max(value)
     min_input = min(value)
-    assert min_input >= 0, "Input must contain non-negative integers"
+    if min_input < 0:
+        raise NgioValueError(
+            f"Invalid negative value {min_input} in sequence {value}. "
+            "Slicing sequences must contain non-negative integers."
+        )
 
     if sorted(value) == list(range(min_input, max_input + 1)):
         return slice(min_input, max_input + 1)

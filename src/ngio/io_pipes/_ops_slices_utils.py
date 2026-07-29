@@ -47,12 +47,7 @@ def check_elem_intersection(s1: SlicingType, s2: SlicingType) -> bool:
         start1, stop1, step1 = s1.start or 0, s1.stop or float("inf"), s1.step or 1
         start2, stop2, step2 = s2.start or 0, s2.stop or float("inf"), s2.step or 1
 
-        if step1 is not None and step2 != 1:
-            raise NotImplementedError(
-                "Intersection for slices with step != 1 is not implemented"
-            )
-
-        if step2 is not None and step1 != 1:
+        if step1 != 1 or step2 != 1:
             raise NotImplementedError(
                 "Intersection for slices with step != 1 is not implemented"
             )

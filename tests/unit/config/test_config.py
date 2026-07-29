@@ -160,3 +160,19 @@ def test_retry_config_no_warning_by_default(recwarn):
     RetryConfig()
     RetryConfig(max_retries=5, retry_on=["OSError"])
     assert len(recwarn) == 0
+
+
+def test_get_config_lazy_load_respects_env_var(monkeypatch, tmp_path):
+    from ngio.config._config import _reset_config, get_config
+
+    config_path = tmp_path / "ngio_config.json"
+    config_path.write_text('{"io_retry": {"max_retries": 7}}')
+    monkeypatch.setenv("NGIO_CONFIG_PATH", str(config_path))
+
+    _reset_config()
+    try:
+        assert get_config().io_retry.max_retries == 7
+        # cached: same object on repeated calls
+        assert get_config() is get_config()
+    finally:
+        _reset_config()

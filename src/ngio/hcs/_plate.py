@@ -387,8 +387,9 @@ class OmeZarrPlate:
             return cached_well
 
         group_handler = self._group_handler.get_handler(well_path)
-        self._wells_cache.set(well_path, OmeZarrWell(group_handler))
-        return OmeZarrWell(group_handler)
+        well = OmeZarrWell(group_handler)
+        self._wells_cache.set(well_path, well)
+        return well
 
     def get_well(self, row: str, column: int | str) -> OmeZarrWell:
         """Get a well from the plate.

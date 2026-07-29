@@ -458,3 +458,42 @@ def test_channels_label_meta():
         scale = [s * f for s, f in zip(scale, [1, 1, 1, 2, 2], strict=True)]
 
     _ = NgioLabelMeta(version="0.4", name="test", datasets=datasets)
+
+
+def test_pixel_size_eq_with_non_pixel_size():
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    assert ps != "not a pixel size"
+    assert ps != None  # noqa: E711
+    assert ps not in [1, "a", None]
+
+
+def test_pixel_size_eq_time_unit_symmetry():
+    ps_no_time = PixelSize(x=1.0, y=1.0, z=1.0, time_unit=None)
+    ps_time = PixelSize(x=1.0, y=1.0, z=1.0, time_unit=DefaultTimeUnit)
+
+    assert (ps_no_time == ps_time) == (ps_time == ps_no_time)
+    assert ps_time != ps_no_time
+
+
+def test_axes_setup_from_ordered_list():
+    canonical = ("t", "c", "z", "y", "x")
+
+    setup = AxesSetup.from_ordered_list(["z", "y", "x"], canonical)
+    assert (setup.z, setup.y, setup.x) == ("z", "y", "x")
+
+    # all non-canonical: right-aligned slot assignment
+    setup = AxesSetup.from_ordered_list(["a", "b"], canonical)
+    assert setup.x == "b"
+    assert setup.y == "a"
+
+    # non-canonical name to the left of the canonical ones
+    setup = AxesSetup.from_ordered_list(["custom", "z", "y", "x"], canonical)
+    assert (setup.z, setup.y, setup.x) == ("z", "y", "x")
+    assert setup.c == "custom"
+
+    # canonical name to the left of a non-canonical one: the custom axis
+    # must not be silently dropped
+    setup = AxesSetup.from_ordered_list(["z", "custom", "y", "x"], canonical)
+    values = [setup.t, setup.c, setup.z, setup.y, setup.x]
+    assert "custom" in values
+    assert (setup.z, setup.y, setup.x) == ("z", "y", "x")

@@ -44,31 +44,10 @@ class IdentityTransform:
         return array
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_open_ome_zarr_container(images_all_versions: dict[str, Path], zarr_name: str):
-    path = images_all_versions[zarr_name]
+def test_open_ome_zarr_container(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     whole_image_roi = ome_zarr.build_image_roi_table().get("image")
@@ -249,6 +228,7 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert masked_label.shape == image.shape
 
 
+@pytest.mark.network
 def test_remote_ome_zarr_container():
     url = (
         "https://raw.githubusercontent.com/"
@@ -261,12 +241,6 @@ def test_remote_ome_zarr_container():
     ome_zarr = open_ome_zarr_container(store)
 
     assert ome_zarr.list_labels() == ["nuclei"]
-    # assert ome_zarr.list_tables() == [
-    #    "FOV_ROI_table",
-    #    "nuclei_ROI_table",
-    #    "well_ROI_table",
-    #    "regionprops_DAPI",
-    # ]
 
     _ = ome_zarr.get_label("nuclei", path="0")
     _ = ome_zarr.get_table("well_ROI_table").dataframe

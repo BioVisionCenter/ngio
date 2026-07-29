@@ -116,7 +116,7 @@ class NgioWellMeta(BaseModel):
             strict (bool): If True, check if the image already exists in the well.
                 If False, do not check if the image already exists in the well.
         """
-        list_of_images = self.images
+        list_of_images = list(self.images)
         for image in list_of_images:
             if image.path == path:
                 raise NgioValueError(
@@ -143,7 +143,7 @@ class NgioWellMeta(BaseModel):
         Args:
             path (str): The path of the image.
         """
-        list_of_images = self.images
+        list_of_images = list(self.images)
         for image in list_of_images:
             if image.path == path:
                 list_of_images.remove(image)
@@ -450,7 +450,7 @@ class NgioPlateMeta(BaseModel):
         plate, row_idx = self.add_row(row=row)
         plate, column_idx = plate.add_column(column=column)
 
-        wells = plate.plate.wells
+        wells = list(plate.plate.wells)
         for well_obj in wells:
             if well_obj.rowIndex == row_idx and well_obj.columnIndex == column_idx:
                 break
@@ -487,9 +487,10 @@ class NgioPlateMeta(BaseModel):
             acquisition_name (str | None): The acquisition name of the well.
             **acquisition_kwargs: Additional acquisition metadata.
         """
-        acquisitions = self.plate.acquisitions
-        if acquisitions is None:
+        if self.plate.acquisitions is None:
             acquisitions = []
+        else:
+            acquisitions = list(self.plate.acquisitions)
 
         for acquisition_obj in acquisitions:
             if acquisition_obj.id == acquisition_id:
@@ -528,7 +529,7 @@ class NgioPlateMeta(BaseModel):
         if column_idx is None:
             raise NgioValueError(f"Column {column} not found in the plate.")
 
-        wells = self.plate.wells
+        wells = list(self.plate.wells)
         for well_obj in wells:
             if well_obj.rowIndex == row_idx and well_obj.columnIndex == column_idx:
                 wells.remove(well_obj)

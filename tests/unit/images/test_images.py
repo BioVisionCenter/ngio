@@ -8,31 +8,8 @@ from ngio.transforms import ZoomTransform
 from ngio.utils import NgioValueError
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_open_image(images_all_versions: dict[str, Path], zarr_name: str):
-    path = images_all_versions[zarr_name]
+def test_open_image(images_all_versions_readonly: dict[str, Path], zarr_name: str):
+    path = images_all_versions_readonly[zarr_name]
     image = open_image(path)
     assert isinstance(image, Image)
 

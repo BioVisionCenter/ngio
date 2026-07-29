@@ -2,7 +2,7 @@ from pathlib import Path
 
 from ngio import NgffVersions, create_empty_ome_zarr
 
-DATA_DIR = Path("tests/data")
+DATA_DIR = Path(__file__).parent / "data"
 
 IMAGE_SPECS = [
     {

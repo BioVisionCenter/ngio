@@ -87,10 +87,12 @@ def _check_deprecated_scaling_factors(
             y_scale = yx_scaling_factor if yx_scaling_factor is not None else 2.0
             x_scale = yx_scaling_factor if yx_scaling_factor is not None else 2.0
         z_scale = z_scaling_factor if z_scaling_factor is not None else 1.0
-        scaling_factors = (z_scale, x_scale, y_scale)
+        scaling_factors = (z_scale, y_scale, x_scale)
         if len(scaling_factors) < len(shape):
             padding = (1.0,) * (len(shape) - len(scaling_factors))
             scaling_factors = padding + scaling_factors
+        elif len(scaling_factors) > len(shape):
+            scaling_factors = scaling_factors[len(scaling_factors) - len(shape) :]
 
         return scaling_factors
     return scaling_factors

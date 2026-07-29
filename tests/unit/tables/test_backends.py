@@ -62,133 +62,64 @@ def test_backend_manager(tmp_path: Path):
         manager.add_backend(JsonTableBackend)
 
 
-def test_json_backend(tmp_path: Path):
-    store = tmp_path / "test_json_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
-    backend = JsonTableBackend()
-    backend.set_group_handler(handler, index_type="str")
+@pytest.mark.parametrize(
+    "backend_cls, backend_name, implements_anndata, handler_kwargs, backend_kwargs",
+    [
+        (JsonTableBackend, "json", False, {}, {"index_type": "str"}),
+        (CsvTableBackend, "csv", False, {}, {}),
+        (ParquetTableBackend, "parquet", False, {}, {}),
+        (AnnDataBackend, "anndata", True, {"zarr_format": 2}, {"index_type": "int"}),
+    ],
+)
+def test_backend_round_trip(
+    tmp_path: Path,
+    backend_cls: type,
+    backend_name: str,
+    implements_anndata: bool,
+    handler_kwargs: dict,
+    backend_kwargs: dict,
+):
+    store = tmp_path / f"test_{backend_name}_backend.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a", **handler_kwargs)
+    backend = backend_cls()
+    backend.set_group_handler(handler, **backend_kwargs)
 
-    assert backend.backend_name() == "json"
-    assert not backend.implements_anndata()
-    assert backend.implements_pandas()
-
-    test_table = pd.DataFrame(
-        {"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["a", "b", "c"]}
-    )
-    test_table.index = test_table.index.astype(str)
-
-    backend.write(test_table, metadata={"test": "test"})
-    loaded_table = backend.load_as_pandas_df()
-
-    assert loaded_table.equals(test_table)
-
-    meta = backend._group_handler.load_attrs()
-    assert meta["test"] == "test"
-    assert meta["backend"] == "json"
-
-    a_data = backend.load_as_anndata()
-
-    with pytest.raises(NotImplementedError):
-        backend.write(a_data, metadata={"test": "test"})
-
-    lf_data = backend.load_as_polars_lf()
-    backend.write(lf_data, metadata={"test": "test"})
-
-
-def test_csv_backend(tmp_path: Path):
-    store = tmp_path / "test_csv_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
-    backend = CsvTableBackend()
-    backend.set_group_handler(handler)
-
-    assert backend.backend_name() == "csv"
-    assert not backend.implements_anndata()
+    assert backend.backend_name() == backend_name
+    assert backend.implements_anndata() == implements_anndata
     assert backend.implements_pandas()
 
     test_table = pd.DataFrame(
         {"a": [1, 2, 3], "b": [4.1, 5.1, 6.1], "c": ["a", "b", "c"]}
     )
-
-    backend.write(test_table, metadata={"test": "test"})
-    loaded_table = backend.load_as_pandas_df()
-    assert loaded_table.equals(test_table), loaded_table
-    meta = backend._group_handler.load_attrs()
-    assert meta["test"] == "test"
-    assert meta["backend"] == "csv"
-
-    a_data = backend.load_as_anndata()
-    with pytest.raises(NotImplementedError):
-        backend.write(a_data, metadata={"test": "test"})
-
-    lf_data = backend.load_as_polars_lf()
-    backend.write(lf_data, metadata={"test": "test"})
-
-
-def test_parquet_backend(tmp_path: Path):
-    store = tmp_path / "test_parquet_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
-    backend = ParquetTableBackend()
-    backend.set_group_handler(handler)
-
-    assert backend.backend_name() == "parquet"
-    assert not backend.implements_anndata()
-    assert backend.implements_pandas()
-
-    test_table = pd.DataFrame(
-        {"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["a", "b", "c"]}
-    )
-
-    backend.write(test_table, metadata={"test": "test"})
-    loaded_table = backend.load_as_pandas_df()
-    assert loaded_table.equals(test_table), loaded_table
-    meta = backend._group_handler.load_attrs()
-    assert meta["test"] == "test"
-    assert meta["backend"] == "parquet"
-
-    a_data = backend.load_as_anndata()
-    with pytest.raises(NotImplementedError):
-        backend.write(a_data, metadata={"test": "test"})
-
-    lf_data = backend.load_as_polars_lf()
-    backend.write(lf_data, metadata={"test": "test"})
-
-
-def test_anndata_backend(tmp_path: Path):
-    store = tmp_path / "test_anndata_backend.zarr"
-    handler = ZarrGroupHandler(store=store, cache=True, mode="a", zarr_format=2)
-    backend = AnnDataBackend()
-    backend.set_group_handler(handler, index_type="int")
-
-    assert backend.backend_name() == "anndata"
-    assert backend.implements_anndata()
-    assert backend.implements_pandas()
-
-    test_table = pd.DataFrame(
-        {"a": [1, 2, 3], "b": [4.0, 5.0, 6.0], "c": ["a", "b", "c"]}
-    )
+    if backend_kwargs.get("index_type") == "str":
+        test_table.index = test_table.index.astype(str)
 
     backend.write(test_table, metadata={"test": "test"})
     loaded_table = backend.load_as_pandas_df()
 
+    # The anndata round trip does not preserve the index, compare columns only
     for column in loaded_table.columns:
-        # Since the transformation from anndata to dataframe is not perfect
-        # We can only compare the columns
         pd.testing.assert_series_equal(loaded_table[column], test_table[column])
+    if not implements_anndata:
+        assert loaded_table.equals(test_table), loaded_table
 
     meta = backend._group_handler.load_attrs()
     assert meta["test"] == "test"
-    assert meta["backend"] == "anndata"
+    assert meta["backend"] == backend_name
 
     a_data = backend.load_as_anndata()
-    backend.write(a_data, metadata={"test": "test"})
+    if implements_anndata:
+        backend.write(a_data, metadata={"test": "test"})
+        # Test that the "raw" entry with encoding-type "null" is
+        # removed after writing for compatibility with older anndata versions
+        with pytest.raises(KeyError):
+            backend._group_handler._group["raw"]
+    else:
+        with pytest.raises(NotImplementedError):
+            backend.write(a_data, metadata={"test": "test"})
 
     lf_data = backend.load_as_polars_lf()
     backend.write(lf_data, metadata={"test": "test"})
-
-    # Test that the "raw" entry with encoding-type "null" is
-    # removed after writing for compatibility with older anndata versions
-    with pytest.raises(KeyError):
-        backend._group_handler._group["raw"]
 
 
 @pytest.mark.parametrize(

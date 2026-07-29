@@ -14,33 +14,22 @@ from ngio.experimental.iterators import (
 )
 from ngio.utils import NgioValueError
 
+# The iterators run through the version-agnostic container API, so the
+# expensive write tests cover the full axes matrix on v05 only, plus a v04
+# smoke subset; the full v04 write path is monitored by creation/store tests.
+WRITER_ZARR_NAMES = [
+    f"v05/test_image_{axes}.zarr"
+    for axes in ("yx", "cyx", "zyx", "czyx", "c1yx", "tyx", "tcyx", "tzyx", "tczyx")
+] + [
+    "v04/test_image_yx.zarr",
+    "v04/test_image_tczyx.zarr",
+]
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+
+@pytest.mark.parametrize("zarr_name", WRITER_ZARR_NAMES)
+def test_segmentation_iterator(single_image_copy: Path):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = single_image_copy
     ome_zarr = open_ome_zarr_container(path)
     image = ome_zarr.get_image()
     label = ome_zarr.get_label("label")
@@ -75,34 +64,10 @@ def test_segmentation_iterator(images_all_versions: dict[str, Path], zarr_name: 
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_masked_segmentation_iterator(
-    images_all_versions: dict[str, Path], zarr_name: str
-):
+@pytest.mark.parametrize("zarr_name", WRITER_ZARR_NAMES)
+def test_masked_segmentation_iterator(single_image_copy: Path):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = single_image_copy
     ome_zarr = open_ome_zarr_container(path)
 
     masked_label = ome_zarr.derive_label("masking_label")
@@ -134,32 +99,11 @@ def test_masked_segmentation_iterator(
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+def test_img_processing_iterator(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
     image = ome_zarr.get_image()
     t_ome_zarr = ome_zarr.derive_image(store=MemoryStore())
@@ -189,32 +133,11 @@ def test_img_processing_iterator(images_all_versions: dict[str, Path], zarr_name
     iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
-@pytest.mark.parametrize(
-    "zarr_name",
-    [
-        "v04/test_image_yx.zarr",
-        "v04/test_image_cyx.zarr",
-        "v04/test_image_zyx.zarr",
-        "v04/test_image_czyx.zarr",
-        "v04/test_image_c1yx.zarr",
-        "v04/test_image_tyx.zarr",
-        "v04/test_image_tcyx.zarr",
-        "v04/test_image_tzyx.zarr",
-        "v04/test_image_tczyx.zarr",
-        "v05/test_image_yx.zarr",
-        "v05/test_image_cyx.zarr",
-        "v05/test_image_zyx.zarr",
-        "v05/test_image_czyx.zarr",
-        "v05/test_image_c1yx.zarr",
-        "v05/test_image_tyx.zarr",
-        "v05/test_image_tcyx.zarr",
-        "v05/test_image_tzyx.zarr",
-        "v05/test_image_tczyx.zarr",
-    ],
-)
-def test_features_iterator(images_all_versions: dict[str, Path], zarr_name: str):
+def test_features_iterator(
+    images_all_versions_readonly: dict[str, Path], zarr_name: str
+):
     # Base test only the API, not the actual segmentation logic
-    path = images_all_versions[zarr_name]
+    path = images_all_versions_readonly[zarr_name]
     ome_zarr = open_ome_zarr_container(path)
 
     image = ome_zarr.get_image()

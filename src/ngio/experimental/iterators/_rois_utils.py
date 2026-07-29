@@ -1,5 +1,6 @@
 from ngio import Roi
 from ngio.images._abstract_image import AbstractImage
+from ngio.utils import NgioValueError
 
 
 def rois_product(rois_a: list[Roi], rois_b: list[Roi]) -> list[Roi]:
@@ -42,14 +43,29 @@ def grid(
     stride_y = stride_y if stride_y is not None else size_y
     stride_x = stride_x if stride_x is not None else size_x
 
+    for axis_name, stride in (
+        ("t", stride_t),
+        ("z", stride_z),
+        ("y", stride_y),
+        ("x", stride_x),
+    ):
+        if stride < 1:
+            raise NgioValueError(
+                f"Grid stride along '{axis_name}' must be >= 1, got {stride}. "
+                "This can happen when the requested overlap is equal to or "
+                "larger than the tile size."
+            )
+
     # Here we would create a grid of ROIs based on the specified parameters.
     new_rois = []
     for t in range(0, t_dim, stride_t):
         for z in range(0, z_dim, stride_z):
             for y in range(0, y_dim, stride_y):
                 for x in range(0, x_dim, stride_x):
+                    tile_name = f"t{t}_z{z}_y{y}_x{x}"
+                    name = f"{base_name}_{tile_name}" if base_name else tile_name
                     roi = Roi.from_values(
-                        name=base_name,
+                        name=name,
                         slices={
                             "x": (x, size_x),
                             "y": (y, size_y),
