@@ -1,10 +1,18 @@
+---
+description: Install ngio and open your first OME-Zarr container in a few lines of Python.
+---
+
 # Quickstart
 
-Ngio is a Python package that provides a simple and intuitive API for reading and writing data to and from OME-Zarr. This guide will walk you through the basics of using `ngio` to read and write data.
+**Install ngio and open your first OME-Zarr container.**
+
+In a few lines of Python you can open an OME-Zarr store, see what is inside it, and reach
+the images, labels and tables it contains.
 
 ## Installation
 
-`ngio` can be installed from PyPI, conda-forge, or from source.
+To install `ngio`, use whichever package manager you already work with — it is published on
+PyPI and conda-forge, and can also be installed from source.
 
 - `ngio` requires Python `>=3.11`
 
@@ -14,6 +22,27 @@ Ngio is a Python package that provides a simple and intuitive API for reading an
 
     ```bash
     pip install ngio
+    ```
+
+=== "uv"
+
+    Inside a uv project:
+
+    ```bash
+    uv add ngio
+    ```
+
+    Or into an existing environment:
+
+    ```bash
+    uv pip install ngio
+    ```
+
+=== "pixi"
+
+    ```bash
+    pixi add ngio          # from conda-forge
+    pixi add --pypi ngio   # from PyPI
     ```
 
 === "mamba/conda"
@@ -34,7 +63,7 @@ Ngio is a Python package that provides a simple and intuitive API for reading an
 
     1. Clone the repository:
     ```bash
-    git clone https://github.com/fractal-analytics-platform/ngio.git
+    git clone https://github.com/BioVisionCenter/ngio.git
     cd ngio
     ```
 
@@ -45,55 +74,53 @@ Ngio is a Python package that provides a simple and intuitive API for reading an
 
 ### Troubleshooting
 
-Please report installation problems by opening an issue on our [GitHub repository](https://github.com/fractal-analytics-platform/ngio).
+Please report installation problems by opening an issue on the [ngio GitHub repository](https://github.com/BioVisionCenter/ngio).
 
-## Setup some test data
+## Set up test data
 
-Let's start by downloading a sample OME-Zarr dataset to work with.
+Download a sample OME-Zarr dataset to work with.
 
 ```python exec="true" source="material-block" session="quickstart"
-from pathlib import Path
-from ngio.utils import download_ome_zarr_dataset
-
-# Download a sample dataset
-download_dir = Path("./data")
-download_dir = Path(".").absolute() / "data" # markdown-exec: hide
-hcs_path = download_ome_zarr_dataset("CardiomyocyteSmallMip", download_dir=download_dir)
-image_path = hcs_path / "B" / "03" / "0"
+--8<-- "docs/snippets/getting_started/quickstart.py:setup"
 ```
 
 ## Open an OME-Zarr image
 
-Let's start by opening an OME-Zarr file and inspecting its contents.
+Open an OME-Zarr file and inspect its contents.
 
-```pycon exec="true" source="console" session="quickstart"
->>> from ngio import open_ome_zarr_container
->>> ome_zarr_container = open_ome_zarr_container(image_path)
->>> ome_zarr_container
->>> print(ome_zarr_container) # markdown-exec: hide
+```python exec="true" source="material-block" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:open_container"
+```
+
+The pixels are one call away — here is the DAPI channel of that container, read from a
+lower pyramid level:
+
+```python exec="true" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:plot_helpers"
+```
+```python exec="true" html="1" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:plot_quickstart_image"
 ```
 
 ### What is the OME-Zarr container?
 
-The `OME-Zarr Container` is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
+The OME-Zarr container is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables. The [next section](1_ome_zarr_containers.md) goes into more detail: inspecting and editing metadata, opening remote stores, and deriving new images and labels.
 
 ### What is the OME-Zarr container not?
 
-The `OME-Zarr Container` object does not allow the user to interact with the image data directly. For that, we need to use the `Image`, `Label`, and `Table` objects.
+The OME-Zarr container does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
 
 ## Next steps
 
-To learn how to work with the `OME-Zarr Container` object, but also with the image, label, and table data, check out the following guides:
+- [OME-Zarr containers](1_ome_zarr_containers.md) — inspect and modify metadata, and create new images and labels.
+- [Images and labels](2_images.md) — read and write pixel data.
+- [Tables](3_tables.md) — ROIs, features and measurements stored alongside the image.
+- [Masked images and labels](4_masked_images.md) — work object-by-object using a segmentation.
+- [HCS plates](5_hcs.md) — scale up from a single image to a whole plate.
 
-- [OME-Zarr Container](1_ome_zarr_containers.md): An overview on how to use the OME-Zarr Container object and how to create new images and labels.
-- [Images/Labels](2_images.md): To know more on how to work with image data.
-- [Tables](3_tables.md): To know more on how to work with table data, and how you can combine tables with image data.
-- [Masked Images/Labels](4_masked_images.md): To know more on how to work with masked image data.
-- [HCS Plates](5_hcs.md): To know more on how to work with HCS plate data.
+For worked end-to-end examples, see the tutorials:
 
-Also, checkout our jupyer notebook tutorials for more examples:
-
-- [Image Processing](../tutorials/image_processing.ipynb): Learn how to perform simple image processing operations.
-- [Image Segmentation](../tutorials/image_segmentation.ipynb): Learn how to create new labels from images.
-- [Feature Extraction](../tutorials/feature_extraction.ipynb): Learn how to extract features from images.
-- [HCS Exploration](../tutorials/hcs_exploration.ipynb): Learn how to explore high-content screening data using ngio.
+- [Image processing](../tutorials/image_processing.md) — apply a processing step across an image.
+- [Image segmentation](../tutorials/image_segmentation.md) — create new labels from images.
+- [Feature extraction](../tutorials/feature_extraction.md) — measure objects and store the results.
+- [HCS exploration](../tutorials/hcs_exploration.md) — navigate high-content screening data.

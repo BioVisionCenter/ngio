@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+title: "ngio: a Python library for OME-Zarr bioimage analysis"
+message: "If you use this software, please cite it using these metadata."
+type: software
+authors:
+  - given-names: Lorenzo
+    family-names: Cerrone
+    affiliation: "BioVisionCenter, University of Zurich"
+    alias: lorenzocerrone
+  - given-names: Joel
+    family-names: Luethi
+    affiliation: "BioVisionCenter, University of Zurich"
+    alias: jluethi
+repository-code: "https://github.com/BioVisionCenter/ngio"
+url: "https://biovisioncenter.github.io/ngio/"
+abstract: >-
+  ngio is a Python library that simplifies bioimage analysis workflows on OME-Zarr data.
+  It provides an object-based API for images, labels, tables, regions of interest and
+  high-content screening plates.
+keywords:
+  - OME-Zarr
+  - OME-NGFF
+  - bioimage analysis
+  - microscopy
+  - Python
+  - zarr
+license: BSD-3-Clause

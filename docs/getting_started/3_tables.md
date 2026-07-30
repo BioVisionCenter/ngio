@@ -1,221 +1,127 @@
+---
+description: "Load and create ngio tables: ROI, masking ROI, feature and generic tables."
+---
+
 # 3. Tables
 
-Tables are not part of the core OME-Zarr specification but can be used in ngio to store measurements, features, regions of interest (ROIs), and other tabular data. Ngio follows the [Fractal's Table Spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+**Keep ROIs, features and measurements alongside the image.**
+
+Tables are not part of the core OME-Zarr specification, but ngio uses them to store regions
+of interest (ROIs), per-object measurements and other tabular data next to the pixel data.
+The on-disk layout follows ngio's [table specifications](../table_specs/overview.md). It was
+originally defined as part of [Fractal](https://fractal-analytics-platform.github.io/); ngio
+is now where the spec lives and is maintained.
 
 ## Getting a table
 
-We can list all available tables and load a specific table:
+List all available tables and load a specific one:
 
-```pycon exec="true" source="console" session="get_started"
-# List all available tables
->>> ome_zarr_container.list_tables()
->>> list_tables = ome_zarr_container.list_tables() # markdown-exec: hide
->>> print(list_tables) # markdown-exec: hide
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:reopen_container"
 ```
 
-Ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_roi_table`, as well as untyped `generic_table`.
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:reopen_image"
+```
 
-=== "ROI Table"
+```python exec="true" source="material-block" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:list_tables"
+```
+
+ngio recognises four typed tables — `roi_table`, `masking_roi_table`, `feature_table` and `condition_table` — plus the untyped `generic_table`, which is what anything it cannot classify is loaded as. The three you will meet most often are below; see the [table specifications](../table_specs/overview.md) for the rest.
+
+=== "ROI table"
     ROI tables can be used to store arbitrary regions of interest (ROIs) in the image.
-    Here for example we will load the `FOV_ROI_table` that contains the microscope field of view (FOV) ROIs:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> roi_table = ome_zarr_container.get_table("FOV_ROI_table") # Get a ROI table
-    >>> roi_table.get("FOV_1")
-    >>> print(roi_table.get("FOV_1")) # markdown-exec: hide
+    For example, load the `FOV_ROI_table`, which contains the microscope field of view (FOV) ROIs:
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:roi_table_get"
     ```
-    ```python exec="1" html="1" session="get_started"
-    from io import StringIO
-    import matplotlib.pyplot as plt
-    import numpy as np
-    # Create a random colormap for labels
-    from matplotlib.colors import ListedColormap
-    from matplotlib.patches import Rectangle
-    np.random.seed(0)
-    cmap_array = np.random.rand(1000, 3)
-    cmap_array[0] = 0
-    cmap = ListedColormap(cmap_array)
-    image_3 = ome_zarr_container.get_image(path="3")
-    image_data = image_3.get_as_numpy(c=0)
-    image_data = np.squeeze(image_data)
-    roi = roi_table.get("FOV_1")
-    roi = roi.to_pixel(pixel_size=image_3.pixel_size)
-    x_slice = roi.get("x")
-    y_slice = roi.get("y")
-    #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    #label_data = label_3.get_as_numpy()
-    #label_data = np.squeeze(label_data)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_title("FOV_1 ROI")
-    ax.imshow(image_data, cmap='gray')
-    ax.add_patch(Rectangle((x_slice.start, y_slice.start), x_slice.length, y_slice.length, edgecolor='red', facecolor='none', lw=2))
-    #ax.imshow(label_data, cmap=cmap, alpha=0.6)
-    # make sure the roi is centered
-    ax.axis('off')
-    fig.tight_layout()
-    buffer = StringIO()
-    plt.savefig(buffer, format="svg")
-    print(buffer.getvalue())
+    ```python exec="true" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_helpers"
     ```
-    This will return all the ROIs in the table.
-    ROIs can be used to slice the image data:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> roi = roi_table.get("FOV_1")
-    >>> roi_data = image.get_roi_as_numpy(roi)
-    >>> roi_data.shape
-    >>> print(roi_data.shape) # markdown-exec: hide
+    ```python exec="true" html="1" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_fov_roi_on_image"
+    ```
+    `get` returns the single ROI with that name; `rois()` returns them all as a list.
+    A ROI can then be used to slice the image data:
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:roi_table_slice_image"
     ```
     This will return the image data for the specified ROI.
-    ```python exec="1" html="1" session="get_started"
-    from io import StringIO
-    import matplotlib.pyplot as plt
-    import numpy as np
-    # Create a random colormap for labels
-    from matplotlib.colors import ListedColormap
-    from matplotlib.patches import Rectangle
-    np.random.seed(0)
-    cmap_array = np.random.rand(1000, 3)
-    cmap_array[0] = 0
-    cmap = ListedColormap(cmap_array)
-    roi = roi_table.get("FOV_1")
-    image_3 = ome_zarr_container.get_image(path="3")
-    image_data = image_3.get_roi_as_numpy(roi, c=0)
-    image_data = np.squeeze(image_data)
-    #label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    #label_data = label_3.get_as_numpy()
-    #label_data = np.squeeze(label_data)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_title("FOV_1 ROI")
-    ax.imshow(image_data, cmap='gray')
-    #ax.imshow(label_data, cmap=cmap, alpha=0.6)
-    # make sure the roi is centered
-    ax.axis('off')
-    fig.tight_layout()
-    buffer = StringIO()
-    plt.savefig(buffer, format="svg")
-    print(buffer.getvalue())
+    ```python exec="true" html="1" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_fov_roi_crop"
     ```
 
-=== "Masking ROI Table"
+=== "Masking ROI table"
     Masking ROIs are a special type of ROIs that can be used to store ROIs for masked objects in the image.
     The `nuclei_ROI_table` contains the masks for the `nuclei` label in the image, and is indexed by the label id.
-    ```pycon exec="true" source="console" session="get_started"
-    >>> masking_table = ome_zarr_container.get_table("nuclei_ROI_table") # Get a mask table
-    >>> masking_table.get_label(1)
-    >>> print(masking_table.get_label(100)) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:masking_table_get"
     ```
     ROIs can be used to slice the image data:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> roi = masking_table.get_label(100)
-    >>> roi_data = image.get_roi_as_numpy(roi)
-    >>> roi_data.shape
-    >>> print(roi_data.shape) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:masking_table_slice_image"
     ```
     This will return the image data for the specified ROI.
-    ```python exec="1" html="1" session="get_started"
-    from io import StringIO
-    import matplotlib.pyplot as plt
-    import numpy as np
-    # Create a random colormap for labels
-    from matplotlib.colors import ListedColormap
-    from matplotlib.patches import Rectangle
-    np.random.seed(0)
-    cmap_array = np.random.rand(1000, 3)
-    cmap_array[0] = 0
-    cmap = ListedColormap(cmap_array)
-    roi = masking_table.get_label(100)
-    image_3 = ome_zarr_container.get_image(path="2")
-    image_data = image_3.get_roi_as_numpy(roi, c=0)
-    image_data = np.squeeze(image_data)
-    label_3 = ome_zarr_container.get_label("nuclei", pixel_size=image_3.pixel_size)
-    label_data = label_3.get_roi_as_numpy(roi)
-    label_data = np.squeeze(label_data)
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.set_title("Label 1 ROI")
-    ax.imshow(image_data, cmap='gray')
-    ax.imshow(label_data, cmap=cmap, alpha=0.6)
-    # make sure the roi is centered
-    ax.axis('off')
-    fig.tight_layout()
-    buffer = StringIO()
-    plt.savefig(buffer, format="svg")
-    print(buffer.getvalue())
+    ```python exec="true" html="1" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_masking_roi_crop"
     ```
-    See [4. Masked Images and Labels](./4_masked_images.md) for more details on how to use the masking ROIs to load masked data.
+    See [4. Masked images and labels](./4_masked_images.md) for more details on how to use the masking ROIs to load masked data.
 
-=== "Features Table"
-    Features tables are used to store measurements and are indexed by the label id
-    ```pycon exec="true" source="material-block" session="get_started"
-    >>> feature_table = ome_zarr_container.get_table("regionprops_DAPI") # Get a feature table
-    >>> feature_table.dataframe.head(5) # only show the first 5 rows
-    >>> print(feature_table.dataframe.head(5).to_markdown()) # markdown-exec: hide
+=== "Feature table"
+    Feature tables are used to store measurements and are indexed by the label id
+    ```python exec="true" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:table_helpers"
+    ```
+    ```python exec="true" html="1" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:feature_table"
     ```
 
 ## Creating a table
 
-Tables (differently from Images and Labels) can be purely in memory objects, and don't need to be saved on disk.
+Tables (unlike images and labels) can be purely in-memory objects, and don't need to be saved on disk.
 
-=== "Creating a ROI Table"
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio.tables import RoiTable
-    >>> from ngio import Roi
-    >>> roi = Roi.from_values(slices={"x": (0, 128), "y": (0, 128)}, name="FOV_1")
-    >>> roi_table = RoiTable(rois=[roi])
-    >>> print(roi_table) # markdown-exec: hide
+=== "Creating a ROI table"
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:create_roi_table"
     ```
     If you would like to create on-the-fly a ROI table for the whole image:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> roi_table = ome_zarr_container.build_image_roi_table("whole_image")
-    >>> roi_table
-    >>> print(ome_zarr_container.build_image_roi_table("whole_image")) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:build_image_roi_table"
     ```
     The `build_image_roi_table` method will create a ROI table with a single ROI that covers the whole image.
     This table is not associated with the image and is purely in memory.
-    If we want to save it to disk, we can use the `add_table` method:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> ome_zarr_container.add_table("new_roi_table", roi_table, overwrite=True)
-    >>> roi_table = ome_zarr_container.get_table("new_roi_table")
-    >>> print(roi_table) # markdown-exec: hide
+    To save it to disk, use the `add_table` method:
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:add_roi_table"
     ```
 
-=== "Creating a Masking ROI Table"
-    Similarly to the ROI table, we can create a masking ROI table on-the-fly:
-    Let's for example create a masking ROI table for the `nuclei` label:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> masking_table = ome_zarr_container.build_masking_roi_table("nuclei")
-    >>> masking_table
-    >>> print(ome_zarr_container.build_masking_roi_table("nuclei")) # markdown-exec: hide
+=== "Creating a masking ROI table"
+    As with the ROI table, you can create a masking ROI table on the fly, here for the `nuclei` label:
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:build_masking_roi_table"
     ```
 
-=== "Creating a Feature Table"
+=== "Creating a feature table"
     Feature tables can be created from a pandas `Dataframe`:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio.tables import FeatureTable
-    >>> import pandas as pd
-    >>> example_data = pd.DataFrame({"label": [1, 2, 3], "area": [100, 200, 300]})
-    >>> feature_table = FeatureTable(table_data=example_data)
-    >>> feature_table
-    >>> print(feature_table) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:create_feature_table"
     ```
 
-=== "Creating a Generic Table"
+=== "Creating a generic table"
     Sometimes you might want to create a table that doesn't fit into the `ROI`, `Masking ROI`, or `Feature` categories.
-    In this case, you can use the `GenericTable` class, which allows you to store any tabular data.
+    In this case, you can use the [`GenericTable`][ngio.tables.GenericTable] class, which allows you to store any tabular data.
     It can be created from a pandas `Dataframe`:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio.tables import GenericTable
-    >>> import pandas as pd
-    >>> example_data = pd.DataFrame({"area": [100, 200, 300], "perimeter": [50, 60, 70]})
-    >>> generic_table = GenericTable(table_data=example_data)
-    >>> generic_table
-    >>> print(generic_table) # markdown-exec: hide
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:create_generic_table"
     ```
-    Or from an "AnnData" object:
-    ```pycon exec="true" source="console" session="get_started"
-    >>> from ngio.tables import GenericTable
-    >>> import anndata as ad
-    >>> adata = ad.AnnData(X=np.random.rand(10, 5), obs=pd.DataFrame({"cell_type": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]}))
-    >>> generic_table = GenericTable(table_data=adata)
-    >>> generic_table
-    >>> print(generic_table) # markdown-exec: hide
+    Or from an `AnnData` object:
+    ```python exec="true" source="material-block" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:generic_table_from_anndata"
     ```
-    The `GenericTable` class allows you to store any tabular data, and is a flexible way to work with tables in ngio.
+
+## Next steps
+
+- [Masked images and labels](4_masked_images.md) — use masking ROI tables to read per-object data.
+- [Table specifications](../table_specs/overview.md) — the on-disk format behind these tables.
+- [Tables API reference](../api/tables.md) — the table classes and backends.

@@ -1,17 +1,27 @@
-# HCS API Documentation
+---
+description: API reference for OmeZarrPlate and OmeZarrWell.
+---
 
-## Open a Plate
+# HCS API reference
+
+## Open a plate
 
 ::: ngio.open_ome_zarr_plate
 
-## ngio.OmeZarrPlate Class Reference
+## OmeZarrPlate
 
 ::: ngio.OmeZarrPlate
 
-## Open a Well
+## Open a well
 
 ::: ngio.open_ome_zarr_well
 
-## ngio.OmeZarrWell Class Reference
+## OmeZarrWell
 
 ::: ngio.OmeZarrWell
+
+## Create a plate or a well
+
+::: ngio.create_empty_plate
+
+::: ngio.create_empty_well

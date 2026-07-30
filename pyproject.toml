@@ -89,22 +89,21 @@ dev = [
 
 docs = [
     "ruff",
-    "mkdocs<2.0",
-    "mkdocs-include-markdown-plugin",
-    "mkdocs-material",
+    "zensical",
     "mkdocstrings[python]",
-    "mkdocs-jupyter",
     "mkdocs-autorefs",
-    "mkdocs-git-revision-date-localized-plugin",
-    "mkdocs-git-committers-plugin-2",
     "markdown-exec[ansi]",
+    # Was only transitive via mkdocs-material, which Zensical replaces.
+    "pymdown-extensions",
     "griffe-typingdoc",
     "scikit-image",
     "matplotlib",
     "tabulate",
     "rich",
-    "mike",
 ]
+# `mike` is deliberately NOT listed above: Zensical needs the maintainers' fork, which is
+# only installable from git, and a PEP 508 direct reference in optional-dependencies would
+# make ngio unpublishable to PyPI. It lives in the pixi docs feature instead.
 
 
 [project.urls]
@@ -148,6 +147,9 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
+# Doc snippets are split into sections that are rendered as standalone code blocks,
+# so each section repeats the imports it needs.
+"docs/snippets/**/*.py" = ["D", "E402", "F811", "I001"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
@@ -261,10 +263,48 @@ python = ">=3.13,<3.14"
 [tool.pixi.feature.py14.dependencies]
 python = ">=3.14,<3.15"
 
+[tool.pixi.feature.docs.pypi-dependencies]
+# Zensical's versioning story is a fork of mike that is not published to PyPI.
+# Kept here rather than in [project.optional-dependencies] so ngio itself stays
+# publishable (PyPI rejects direct URL references).
+mike = { git = "https://github.com/squidfunk/mike.git" }
+
 [tool.pixi.feature.docs.tasks]
-serve_docs = "mkdocs serve"
-clean_nb_data = "rm -rf ./docs/notebooks/**/*.zarr"
-test_nb = { cmd = "jupyter-execute ./docs/notebooks/*.ipynb" }
+serve_docs = "zensical serve"
+# --strict matters: without it `zensical build` exits 0 and prints "No issues found"
+# even when markdown-exec code blocks raised, silently publishing tracebacks.
+# --clean avoids reusing cached HTML from a previous (possibly broken) build.
+build_docs = "zensical build --clean --strict"
+# Drops the generated stores but keeps the downloaded archives cached in ./data.
+# `data/tmp` is the shared staging dir `download_ome_zarr_dataset` extracts through; an
+# interrupted build can leave a half-extracted dataset there, and every later build then
+# fails with "Expected one directory to be extracted, got 2". Clearing it is the fix.
+clean_docs_data = "rm -rf ./data/tmp ./data/*.zarr"
+snip_quickstart = "python docs/snippets/getting_started/quickstart.py > /dev/null"
+snip_get_started = "python docs/snippets/getting_started/get_started.py > /dev/null"
+snip_masked_images = "python docs/snippets/getting_started/masked_images.py > /dev/null"
+snip_iterators = "python docs/snippets/getting_started/iterators.py > /dev/null"
+snip_hcs = "python docs/snippets/getting_started/hcs.py > /dev/null"
+snip_create_ome_zarr = "python docs/snippets/tutorials/create_ome_zarr.py > /dev/null"
+snip_image_processing = "python docs/snippets/tutorials/image_processing.py > /dev/null"
+snip_image_segmentation = "python docs/snippets/tutorials/image_segmentation.py > /dev/null"
+snip_feature_extraction = "python docs/snippets/tutorials/feature_extraction.py > /dev/null"
+snip_hcs_exploration = "python docs/snippets/tutorials/hcs_exploration.py > /dev/null"
+# Must stay sequential: `download_ome_zarr_dataset` stages every extraction through a
+# single shared `<download_dir>/tmp` that it wipes on entry, so two scripts downloading
+# at once clobber each other. (`depends-on` would run them in parallel.)
+test_snippets = """
+python docs/snippets/getting_started/quickstart.py > /dev/null &&
+python docs/snippets/getting_started/get_started.py > /dev/null &&
+python docs/snippets/getting_started/masked_images.py > /dev/null &&
+python docs/snippets/getting_started/iterators.py > /dev/null &&
+python docs/snippets/getting_started/hcs.py > /dev/null &&
+python docs/snippets/tutorials/create_ome_zarr.py > /dev/null &&
+python docs/snippets/tutorials/image_processing.py > /dev/null &&
+python docs/snippets/tutorials/image_segmentation.py > /dev/null &&
+python docs/snippets/tutorials/feature_extraction.py > /dev/null &&
+python docs/snippets/tutorials/hcs_exploration.py > /dev/null
+"""
 
 
 [tool.pixi.environments]

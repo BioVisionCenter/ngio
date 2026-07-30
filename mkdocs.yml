@@ -1,60 +1,98 @@
-site_name: "NGIO: Next Generation File Format I/O"
-site_url: "https://github.com/BioVisionCenter/ngio.git"
-site_description: "A Python library for processing OME-Zarr images"
+# The name is an acronym: n(ext) g(eneration file format) IO. Lowercased, because the
+# project styles itself lowercase everywhere else. What the library actually does is
+# spelled out in `site_description` and on the landing page.
+site_name: "ngio: next generation file format IO"
+# The published docs root (mike serves versions beneath it, e.g. /ngio/stable/).
+# This was previously the git clone URL, which produced wrong canonical links and, under
+# Zensical, a bogus /BioVisionCenter/ngio.git/ base path when serving locally.
+site_url: "https://biovisioncenter.github.io/ngio/"
+site_description: "A Python library for OME-Zarr bioimage analysis"
 repo_name: "ngio"
 repo_url: "https://github.com/BioVisionCenter/ngio"
-copyright: "Copyright &copy; 2024-, BioVisionCenter UZH"
+copyright: "Copyright &copy; 2024-2026, BioVisionCenter UZH"
+# GitHub's default branch here is `main`. Zensical would otherwise derive
+# `edit/master/docs` (config.py:439-453) and every edit link would 404.
+edit_uri: edit/main/docs/
+
+# The snippet scripts are executed into the docs via pymdownx.snippets, which reads them
+# from the filesystem rather than from the page tree.
+# NOTE: Zensical does not honour `exclude_docs`, so the .py files are still copied into
+# the built site as static assets (they are not rendered as pages). Harmless — they are
+# already public in the repo — but that is why they show up under site/snippets/.
+exclude_docs: |
+  snippets/
 
 theme:
   name: material
-  favicon: images/favicon.ico
-  #logo: logos/logo_white.png
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
   icon:
     repo: fontawesome/brands/github
+  # Space Grotesk (display face) is loaded from ngio.css; theme.font only
+  # manages the text and code families.
+  font:
+    text: IBM Plex Sans
+    code: JetBrains Mono
+  # The real brand palette lives in stylesheets/ngio.css as variable overrides;
+  # config only picks the nearest stock name so the toggle behaves.
   palette:
     # Palette toggle for light mode
     - scheme: default
-      # primary: green
+      primary: teal
+      accent: teal
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
 
     # Palette toggle for dark mode
     - scheme: slate
-      # primary: teal
-      # accent: light-green
+      primary: teal
+      accent: teal
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
 
+  # Only flags Zensical's templates actually read are listed. Previously enabled but
+  # absent from zensical/templates/, i.e. dead config: navigation.instant, toc.follow,
+  # search.suggest, search.share.
   features:
-    - content.tooltips
-    - content.tabs.link
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
     - content.code.annotate
-    - navigation.instant
-    - navigation.instant.progress
-    - navigation.sections
-    - navigation.path
-    - navigation.indexes
+    - content.tabs.link
+    - content.tooltips
     - navigation.footer
-    #- toc.integrate
-    - toc.follow
-    - search.suggest
-    - search.share
+    - navigation.indexes
+    - navigation.instant.progress
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+
+extra_css:
+  - stylesheets/ngio.css
 
 extra:
+  homepage: https://biovisioncenter.github.io/ngio/
   version:
     provider: mike
   social:
     - icon: fontawesome/brands/github
       link: "https://github.com/BioVisionCenter/ngio"
-      name: NGIO on GitHub
+      name: ngio on GitHub
+    - icon: fontawesome/brands/python
+      link: "https://pypi.org/project/ngio/"
+      name: ngio on PyPI
+    - icon: fontawesome/solid/microscope
+      link: "https://www.biovisioncenter.uzh.ch/en.html"
+      name: BioVisionCenter, University of Zurich
 
 plugins:
   - search
   - autorefs
   - markdown-exec
-  - include-markdown
   - mkdocstrings:
       handlers:
         python:
@@ -83,57 +121,93 @@ plugins:
             signature_crossrefs: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
-  - git-revision-date-localized:
-      enable_creation_date: true
-  - git-committers:
-      repository: BioVisionCenter/ngio
-      branch: main
-  - mkdocs-jupyter:
-      execute: true
 
+# IMPORTANT: declaring this key REPLACES Zensical's ~30 defaults rather than extending
+# them (zensical/config.py:656 — `config.get("markdown_extensions", DEFAULT_...)`), so
+# everything we rely on must be listed here explicitly. Omitting `tables` is what once
+# made pipe tables render as literal `|---|` text; omitting `attr_list` silently broke
+# `content.code.annotate`, and omitting `abbr` broke `content.tooltips`.
+# Deliberately NOT restored from Zensical's defaults:
+#   pymdownx.smartsymbols — rewrites `<--` to an arrow, and every snippet include
+#     contains `--8<--`; not worth the risk for the gain.
+#   pymdownx.caret / tilde — turn `^x^` / `~x~` into super/subscript, a latent trap in
+#     prose about array axes and dtypes.
+#   pymdownx.magiclink — changes how bare URLs render across existing pages.
+#   pymdownx.arithmatex — no maths in these docs.
 markdown_extensions:
+  - abbr                  # glossary tooltips (with content.tooltips)
   - admonition
-  - pymdownx.details
-  - pymdownx.superfences
+  - attr_list             # grid cards, code annotations, link attributes
+  - def_list
+  - footnotes
   - md_in_html
+  - tables
+  - pymdownx.details
+  # NB: zensical.extensions.emoji, not material.extensions.emoji — mkdocs-material is
+  # not installed since the Zensical migration.
+  - pymdownx.emoji:
+      emoji_generator: !!python/name:zensical.extensions.emoji.to_svg
+      emoji_index: !!python/name:zensical.extensions.emoji.twemoji
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets:
+      base_path: ["."]
+      check_paths: true
+      auto_append:
+        - docs/_glossary.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
   - pymdownx.tabbed:
       alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
   - toc:
       permalink: true
       toc_depth: 3
 
 
+# Nav labels are sentence case, like every other heading and title on the site.
+# Initialisms (OME-Zarr, HCS, ROI, API) keep their capitals; the common nouns
+# beside them do not. "Code of Conduct" is the exception: that is the proper
+# name of the Contributor Covenant document, not a description.
 nav:
-  - "NGIO: Streamlined OME-Zarr Image Analysis": index.md
-  - Getting Started:
-    - getting_started/0_quickstart.md
-    - getting_started/1_ome_zarr_containers.md
-    - getting_started/2_images.md
-    - getting_started/3_tables.md
-    - getting_started/4_masked_images.md
-    - getting_started/5_hcs.md
-    - getting_started/6_iterators.md
-    - getting_started/7_configuration.md
+  - Home: index.md
+  - Getting started:
+    - "Quickstart": getting_started/0_quickstart.md
+    - "OME-Zarr containers": getting_started/1_ome_zarr_containers.md
+    - "Images and labels": getting_started/2_images.md
+    - "Tables": getting_started/3_tables.md
+    - "Masked images and labels": getting_started/4_masked_images.md
+    - "HCS plates": getting_started/5_hcs.md
+    - "Iterators": getting_started/6_iterators.md
+    - "Configuration": getting_started/7_configuration.md
 
   - Tutorials:
-    - tutorials/create_ome_zarr.ipynb
-    - tutorials/image_processing.ipynb
-    - tutorials/image_segmentation.ipynb
-    - tutorials/feature_extraction.ipynb
-    - tutorials/hcs_exploration.ipynb
+    - "Create an OME-Zarr image": tutorials/create_ome_zarr.md
+    - "Image processing": tutorials/image_processing.md
+    - "Image segmentation": tutorials/image_segmentation.md
+    - "Feature extraction": tutorials/feature_extraction.md
+    - "HCS exploration": tutorials/hcs_exploration.md
 
-  - Table Specifications:
+  - Table specifications:
     - "Overview": table_specs/overview.md
-    - "Table Backends": table_specs/backend.md
-    - "Table Types":
-      - "Generic Table": table_specs/table_types/generic_table.md
-      - "ROI Table": table_specs/table_types/roi_table.md
-      - "Masking ROI Table": table_specs/table_types/masking_roi_table.md
-      - "Feature Table": table_specs/table_types/feature_table.md
-      - "Condition Table": table_specs/table_types/condition_table.md
-      - "Add Custom Table": table_specs/table_types/custom_table.md
+    - "Table backends": table_specs/backend.md
+    - "Table types":
+      - "Generic table": table_specs/table_types/generic_table.md
+      - "ROI table": table_specs/table_types/roi_table.md
+      - "Masking ROI table": table_specs/table_types/masking_roi_table.md
+      - "Feature table": table_specs/table_types/feature_table.md
+      - "Condition table": table_specs/table_types/condition_table.md
+      - "Add a custom table": table_specs/table_types/custom_table.md
 
-  - API Reference:
+  - API reference:
     - "OmeZarrContainer": api/ome_zarr_container.md
     - "Images": api/images.md
     - "HCS": api/hcs.md
@@ -143,7 +217,7 @@ nav:
       - "ngio": api/ngio/ngio.md
       - "ngio.common": api/ngio/common.md
       - "ngio.io_pipes": api/ngio/io_pipes.md
-      - "ngio.iterators": api/ngio/iterators.md
+      - "ngio.experimental.iterators": api/ngio/iterators.md
       - "ngio.images": api/ngio/images.md
       - "ngio.tables": api/ngio/tables.md
       - "ngio.hcs": api/ngio/hcs.md
@@ -152,5 +226,5 @@ nav:
     - changelog.md
 
   - Contributing:
-    - "Contributing Guide": contributing.md
+    - "Contributing guide": contributing.md
     - "Code of Conduct": code_of_conduct.md

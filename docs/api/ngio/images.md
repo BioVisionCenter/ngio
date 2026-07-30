@@ -1,3 +1,3 @@
-# ngio.images API documentation
+# ngio.images API reference
 
 ::: ngio.images

@@ -41,6 +41,11 @@
 - Apply the `io_retry` policy to the IO paths that bypass the zarr store: the pyarrow table backend's dataset load/write, the AnnData backend's direct local/fsspec writes, and the `fractal_fsspec_store` metadata probe (where 401 auth failures are translated to `NgioValueError` inside the retried call, so they are never retried — even in blanket mode).
 
 ### Documentation
+- Rebuild the docs on [Zensical](https://zensical.org) instead of MkDocs + Material, and move every executed code block out of the Markdown into standalone scripts under `docs/snippets/`, included via `pymdownx.snippets` and run at build time. The five tutorial notebooks become Markdown pages, and CI builds with `--strict`.
+- Apply a new design system to the docs and the README. The full theme in `docs/stylesheets/ngio.css`.
+- Rewrite the copy to the design system's content conventions across every page, the nav and `llms.txt`, and add a landing page, a glossary, and API cross-references.
+- Correct what the docs claim against what ngio actually does, most substantially on the table specification pages.
+- Add `CODE_OF_CONDUCT.md` and `CITATION.cff`, and move `CONTRIBUTING.md` to the repository root, single-sourced into the docs so GitHub's community widgets pick them up.
 - Add a "Configuration" getting-started page documenting the config file location (`~/.ngio/ngio_config.json` / `NGIO_CONFIG_PATH`), the `io_retry` policy (fields, backoff strategies, marker matching, snapshot-at-open vs read-at-call semantics), and its relationship to the lower-level `s3fs.custom_retry_markers` mechanism. `NgioConfig`, `RetryConfig`, and `get_config` are now listed in the top-level API reference.
 
 ### Fix

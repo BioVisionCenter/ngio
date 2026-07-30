@@ -1,17 +1,21 @@
-# Images Like: API Documentation
+---
+description: API reference for the Image and Label objects.
+---
 
-## Open an Image
+# Images API reference
+
+## Open an image
 
 ::: ngio.open_image
 
-## ngio.Image Class Reference
+## Image
 
 ::: ngio.Image
 
-## Open a Label
+## Open a label
 
 ::: ngio.open_label
 
-## ngio.Label Class Reference
+## Label
 
 ::: ngio.Label

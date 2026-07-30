@@ -1,4 +1,4 @@
-# ngio API documentation
+# ngio API reference
 
 ::: ngio
     options:
