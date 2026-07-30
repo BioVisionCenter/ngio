@@ -2,7 +2,10 @@
 description: ngio is a Python library for OME-Zarr bioimage analysis, with an object-based API for images, labels, tables, ROIs and HCS plates.
 ---
 
-# ngio
+# ngio { .ngio-visually-hidden }
+
+![](assets/logo-lockup.svg#only-light){ .ngio-hero-logo }
+![](assets/logo-lockup-dark.svg#only-dark){ .ngio-hero-logo }
 
 **Next generation file format IO — a Python library for OME-Zarr bioimage analysis.**
 

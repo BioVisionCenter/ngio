@@ -1,4 +1,9 @@
-# ngio
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/BioVisionCenter/ngio/main/docs/assets/logo-lockup-dark.svg">
+    <img alt="ngio" width="320" src="https://raw.githubusercontent.com/BioVisionCenter/ngio/main/docs/assets/logo-lockup.svg">
+  </picture>
+</p>
 
 [![License](https://img.shields.io/pypi/l/ngio.svg?color=green)](https://github.com/BioVisionCenter/ngio/raw/main/LICENSE)
 [![PyPI](https://img.shields.io/pypi/v/ngio.svg?color=green)](https://pypi.org/project/ngio)

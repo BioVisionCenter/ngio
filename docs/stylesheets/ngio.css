@@ -269,6 +269,22 @@
   width: 1.5rem;
 }
 
+/* theme.logo is one file for both schemes, and it is an `<img src>`, so it has
+   the same problem as the lockup in 6c: it cannot see the palette. The chrome
+   is near-white under default and dark under slate, where the colour mark's
+   deepest level (#1c7c69) goes muddy — hence the swap to the dark mark.
+   Done as a background on the anchor rather than `content: url()`, whose
+   support on replaced elements is uneven; the img is left in place, only made
+   invisible, so it keeps holding the 1.5rem box open. Paths here resolve
+   against this stylesheet, i.e. /stylesheets/ → /assets/. */
+[data-md-color-scheme="slate"] .md-header__button.md-logo {
+  background: url("../assets/logo-dark.svg") no-repeat center / 1.5rem 1.5rem;
+}
+
+[data-md-color-scheme="slate"] .md-header__button.md-logo :is(img, svg) {
+  visibility: hidden;
+}
+
 /* ── The header wordmark ──────────────────────────────────────────────────
    Zensical renders `site_name` as the header title, which is the descriptive
    string we want in <title> and in search results but not in the lockup. The
@@ -477,6 +493,42 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* ── 6c. The landing-page lockup ──────────────────────────────────────────────
+   The one place the inline-SVG trick of 6b does not apply. The lockup's
+   wordmark is outlined path data rather than live text — an SVG used as an
+   image cannot load the webfont — so it ships as two files with baked-in
+   fills, one per scheme, and takes the two-file route 6b avoids.
+
+   Nothing here performs the swap: Zensical's own stylesheets hide
+   `img[src$="#only-light"]` under slate and `img[src$="#only-dark"]` under
+   default, so the pair in index.md only needs the URL fragments. What is left
+   is the size, which the SVG cannot supply on its own at this width.
+
+   The heading the lockup replaced is still in the page, just moved off-screen:
+   Zensical takes the page title from the first h1, the table of contents wants
+   a root entry, and a screen reader wants a heading — none of which an image
+   provides. The images are therefore marked decorative (empty alt) so the name
+   is announced once, by the h1. */
+.md-typeset .ngio-hero-logo {
+  display: block;
+  width: 15rem;
+  max-width: 100%;
+  height: auto;
+  margin: 0 0 1.2rem;
+}
+
+.md-typeset .ngio-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* ── 7. Content tabs (pip / mamba / source) ──────────────────────────────── */

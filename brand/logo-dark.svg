@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="ngio">
+  <title>ngio</title>
+  
+  
+  <polygon points="3,21.5 16,15 29,21.5 16,28" fill="#1f9389"></polygon>
+  <polygon points="3,21.5 16,28 16,30.2 3,23.7" fill="#1b8177"></polygon>
+  <polygon points="29,21.5 16,28 16,30.2 29,23.7" fill="#1d8a80"></polygon>
+  
+  <polygon points="7,14 16,9.5 25,14 16,18.5" fill="#6cc8be"></polygon>
+  <polygon points="7,14 16,18.5 16,20.7 7,16.2" fill="#5fb0a7"></polygon>
+  <polygon points="25,14 16,18.5 16,20.7 25,16.2" fill="#65bcb3"></polygon>
+  
+  <polygon points="10.5,7.5 16,4.75 21.5,7.5 16,10.25" fill="#abe4dc"></polygon>
+  <polygon points="10.5,7.5 16,10.25 16,12.45 10.5,9.7" fill="#97c8c1"></polygon>
+  <polygon points="21.5,7.5 16,10.25 16,12.45 21.5,9.7" fill="#a1d7d0"></polygon>
+</svg>
