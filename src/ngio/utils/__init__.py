@@ -5,6 +5,7 @@ from ngio.utils._datasets import (
     list_ome_zarr_datasets,
     print_datasets_infos,
 )
+from ngio.utils._deprecate import deprecated, deprecated_alias
 from ngio.utils._errors import (
     NgioError,
     NgioFileExistsError,
@@ -44,6 +45,8 @@ __all__ = [
     "StoreOrGroup",
     "ZarrGroupHandler",
     "copy_group",
+    "deprecated",
+    "deprecated_alias",
     "download_ome_zarr_dataset",
     "fractal_fsspec_store",
     "list_ome_zarr_datasets",
