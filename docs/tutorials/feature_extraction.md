@@ -4,6 +4,8 @@ description: Extract regionprops features and store them as an ngio feature tabl
 
 # Feature extraction
 
+**Measure per-label features and store them as a table.**
+
 Measure regionprops features from a segmented image with `ngio` and `skimage`, and write
 them back as a feature table in the OME-Zarr container. By the end the container holds a
 table with one row per label, ready to be read back or aggregated across a plate.

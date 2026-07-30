@@ -4,6 +4,8 @@ description: Segment an OME-Zarr image per field of view, then repeat within a m
 
 # Image segmentation
 
+**Segment an image one field of view at a time.**
+
 Segment an OME-Zarr image with `ngio` and `skimage`, one field of view at a time, and
 write the result back as a label. The second half repeats the segmentation inside a mask,
 so it only runs where you want it to.

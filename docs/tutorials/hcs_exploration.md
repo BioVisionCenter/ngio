@@ -4,6 +4,8 @@ description: Explore an HCS plate, aggregate tables across images, and create a 
 
 # HCS exploration
 
+**Explore a plate and aggregate tables across it.**
+
 Open an OME-Zarr plate with `ngio`, see what it contains, aggregate a table across every
 image in it, and write the result back to the plate. The last section creates a new empty
 plate from scratch.

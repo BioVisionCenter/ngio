@@ -212,6 +212,9 @@
   font-size: 2.6rem;
   line-height: 1.08;
   letter-spacing: -0.035em;
+  /* The theme's bottom margin is 1.25em of the h1's own size, so the 2.6rem
+     above opens a 65px gap over the lede. Pinned in rem so it stays put. */
+  margin: 0 0 1.1rem;
   color: var(--md-default-fg-color);
 }
 

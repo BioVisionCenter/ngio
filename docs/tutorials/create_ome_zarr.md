@@ -4,6 +4,8 @@ description: Convert a numpy array into an OME-Zarr image and attach a ROI table
 
 # Create an OME-Zarr image
 
+**Convert a numpy array into an OME-Zarr image.**
+
 Convert a numpy array into an OME-Zarr image with `ngio`, then attach a ROI table to it.
 By the end you will have an on-disk container that the other tutorials read from.
 

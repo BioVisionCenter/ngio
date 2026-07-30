@@ -4,6 +4,8 @@ description: Apply a Gaussian blur eagerly, lazily with dask, and through an ngi
 
 # Image processing
 
+**Apply a Gaussian blur three ways.**
+
 Apply a Gaussian blur to an OME-Zarr image three ways with `ngio`: eagerly on a numpy
 array, lazily with `dask`, and through an ngio iterator. Along the way you derive a new
 container that keeps the metadata of the original and write the processed image into it.
