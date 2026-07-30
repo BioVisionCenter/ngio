@@ -23,34 +23,10 @@ docs test_snippets                # run every docs snippet script standalone
 docs clean_docs_data              # drop generated ./data/*.zarr stores
 ```
 
-## Docs snippets
-Executed code on the docs pages lives in real Python scripts under `docs/snippets/`,
-not in the markdown. A page includes a named section via `pymdownx.snippets`:
-
-````markdown
-```python exec="true" source="material-block" session="get_started"
---8<-- "docs/snippets/getting_started/get_started.py:levels"
-```
-````
-
-- Sections are delimited by `# --8<-- [start:name]` / `# --8<-- [end:name]`.
-- Use `source="material-block"` (not `block`) and `html="1"` for figure blocks.
-- One script per session; each must run standalone from the repo root.
-- **Every page must bind its own state.** The site is built by Zensical, which gives each
-  page a fresh markdown-exec session — a page cannot use a variable bound on another page.
-  Pages 2 and 3 of the getting-started guide therefore include the silent
-  `reopen_container` / `reopen_image` sections at the top (hidden, no `source=`).
-- **Printing a table? Call the `print_table` helper, with `html="1"` on the fence.**
-  `.to_markdown()` does not work: Zensical does not run block-level Markdown over
-  markdown-exec output, so a pipe table stays literal `|---|` text (static pipe tables in
-  `.md` sources are fine). `print_table` emits `to_html()` and strips the
-  `class="dataframe"` / `border` attributes pandas adds, because every theme table rule —
-  and the JS that adds the horizontal-scroll wrapper — is gated on `table:not([class])`.
-- Always build with `--clean --strict` (what `build_docs` does). Plain `zensical build`
-  exits 0 and reports "No issues found" even when a code block raised, and it will serve
-  cached HTML from a previous broken build.
-- Sections repeat their imports so each rendered block stands alone (hence the
-  `docs/snippets/**` ruff per-file-ignores).
+## Docs
+Snippet mechanics and build traps: see `docs/CLAUDE.md`. Snippet scripts repeat their
+imports so each rendered block stands alone (hence the `docs/snippets/**` ruff
+per-file-ignores).
 
 ## Config
 - Python: 3.11–3.14
@@ -65,7 +41,6 @@ not in the markdown. A page includes a named section via `pymdownx.snippets`:
   - Don't restate types in prose — they live in the signature (`channel: The channel to load.`, not `channel (int): ...`)
   - Sections: `Args`, `Returns`, `Raises`, `Example`, `Note`
   - One-line summary, blank line, then body
-  - Code examples in fenced ` ```python ` blocks, not `>>>` doctests
   - Terse: behavior and edge cases only, don't restate the signature
 - Type checking via `ty`
 - Internal modules prefixed with `_`
@@ -74,12 +49,5 @@ not in the markdown. A page includes a named section via `pymdownx.snippets`:
 
 ## Changelog
 
-- Follow the format in `CHANGELOG.md`
-- **Always** update `CHANGELOG.md` when making code changes — add entries under the current `## [vX.Y.Z]` section (or create one if missing).
-- Use these subsections (omit empty ones):
-  - `### Features` — new user-visible behaviour
-  - `### Fix` — bug fixes
-  - `### API Breaking Changes` — anything that breaks existing call sites (include before/after example)
-  - `### Chores` — internal refactors, dependency bumps, CI changes
-  - `### Documentation` — doc-only changes
-- One bullet per logical change; use backticks for identifiers.
+- Follow the format in `CHANGELOG.md`.
+- **Always** update `CHANGELOG.md` when making code changes — add entries under the current `## [Unreleased]` section (or create one if missing).
