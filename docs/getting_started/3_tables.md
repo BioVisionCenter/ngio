@@ -8,7 +8,9 @@ description: "Load and create ngio tables: ROI, masking ROI, feature and generic
 
 Tables are not part of the core OME-Zarr specification, but ngio uses them to store regions
 of interest (ROIs), per-object measurements and other tabular data next to the pixel data.
-The on-disk layout follows [Fractal's table spec](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+The on-disk layout follows ngio's [table specifications](../table_specs/overview.md). It was
+originally defined as part of [Fractal](https://fractal-analytics-platform.github.io/); ngio
+is now where the spec lives and is maintained.
 
 ## Getting a table
 

@@ -69,3 +69,10 @@ the masked image rather than the original one.
 
 - [Feature extraction](feature_extraction.md) — measure the objects you just segmented.
 - [Masked images and labels](../getting_started/4_masked_images.md) — read data object-by-object.
+
+## Beyond the tutorials
+
+The [ngio workshop](https://github.com/BioVisionCenter/ngio-workshop) has hands-on marimo
+notebooks covering containers, images, labels and tables, and the processing iterators. Run
+them locally with `uv`, in the browser via molab, or read them as
+[static pages](https://biovisioncenter.github.io/ngio-workshop/).

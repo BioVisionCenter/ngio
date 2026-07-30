@@ -16,14 +16,14 @@ regions of interest (ROIs) for extracting and analysing specific regions of your
 
 ## Installation
 
-```bash
-pip install ngio
-```
-
-or
+To install ngio, use whichever package manager you already work with — it is published on
+both PyPI and conda-forge.
 
 ```bash
-mamba install -c conda-forge ngio
+pip install ngio                    # pip
+uv add ngio                         # uv project (or: uv pip install ngio)
+pixi add ngio                       # pixi, from conda-forge (--pypi for PyPI)
+mamba install -c conda-forge ngio   # mamba/conda
 ```
 
 Then work through the

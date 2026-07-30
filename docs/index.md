@@ -28,10 +28,35 @@ regions of interest (ROIs) for extracting and analysing specific regions of your
 
 ## Installation
 
+To install ngio, use whichever package manager you already work with — it is published on
+both PyPI and conda-forge. To install from source, see the
+[quickstart](getting_started/0_quickstart.md).
+
 === "pip"
 
     ```bash
     pip install ngio
+    ```
+
+=== "uv"
+
+    Inside a uv project:
+
+    ```bash
+    uv add ngio
+    ```
+
+    Or into an existing environment:
+
+    ```bash
+    uv pip install ngio
+    ```
+
+=== "pixi"
+
+    ```bash
+    pixi add ngio          # from conda-forge
+    pixi add --pypi ngio   # from PyPI
     ```
 
 === "mamba/conda"
@@ -41,6 +66,11 @@ regions of interest (ROIs) for extracting and analysing specific regions of your
     ```
 
 ## ngio in 30 seconds
+
+Opening a container, inspecting it and slicing out a region of interest take a couple of
+lines each. The example below uses a placeholder path; the
+[quickstart](getting_started/0_quickstart.md) walks through the same steps on a dataset you
+can download.
 
 ```python
 from ngio import open_ome_zarr_container
@@ -76,7 +106,8 @@ patch = image.get_roi_as_numpy(roi)
     ---
 
     End-to-end walkthroughs: create an OME-Zarr, process and segment images, extract
-    features, and explore a plate.
+    features, and explore a plate. For hands-on notebooks, see the
+    [ngio workshop](https://github.com/BioVisionCenter/ngio-workshop).
 
     [:octicons-arrow-right-24: Browse tutorials](tutorials/create_ome_zarr.md)
 

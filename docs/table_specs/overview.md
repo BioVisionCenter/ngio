@@ -4,7 +4,7 @@ description: "The ngio table architecture: backends, in-memory objects and type 
 
 # Tables overview
 
-ngio's architecture tightly integrates image and tabular data. To do that, ngio defines custom specifications for serialising and deserialising tabular data into OME-Zarr containers, together with semantically typed tables derived from the [fractal table specification](https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/).
+ngio's architecture tightly integrates image and tabular data. To do that, ngio defines custom specifications for serialising and deserialising tabular data into OME-Zarr containers, together with semantically typed tables. These table types were originally defined as part of [Fractal](https://fractal-analytics-platform.github.io/) and are now specified and maintained here.
 
 ## Architecture
 

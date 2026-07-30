@@ -11,7 +11,8 @@ the images, labels and tables it contains.
 
 ## Installation
 
-`ngio` can be installed from PyPI, conda-forge, or from source.
+To install `ngio`, use whichever package manager you already work with — it is published on
+PyPI and conda-forge, and can also be installed from source.
 
 - `ngio` requires Python `>=3.11`
 
@@ -21,6 +22,27 @@ the images, labels and tables it contains.
 
     ```bash
     pip install ngio
+    ```
+
+=== "uv"
+
+    Inside a uv project:
+
+    ```bash
+    uv add ngio
+    ```
+
+    Or into an existing environment:
+
+    ```bash
+    uv pip install ngio
+    ```
+
+=== "pixi"
+
+    ```bash
+    pixi add ngio          # from conda-forge
+    pixi add --pypi ngio   # from PyPI
     ```
 
 === "mamba/conda"
@@ -72,7 +94,7 @@ Open an OME-Zarr file and inspect its contents.
 
 ### What is the OME-Zarr container?
 
-The OME-Zarr container is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
+The OME-Zarr container is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables. The [next section](1_ome_zarr_containers.md) goes into more detail: inspecting and editing metadata, opening remote stores, and deriving new images and labels.
 
 ### What is the OME-Zarr container not?
 
