@@ -52,4 +52,4 @@ def get_sample_info(name: AVAILABLE_SAMPLES) -> SampleInfo:
     return image_info
 
 
-__all__ = ["AVAILABLE_SAMPLES", "LabelsInfo", "SampleInfo"]
+__all__ = ["AVAILABLE_SAMPLES", "LabelsInfo", "SampleInfo", "get_sample_info"]

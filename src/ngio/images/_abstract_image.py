@@ -65,6 +65,7 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
+    deprecated,
 )
 from ngio.utils._zarr_utils import find_dimension_separator
 
@@ -219,20 +220,29 @@ class AbstractImage(ABC):
         """Return True if the image has the given axis."""
         return self.axes_handler.has_axis(axis)
 
+    def set_axes_units(
+        self,
+        space_unit: SpaceUnits = DefaultSpaceUnit,
+        time_unit: TimeUnits = DefaultTimeUnit,
+    ) -> None:
+        """Set the space and time units of the image axes.
+
+        Args:
+            space_unit: The space unit of the image.
+            time_unit: The time unit of the image.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
+        self._meta_handler.update_meta(meta)  # type: ignore
+
+    @deprecated(replacement="set_axes_units()")
     def set_axes_unit(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the axes unit of the image.
-
-        Args:
-            space_unit (SpaceUnits): The space unit of the image.
-            time_unit (TimeUnits): The time unit of the image.
-        """
-        meta = self._meta_handler.get_meta()
-        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.update_meta(meta)  # type: ignore
+        """Deprecated alias for `set_axes_units`."""
+        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(self, axes_names: Sequence[str]) -> None:
         """Set the axes names of the label.
@@ -976,6 +986,8 @@ def abstract_derive(
         overwrite (bool): Whether to overwrite an existing image.
         shape (Sequence[int] | None): The shape of the new image.
         pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
         name (str | None): The name of the new image.

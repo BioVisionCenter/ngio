@@ -39,6 +39,8 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
+    deprecated,
+    deprecated_alias,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -415,19 +417,30 @@ class Image(AbstractImage):
 class ImagesContainer:
     """A class to handle the /images group in an OME-NGFF file."""
 
+    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
         axes_setup: AxesSetup | None,
         version: NgffVersions | None = None,
-        validate_paths: bool = True,
+        validate_arrays: bool = False,
     ) -> None:
-        """Initialize the ImagesContainer."""
+        """Initialize the ImagesContainer.
+
+        Args:
+            group_handler: The Zarr group handler.
+            axes_setup: Axes setup to load ome-zarr with non-standard axes
+                configurations.
+            version: The NGFF version to read the metadata as.
+            validate_arrays: Whether to open every level listed in the multiscale
+                metadata, so a missing or malformed array fails here rather than
+                on first access.
+        """
         self._group_handler = group_handler
         self._meta_handler = ImageMetaHandler(
             group_handler=group_handler, axes_setup=axes_setup, version=version
         )
-        if validate_paths:
+        if validate_arrays:
             for level_path in self._meta_handler.get_meta().paths:
                 self.get(path=level_path)
 
@@ -643,18 +656,27 @@ class ImagesContainer:
         starts_ends = compute_image_percentile(ref_image, percentiles=percentiles)
         self.set_channel_windows(starts_ends=starts_ends)
 
+    def set_axes_units(
+        self,
+        space_unit: SpaceUnits = DefaultSpaceUnit,
+        time_unit: TimeUnits = DefaultTimeUnit,
+    ) -> None:
+        """Set the space and time units of the image axes.
+
+        Args:
+            space_unit: The space unit of the image.
+            time_unit: The time unit of the image.
+        """
+        self.get().set_axes_units(space_unit=space_unit, time_unit=time_unit)
+
+    @deprecated(replacement="set_axes_units()")
     def set_axes_unit(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the axes unit of the image.
-
-        Args:
-            space_unit (SpaceUnits): The space unit of the image.
-            time_unit (TimeUnits): The time unit of the image.
-        """
-        self.get().set_axes_unit(space_unit=space_unit, time_unit=time_unit)
+        """Deprecated alias for `set_axes_units`."""
+        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(
         self,
@@ -699,9 +721,9 @@ class ImagesContainer:
         # Zarr Array parameters
         chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
-        dtype: str = "uint16",
-        dimension_separator: Literal[".", "/"] = "/",
-        compressors: CompressorLike = "auto",
+        dtype: str | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
         extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
     ) -> "ImagesContainer":
@@ -716,6 +738,8 @@ class ImagesContainer:
             shape (Sequence[int] | None): The shape of the new image.
             pixelsize (float | tuple[float, float] | None): The pixel size of the new
                 image.
+                A value to write, not a lookup key; to select an existing
+                level see `pixel_size` on the getters.
             z_spacing (float | None): The z spacing of the new image.
             time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
@@ -777,7 +801,9 @@ class ImagesContainer:
 
         Args:
             path (str | None): The path to the image in the ome_zarr file.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -888,6 +914,8 @@ def derive_image_container(
         ref_path (str | None): The path to the reference image in the image container.
         shape (Sequence[int] | None): The shape of the new image.
         pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
         name (str | None): The name of the new image.

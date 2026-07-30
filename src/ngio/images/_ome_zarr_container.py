@@ -47,6 +47,7 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
+    deprecated_alias,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -102,34 +103,35 @@ class OmeZarrContainer:
     _labels_container: LabelsContainer | None
     _tables_container: TablesContainer | None
 
+    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
         table_container: TablesContainer | None = None,
         label_container: LabelsContainer | None = None,
         axes_setup: AxesSetup | None = None,
-        validate_paths: bool = False,
+        validate_arrays: bool = False,
     ) -> None:
         """Initialize the OmeZarrContainer.
 
         Args:
-            group_handler (ZarrGroupHandler): The Zarr group handler.
-            table_container (TablesContainer | None): The tables container.
-            label_container (LabelsContainer | None): The labels container.
-            axes_setup (AxesSetup | None): Axes setup to load ome-zarr with
-                non-standard axes configurations.
-            validate_paths (bool): Whether to validate the paths of the image multiscale
+            group_handler: The Zarr group handler.
+            table_container: The tables container.
+            label_container: The labels container.
+            axes_setup: Axes setup to load ome-zarr with non-standard axes
+                configurations.
+            validate_arrays: Whether to open every level listed in the multiscale
+                metadata, so a missing or malformed array fails here rather than
+                on first access.
         """
         self._group_handler = group_handler
         self._images_container = ImagesContainer(
-            self._group_handler, axes_setup=axes_setup
+            self._group_handler,
+            axes_setup=axes_setup,
+            validate_arrays=validate_arrays,
         )
         self._labels_container = label_container
         self._tables_container = table_container
-
-        if validate_paths:
-            for level_path in self._images_container.level_paths:
-                self.get_image(path=level_path)
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
@@ -358,18 +360,20 @@ class OmeZarrContainer:
         time_unit: TimeUnits = DefaultTimeUnit,
         set_labels: bool = True,
     ) -> None:
-        """Set the units of the image.
+        """Set the space and time units of the image axes.
 
         Args:
-            space_unit (SpaceUnits): The unit of space.
-            time_unit (TimeUnits): The unit of time.
-            set_labels (bool): Whether to set the units for the labels as well.
+            space_unit: The unit of space.
+            time_unit: The unit of time.
+            set_labels: Whether to set the units for the labels as well.
         """
         if set_labels:
             for label_name in self.list_labels():
                 label = self.get_label(label_name)
-                label.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
-        self._images_container.set_axes_unit(space_unit=space_unit, time_unit=time_unit)
+                label.set_axes_units(space_unit=space_unit, time_unit=time_unit)
+        self._images_container.set_axes_units(
+            space_unit=space_unit, time_unit=time_unit
+        )
 
     def set_axes_names(
         self,
@@ -405,7 +409,9 @@ class OmeZarrContainer:
 
         Args:
             path (str | None): The path to the image in the ome_zarr file.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -480,7 +486,9 @@ class OmeZarrContainer:
                 If None, the masking label must be provided.
             path (str | None): The path to the image in the ome_zarr file.
                 If None, the first level will be used.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
                 This is only used if path is None.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
@@ -517,9 +525,9 @@ class OmeZarrContainer:
         # Zarr Array parameters
         chunks: ChunksLike | None = None,
         shards: ShardsLike | None = None,
-        dtype: str = "uint16",
-        dimension_separator: Literal[".", "/"] = "/",
-        compressors: CompressorLike = "auto",
+        dtype: str | None = None,
+        dimension_separator: Literal[".", "/"] | None = None,
+        compressors: CompressorLike | None = None,
         extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
         # Copy from current image
@@ -537,6 +545,8 @@ class OmeZarrContainer:
             shape (Sequence[int] | None): The shape of the new image.
             pixelsize (float | tuple[float, float] | None): The pixel size of the new
                 image.
+                A value to write, not a lookup key; to select an existing
+                level see `pixel_size` on the getters.
             z_spacing (float | None): The z spacing of the new image.
             time_spacing (float | None): The time spacing of the new image.
             name (str | None): The name of the new image.
@@ -554,10 +564,10 @@ class OmeZarrContainer:
             ngff_version (NgffVersions | None): The NGFF version to use.
             chunks (ChunksLike | None): The chunk shape of the new image.
             shards (ShardsLike | None): The shard shape of the new image.
-            dtype (str): The data type of the new image. Defaults to "uint16".
-            dimension_separator (Literal[".", "/"]): The separator to use for
-                dimensions. Defaults to "/".
-            compressors (CompressorLike): The compressors to use. Defaults to "auto".
+            dtype (str | None): The data type of the new image.
+            dimension_separator (Literal[".", "/"] | None): The separator to use for
+                dimensions.
+            compressors (CompressorLike | None): The compressors to use.
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
             overwrite (bool): Whether to overwrite an existing image. Defaults to False.
@@ -592,7 +602,7 @@ class OmeZarrContainer:
         )
         new_ome_zarr = OmeZarrContainer(
             group_handler=new_container._group_handler,
-            validate_paths=False,
+            validate_arrays=False,
             axes_setup=new_container.meta.axes_handler.axes_setup,
         )
 
@@ -618,14 +628,17 @@ class OmeZarrContainer:
         )
 
     def list_roi_tables(self) -> list[str]:
-        """List all ROI tables in the image."""
-        masking_roi = self.tables_container.list(
-            filter_types="masking_roi_table",
-        )
-        roi = self.tables_container.list(
-            filter_types="roi_table",
-        )
-        return masking_roi + roi
+        """List all ROI tables in the image.
+
+        Returns `[]` when the image has no tables, matching `list_tables`.
+        """
+        table_container = self._get_tables_container(create_mode=False)
+        if table_container is None:
+            return []
+
+        roi = table_container.list(filter_types="roi_table")
+        masking_roi = table_container.list(filter_types="masking_roi_table")
+        return roi + masking_roi
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.
@@ -779,7 +792,9 @@ class OmeZarrContainer:
         Args:
             name (str): The name of the label.
             path (str | None): The path to the image in the ome_zarr file.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -804,7 +819,9 @@ class OmeZarrContainer:
             masking_label_name (str | None): The name of the masking label.
             masking_table_name (str | None): The name of the masking table.
             path (str | None): The path to the image in the ome_zarr file.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -815,7 +832,7 @@ class OmeZarrContainer:
         masking_label, masking_table = self._find_matching_masking_label(
             masking_label_name=masking_label_name,
             masking_table_name=masking_table_name,
-            pixel_size=pixel_size,
+            pixel_size=label.pixel_size,
         )
         return MaskedLabel(
             group_handler=label._group_handler,
@@ -876,6 +893,8 @@ class OmeZarrContainer:
             shape (Sequence[int] | None): The shape of the new label.
             pixelsize (float | tuple[float, float] | None): The pixel size of the new
                 label.
+                A value to write, not a lookup key; to select an existing
+                level see `pixel_size` on the getters.
             z_spacing (float | None): The z spacing of the new label.
             time_spacing (float | None): The time spacing of the new label.
             translation (Sequence[float] | None): The translation for each axis
@@ -930,13 +949,24 @@ def open_ome_zarr_container(
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
     axes_setup: AxesSetup | None = None,
-    validate_arrays: bool = True,
+    validate_arrays: bool = False,
 ) -> OmeZarrContainer:
-    """Open an OME-Zarr image."""
+    """Open an OME-Zarr image.
+
+    Args:
+        store: The Zarr store or group holding the image.
+        cache: Whether to cache the zarr group metadata.
+        mode: The access mode for the image.
+        axes_setup: Axes setup to load ome-zarr with non-standard axes
+            configurations.
+        validate_arrays: Whether to open every level listed in the multiscale
+            metadata up front, so a missing or malformed array fails here
+            rather than on first access.
+    """
     handler = ZarrGroupHandler(store=store, cache=cache, mode=mode)
     return OmeZarrContainer(
         group_handler=handler,
-        validate_paths=validate_arrays,
+        validate_arrays=validate_arrays,
         axes_setup=axes_setup,
     )
 
@@ -945,7 +975,7 @@ def open_image(
     store: StoreOrGroup,
     path: str | None = None,
     pixel_size: PixelSize | None = None,
-    strict: bool = True,
+    strict: bool = False,
     axes_setup: AxesSetup | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
@@ -955,7 +985,9 @@ def open_image(
     Args:
         store (StoreOrGroup): The Zarr store or group to create the image in.
         path (str | None): The path to the image in the ome_zarr file.
-        pixel_size (PixelSize | None): The pixel size of the image.
+        pixel_size: Select the pyramid level whose pixel size matches this one.
+            A lookup key, not a value to write; to set a pixel size see
+            `pixelsize` on the create/derive entry points.
         strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -979,7 +1011,7 @@ def open_label(
     name: str | None = None,
     path: str | None = None,
     pixel_size: PixelSize | None = None,
-    strict: bool = True,
+    strict: bool = False,
     axes_setup: AxesSetup | None = None,
     cache: bool = False,
     mode: AccessModeLiteral = "r+",
@@ -991,7 +1023,9 @@ def open_label(
         name (str | None): The name of the label. If None,
             we will try to open the store as a multiscale label.
         path (str | None): The path to the image in the ome_zarr file.
-        pixel_size (PixelSize | None): The pixel size of the image.
+        pixel_size: Select the pyramid level whose pixel size matches this one.
+            A lookup key, not a value to write; to set a pixel size see
+            `pixelsize` on the create/derive entry points.
         strict (bool): Only used if the pixel size is provided. If True, the
             pixel size must match the image pixel size exactly. If False, the
             closest pixel size level will be returned.
@@ -1051,6 +1085,8 @@ def create_empty_ome_zarr(
         shape (Sequence[int]): The shape of the image.
         pixelsize (float | tuple[float, float] | None): The pixel size in x and y
             dimensions.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float): The spacing between z slices. Defaults to 1.0.
         time_spacing (float): The spacing between time points. Defaults to 1.0.
         scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors
@@ -1140,6 +1176,8 @@ def create_ome_zarr_from_array(
         array (np.ndarray): The image data.
         pixelsize (float | tuple[float, float] | None): The pixel size in x and y
             dimensions.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float): The spacing between z slices. Defaults to 1.0.
         time_spacing (float): The spacing between time points. Defaults to 1.0.
         scaling_factors (Sequence[float] | Literal["auto"]): The down-scaling factors

@@ -249,12 +249,12 @@ def init_image_like(
         axes_handler=axes_handler,
     )
     if isinstance(levels, int):
-        levels_paths = tuple(str(i) for i in range(levels))
+        level_paths = tuple(str(i) for i in range(levels))
     else:
-        levels_paths = tuple(levels)
+        level_paths = tuple(levels)
 
     pyramid_builder = ImagePyramidBuilder.from_scaling_factors(
-        levels_paths=levels_paths,
+        level_paths=level_paths,
         scaling_factors=scaling_factors,
         base_shape=shape,
         base_scale=base_scale,
@@ -331,15 +331,15 @@ def init_image_like_from_shapes(
             f"and number of axes {len(axes_handler.axes_names)}."
         )
     if levels is None:
-        levels_paths = tuple(str(i) for i in range(len(shapes)))
+        level_paths = tuple(str(i) for i in range(len(shapes)))
     else:
-        levels_paths = tuple(levels)
+        level_paths = tuple(levels)
 
     pyramid_builder = ImagePyramidBuilder.from_shapes(
         shapes=shapes,
         base_scale=base_scale,
         base_translation=translation,
-        levels_paths=levels_paths,
+        level_paths=level_paths,
         axes=axes_handler.axes_names,
         chunks=chunks,
         data_type=dtype,

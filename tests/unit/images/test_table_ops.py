@@ -54,6 +54,7 @@ def test_list_sync_api(sample_ome_zarrs):
     ]
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_list_async_api(sample_ome_zarrs):
     ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
@@ -147,6 +148,7 @@ def test_set_index(sample_ome_zarrs):
     assert df.index.name == "Index"
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_cat_async_api(sample_ome_zarrs):
     ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 
@@ -178,6 +180,7 @@ def test_cat_async_api(sample_ome_zarrs):
     assert isinstance(concatenate_table, GenericTable)
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_cat_eager_lazy_index_parity(sample_ome_zarrs):
     ome_zarr_1, ome_zarr_2 = sample_ome_zarrs
 

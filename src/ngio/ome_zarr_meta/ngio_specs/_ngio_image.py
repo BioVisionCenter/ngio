@@ -25,6 +25,7 @@ from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
 from ngio.utils import NgioValidationError, NgioValueError
 
 T = TypeVar("T")
+ResolutionSearchMode = Literal["any", "lr", "hr"]
 NgffVersions = Literal["0.4", "0.5"]
 DefaultNgffVersion: Literal["0.4"] = "0.4"
 
@@ -230,16 +231,16 @@ class AbstractNgioImageMeta:
         return self.datasets[idx]
 
     def _find_closest_dataset(
-        self, pixel_size: PixelSize, mode: str = "any"
+        self, pixel_size: PixelSize, mode: ResolutionSearchMode = "any"
     ) -> Dataset | None:
         """Find the closest dataset to the given pixel size.
 
         Args:
-            pixel_size(PixelSize): The pixel size to search for.
-            mode(str): The mode to find the closest dataset.
-                "any": Will find the closest dataset.
-                "lr": Will find closest "lower" resolution dataset.
-                "hr": Will find closest "higher" resolution
+            pixel_size: The pixel size to search for.
+            mode: Which datasets are eligible.
+                `"any"`: any dataset.
+                `"lr"`: only lower resolution (larger pixel size) datasets.
+                `"hr"`: only higher resolution (smaller pixel size) datasets.
         """
         min_dist = np.inf
         closest_dataset = None

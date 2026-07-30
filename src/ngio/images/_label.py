@@ -150,7 +150,9 @@ class LabelsContainer:
         Args:
             name (str): The name of the label.
             path (str | None): The path to the image in the ome_zarr file.
-            pixel_size (PixelSize | None): The pixel size of the image.
+            pixel_size: Select the pyramid level whose pixel size matches this one.
+                A lookup key, not a value to write; to set a pixel size see
+                `pixelsize` on the create/derive entry points.
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -231,6 +233,8 @@ class LabelsContainer:
             shape (Sequence[int] | None): The shape of the new label.
             pixelsize (float | tuple[float, float] | None): The pixel size of the new
                 label.
+                A value to write, not a lookup key; to select an existing
+                level see `pixel_size` on the getters.
             z_spacing (float | None): The z spacing of the new label.
             time_spacing (float | None): The time spacing of the new label.
             translation (Sequence[float] | None): The translation for each axis
@@ -326,6 +330,8 @@ def derive_label(
         ref_image (Image | Label): The reference image to derive the new label from.
         shape (Sequence[int] | None): The shape of the new label.
         pixelsize (float | tuple[float, float] | None): The pixel size of the new label.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float | None): The z spacing of the new label.
         time_spacing (float | None): The time spacing of the new label.
         name (str | None): The name of the new label.

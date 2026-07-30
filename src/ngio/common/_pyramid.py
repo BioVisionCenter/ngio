@@ -16,6 +16,7 @@ from ngio.common._zoom import (
 )
 from ngio.utils import (
     NgioValueError,
+    deprecated_alias,
 )
 
 
@@ -344,9 +345,10 @@ class ImagePyramidBuilder(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
+    @deprecated_alias(levels_paths="level_paths")
     def from_scaling_factors(
         cls,
-        levels_paths: tuple[str, ...],
+        level_paths: tuple[str, ...],
         scaling_factors: tuple[float, ...],
         base_shape: tuple[int, ...],
         base_scale: tuple[float, ...],
@@ -368,7 +370,7 @@ class ImagePyramidBuilder(BaseModel):
         shapes = compute_shapes_from_scaling_factors(
             base_shape=base_shape,
             scaling_factors=scaling_factors,
-            num_levels=len(levels_paths),
+            num_levels=len(level_paths),
         )
 
         if precision_scale:
@@ -384,7 +386,7 @@ class ImagePyramidBuilder(BaseModel):
             base_scale_ = _compute_scales_from_factors(
                 base_scale=base_scale,
                 scaling_factors=scaling_factors,
-                num_levels=len(levels_paths),
+                num_levels=len(level_paths),
             )
 
         return cls.from_shapes(
@@ -392,7 +394,7 @@ class ImagePyramidBuilder(BaseModel):
             base_scale=base_scale_,
             axes=axes,
             base_translation=base_translation,
-            levels_paths=levels_paths,
+            level_paths=level_paths,
             chunks=chunks,
             shards=shards,
             data_type=data_type,
@@ -403,13 +405,14 @@ class ImagePyramidBuilder(BaseModel):
         )
 
     @classmethod
+    @deprecated_alias(levels_paths="level_paths")
     def from_shapes(
         cls,
         shapes: Sequence[tuple[int, ...]],
         base_scale: tuple[float, ...] | list[tuple[float, ...]],
         axes: tuple[str, ...],
         base_translation: Sequence[float] | None = None,
-        levels_paths: Sequence[str] | None = None,
+        level_paths: Sequence[str] | None = None,
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
@@ -419,8 +422,8 @@ class ImagePyramidBuilder(BaseModel):
         other_array_kwargs: Mapping[str, Any] | None = None,
     ) -> "ImagePyramidBuilder":
         levels = []
-        if levels_paths is None:
-            levels_paths = tuple(str(i) for i in range(len(shapes)))
+        if level_paths is None:
+            level_paths = tuple(str(i) for i in range(len(shapes)))
 
         _check_order(shapes)
         if isinstance(base_scale, tuple) and all(
@@ -442,7 +445,7 @@ class ImagePyramidBuilder(BaseModel):
 
         translations = _compute_translations_from_shapes(scales, base_translation)
         for level_path, shape, scale, translation in zip(
-            levels_paths,
+            level_paths,
             shapes,
             scales,
             translations,

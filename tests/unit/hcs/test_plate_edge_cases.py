@@ -118,6 +118,7 @@ def test_get_table_as(tmp_path: Path):
     assert len(table.rois()) == 1
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_concatenate_image_tables_as(cardiomyocyte_small_mip_path_readonly: Path):
     plate = open_ome_zarr_plate(cardiomyocyte_small_mip_path_readonly, mode="r")
     table = plate.concatenate_image_tables_as(

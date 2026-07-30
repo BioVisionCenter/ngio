@@ -76,7 +76,7 @@ def deprecated_alias(
             _resolve_aliases(kwargs, aliases, qualname, removed_in)
             return func(*args, **kwargs)
 
-        return cast(_F, wrapper)
+        return cast("_F", wrapper)
 
     return decorator
 
@@ -113,6 +113,6 @@ def deprecated(
             warnings.warn(message, NgioDeprecationWarning, stacklevel=2)
             return func(*args, **kwargs)
 
-        return cast(_F, wrapper)
+        return cast("_F", wrapper)
 
     return decorator

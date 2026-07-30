@@ -8,7 +8,7 @@ from ngio import iterators
 from ngio.utils import NgioDeprecationWarning
 
 
-@pytest.mark.parametrize("name", sorted(iterators.__all__))
+@pytest.mark.parametrize("name", sorted(experimental_iterators.__all__))
 def test_shim_warns_and_forwards(name: str):
     with pytest.warns(NgioDeprecationWarning, match=f"ngio.iterators.{name}") as record:
         obj = getattr(experimental_iterators, name)

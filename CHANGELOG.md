@@ -32,6 +32,26 @@ Derive entry points: `OmeZarrContainer.derive_image`/`derive_label`, `ImagesCont
 - **Not affected**: the `pixel_size=` *lookup* argument on the getters (`get`, `get_image`, `get_label`, ...) stays.
 - Internal: `_check_deprecated_scaling_factors` removed; `init_image_like` and `_compute_scaling_factors` lost their `yx_scaling_factor`/`z_scaling_factor` parameters.
 
+**Behaviour changes**
+
+- `OmeZarrContainer.derive_image` hardcoded `dtype="uint16"`, `dimension_separator="/"` and `compressors="auto"` while documenting "the value from the reference image will be used", so deriving from a `float32` image silently downcast it. All three are now `None` sentinels and inherit from the reference, matching `derive_label` and `derive_image_container`. `ImagesContainer.derive` carried the same three hardcoded defaults and is fixed with it. `derive_label` is unchanged: it still inherits from a reference `Label` and falls back to `uint32` only when the reference is an `Image`.
+- `get_masked_label` resolved the masking label at the raw `pixel_size` argument rather than at the resolved label's pixel size, so `get_masked_label(path=...)` disagreed with `get_masked_image(path=...)`. It now mirrors `get_masked_image`.
+- `list_roi_tables` returns `[]` on a container or plate with no tables, matching `list_tables`. It previously raised — `NgioValidationError` from `OmeZarrContainer`, `NgioValueError` from `OmeZarrPlate` — and could create the `tables` group as a side effect. Both classes now also return ROI tables in the same order (`roi_table` then `masking_roi_table`); `OmeZarrContainer` previously reversed it.
+- `open_image` and `open_label` now default to `strict=False`, matching `get_image`, `get_label`, `get_masked_image`, `get_masked_label`, `ImagesContainer.get` and `LabelsContainer.get`. They were the only two entry points defaulting to `True`.
+- `OmeZarrContainer.__init__` never forwarded `validate_paths` to its `ImagesContainer`, so passing `False` still validated every level. The flag is now forwarded and named `validate_arrays` everywhere, and defaults to `False` — opening a container no longer touches every pyramid level up front. `open_ome_zarr_container(validate_arrays=True)` restores the eager check. **Behaviour change**: a container whose multiscale metadata references a missing or malformed array now fails on first access to that level rather than at open.
+- `ImplementedTableBackends.get_backend` no longer defaults `backend_name`. The default was dead — every caller passes it explicitly, and it named `"anndata"` while the real default is `"anndata_v1"`.
+
+**Renamed, with deprecation warnings (removal in `ngio=1.1`)**
+
+| Deprecated | Use instead |
+| --- | --- |
+| `conctatenate_tables` | `concatenate_tables` (the typo is fixed) |
+| `set_axes_unit` on `AbstractImage`, `ImagesContainer` | `set_axes_units` |
+| `levels_paths=` on `ImagePyramidBuilder.from_scaling_factors`/`from_shapes` | `level_paths=` |
+| `validate_paths=` on `OmeZarrContainer`, `ImagesContainer` | `validate_arrays=` |
+| `OmeZarrPlate.get_images_async`, `get_wells_async`, `images_paths_async`, `list_image_tables_async`, `concatenate_image_tables_async`, `concatenate_image_tables_as_async` | the sync method with `max_workers=` |
+| `list_image_tables_async`, `concatenate_image_tables_async`, `concatenate_image_tables_as_async` in `ngio.images` | the sync function with `max_workers=` |
+
 ### Migration Guide (v0.5 → v1.0)
 
 ```python
@@ -56,6 +76,19 @@ ome_zarr.derive_image(store, channels_meta=["DAPI"], pixelsize=(ps.y, ps.x))
 from ngio.experimental.iterators import SegmentationIterator
 from ngio.iterators import SegmentationIterator   # or: from ngio import ...
 
+# Async -> max_workers (the async forms still work until 1.1, with a warning)
+images = asyncio.run(plate.get_images_async())
+images = plate.get_images(max_workers=8)
+
+paths = asyncio.run(plate.images_paths_async())
+paths = plate.images_paths()          # never did IO worth parallelising
+
+names = asyncio.run(list_image_tables_async(images))
+names = list_image_tables(images, max_workers=8)
+
+table = asyncio.run(concatenate_image_tables_async(images, extras=extras, name="t"))
+table = concatenate_image_tables(images, extras=extras, name="t", max_workers=8)
+
 # Channel metadata
 ome_zarr.set_channel_meta(labels=["DAPI", "GFP"], wavelength_id=["A01", "A02"])
 ome_zarr.set_channel_meta(
@@ -77,6 +110,11 @@ create_empty_ome_zarr(store, shape=(2, 64, 64), axes_names=("c", "y", "x"),
 - Add a configurable IO retry policy: `NgioConfig.io_retry` (`RetryConfig`) with `max_retries` (default `0`), a backoff strategy (`ConstantBackoff`, `LinearBackoff`, `ExponentialBackoff`), and error matching via `retry_on` substrings or the discouraged blanket `retry_all_errors`. Ngio's own `NgioError`s are never retried. The public `ngio.utils.retry_io` decorator reads the global config at call time.
 - Add `ngio.utils.NgioStore`, a picklable zarr `WrapperStore` that applies the `io_retry` policy to every store IO call and centralizes store-type dispatch (`store_type`, `full_url`, `sync_fs_and_path`, `get_mapper`, `local_root`, `memory_dict`, `list_dir_collected`, `from_any`/`ensure`). Every group ngio opens is now backed by it, so the policy covers metadata, pixel data, and lazy dask IO on workers. `ZipStore` is now explicitly supported (it previously warned).
 - Apply `io_retry` to the IO paths that bypass the zarr store: the pyarrow backend's dataset load/write, the AnnData backend's direct local/fsspec writes, and the `fractal_fsspec_store` metadata probe (401s become `NgioValueError` inside the retried call, so they are never retried).
+- **Parallelism is now a `max_workers=` argument on the sync API** rather than a separate async surface. `OmeZarrPlate.get_images`, `get_wells`, `list_image_tables`, `concatenate_image_tables`, `concatenate_image_tables_as` and the matching `ngio.images` functions all take `max_workers: int | None = None`; `None` keeps the current serial behaviour. The `_async` counterparts still work but warn, and will be removed in `ngio=1.1`. Note that the async path was never unbounded: `asyncio.to_thread` uses Python's default executor, capped at `min(32, cpu_count + 4)`. `max_workers` exists so the concurrency can be lowered for rate-limited stores and so ngio's IO stops sharing that process-wide pool.
+- Concatenation no longer has two divergent implementations: the sync path now materializes each table (`.dataframe` or `.lazy_frame` per `mode`) before concatenating, which only the async path used to do. Sync and async now produce identical tables with identical laziness.
+- **Public namespace.** `ngio` now exports `MaskedImage`, `MaskedLabel`, `Channel`, `S3FSConfig`, `derive_ome_zarr_plate`, `BasicMapper`, `MapperProtocol`, `get_sample_info`, `__version__`, the six `get_ngio_*_meta` readers (only the `update_*` writers were exported before), and all seven error classes. `AbstractImage` is now importable from `ngio.images`, and `AbstractBaseTable`, `ImplementedTables` and `write_table` from `ngio.tables` — so a third-party table type can be registered without reaching into private modules. Table classes stay in `ngio.tables` and are deliberately not lifted to the top level. `ngio.resources.__all__` was missing `get_sample_info`, its only callable, and `ngio.ome_zarr_meta.__all__` listed `NgffVersions` and `PlateMetaHandler` twice.
+- **Error hierarchy.** `NgioTableValidationError` was the only ngio error that did not subclass a builtin, so `except ValueError` caught its siblings but not it; it now subclasses `NgioValidationError`. New `NgioKeyError` (subclassing `KeyError`, with a `__str__` that does not repr-quote the message). The `NgioValidationError` (data read off disk failed a spec check) versus `NgioValueError` (a caller argument failed a run time check) boundary is now written into their docstrings.
+- `pixel_size` and `pixelsize` are deliberately kept distinct and are now documented as such: `pixel_size` (a `PixelSize`) is a *lookup key* that selects a pyramid level on the getters; `pixelsize` (a float or `(y, x)` tuple) is a *value* written by the create/derive entry points.
 - Add `ngio.utils.deprecated_alias` and `ngio.utils.deprecated`, the decorators behind ngio's own deprecations. `deprecated_alias(old="new")` forwards a renamed keyword and raises `NgioValueError` if both spellings are passed; `deprecated(replacement=...)` warns when a callable is invoked. Both emit `NgioDeprecationWarning` naming the removal version (default `1.1`) and report the caller's stack frame; on `async def` callables the warning fires when the coroutine is created, not when it is awaited.
 
 ### Fix

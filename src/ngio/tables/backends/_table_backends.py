@@ -176,11 +176,15 @@ class ImplementedTableBackends:
         self,
         *,
         group_handler: ZarrGroupHandler,
-        backend_name: str = "anndata",
+        backend_name: str,
         index_key: str | None = None,
         index_type: Literal["int", "str"] | None = None,
     ) -> TableBackendProtocol:
-        """Try to get a handler for the given store based on the metadata version."""
+        """Instantiate the named backend and attach it to `group_handler`.
+
+        Raises:
+            NgioValueError: If `backend_name` is not registered.
+        """
         if backend_name not in self._implemented_backends:
             raise NgioValueError(f"Table backend {backend_name} not implemented.")
         backend = self._implemented_backends[backend_name]()
