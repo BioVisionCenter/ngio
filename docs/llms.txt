@@ -1,11 +1,10 @@
 # ngio
 
-> ngio (short for "next generation file format IO", after the OME-NGFF specification it
-> reads and writes) is a Python library for bioimage analysis on OME-Zarr data. It provides
-> an object-based API for opening and manipulating OME-Zarr images, labels, tables, regions
-> of interest (ROIs) and high-content screening (HCS) plates. It supports OME-Zarr v0.4
-> and v0.5 over Zarr v2 and v3 storage, and is developed at the BioVisionCenter,
-> University of Zurich, under the BSD-3-Clause licence.
+> ngio (next generation file format IO) is a Python library for bioimage analysis on
+> OME-Zarr data. It provides an object-based API for opening and manipulating OME-Zarr
+> images, labels, tables, regions of interest (ROIs) and high-content screening (HCS)
+> plates. It supports OME-Zarr v0.4 and v0.5 over Zarr v2 and v3 storage, and is developed
+> at the BioVisionCenter, University of Zurich, under the BSD-3-Clause licence.
 
 Install with `pip install ngio` or `mamba install -c conda-forge ngio`. The central object
 is the OME-Zarr container, obtained with `open_ome_zarr_container(store)`; from it you

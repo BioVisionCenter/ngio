@@ -1,17 +1,16 @@
 ---
-description: ngio — next generation file format IO — is a Python library for OME-Zarr bioimage analysis, with an object-based API for images, labels, tables, ROIs and HCS plates.
+description: ngio is a Python library for OME-Zarr bioimage analysis, with an object-based API for images, labels, tables, ROIs and HCS plates.
 ---
 
 # ngio
 
 **Next generation file format IO — a Python library for OME-Zarr bioimage analysis.**
 
-The name says what the library does: IO for the OME next generation file format (NGFF),
-which [OME-Zarr](https://ngff.openmicroscopy.org/) implements. ngio gives you an
-object-based API for that format — the cloud-optimised one for large, multi-dimensional
-microscopy data. Open an image, reach for the resolution level you need, work with
-labels, tables and regions of interest, and scale the same code from one field of view to
-a whole plate.
+ngio is built for [OME-Zarr](https://ngff.openmicroscopy.org/), a cloud-optimised format
+that stores large, multi-dimensional microscopy images and their metadata in an efficient,
+scalable way. It provides an object-based API for opening, exploring and manipulating
+OME-Zarr images and high-content screening (HCS) plates, along with labels, tables and
+regions of interest (ROIs) for extracting and analysing specific regions of your data.
 
 ## Installation
 
