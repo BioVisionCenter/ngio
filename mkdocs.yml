@@ -1,12 +1,12 @@
-# Describes the library, not the format. The old value expanded NGFF ("next
-# generation file format"), which names OME-Zarr rather than ngio, and title-cased
-# a project that styles itself lowercase everywhere else.
-site_name: "ngio: OME-Zarr bioimage analysis for Python"
+# The name is an acronym: n(ext) g(eneration file format) IO. Lowercased, because the
+# project styles itself lowercase everywhere else. What the library actually does is
+# spelled out in `site_description` and on the landing page.
+site_name: "ngio: next generation file format IO"
 # The published docs root (mike serves versions beneath it, e.g. /ngio/stable/).
 # This was previously the git clone URL, which produced wrong canonical links and, under
 # Zensical, a bogus /BioVisionCenter/ngio.git/ base path when serving locally.
 site_url: "https://biovisioncenter.github.io/ngio/"
-site_description: "A Python library for processing OME-Zarr images"
+site_description: "A Python library for OME-Zarr bioimage analysis"
 repo_name: "ngio"
 repo_url: "https://github.com/BioVisionCenter/ngio"
 copyright: "Copyright &copy; 2024-2026, BioVisionCenter UZH"
