@@ -8,54 +8,17 @@ is also runnable on its own:
 """
 
 # --8<-- [start:plot_helpers]
-from io import StringIO
+import sys
 
-import matplotlib
+# markdown-exec execs this block, so `__file__` does not exist; a standalone run puts
+# only this script's own directory on sys.path. Both run from the repo root, which is
+# what the rest of the snippets already assume (`Path("./data")`), so resolve the
+# shared module against that.
+sys.path.append("docs/snippets")
+
 from matplotlib import pyplot as plt
-from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-
-
-def print_figure(fig: Figure) -> None:
-    """Print a figure as inline SVG, for markdown-exec `html` blocks.
-
-    Recolours every bit of chrome to one sentinel, then swaps that sentinel for
-    a theme variable in the emitted markup. The figure therefore follows the
-    light/dark toggle rather than baking black text on white into the page.
-    This only works because the SVG is inline: an `<img src>` would be a
-    separate document and would not see the site's custom properties.
-
-    The `.ngio-figure` wrapper is what the stylesheet keys on to strip the
-    `OUT` terminal-output treatment that `.result` applies by default.
-    """
-    ink = "#5b6569"
-    for ax in fig.axes:
-        ax.tick_params(colors=ink, which="both")
-        for spine in ax.spines.values():
-            spine.set_edgecolor(ink)
-        for text in (ax.title, ax.xaxis.label, ax.yaxis.label):
-            text.set_color(ink)
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_color(ink)
-        if ax.get_legend() is not None:
-            for text in ax.get_legend().get_texts():
-                text.set_color(ink)
-    for text in fig.texts:
-        text.set_color(ink)
-
-    buffer = StringIO()
-    fig.savefig(buffer, format="svg", transparent=True)
-    plt.close(fig)
-
-    # Drop matplotlib's XML declaration and DOCTYPE — they are meaningless
-    # inside an HTML body, and the figure is being embedded, not served.
-    svg = buffer.getvalue()
-    svg = svg[svg.index("<svg") :]
-    svg = svg.replace(ink, "var(--md-default-fg-color--light)")
-    print(f'<div class="ngio-figure">{svg}</div>')
-
-
+from _render import figure_html
 # --8<-- [end:plot_helpers]
 
 # --8<-- [start:gaussian_blur]
@@ -123,15 +86,22 @@ blurred_image.consolidate()
 # --8<-- [end:apply_blur]
 
 # --8<-- [start:plot_blur]
-fig, axs = plt.subplots(2, 1, figsize=(8, 4))
+original = image.get_as_numpy(c=0, z=1, axes_order=["y", "x"])
+blurred = blurred_image.get_as_numpy(c=0, z=1, axes_order=["y", "x"])
+
+# The data does not fill its uint16 range, so window it on percentiles. One window for
+# both panels: stretching them separately would misrepresent the difference.
+vmin, vmax = np.percentile(original, (1, 99.8))
+
+fig, axs = plt.subplots(2, 1, figsize=(8, 6))
 axs[0].set_title("Original image")
-axs[0].imshow(image.get_as_numpy(c=0, z=1, axes_order=["y", "x"]), cmap="gray")
+axs[0].imshow(original, cmap="gray", vmin=vmin, vmax=vmax)
 axs[1].set_title("Blurred image")
-axs[1].imshow(blurred_image.get_as_numpy(c=0, z=1, axes_order=["y", "x"]), cmap="gray")
+axs[1].imshow(blurred, cmap="gray", vmin=vmin, vmax=vmax)
 for ax in axs:
     ax.axis("off")
 fig.tight_layout()
-print_figure(fig)
+print(figure_html(fig))
 # --8<-- [end:plot_blur]
 
 # --8<-- [start:dask_blur]

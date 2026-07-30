@@ -103,6 +103,9 @@ ngio provides a high-level API to access the image data at different resolution 
 ```python exec="true" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:reopen_container"
 ```
+```python exec="true" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:plot_helpers"
+```
 
 === "Highest resolution image"
     By default, the `get_image` method returns the highest resolution image:
@@ -206,6 +209,14 @@ To read or write a specific region of the image defined in world coordinates, yo
 --8<-- "docs/snippets/getting_started/get_started.py:roi_slicing"
 ```
 
+The ROI is defined in micrometres, so it names the same region whatever pyramid level you
+read it from — on the left it is outlined on the whole image, on the right it is the region
+that came back:
+
+```python exec="true" html="1" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:plot_roi_slicing"
+```
+
 ## Labels
 
 A label is a segmentation mask that identifies objects in the image. In ngio a [`Label`][ngio.Label]
@@ -245,6 +256,13 @@ Here is how to reach one of them:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:get_label_nearest"
     ```
+
+Each object in a label carries its own id, drawn here in its own colour over the channel it
+was segmented from:
+
+```python exec="true" html="1" session="get_started"
+--8<-- "docs/snippets/getting_started/get_started.py:plot_label_overlay"
+```
 
 ### Working with label data
 

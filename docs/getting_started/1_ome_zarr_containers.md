@@ -164,6 +164,13 @@ Examples of accessing the OME-Zarr metadata:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:channel_labels"
     ```
+    And those three channels, read from a lower pyramid level:
+    ```python exec="true" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_helpers"
+    ```
+    ```python exec="true" html="1" session="get_started"
+    --8<-- "docs/snippets/getting_started/get_started.py:plot_container_channels"
+    ```
 
 ## Modifying metadata
 

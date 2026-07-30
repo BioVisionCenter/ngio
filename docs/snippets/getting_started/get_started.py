@@ -12,87 +12,25 @@ here is load-bearing.
 """
 
 # --8<-- [start:plot_helpers]
-from io import StringIO
+import sys
 
-import matplotlib
-import numpy as np
+# markdown-exec execs this block, so `__file__` does not exist; a standalone run puts
+# only this script's own directory on sys.path. Both run from the repo root, which is
+# what the rest of the snippets already assume (`Path("./data")`), so resolve the
+# shared module against that.
+sys.path.append("docs/snippets")
+
 from matplotlib import pyplot as plt
-from matplotlib.colors import ListedColormap
-from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-
-
-def random_label_cmap(n_labels: int = 1000, seed: int = 0) -> ListedColormap:
-    """Build a reproducible random colormap for label images."""
-    rng = np.random.default_rng(seed)
-    colors = rng.random((n_labels, 3))
-    colors[0] = 0.0
-    return ListedColormap(colors)
-
-
-def print_figure(fig: Figure) -> None:
-    """Print a figure as inline SVG, for markdown-exec `html` blocks.
-
-    Recolours every bit of chrome to one sentinel, then swaps that sentinel for
-    a theme variable in the emitted markup. The figure therefore follows the
-    light/dark toggle rather than baking black text on white into the page.
-    This only works because the SVG is inline: an `<img src>` would be a
-    separate document and would not see the site's custom properties.
-
-    The `.ngio-figure` wrapper is what the stylesheet keys on to strip the
-    `OUT` terminal-output treatment that `.result` applies by default.
-    """
-    ink = "#5b6569"
-    for ax in fig.axes:
-        ax.tick_params(colors=ink, which="both")
-        for spine in ax.spines.values():
-            spine.set_edgecolor(ink)
-        for text in (ax.title, ax.xaxis.label, ax.yaxis.label):
-            text.set_color(ink)
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_color(ink)
-        if ax.get_legend() is not None:
-            for text in ax.get_legend().get_texts():
-                text.set_color(ink)
-    for text in fig.texts:
-        text.set_color(ink)
-
-    buffer = StringIO()
-    fig.savefig(buffer, format="svg", transparent=True)
-    plt.close(fig)
-
-    # Drop matplotlib's XML declaration and DOCTYPE — they are meaningless
-    # inside an HTML body, and the figure is being embedded, not served.
-    svg = buffer.getvalue()
-    svg = svg[svg.index("<svg") :]
-    svg = svg.replace(ink, "var(--md-default-fg-color--light)")
-    print(f'<div class="ngio-figure">{svg}</div>')
-
-
+from _render import add_roi_rectangle, figure_html, random_label_cmap, show_image
 # --8<-- [end:plot_helpers]
 
 # --8<-- [start:table_helpers]
-import pandas as pd
+import sys
 
+sys.path.append("docs/snippets")
 
-def print_table(df: pd.DataFrame) -> None:
-    """Print a DataFrame as HTML that the docs theme will style.
-
-    Markdown is not an option here: Zensical does not run block-level Markdown over
-    markdown-exec output, so a pipe table would stay literal text. The theme styles
-    only `table:not([class])` — and its JS only wraps such tables in a horizontal
-    scroll container — while pandas tags its output `class="dataframe"`, so the class
-    and the presentational border are stripped.
-    """
-    # A named index (here the label id) is real data, so promote it to a column: pandas
-    # otherwise renders it as a second, near-empty header row.
-    if df.index.name is not None:
-        df = df.reset_index()
-    html = df.to_html(index=False, border=0, float_format="{:.2f}".format)
-    print(html.replace(' class="dataframe"', ""))
-
-
+from _render import table_html
 # --8<-- [end:table_helpers]
 
 # ---------------------------------------------------------------------------
@@ -169,6 +107,24 @@ print(metadata)
 # --8<-- [start:channel_labels]
 print(metadata.channels_meta.channel_labels)
 # --8<-- [end:channel_labels]
+
+# --8<-- [start:plot_container_channels]
+image_3 = ome_zarr_container.get_image(path="3")
+
+fig, axs = plt.subplots(1, 3, figsize=(8.6, 3.4))
+# Each channel is windowed on its own percentiles: the three stains have unrelated
+# intensity ranges, and one shared window would render the dimmest as an empty panel.
+# One scale bar is enough — the three panels are the same image at the same level.
+for ax, channel_label in zip(axs, image_3.channel_labels, strict=True):
+    show_image(
+        ax,
+        image_3.get_as_numpy(channel_selection=channel_label),
+        title=channel_label,
+        pixel_size=image_3.pixel_size if ax is axs[0] else None,
+    )
+fig.tight_layout()
+print(figure_html(fig, alt="The three channels of the container, side by side."))
+# --8<-- [end:plot_container_channels]
 
 # ---------------------------------------------------------------------------
 # 2. Images and Labels
@@ -281,6 +237,31 @@ roi = Roi.from_values(slices={"x": (34.1, 321.6), "y": (10, 330)}, name=None)
 print(image.get_roi_as_numpy(roi).shape)
 # --8<-- [end:roi_slicing]
 
+# --8<-- [start:plot_roi_slicing]
+image_3 = ome_zarr_container.get_image(path="3")
+
+fig, axs = plt.subplots(1, 2, figsize=(8, 4.1))
+show_image(
+    axs[0],
+    image_3.get_as_numpy(c=0),
+    title="Whole image",
+    pixel_size=image_3.pixel_size,
+)
+add_roi_rectangle(axs[0], roi, image_3.pixel_size)
+show_image(
+    axs[1],
+    image_3.get_roi_as_numpy(roi, c=0),
+    title="The ROI",
+    pixel_size=image_3.pixel_size,
+)
+fig.tight_layout()
+print(
+    figure_html(
+        fig, alt="The ROI outlined on the whole image, and the region it returns."
+    )
+)
+# --8<-- [end:plot_roi_slicing]
+
 # --8<-- [start:list_labels]
 print(ome_zarr_container.list_labels())  # Available labels
 # --8<-- [end:list_labels]
@@ -313,6 +294,36 @@ label_nuclei = ome_zarr_container.get_label(
 print(label_nuclei)
 # --8<-- [end:get_label_nearest]
 
+# --8<-- [start:plot_label_overlay]
+image_3 = ome_zarr_container.get_image(path="3")
+label_3 = ome_zarr_container.get_label(
+    "nuclei", pixel_size=image_3.pixel_size, strict=False
+)
+
+fig, ax = plt.subplots(figsize=(5.5, 5.5))
+show_image(
+    ax,
+    image_3.get_as_numpy(c=0),
+    title="nuclei over DAPI",
+    pixel_size=image_3.pixel_size,
+)
+# `mask_zeros` drops the label background, so the image below stays at full contrast
+# instead of being dimmed by a semi-transparent black.
+show_image(
+    ax,
+    label_3.get_as_numpy(),
+    cmap=random_label_cmap(),
+    alpha=0.6,
+    mask_zeros=True,
+)
+fig.tight_layout()
+print(
+    figure_html(
+        fig, alt="The nuclei label, coloured by object id, over the DAPI channel."
+    )
+)
+# --8<-- [end:plot_label_overlay]
+
 # --8<-- [start:derive_label]
 # Derive a new label
 new_label = ome_zarr_container.derive_label("new_label", overwrite=True)
@@ -334,32 +345,18 @@ print(roi_table.get("FOV_1"))
 # --8<-- [end:roi_table_get]
 
 # --8<-- [start:plot_fov_roi_on_image]
-from matplotlib.patches import Rectangle
-
 image_3 = ome_zarr_container.get_image(path="3")
-image_data = np.squeeze(image_3.get_as_numpy(c=0))
 
-roi = roi_table.get("FOV_1").to_pixel(pixel_size=image_3.pixel_size)
-x_slice = roi.get("x")
-y_slice = roi.get("y")
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("FOV_1 ROI")
-ax.imshow(image_data, cmap="gray")
-ax.add_patch(
-    Rectangle(
-        (x_slice.start, y_slice.start),
-        x_slice.length,
-        y_slice.length,
-        # Magenta is the docs' semantic colour for tables and ROIs.
-        edgecolor="#c2185b",
-        facecolor="none",
-        lw=2,
-    )
+fig, ax = plt.subplots(figsize=(6.5, 6.5))
+show_image(
+    ax,
+    image_3.get_as_numpy(c=0),
+    title="FOV_1 ROI",
+    pixel_size=image_3.pixel_size,
 )
-ax.axis("off")
+add_roi_rectangle(ax, roi_table.get("FOV_1"), image_3.pixel_size)
 fig.tight_layout()
-print_figure(fig)
+print(figure_html(fig, alt="One field of view outlined on the whole well image."))
 # --8<-- [end:plot_fov_roi_on_image]
 
 # --8<-- [start:roi_table_slice_image]
@@ -371,14 +368,16 @@ print(roi_data.shape)
 # --8<-- [start:plot_fov_roi_crop]
 roi = roi_table.get("FOV_1")
 image_3 = ome_zarr_container.get_image(path="3")
-image_data = np.squeeze(image_3.get_roi_as_numpy(roi, c=0))
 
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("FOV_1 ROI")
-ax.imshow(image_data, cmap="gray")
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(5.5, 5.5))
+show_image(
+    ax,
+    image_3.get_roi_as_numpy(roi, c=0),
+    title="FOV_1 ROI",
+    pixel_size=image_3.pixel_size,
+)
 fig.tight_layout()
-print_figure(fig)
+print(figure_html(fig, alt="The pixels of one field of view, read through its ROI."))
 # --8<-- [end:plot_fov_roi_crop]
 
 # --8<-- [start:masking_table_get]
@@ -394,29 +393,37 @@ print(roi_data.shape)
 # --8<-- [end:masking_table_slice_image]
 
 # --8<-- [start:plot_masking_roi_crop]
-cmap = random_label_cmap()
-
 roi = masking_table.get_label(100)
 image_2 = ome_zarr_container.get_image(path="2")
-image_data = np.squeeze(image_2.get_roi_as_numpy(roi, c=0))
-
 label_2 = ome_zarr_container.get_label("nuclei", pixel_size=image_2.pixel_size)
-label_data = np.squeeze(label_2.get_roi_as_numpy(roi))
 
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("Label 100 ROI")
-ax.imshow(image_data, cmap="gray")
-ax.imshow(label_data, cmap=cmap, alpha=0.6)
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+show_image(
+    ax,
+    image_2.get_roi_as_numpy(roi, c=0),
+    title="Label 100 ROI",
+    pixel_size=image_2.pixel_size,
+)
+show_image(
+    ax,
+    label_2.get_roi_as_numpy(roi),
+    cmap=random_label_cmap(),
+    alpha=0.6,
+    mask_zeros=True,
+)
 fig.tight_layout()
-print_figure(fig)
+print(
+    figure_html(
+        fig, alt="One nucleus, cropped to its masking ROI, with its label on top."
+    )
+)
 # --8<-- [end:plot_masking_roi_crop]
 
 # --8<-- [start:feature_table]
 # Get a feature table
 feature_table = ome_zarr_container.get_table("regionprops_DAPI")
 # only show the first 5 rows
-print_table(feature_table.dataframe.head(5))
+print(table_html(feature_table.dataframe.head(5)))
 # --8<-- [end:feature_table]
 
 # --8<-- [start:create_roi_table]

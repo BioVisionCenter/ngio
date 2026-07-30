@@ -92,6 +92,16 @@ Open an OME-Zarr file and inspect its contents.
 --8<-- "docs/snippets/getting_started/quickstart.py:open_container"
 ```
 
+The pixels are one call away — here is the DAPI channel of that container, read from a
+lower pyramid level:
+
+```python exec="true" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:plot_helpers"
+```
+```python exec="true" html="1" session="quickstart"
+--8<-- "docs/snippets/getting_started/quickstart.py:plot_quickstart_image"
+```
+
 ### What is the OME-Zarr container?
 
 The OME-Zarr container is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables. The [next section](1_ome_zarr_containers.md) goes into more detail: inspecting and editing metadata, opening remote stores, and deriving new images and labels.

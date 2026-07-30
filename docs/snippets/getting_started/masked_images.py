@@ -8,54 +8,17 @@ is also runnable on its own:
 """
 
 # --8<-- [start:plot_helpers]
-from io import StringIO
+import sys
 
-import matplotlib
+# markdown-exec execs this block, so `__file__` does not exist; a standalone run puts
+# only this script's own directory on sys.path. Both run from the repo root, which is
+# what the rest of the snippets already assume (`Path("./data")`), so resolve the
+# shared module against that.
+sys.path.append("docs/snippets")
+
 from matplotlib import pyplot as plt
-from matplotlib.figure import Figure
 
-matplotlib.use("Agg")
-
-
-def print_figure(fig: Figure) -> None:
-    """Print a figure as inline SVG, for markdown-exec `html` blocks.
-
-    Recolours every bit of chrome to one sentinel, then swaps that sentinel for
-    a theme variable in the emitted markup. The figure therefore follows the
-    light/dark toggle rather than baking black text on white into the page.
-    This only works because the SVG is inline: an `<img src>` would be a
-    separate document and would not see the site's custom properties.
-
-    The `.ngio-figure` wrapper is what the stylesheet keys on to strip the
-    `OUT` terminal-output treatment that `.result` applies by default.
-    """
-    ink = "#5b6569"
-    for ax in fig.axes:
-        ax.tick_params(colors=ink, which="both")
-        for spine in ax.spines.values():
-            spine.set_edgecolor(ink)
-        for text in (ax.title, ax.xaxis.label, ax.yaxis.label):
-            text.set_color(ink)
-        for label in ax.get_xticklabels() + ax.get_yticklabels():
-            label.set_color(ink)
-        if ax.get_legend() is not None:
-            for text in ax.get_legend().get_texts():
-                text.set_color(ink)
-    for text in fig.texts:
-        text.set_color(ink)
-
-    buffer = StringIO()
-    fig.savefig(buffer, format="svg", transparent=True)
-    plt.close(fig)
-
-    # Drop matplotlib's XML declaration and DOCTYPE — they are meaningless
-    # inside an HTML body, and the figure is being embedded, not served.
-    svg = buffer.getvalue()
-    svg = svg[svg.index("<svg") :]
-    svg = svg.replace(ink, "var(--md-default-fg-color--light)")
-    print(f'<div class="ngio-figure">{svg}</div>')
-
-
+from _render import figure_html, show_image
 # --8<-- [end:plot_helpers]
 
 # --8<-- [start:setup]
@@ -84,17 +47,15 @@ print(roi_data.shape)
 # --8<-- [end:masked_roi_numpy]
 
 # --8<-- [start:plot_masked_roi]
-import numpy as np
-
-image_data = masked_image.get_roi_as_numpy(label=1009, c=0)
-image_data = np.squeeze(image_data)
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("Label 1009 ROI")
-ax.imshow(image_data, cmap="gray")
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+show_image(
+    ax,
+    masked_image.get_roi_as_numpy(label=1009, c=0),
+    title="Label 1009 ROI",
+    pixel_size=masked_image.pixel_size,
+)
 fig.tight_layout()
-print_figure(fig)
+print(figure_html(fig, alt="One nucleus, cropped to the bounding box of its label."))
 # --8<-- [end:plot_masked_roi]
 
 # --8<-- [start:masked_roi_zoom]
@@ -103,15 +64,15 @@ print(roi_data.shape)
 # --8<-- [end:masked_roi_zoom]
 
 # --8<-- [start:plot_masked_roi_zoom]
-image_data = masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2)
-image_data = np.squeeze(image_data)
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("Label 1009 ROI - Zoomed out")
-ax.imshow(image_data, cmap="gray")
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+show_image(
+    ax,
+    masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2),
+    title="Label 1009 ROI - Zoomed out",
+    pixel_size=masked_image.pixel_size,
+)
 fig.tight_layout()
-print_figure(fig)
+print(figure_html(fig, alt="The same nucleus with twice the surrounding context."))
 # --8<-- [end:plot_masked_roi_zoom]
 
 # --8<-- [start:get_roi_masked]
@@ -120,15 +81,20 @@ print(masked_roi_data.shape)
 # --8<-- [end:get_roi_masked]
 
 # --8<-- [start:plot_get_roi_masked]
-masked_roi_data = masked_image.get_roi_masked_as_numpy(label=1009, c=0, zoom_factor=2)
-masked_roi_data = np.squeeze(masked_roi_data)
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("Masked Label 1009 ROI")
-ax.imshow(masked_roi_data, cmap="gray")
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+show_image(
+    ax,
+    masked_image.get_roi_masked_as_numpy(label=1009, c=0, zoom_factor=2),
+    title="Masked Label 1009 ROI",
+    # Everything outside the mask is zero here, and would otherwise take the low end of
+    # the window with it, leaving the nucleus washed out.
+    ignore_zeros=True,
+    pixel_size=masked_image.pixel_size,
+)
 fig.tight_layout()
-print_figure(fig)
+print(
+    figure_html(fig, alt="The same nucleus with every pixel outside its mask zeroed.")
+)
 # --8<-- [end:plot_get_roi_masked]
 
 # --8<-- [start:set_roi_masked]
@@ -140,15 +106,19 @@ masked_image.set_roi_masked(label=1009, c=0, patch=masked_data)
 # --8<-- [end:set_roi_masked]
 
 # --8<-- [start:plot_after_set_roi_masked]
-masked_data = masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2)
-masked_data = np.squeeze(masked_data)
-
-fig, ax = plt.subplots(figsize=(8, 4))
-ax.set_title("Masked Label 1009 ROI - After setting")
-ax.imshow(masked_data, cmap="gray")
-ax.axis("off")
+fig, ax = plt.subplots(figsize=(4.5, 4.5))
+show_image(
+    ax,
+    masked_image.get_roi_as_numpy(label=1009, c=0, zoom_factor=2),
+    title="Masked Label 1009 ROI - After setting",
+    pixel_size=masked_image.pixel_size,
+)
 fig.tight_layout()
-print_figure(fig)
+print(
+    figure_html(
+        fig, alt="The nucleus replaced by random values, its surroundings intact."
+    )
+)
 # --8<-- [end:plot_after_set_roi_masked]
 
 # --8<-- [start:get_masked_label]

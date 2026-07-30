@@ -8,26 +8,15 @@ is also runnable on its own:
 """
 
 # --8<-- [start:table_helpers]
-import pandas as pd
+import sys
 
+# markdown-exec execs this block, so `__file__` does not exist; a standalone run puts
+# only this script's own directory on sys.path. Both run from the repo root, which is
+# what the rest of the snippets already assume (`Path("./data")`), so resolve the
+# shared module against that.
+sys.path.append("docs/snippets")
 
-def print_table(df: pd.DataFrame) -> None:
-    """Print a DataFrame as HTML that the docs theme will style.
-
-    Markdown is not an option here: Zensical does not run block-level Markdown over
-    markdown-exec output, so a pipe table would stay literal text. The theme styles
-    only `table:not([class])` — and its JS only wraps such tables in a horizontal
-    scroll container — while pandas tags its output `class="dataframe"`, so the class
-    and the presentational border are stripped.
-    """
-    # A named index (here the label id) is real data, so promote it to a column: pandas
-    # otherwise renders it as a second, near-empty header row.
-    if df.index.name is not None:
-        df = df.reset_index()
-    html = df.to_html(index=False, border=0, float_format="{:.2f}".format)
-    print(html.replace(' class="dataframe"', ""))
-
-
+from _render import table_html
 # --8<-- [end:table_helpers]
 
 
@@ -116,5 +105,5 @@ ome_zarr.add_table("nuclei_regionprops", feat_table, overwrite=True)
 # --8<-- [end:extract]
 
 # --8<-- [start:read_table_back]
-print_table(ome_zarr.get_table("nuclei_regionprops").dataframe.head())
+print(table_html(ome_zarr.get_table("nuclei_regionprops").dataframe.head()))
 # --8<-- [end:read_table_back]
