@@ -124,13 +124,13 @@ ngio provides a high-level API to access the image data at different resolution 
     ```
 
 === "Nearest resolution"
-    By default the pixels must match exactly the requested pixel size. If you want to get the nearest resolution, you can use the `strict` parameter:
+    ngio returns the level whose pixel size is nearest to the one you ask for. That is the default, `strict=False`, spelled out here:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:get_image_nearest"
     ```
-    This will return the image with the nearest resolution to the requested pixel size.
+    Pass `strict=True` instead to require an exact match, and raise `NgioValueError` when no level has that pixel size. The module-level [`open_image`][ngio.open_image] and [`open_label`][ngio.open_label] functions default the other way, to `strict=True`.
 
-Similarly to the `OME-Zarr Container`, the `Image` object provides a high-level API to access the image metadata.
+Similarly to the OME-Zarr container, the `Image` object provides a high-level API to access the image metadata.
 
 === "Dimensions"
     ```python exec="true" source="material-block" session="get_started"
@@ -148,7 +148,7 @@ Similarly to the `OME-Zarr Container`, the `Image` object provides a high-level 
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:image_array_info"
     ```
-    The `axes` attribute returns the order of the axes in the image.
+    `shape`, `dtype` and `chunks` come straight from the underlying Zarr array; `axes` gives the order those dimensions are stored in.
 
 ### Working with image data
 
@@ -164,39 +164,39 @@ Once you have the `Image` object, you can access the image data as a:
     --8<-- "docs/snippets/getting_started/get_started.py:image_as_dask"
     ```
 
-=== "Legacy"
-    A generic `get_array` method is still available for backwards compatibility.
+=== "Either, by mode"
+    `get_array` is the generic form of the two above: one entry point that picks the backend from a `mode` argument. Reach for it when the backend is decided at runtime; otherwise prefer the explicit `get_as_numpy` / `get_as_dask`.
 
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:image_get_array_legacy"
     ```
 
-The `get_as_*` can also be used to slice the image data, and query specific axes in specific orders:
+The `get_as_*` methods can also slice the image data, and return the axes in an order you choose:
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:image_slice"
 ```
 
-If you want to edit the image data, you can use the `set_array` method:
+To write pixel data back, use the `set_array` method:
 
 ```python
->>> image.set_array(data) # Set the image data
+image.set_array(data)
 ```
 
-The `set_array` method can be used to set the image data from a numpy array, dask array, or dask delayed object.
+It accepts a numpy array or a dask array, and takes the same slicing and `axes_order`
+arguments as the getters, so you can write back exactly the region you read.
 
-A minimal example of how to use the `get_array` and `set_array` methods:
+A minimal read-modify-write example:
 
 ```python exec="true" source="material-block" session="get_started"
 --8<-- "docs/snippets/getting_started/get_started.py:set_array_example"
 ```
 
 !!! important
-    The `set_array` method will overwrite the image data at single resolution level. After you have finished editing the image data, you need to `consolidate` the changes to the OME-Zarr file at all resolution levels:
+    `set_array` writes to one resolution level only. Once you have finished editing, consolidate the changes so the rest of the pyramid is rebuilt from it:
     ```python
-    >>> image.consolidate() # Consolidate the changes
+    image.consolidate()
     ```
-    This will write the changes to the OME-Zarr file at all resolution levels.
 
 ### World coordinates slicing
 
@@ -208,8 +208,8 @@ To read or write a specific region of the image defined in world coordinates, yo
 
 ## Labels
 
-`Labels` represent segmentation masks that identify objects in the image. In ngio `Labels` are similar to `Images` and can
-be accessed and manipulated in the same way.
+A label is a segmentation mask that identifies objects in the image. In ngio a [`Label`][ngio.Label]
+behaves like an [`Image`][ngio.Image], and is accessed and manipulated the same way.
 
 ### Getting a label
 
@@ -219,7 +219,7 @@ See which labels are available in the image:
 --8<-- "docs/snippets/getting_started/get_started.py:list_labels"
 ```
 
-There are `4` labels available in this image. Here is how to access them:
+Here is how to reach one of them:
 
 === "Highest resolution label"
     By default, the `get_label` method returns the highest resolution label:
@@ -241,15 +241,14 @@ There are `4` labels available in this image. Here is how to access them:
     ```
 
 === "Nearest resolution"
-    By default the pixels must match exactly the requested pixel size. If you want to get the nearest resolution, you can use the `strict` parameter:
+    As with images, the nearest level wins unless you ask for an exact match with `strict=True`:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:get_label_nearest"
     ```
-    This will return the label with the nearest resolution to the requested pixel size.
 
 ### Working with label data
 
-Data access and manipulation for `Labels` is similar to `Images`. You can use the `get_array` and `set_array` methods to access and modify the label data.
+Reading and writing label data works exactly as it does for images: `get_as_numpy`, `get_as_dask`, `get_roi_as_numpy` and `set_array` are all available on a `Label`.
 
 ### Deriving a label
 

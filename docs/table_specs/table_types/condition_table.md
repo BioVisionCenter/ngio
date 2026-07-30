@@ -19,14 +19,19 @@ Example condition table:
 
 A condition table must include the following metadata fields in the group attributes:
 
-```json
+```json5
 {
     // Condition table metadata
     "type": "condition_table",
     "table_version": "1",
     // Backend metadata
     "backend": "csv", // the backend used to store the table, e.g. "anndata", "parquet", etc..
-    "index_key": "index", // The default index key for the condition table, which is used to identify each row.
-    "index_type": "int" // Either "int" or "str"
+    "index_key": "condition_id", // Optional. The column used as the row index.
+    "index_type": "str" // Optional. Either "int" or "str"
 }
 ```
+
+As with [generic tables](generic_table.md), a condition table has no default index:
+`index_key` and `index_type` appear only when you set one.
+
+In ngio this table type is the [`ConditionTable`][ngio.tables.ConditionTable] class.

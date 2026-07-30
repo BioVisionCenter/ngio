@@ -75,7 +75,7 @@ the pixels belonging to that object.
 --8<-- "docs/snippets/getting_started/masked_images.py:setup"
 ```
 
-Like the `Image` and `Label` objects, a `MaskedImage` is initialised from an `OME-Zarr Container` object, using the `get_masked_image` method.
+Like the `Image` and `Label` objects, a `MaskedImage` is initialised from an OME-Zarr container, using the `get_masked_image` method.
 
 Create a masked image from the `nuclei` label:
 
@@ -112,10 +112,12 @@ For example, zoom out the ROI by a factor of `2`:
 
 ## Masked operations
 
-In addition to the `get_roi_as_numpy` method, the `MaskedImage` class also provides a masked operation method that allows you to perform reading and writing only on the masked pixels.
+`get_roi_as_numpy` returns the object's whole bounding box, neighbouring objects included.
+To read or write only the pixels that belong to the object, use the masked operations:
+`get_roi_masked_as_numpy`, `get_roi_masked_as_dask` and `set_roi_masked`. Everything
+outside the mask comes back zeroed, and on write is left untouched.
 
-For these operations, use the `get_roi_masked` and `set_roi_masked` methods.
-For example, use `get_roi_masked` to get the masked data for a specific label:
+For example, read the masked data for one label:
 
 ```python exec="true" source="material-block" session="masked_images"
 --8<-- "docs/snippets/getting_started/masked_images.py:get_roi_masked"
@@ -125,7 +127,7 @@ For example, use `get_roi_masked` to get the masked data for a specific label:
 --8<-- "docs/snippets/getting_started/masked_images.py:plot_get_roi_masked"
 ```
 
-Use the `set_roi_masked` method to set the masked data for a specific label:
+And write it back with `set_roi_masked`, which only touches the pixels inside the mask:
 
 ```python exec="true" source="material-block" session="masked_images"
 --8<-- "docs/snippets/getting_started/masked_images.py:set_roi_masked"
@@ -139,7 +141,7 @@ Use the `set_roi_masked` method to set the masked data for a specific label:
 
 The `MaskedLabel` class is a subclass of [`Label`][ngio.Label] and provides the same functionality as the `MaskedImage` class.
 
-Create a masked label from an `OME-Zarr Container` object using the `get_masked_label` method.
+Create a masked label from an OME-Zarr container using the `get_masked_label` method.
 
 ```python exec="true" source="material-block" session="masked_images"
 --8<-- "docs/snippets/getting_started/masked_images.py:get_masked_label"

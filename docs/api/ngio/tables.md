@@ -1,3 +1,3 @@
-# ngio.tables API documentation
+# ngio.tables API reference
 
 ::: ngio.tables

@@ -8,6 +8,13 @@ description: The four ngio iterators for building scalable image-processing pipe
 
 When building image processing pipelines it is often useful to iterate over specific regions of the image, for example to process the image in smaller tiles or to process only specific regions of interest (ROIs). Iterators also let you set broadcasting rules for the iteration, for example to iterate over all z-planes or over all timepoints.
 
+!!! warning "Experimental API"
+
+    The iterators live in `ngio.experimental.iterators`, outside the stability guarantee
+    that covers the rest of ngio: they may change or be removed in a future release
+    without notice. Everything on this page works today, but pin your ngio version if you
+    depend on it.
+
 <!-- Figure 05 — how an iterator walks -->
 <div class="ngio-diagram">
 <svg viewBox="0 0 640 232" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f5t f5d">
@@ -93,7 +100,8 @@ When building image processing pipelines it is often useful to iterate over spec
         </svg>
 </div>
 
-ngio provides four basic `Iterator` classes:
+ngio provides four basic `Iterator` classes, all imported from
+`ngio.experimental.iterators`:
 
 <!-- Figure 06 — which iterator do I want -->
 <div class="ngio-diagram">
@@ -172,6 +180,37 @@ ngio provides four basic `Iterator` classes:
 * The `MaskedSegmentationIterator` is similar to the `SegmentationIterator`, but it uses a masking ROI table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. For a worked example, see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * The `ImageProcessingIterator` is designed to build image processing pipelines, where an input image is processed to produce a new image. For a worked example, see the [image processing tutorial](../tutorials/image_processing.md).
 * The `FeatureExtractorIterator` is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. For a worked example, see the [feature extraction tutorial](../tutorials/feature_extraction.md).
+
+## Building one
+
+Every iterator is constructed from the images it reads and writes, then narrowed. A fresh
+iterator covers the whole image as a single region:
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:setup"
+```
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:build"
+```
+
+`product` replaces that single region with the ones a ROI table names — here the
+microscope fields of view:
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:product"
+```
+
+The regions are ordinary [`Roi`][ngio.Roi] objects, so you can inspect them before
+processing anything:
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:inspect"
+```
+
+From here you would call `map_as_numpy` or iterate with `iter_as_numpy` to do the work;
+the [image processing tutorial](../tutorials/image_processing.md) carries this through to
+a written result.
 
 More complete examples can be found in the [Fractal tasks template](https://github.com/fractal-analytics-platform/fractal-tasks-template).
 

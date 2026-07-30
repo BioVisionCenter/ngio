@@ -2,13 +2,13 @@
 description: API reference for the Image and Label objects.
 ---
 
-# Images API documentation
+# Images API reference
 
 ## Open an image
 
 ::: ngio.open_image
 
-## ngio.Image class reference
+## Image
 
 ::: ngio.Image
 
@@ -16,6 +16,6 @@ description: API reference for the Image and Label objects.
 
 ::: ngio.open_label
 
-## ngio.Label class reference
+## Label
 
 ::: ngio.Label

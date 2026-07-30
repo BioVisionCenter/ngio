@@ -10,6 +10,8 @@ By the end you will have an on-disk container that the other tutorials read from
 For larger conversion jobs — vendor formats, multi-file acquisitions, whole plates — reach
 for the converter tooling library [ome-zarr-converters-tools](https://github.com/BioVisionCenter/ome-zarr-converters-tools).
 
+## Step 1: convert an array to OME-Zarr
+
 Start by converting a sample image from `skimage` to OME-Zarr format.
 
 ```python exec="true" session="create_ome_zarr"
@@ -24,7 +26,7 @@ Start by converting a sample image from `skimage` to OME-Zarr format.
 --8<-- "docs/snippets/tutorials/create_ome_zarr.py:create"
 ```
 
-## Adding a ROI table to an OME-Zarr image
+## Step 2: add a ROI table
 
 Attaching ROIs to an OME-Zarr image lets you retrieve those regions later. Add them with
 `ngio` as follows.

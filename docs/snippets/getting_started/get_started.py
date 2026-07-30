@@ -207,7 +207,7 @@ print(image.pixel_size)
 # --8<-- [end:image_pixel_size]
 
 # --8<-- [start:image_array_info]
-print(image.shape, image.dtype, image.chunks)
+print(image.shape, image.dtype, image.chunks, image.axes)
 # --8<-- [end:image_array_info]
 
 # --8<-- [start:image_as_numpy]
@@ -221,7 +221,7 @@ print(dask_array)
 # --8<-- [end:image_as_dask]
 
 # --8<-- [start:image_get_array_legacy]
-# Get the image as a numpy or dask or delayed object
+# One entry point for both, selected with mode="numpy" or mode="dask"
 data = image.get_array(mode="numpy")
 print(data.shape, data.dtype)
 # --8<-- [end:image_get_array_legacy]

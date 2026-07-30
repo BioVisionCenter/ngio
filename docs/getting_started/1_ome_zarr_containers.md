@@ -6,14 +6,14 @@ description: "The OME-Zarr container object: inspect and modify metadata, derive
 
 **Open an OME-Zarr image and explore what it holds.**
 
-The `OME-Zarr Container` is your entry point to working with OME-Zarr images. It gives you
+The OME-Zarr container is your entry point to working with OME-Zarr images. It gives you
 high-level access to the metadata, images, labels and tables in a store.
 
 <!-- Figure 01 — the object model -->
 <div class="ngio-diagram">
 <svg viewBox="0 0 640 412" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f1t f1d">
   <title id="f1t">The objects inside an OME-Zarr container</title>
-  <desc id="f1d">An OmeZarrContainer branches into a multiscale image made of one Image per resolution level, a labels container holding named multiscale labels, and a tables container holding typed tables.</desc>
+  <desc id="f1d">An OmeZarrContainer branches into an images container made of one Image per resolution level, a labels container holding named multiscale labels, and a tables container holding typed tables.</desc>
 
   <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5">
     <path d="M192 204H208M208 68V340M208 68H216M208 204H216M208 340H216"></path>
@@ -42,7 +42,7 @@ high-level access to the metadata, images, labels and tables in a store.
     <rect x="246" y="64" width="17" height="8" rx="1.5"></rect>
     <rect x="246" y="74" width="26" height="8" rx="1.5"></rect>
   </g>
-  <text x="286" y="64" style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">MultiscaleImage</text>
+  <text x="286" y="64" style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">ImagesContainer</text>
   <text x="286" y="82" style="font-family:'IBM Plex Sans',sans-serif;font-size:11px;fill:var(--md-default-fg-color--light)">several resolutions</text>
 
   <rect x="232" y="172" width="184" height="64" rx="8" style="fill:var(--ngio-surface);stroke:var(--ngio-line-strong)"></rect>
@@ -112,13 +112,13 @@ high-level access to the metadata, images, labels and tables in a store.
 --8<-- "docs/snippets/getting_started/get_started.py:print_container"
 ```
 
-The `OME-Zarr Container` will be the starting point for all your image processing tasks.
+The OME-Zarr container will be the starting point for all your image processing tasks.
 
 ## Main concepts
 
 ### What is the OME-Zarr container?
 
-The `OME-Zarr Container` gives you:
+The OME-Zarr container gives you:
 
 - **OME-Zarr overview**: get an overview of the OME-Zarr file, including the number of image levels, list of labels, and tables available.
 - **Image access**: get access to the images at different resolution levels and pixel sizes.
@@ -128,7 +128,7 @@ The `OME-Zarr Container` gives you:
 
 ### What is the OME-Zarr container not?
 
-The `OME-Zarr Container` object does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
+The OME-Zarr container does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
 
 ## OME-Zarr overview
 
@@ -176,25 +176,25 @@ You can update channel labels, colours, and display windows:
 === "Channel labels"
     Update the labels (names) of the channels:
     ```python
-    >>> ome_zarr_container.set_channel_labels(["DAPI", "GFP", "RFP"])
+    ome_zarr_container.set_channel_labels(["DAPI", "GFP", "RFP"])
     ```
 
 === "Channel colours"
     Update the display colours of the channels (hex format):
     ```python
-    >>> ome_zarr_container.set_channel_colors(["0000FF", "00FF00", "FF0000"])
+    ome_zarr_container.set_channel_colors(["0000FF", "00FF00", "FF0000"])
     ```
 
 === "Channel windows"
     Update the display windows (start/end values) for each channel:
     ```python
-    >>> ome_zarr_container.set_channel_windows([(0, 255), (0, 1000), (0, 500)])
+    ome_zarr_container.set_channel_windows([(0, 255), (0, 1000), (0, 500)])
     ```
 
 === "Channel windows from percentiles"
     Automatically compute display windows based on data percentiles:
     ```python
-    >>> ome_zarr_container.set_channel_windows_with_percentiles(percentiles=(0.1, 99.9))
+    ome_zarr_container.set_channel_windows_with_percentiles(percentiles=(0.1, 99.9))
     ```
 
 ### Axes metadata
@@ -204,13 +204,13 @@ You can update the axes names and units:
 === "Axes names"
     Rename the axes in the metadata:
     ```python
-    >>> ome_zarr_container.set_axes_names(["t", "c", "z", "y", "x"])
+    ome_zarr_container.set_axes_names(["t", "c", "z", "y", "x"])
     ```
 
 === "Axes units"
     Set the space and time units:
     ```python
-    >>> ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
+    ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
     ```
 
 ### Image name
@@ -218,7 +218,7 @@ You can update the axes names and units:
 You can set the name of the image in the metadata:
 
 ```python
->>> ome_zarr_container.set_name("My Processed Image")
+ome_zarr_container.set_name("My Processed Image")
 ```
 
 !!! note
@@ -226,7 +226,7 @@ You can set the name of the image in the metadata:
 
 ## Accessing images / labels / tables
 
-To access images, labels, and tables, you can use the `get_image`, `get_label`, and `get_table` methods of the `OME-Zarr Container` object.
+To access images, labels, and tables, you can use the `get_image`, `get_label`, and `get_table` methods of the OME-Zarr container.
 
 A variety of examples and additional information can be found in the [Images and labels](./2_images.md), and [Tables](./3_tables.md) sections.
 

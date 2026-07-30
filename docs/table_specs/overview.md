@@ -41,6 +41,14 @@ These specifications define structured tables that standardise common table type
 - **Feature tables**: A table type for representing features extracted from images. This table is also associated with a specific label image. See more in the [feature tables documentation](table_types/feature_table.md).
 - **Condition tables**: A table to represent experimental conditions or metadata associated with images or experiments. See more in the [condition tables documentation](table_types/condition_table.md).
 
+Of these, four are recognised automatically when a table is read: ROI, masking ROI, feature
+and condition. Anything else — including a table written by another tool — is loaded as a
+generic table.
+
+There is also [`GenericRoiTable`][ngio.tables.GenericRoiTable], a ROI table without the
+naming and indexing conventions of the standard one. It has no spec page, and is not
+auto-detected on read: reach it explicitly with `get_generic_roi_table`.
+
 ## Table groups
 
 Tables in OME-Zarr images are organised into groups of tables. Each group is saved in a Zarr group, and can be associated with a specific image or plate. The table groups are:
@@ -71,10 +79,10 @@ image.zarr        # Zarr group for a OME-Zarr image
 plate.zarr       # Zarr group for a OME-Zarr HCS plate
 |
 ├── A             # Row A of the plate
-|   ├── 1         # Column 0 of row A
-|   |   ├── 0     # Acquisition 0 of column A1
-|   |   ├── 1     # Acquisition 1 of column A1
-|   |   └── ...   # Other acquisitions of column A1
+|   ├── 1         # Column 1 of row A, i.e. well A1
+|   |   ├── 0     # Image 0 in well A1
+|   |   ├── 1     # Image 1 in well A1
+|   |   └── ...   # Other images in well A1, one per field and acquisition
 ...
 ├── tables        # Zarr subgroup with a list of tables associated to this plate
 |   ├── table_1   # Zarr subgroup for a given table

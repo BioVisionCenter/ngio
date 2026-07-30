@@ -100,7 +100,7 @@ This example plate is very small and contains only a single well.
 
 ## Plate overview
 
-The `OmeZarrPlate` object provides a high-level overview of the plate, including rows, columns, and acquisitions. The following methods are available:
+The `OmeZarrPlate` object gives you a high-level overview of the plate through three properties:
 
 === "Columns"
     Show the columns in the plate:
@@ -142,7 +142,7 @@ The `OmeZarrPlate` object provides multiple methods to retrieve the path to the 
 
 ## Getting the images
 
-The `OmeZarrPlate` object provides a method to get the image objects in a well. The method `get_well_images` takes the row and column indices of the well and returns a list of [`OmeZarrContainer`][ngio.OmeZarrContainer] objects.
+`get_well_images` takes the row and column of a well and returns a dictionary mapping each image path to its [`OmeZarrContainer`][ngio.OmeZarrContainer].
 
 === "All images"
     Get all images in the plate:
@@ -170,7 +170,7 @@ The `OmeZarrPlate` object provides a method to get the image objects in a well. 
     ```python exec="true" source="material-block" session="hcs_plate"
     --8<-- "docs/snippets/getting_started/hcs.py:get_well_images_by_acquisition"
     ```
-    The `acquisition` is not required, and if not provided, an empty dictionary will be returned.
+    `acquisition` is optional: omit it and every image in the well is returned. Pass an acquisition id that the plate does not define — as on this example plate, which carries no acquisition metadata — and you get an empty dictionary back.
 
 ## Creating a plate
 
@@ -198,7 +198,7 @@ This has created a new empty plate with the metadata correctly set. But no image
 You can add or remove images.
 
 === "Add images"
-    To add images to the plate, you can use the `add_image` method. This method takes the row and column indices of the well and the path to the image.
+    To add images to the plate, use the `add_image` method. It takes the row and column of the well and the path to the image within it.
     ```python exec="true" source="material-block" session="hcs_plate"
     --8<-- "docs/snippets/getting_started/hcs.py:plate_add_image"
     ```
@@ -209,7 +209,7 @@ You can add or remove images.
         This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_add_image` method instead.
 
 === "Remove images"
-    To remove images from the plate, you can use the `remove_image` method. This method takes the row and column indices of the well and the path to the image.
+    To remove images from the plate, use the `remove_image` method. It takes the same arguments as `add_image`.
     ```python exec="true" source="material-block" session="hcs_plate"
     --8<-- "docs/snippets/getting_started/hcs.py:plate_remove_image"
     ```

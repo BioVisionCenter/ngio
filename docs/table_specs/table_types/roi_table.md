@@ -18,7 +18,7 @@ ROI tables serve several purposes, such as:
 
 A ROI table must include the following metadata fields in the group attributes:
 
-```json
+```json5
 {
     // ROI table metadata
     "type": "roi_table",
@@ -26,7 +26,7 @@ A ROI table must include the following metadata fields in the group attributes:
     // Backend metadata
     "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "FieldIndex", // The default index key for the ROI table, which is used to identify each ROI.
-    "index_type": "str", // Either "int" or "str"
+    "index_type": "str" // Either "int" or "str"
 }
 ```
 
@@ -40,5 +40,9 @@ Additionally, each ROI can include the following optional columns:
 - `t_second` and `len_t_second`: the time coordinate of the ROI in seconds, and the length of the time coordinate in seconds. This is useful for multiplexing acquisitions.
 - `x_micrometer_original`, `y_micrometer_original` and `z_micrometer_original` which are the original coordinates of the ROI in micrometers. These are typically used when the data is saved in different coordinates during conversion, e.g. to avoid overwriting data from overlapping ROIs.
 - `translation_x`, `translation_y` and `translation_z`, which are used during registration of multiplexing acquisitions.
+- `plate_name`, `row`, `column`, `path_in_well`, `path_in_plate`, `acquisition_id` and `acquisition_name`, which record where in a plate the ROI came from. These matter when ROI tables from many images are concatenated into one plate-level table.
+- `FieldIndex` and `label`, the two column names ngio treats as index keys.
 
-You can add further columns to the ROI table, but they are not exposed in the ROI table API.
+You can add further columns. They are carried through unchanged — read back as attributes
+on the `Roi` object and written out again on save — but ngio does not interpret them, and
+it logs a warning for each column it does not recognise.

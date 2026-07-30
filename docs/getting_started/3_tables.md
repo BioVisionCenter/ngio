@@ -26,7 +26,7 @@ List all available tables and load a specific one:
 --8<-- "docs/snippets/getting_started/get_started.py:list_tables"
 ```
 
-ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_roi_table`, as well as untyped `generic_table`.
+ngio recognises four typed tables — `roi_table`, `masking_roi_table`, `feature_table` and `condition_table` — plus the untyped `generic_table`, which is what anything it cannot classify is loaded as. The three you will meet most often are below; see the [table specifications](../table_specs/overview.md) for the rest.
 
 === "ROI table"
     ROI tables can be used to store arbitrary regions of interest (ROIs) in the image.
@@ -40,8 +40,8 @@ ngio supports three types of tables: `roi_table`, `feature_table`, and `masking_
     ```python exec="true" html="1" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:plot_fov_roi_on_image"
     ```
-    This will return all the ROIs in the table.
-    ROIs can be used to slice the image data:
+    `get` returns the single ROI with that name; `rois()` returns them all as a list.
+    A ROI can then be used to slice the image data:
     ```python exec="true" source="material-block" session="get_started"
     --8<-- "docs/snippets/getting_started/get_started.py:roi_table_slice_image"
     ```

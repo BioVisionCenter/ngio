@@ -9,8 +9,8 @@
 Install with `pip install ngio` or `mamba install -c conda-forge ngio`. The central object
 is the OME-Zarr container, obtained with `open_ome_zarr_container(store)`; from it you
 reach images and labels (`get_image`, `get_label`), tables (`get_table`), masked images
-(`get_masked_image`) and, for plates, `open_ome_zarr_plate`. Every code example in these
-docs is executed when the site is built, so the outputs shown are real.
+(`get_masked_image`) and, for plates, `open_ome_zarr_plate`. The worked examples in the
+guides and tutorials are executed when the site is built, so the outputs shown are real.
 
 ## Getting started
 
@@ -40,17 +40,19 @@ docs is executed when the site is built, so the outputs shown are real.
 - [Feature table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/feature_table/): Measurement tables indexed by label id.
 - [Condition table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/condition_table/): Experimental condition metadata.
 - [Generic table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/generic_table/): Untyped fallback tables.
+- [Add a custom table](https://biovisioncenter.github.io/ngio/stable/table_specs/table_types/custom_table/): Why generic tables are the extension point today.
 
 ## API reference
 
 - [OmeZarrContainer](https://biovisioncenter.github.io/ngio/stable/api/ome_zarr_container/): open_ome_zarr_container, create_empty_ome_zarr, create_ome_zarr_from_array.
 - [Images](https://biovisioncenter.github.io/ngio/stable/api/images/): Image and Label objects and their accessors.
-- [HCS](https://biovisioncenter.github.io/ngio/stable/api/hcs/): OmeZarrPlate, OmeZarrWell and the plate helpers.
+- [HCS](https://biovisioncenter.github.io/ngio/stable/api/hcs/): open_ome_zarr_plate, OmeZarrPlate, open_ome_zarr_well, OmeZarrWell, create_empty_plate, create_empty_well.
 - [Tables](https://biovisioncenter.github.io/ngio/stable/api/tables/): Table classes, the tables container and backends.
-- [Iterators](https://biovisioncenter.github.io/ngio/stable/api/iterators/): ImageProcessingIterator, SegmentationIterator, MaskedSegmentationIterator, FeatureExtractorIterator.
+- [Iterators](https://biovisioncenter.github.io/ngio/stable/api/iterators/): ImageProcessingIterator, SegmentationIterator, MaskedSegmentationIterator, FeatureExtractorIterator — experimental, from ngio.experimental.iterators.
 - [ngio top-level API](https://biovisioncenter.github.io/ngio/stable/api/ngio/ngio/): Roi, PixelSize, Dimensions, NgioConfig and other core types.
 
 ## Optional
 
 - [Changelog](https://biovisioncenter.github.io/ngio/stable/changelog/): Release history.
 - [Contributing](https://biovisioncenter.github.io/ngio/stable/contributing/): Development setup, tests and PR workflow.
+- [Code of Conduct](https://biovisioncenter.github.io/ngio/stable/code_of_conduct/): Contributor Covenant v2.1.

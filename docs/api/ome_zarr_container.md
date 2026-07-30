@@ -2,17 +2,17 @@
 description: API reference for opening and creating OME-Zarr containers.
 ---
 
-# OmeZarrContainer: API documentation
+# OME-Zarr container API reference
 
-## Open an OME-Zarr container
+## Open a container
 
 ::: ngio.open_ome_zarr_container
 
-## Create an OME-Zarr container
+## Create a container
 
 ::: ngio.create_empty_ome_zarr
 ::: ngio.create_ome_zarr_from_array
 
-## OmeZarrContainer class
+## OmeZarrContainer
 
 ::: ngio.OmeZarrContainer

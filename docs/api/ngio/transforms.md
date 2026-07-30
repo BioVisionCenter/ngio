@@ -1,3 +1,3 @@
-# ngio.transforms API documentation
+# ngio.transforms API reference
 
 ::: ngio.transforms

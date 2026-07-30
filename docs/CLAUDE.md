@@ -5,7 +5,7 @@ Executed code lives in scripts under `docs/snippets/`, included by `pymdownx.sni
 `source="material-block"`, and `html="1"` for figures. One script per session, each
 runnable standalone from the repo root.
 
-Three traps, none visible from the sources:
+Four traps, none visible from the sources:
 
 - Build with `--clean --strict` (what `build_docs` does). Plain `zensical build` exits 0
   and reports "No issues found" even when a code block raised, and serves cached HTML.
@@ -15,3 +15,9 @@ Three traps, none visible from the sources:
   block-level Markdown is not run over markdown-exec output, so a pipe table stays literal
   `|---|`. The helper also strips pandas' `class`/`border` attributes, which every theme
   table rule is gated against (`table:not([class])`).
+- Every `.md` under `docs/` becomes a page, this file included (`/CLAUDE/`). Zensical does
+  not read `exclude_docs`, and neither an underscore prefix nor burying the file under
+  `snippets/` prevents it; a post-build `rm` would not help either, because `mike deploy`
+  builds its own copy of the site rather than publishing `site/`. The page is absent from
+  `sitemap.xml` but present in the site search index. Accepted deliberately: the split
+  between this file and the root `CLAUDE.md` is worth more than the stray page.

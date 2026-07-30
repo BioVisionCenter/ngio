@@ -115,12 +115,12 @@ print_figure(fig)
 # --8<-- [end:plot_masked_roi_zoom]
 
 # --8<-- [start:get_roi_masked]
-masked_roi_data = masked_image.get_roi_masked(label=1009, c=0, zoom_factor=2)
+masked_roi_data = masked_image.get_roi_masked_as_numpy(label=1009, c=0, zoom_factor=2)
 print(masked_roi_data.shape)
 # --8<-- [end:get_roi_masked]
 
 # --8<-- [start:plot_get_roi_masked]
-masked_roi_data = masked_image.get_roi_masked(label=1009, c=0, zoom_factor=2)
+masked_roi_data = masked_image.get_roi_masked_as_numpy(label=1009, c=0, zoom_factor=2)
 masked_roi_data = np.squeeze(masked_roi_data)
 
 fig, ax = plt.subplots(figsize=(8, 4))
@@ -134,7 +134,7 @@ print_figure(fig)
 # --8<-- [start:set_roi_masked]
 import numpy as np
 
-masked_data = masked_image.get_roi_masked(label=1009, c=0)
+masked_data = masked_image.get_roi_masked_as_numpy(label=1009, c=0)
 masked_data = np.random.randint(0, 255, masked_data.shape, dtype=np.uint8)
 masked_image.set_roi_masked(label=1009, c=0, patch=masked_data)
 # --8<-- [end:set_roi_masked]

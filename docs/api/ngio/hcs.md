@@ -1,3 +1,3 @@
-# ngio.hcs API documentation
+# ngio.hcs API reference
 
 ::: ngio.hcs

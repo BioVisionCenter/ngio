@@ -97,19 +97,18 @@ download_dir = Path("./data").absolute()
 hcs_path = download_ome_zarr_dataset("CardiomyocyteTiny", download_dir=download_dir)
 image_path = hcs_path / "B" / "03" / "0"
 
-# Open the ome-zarr container
+# Open the OME-Zarr container
 ome_zarr = open_ome_zarr_container(image_path)
 # --8<-- [end:open_container]
 
 # --8<-- [start:segment]
 from ngio.experimental.iterators import SegmentationIterator
 
-# First we will need the image object and the FOVs table
+# Take the image to read from, and the FOV table naming the regions to walk
 image = ome_zarr.get_image()
 roi_table = ome_zarr.get_roi_table("FOV_ROI_table")
 
-# Second we need to derive a new label image to use as target for the segmentation
-
+# Derive an empty label image to write the segmentation into
 label = ome_zarr.derive_label("new_label", overwrite=True)
 
 # Setup the segmentation iterator
@@ -121,10 +120,10 @@ seg_iterator = SegmentationIterator(
 )
 seg_iterator = seg_iterator.product(roi_table)
 
-# Make sure that if other axes are present they are iterated over
+# Split any remaining time axis, so each step yields one whole ZYX volume
 seg_iterator = seg_iterator.by_zyx()
 
-max_label = 0  # We will use this to avoid label collisions
+max_label = 0  # Carried across regions so the label ids never collide
 for image_data, label_writer in seg_iterator.iter_as_numpy():
     roi_segmentation = otsu_threshold_segmentation(
         image_data, max_label
@@ -178,11 +177,10 @@ print_figure(fig)
 # --8<-- [start:masked_segment]
 from ngio.experimental.iterators import MaskedSegmentationIterator
 
-# First we will need the masked image object
-# (that contains the masking table information inside)
+# Take a masked image, which carries its masking ROI table with it
 image = ome_zarr.get_masked_image(masking_label_name="mask")
 
-# Second we need to derive a new label image to use as target for the segmentation
+# Derive an empty label image to write the segmentation into
 label = ome_zarr.derive_label("masked_new_label", overwrite=True)
 
 # Setup the masked segmentation iterator
@@ -193,10 +191,10 @@ seg_iterator = MaskedSegmentationIterator(
     axes_order=["z", "y", "x"],
 )
 
-# Make sure that if other axes are present they are iterated over
+# Split any remaining time axis, so each step yields one whole ZYX volume
 seg_iterator = seg_iterator.by_zyx()
 
-max_label = 0  # We will use this to avoid label collisions
+max_label = 0  # Carried across regions so the label ids never collide
 for image_data, label_writer in seg_iterator.iter_as_numpy():
     roi_segmentation = otsu_threshold_segmentation(
         image_data, max_label

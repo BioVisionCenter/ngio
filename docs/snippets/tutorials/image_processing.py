@@ -88,16 +88,15 @@ download_dir = Path("./data").absolute()
 hcs_path = download_ome_zarr_dataset("CardiomyocyteTiny", download_dir=download_dir)
 image_path = hcs_path / "B" / "03" / "0"
 
-# Open the ome-zarr container
+# Open the OME-Zarr container
 ome_zarr = open_ome_zarr_container(image_path)
 # --8<-- [end:open_container]
 
 # --8<-- [start:derive_image]
-# First we will need the image object
+# Take the image to read from
 image = ome_zarr.get_image()
 
-# Second we need to derive a new ome-zarr image where we will store
-# the processed image
+# Derive a new OME-Zarr container to store the processed image in
 
 blurred_omezarr_path = image_path.parent / "0_blurred"
 blurred_omezarr = ome_zarr.derive_image(
@@ -107,22 +106,19 @@ blurred_image = blurred_omezarr.get_image()
 # --8<-- [end:derive_image]
 
 # --8<-- [start:apply_blur]
-# We can use the axes order to specify how we query the image data.
-# Here we will reorder the axes to be ["c", "z", "y", "x"].
-# So that it will be compatible with the gaussian blur function
-# which expects the channel axis to be the first one.
+# `axes_order` sets the order the array comes back in. Here it is
+# ["c", "z", "y", "x"], to match the blur function, which expects the
+# channel axis first.
 image_data = image.get_as_numpy(axes_order=["c", "z", "y", "x"])
 # Apply gaussian blur to the image
 sigma = 5.0
 blurred_image_data = gaussian_blur(image_data, sigma=sigma)
 
-# Set the processed image data back to the ome-zarr image
+# Write the processed data back to the OME-Zarr image
 blurred_image.set_array(patch=blurred_image_data, axes_order=["c", "z", "y", "x"])
 
-# The `set_array` method only saved the blurred image to the container at a specific
-# resolution level. So all other resolution levels are still empty.
-# To propagate the changes to all resolution levels,
-# we can use the `consolidate` method.
+# `set_array` wrote to one resolution level only, so the rest of the pyramid is
+# still empty. `consolidate` rebuilds the other levels from it.
 blurred_image.consolidate()
 # --8<-- [end:apply_blur]
 
@@ -144,9 +140,8 @@ from dask import array as da
 
 def dask_gaussian_blur(image: da.Array, sigma: float) -> da.Array:
     """Apply gaussian blur to a dask array."""
-    # This will introduce some edge artifacts at chunk boundaries
-    # In a real application, consider using map_overlap to mitigate this
-    # With appropriate depth based on sigma
+    # This introduces edge artefacts at chunk boundaries. In a real application,
+    # use map_overlap with a depth chosen from sigma to avoid them.
     return da.map_blocks(gaussian_blur, image, dtype=image.dtype, sigma=sigma)
 
 
@@ -164,30 +159,26 @@ iterator = ImageProcessingIterator(
     axes_order=["c", "z", "y", "x"],
 )
 
-# After initializing the iterator, the iterator will have created
-# will iterate over the entire image.
-print(f"Iterator after initialization: {iterator}")
+# A freshly built iterator covers the entire image in one region.
+print(f"Iterator over the whole image: {iterator}")
 
-# Iterate over an arbitrary region of interest table
-# We can use the product method that performs a cartesian product
-# between the iterator and the table.
+# Narrow it to an arbitrary ROI table. `product` takes the cartesian product
+# of the iterator's regions and the table's.
 table = ome_zarr.get_roi_table("FOV_ROI_table")
 iterator = iterator.product(table)
 print(f"Iterator after product with table: {iterator}")
 
-# We can explicitly set a broadcasting behavior
-# For example we can iterate over all zyx planes, and broadcast all the other
-# spatial dimensions
+# Set the broadcasting explicitly. `by_zyx` splits the time axis, so each step
+# yields one whole ZYX volume rather than the full time series at once.
 iterator = iterator.by_zyx()
 
-# Finally (if needed) we can check if the regions are not-overlapping
+# Optionally assert the regions do not overlap each other...
 iterator.require_no_regions_overlap()
-# We can also check if the regions lay on non-overlapping chunks
+# ...nor share chunks, which is what makes parallel writes safe.
 iterator.require_no_chunks_overlap()
 
-# Now we can map the gaussian blur function to the iterator
+# Map the blur across every region
 iterator.map_as_numpy(lambda x: gaussian_blur(x, sigma=sigma))
 
-# No need to consolidate, the iterator takes care of that
-# after all the regions have been processed
+# No need to consolidate: the iterator does it once every region is processed
 # --8<-- [end:iterators]

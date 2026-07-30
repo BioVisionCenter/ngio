@@ -2,13 +2,13 @@
 description: API reference for OmeZarrPlate and OmeZarrWell.
 ---
 
-# HCS API documentation
+# HCS API reference
 
 ## Open a plate
 
 ::: ngio.open_ome_zarr_plate
 
-## ngio.OmeZarrPlate class reference
+## OmeZarrPlate
 
 ::: ngio.OmeZarrPlate
 
@@ -16,6 +16,12 @@ description: API reference for OmeZarrPlate and OmeZarrWell.
 
 ::: ngio.open_ome_zarr_well
 
-## ngio.OmeZarrWell class reference
+## OmeZarrWell
 
 ::: ngio.OmeZarrWell
+
+## Create a plate or a well
+
+::: ngio.create_empty_plate
+
+::: ngio.create_empty_well

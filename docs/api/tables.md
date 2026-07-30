@@ -2,7 +2,7 @@
 description: API reference for ngio tables — ROI, masking ROI, feature, condition and generic tables, plus the tables container and backends.
 ---
 
-# Tables API documentation
+# Tables API reference
 
 For the on-disk format of each table type, see the
 [Table Specifications](../table_specs/overview.md).

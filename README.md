@@ -40,11 +40,8 @@ Then work through the
   ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
 - **Remote stores** — stream from S3 and other fsspec-backed sources, with a configurable
   IO retry policy.
-
-## Supported OME-Zarr versions
-
-ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
-v0.6 and later is planned.
+- **Supported OME-Zarr versions** — ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
+  v0.6 and later is planned.
 
 ## Versioning
 
@@ -54,9 +51,9 @@ is stable, and breaking changes are reserved for major releases.
 ## Documentation
 
 Full documentation, including guides, tutorials and the API reference, is at
-[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). Every code
-block in the docs is executed when the site is built, so what you read is what actually
-runs.
+[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). The worked
+examples are executed when the site is built, so the code and the output you read are what
+actually ran.
 
 ## Citing ngio
 

@@ -67,28 +67,28 @@ download_dir = Path("./data").absolute()
 hcs_path = download_ome_zarr_dataset("CardiomyocyteTinyMip", download_dir=download_dir)
 image_path = hcs_path / "B" / "03" / "0"
 
-# Open the ome-zarr container
+# Open the OME-Zarr container
 ome_zarr = open_ome_zarr_container(image_path)
 # --8<-- [end:open_container]
 
 # --8<-- [start:setup_transform]
 from ngio.transforms import ZoomTransform
 
-# First we will need the image object and the FOVs table
+# Take the image to measure
 image = ome_zarr.get_image()
 
 # Get the nuclei label
 nuclei = ome_zarr.get_label("nuclei")
 
-# In this example we the image is available at an higher resolution than the nuclei
+# Here the image is stored at a higher resolution than the nuclei label
 print(f"Image dimensions: {image.dimensions}, pixel size: {image.pixel_size}")
 print(f"Nuclei dimensions: {nuclei.dimensions}, pixel size: {nuclei.pixel_size}")
 
-# We need to setup a transform to resample the nuclei to the image resolution
+# So resample the label up to the image resolution with a transform
 zoom_transform = ZoomTransform(
     input_image=nuclei,
     target_image=image,
-    order="nearest",  # Nearest neighbor interpolation for labels
+    order="nearest",  # Nearest-neighbour interpolation, so label ids stay intact
 )
 # --8<-- [end:setup_transform]
 
@@ -109,7 +109,7 @@ for image_data, label_data, roi in iterator.iter_as_numpy():
     roi_feat_table = extract_features(image=image_data, label=label_data)
     feat_table.append(roi_feat_table)
 
-# Concatenate all the dataframes into a single one
+# Concatenate the per-region frames into one table
 feat_table = pd.concat(feat_table)
 feat_table = FeatureTable(table_data=feat_table, reference_label="nuclei")
 ome_zarr.add_table("nuclei_regionprops", feat_table, overwrite=True)

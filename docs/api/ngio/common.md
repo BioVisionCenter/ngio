@@ -1,3 +1,3 @@
-# ngio.common API documentation
+# ngio.common API reference
 
 ::: ngio.common

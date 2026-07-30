@@ -2,21 +2,25 @@
 description: "Feature table: per-object measurements tied to a label image."
 ---
 
-# Feature tables
+# Feature table
 
 A feature table is a table type for representing per-object features in an image. Each row in a feature table corresponds to a specific label in the label image.
 
-Feature tables can optionally include metadata to specify the type of features stored in each column:
+A feature table can also declare what kind of feature each column holds:
 
 - `measurement`: A quantitative measurement of the object, such as area, perimeter, or intensity.
 - `categorical`: A categorical feature of the object, such as a classification label or a type.
 - `metadata`: Additional free-form columns that can be used to store any other information about the object, but that should not be used for analysis/classification purposes.
 
-These feature types inform casting of the values when serialising a table and can be used in downstream analysis to select specific subsets of features. The feature type can be explicitly specified in the feature table metadata. Alternatively, if a column is not specified, ngio applies the following casting rules:
+The declaration is there so that downstream tools can select subsets of features without
+guessing from dtypes.
 
-- If the column contains only numeric values, it is considered a `measurement`.
-- If the column contains string or boolean values, it is considered a `categorical`.
-- The index column is considered a `categorical` feature.
+!!! warning "Declarative only"
+
+    ngio writes these three lists but does not yet read them back: they do not influence
+    how a table is serialised. Casting is decided by dtype alone, as described under
+    [table backends](../backend.md). Treat the lists as an annotation for your own
+    tooling, not as a contract ngio enforces.
 
 ## Specifications
 
@@ -24,7 +28,7 @@ These feature types inform casting of the values when serialising a table and ca
 
 A feature table must include the following metadata fields in the group attributes:
 
-```json
+```json5
 {
     // Feature table metadata
     "type": "feature_table",
@@ -34,16 +38,17 @@ A feature table must include the following metadata fields in the group attribut
     "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
     "index_key": "label",
     "index_type": "int", // Either "int" or "str"
+    "instance_key": "label" // Mirrors index_key; identifies the label each row describes
 }
 ```
 
-Additionally, it can include feature type information such as:
+ngio also always writes the three feature-type lists, empty when you have not set them:
 
-```json
+```json5
 {
     "categorical_columns": [
         "label",
-        "cell_type",
+        "cell_type"
     ],
     "measurement_columns": [
         "area",
@@ -52,7 +57,7 @@ Additionally, it can include feature type information such as:
         "intensity_std"
     ],
     "metadata_columns": [
-        "description",
-    ],
+        "description"
+    ]
 }
 ```

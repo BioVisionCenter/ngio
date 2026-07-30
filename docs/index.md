@@ -12,6 +12,20 @@ scalable way. It provides an object-based API for opening, exploring and manipul
 OME-Zarr images and high-content screening (HCS) plates, along with labels, tables and
 regions of interest (ROIs) for extracting and analysing specific regions of your data.
 
+## Key features
+
+- **Object-based API** — open, explore and manipulate OME-Zarr images and HCS
+  plates; derive new images and labels with minimal boilerplate.
+- **Tables and ROIs** — tight integration with [tabular
+  data](table_specs/overview.md), extensible table schemas, and measurements stored
+  alongside the image.
+- **Scalable processing** — iterators for building pipelines that generalise from a
+  single ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
+- **Remote stores** — stream from S3 and other fsspec-backed sources, with a
+  [configurable IO retry policy](getting_started/7_configuration.md).
+- **Supported OME-Zarr versions** — ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for 
+  v0.6 and later is planned.
+
 ## Installation
 
 === "pip"
@@ -43,9 +57,6 @@ data = image.get_as_numpy(channel_selection="DAPI")
 roi = ome_zarr.get_table("FOV_ROI_table").get("FOV_1")
 patch = image.get_roi_as_numpy(roi)
 ```
-
-Every code block in these docs is executed when the site is built, so what you read is
-what actually runs.
 
 ## Where to go next
 
@@ -88,21 +99,6 @@ what actually runs.
     [:octicons-arrow-right-24: Open the reference](api/ome_zarr_container.md)
 
 </div>
-
-## Key features
-
-- **Object-based API** — open, explore and manipulate OME-Zarr images and HCS
-  plates; derive new images and labels with minimal boilerplate.
-- **Tables and ROIs** — tight integration with [tabular
-  data](table_specs/overview.md), extensible table schemas, and measurements stored
-  alongside the image.
-- **Scalable processing** — iterators for building pipelines that generalise from a
-  single ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
-
-## Supported OME-Zarr versions
-
-ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
-v0.6 and later is planned.
 
 ## Citing ngio
 

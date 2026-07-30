@@ -72,11 +72,11 @@ Open an OME-Zarr file and inspect its contents.
 
 ### What is the OME-Zarr container?
 
-The `OME-Zarr Container` is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
+The OME-Zarr container is the core of ngio and the entry point to working with OME-Zarr images. It provides high-level access to the image metadata, images, labels, and tables.
 
 ### What is the OME-Zarr container not?
 
-The `OME-Zarr Container` object does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
+The OME-Zarr container does not give you access to the image data directly. For that, use the `Image`, `Label`, and `Table` objects.
 
 ## Next steps
 
