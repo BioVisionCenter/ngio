@@ -1,7 +1,7 @@
-<p align="center">
+<p>
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/BioVisionCenter/ngio/main/docs/assets/logo-lockup-dark.svg">
-    <img alt="ngio" width="320" src="https://raw.githubusercontent.com/BioVisionCenter/ngio/main/docs/assets/logo-lockup.svg">
+    <img alt="" width="320" src="https://raw.githubusercontent.com/BioVisionCenter/ngio/main/docs/assets/logo-lockup.svg">
   </picture>
 </p>
 

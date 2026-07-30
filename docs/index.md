@@ -26,7 +26,7 @@ regions of interest (ROIs) for extracting and analysing specific regions of your
   single ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
 - **Remote stores** — stream from S3 and other fsspec-backed sources, with a
   [configurable IO retry policy](getting_started/7_configuration.md).
-- **Supported OME-Zarr versions** — ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for 
+- **Supported OME-Zarr versions** — ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
   v0.6 and later is planned.
 
 ## Installation
