@@ -87,7 +87,7 @@ create_empty_ome_zarr(store, shape=(2, 64, 64), axes_names=("c", "y", "x"),
 - `NgioWellMeta.add_image`/`remove_image` and `NgioPlateMeta.add_well`/`add_acquisition`/`remove_well` mutated the receiver in place — the returned "copy" shared its lists with the original.
 - `AxesSetup.from_ordered_list` silently dropped a non-canonical axis when a canonical name appeared to its left (e.g. `["z", "custom", "y", "x"]`).
 - `ngio.iterators` grid helpers: `grid()` gave every ROI the same name (now unique per tile, e.g. `t0_z0_y32_x64`), and `by_chunks` with overlap ≥ chunk size raises `NgioValueError` instead of `range() arg 3 must not be zero`.
-- The global config singleton is now loaded lazily, so `NGIO_CONFIG_PATH` set after importing ngio is honored.
+- `get_config()` now builds the global config singleton lazily on first call instead of at `ngio.config` import time. Note that `import ngio` still materializes it (`ngio.utils._zarr_utils` applies the s3fs config at module scope), so `NGIO_CONFIG_PATH` must still be set **before** importing ngio — see `docs/getting_started/7_configuration.md`.
 - The v0.5 metadata decoder discarded the normalized value for non-string axis `unit`s.
 - Accessing labels on a read-only image without a `labels` group raised `NgioValueError` instead of degrading gracefully (`list_labels()` → `[]`, `labels_container` → `NgioValidationError`).
 - An empty `RoiTable` with no backend was unusable: `.rois()`/`.add(roi)` raised instead of treating the table as empty.

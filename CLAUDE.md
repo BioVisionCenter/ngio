@@ -31,7 +31,7 @@ per-file-ignores).
 ## Config
 - Python: 3.11–3.14
 - Versioning: VCS via `hatch-vcs` (git tags, no hardcoded versions)
-- Coverage: branch coverage; omits `tests/`, `src/ngio/_version.py`
+- Coverage: `source = ["ngio"]`; line coverage only (branch coverage is not enabled)
 
 ## Code Style
 
@@ -44,7 +44,7 @@ per-file-ignores).
   - Terse: behavior and edge cases only, don't restate the signature
 - Type checking via `ty`
 - Internal modules prefixed with `_`
-- Spell check via typos — false positives go in `_typos.toml`
+- Spell check via typos — false positives go in `[tool.typos.default.extend-words]` in `pyproject.toml`
 - Pydantic v2: `@field_validator` before `@classmethod`
 
 ## Changelog

@@ -158,9 +158,13 @@ _config: NgioConfig | None = None
 def get_config() -> NgioConfig:
     """Return the global ngio configuration singleton.
 
-    The configuration is loaded lazily on first access, so setting
-    `NGIO_CONFIG_PATH` before the first call is honored even if ngio
-    was imported earlier.
+    The singleton is built on first call rather than at import of this module.
+    In practice `import ngio` already triggers that first call (see
+    `ngio.utils._zarr_utils`), so `NGIO_CONFIG_PATH` must be set *before*
+    importing ngio.
+
+    Note:
+        Use `_reset_config()` to force a reload, e.g. in tests.
     """
     global _config
     if _config is None:
