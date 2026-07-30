@@ -5,7 +5,6 @@ import dask.array as da
 import numpy as np
 
 from ngio.common import Roi
-from ngio.experimental.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.images import Image, Label
 from ngio.images._image import (
     ChannelSlicingInputType,
@@ -17,6 +16,7 @@ from ngio.io_pipes import (
     NumpyRoiGetter,
     TransformProtocol,
 )
+from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 NumpyPipeType: TypeAlias = tuple[np.ndarray, np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, da.Array, Roi]

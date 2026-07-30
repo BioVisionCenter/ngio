@@ -1,7 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
@@ -62,7 +61,6 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
 )
 from ngio.tables import RoiTable
 from ngio.utils import (
-    NgioDeprecationWarning,
     NgioFileExistsError,
     NgioValueError,
     StoreOrGroup,
@@ -966,9 +964,6 @@ def abstract_derive(
     dimension_separator: Literal[".", "/"] | None = None,
     compressors: CompressorLike | None = None,
     extra_array_kwargs: Mapping[str, Any] | None = None,
-    # Deprecated arguments
-    labels: Sequence[str] | None = None,
-    pixel_size: PixelSize | None = None,
 ) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image from an existing image.
 
@@ -1004,35 +999,11 @@ def abstract_derive(
         compressors (CompressorLike | None): The compressors to use.
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation.
-        labels (Sequence[str] | None): The labels of the new image.
-            This argument is DEPRECATED please use channels_meta instead.
-        pixel_size (PixelSize | None): The pixel size of the new image.
-            This argument is DEPRECATED please use pixelsize, z_spacing,
-            and time_spacing instead.
 
     Returns:
         ImagesContainer: The new derived image.
 
     """
-    # TODO: remove in ngio 0.6
-    if labels is not None:
-        warnings.warn(
-            "The 'labels' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        channels_meta = list(labels)
-    if pixel_size is not None:
-        warnings.warn(
-            "The 'pixel_size' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'pixelsize', 'z_spacing', and 'time_spacing'"
-            "instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        pixelsize = (pixel_size.y, pixel_size.x)
-    # End of deprecated arguments handling
     ref_meta = ref_image.meta
 
     shape = _normalize_shape_for_channel_policy(

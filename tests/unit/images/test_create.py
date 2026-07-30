@@ -341,28 +341,3 @@ def test_derive_from_legacy_images(tmp_path: Path, ngff_version: str):
         img = ome_zarr.get_image(path=path_img)
         lbl = ome_zarr.get_label(name="my_label_level_1", path=path_lbl)
         assert img.shape[-2:] == lbl.shape[-2:]
-
-
-def test_deprecated_scaling_factors_order():
-    from ngio.images._create_utils import _check_deprecated_scaling_factors
-    from ngio.utils import NgioDeprecationWarning
-
-    # canonical axes order is (..., z, y, x)
-    with pytest.warns(NgioDeprecationWarning):
-        factors = _check_deprecated_scaling_factors(
-            yx_scaling_factor=(2.0, 4.0),
-            z_scaling_factor=None,
-            scaling_factors="auto",
-            shape=(1, 4, 64, 64),
-        )
-    assert factors == (1.0, 1.0, 2.0, 4.0)
-
-    # 2D shape: factors must be trimmed to (y, x)
-    with pytest.warns(NgioDeprecationWarning):
-        factors = _check_deprecated_scaling_factors(
-            yx_scaling_factor=(2.0, 4.0),
-            z_scaling_factor=None,
-            scaling_factors="auto",
-            shape=(64, 64),
-        )
-    assert factors == (2.0, 4.0)

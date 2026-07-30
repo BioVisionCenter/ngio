@@ -3,7 +3,7 @@ import numpy as np
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
-from ngio.experimental.iterators import FeatureExtractorIterator
+from ngio.iterators import FeatureExtractorIterator
 
 
 def _build_iterator() -> FeatureExtractorIterator:

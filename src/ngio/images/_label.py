@@ -220,9 +220,6 @@ class LabelsContainer:
         compressors: CompressorLike | None = None,
         extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
-        # Deprecated arguments
-        labels: Sequence[str] | None = None,
-        pixel_size: PixelSize | None = None,
     ) -> "Label":
         """Create an empty OME-Zarr label from an existing image or label.
 
@@ -255,11 +252,6 @@ class LabelsContainer:
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
             overwrite (bool): Whether to overwrite an existing label.
-            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
-                please use channels_meta instead.
-            pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
-                This argument is deprecated, please use pixelsize, z_spacing,
-                and time_spacing instead.
 
         Returns:
             Label: The new derived label.
@@ -291,8 +283,6 @@ class LabelsContainer:
             compressors=compressors,
             extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
-            labels=labels,
-            pixel_size=pixel_size,
         )
 
         if name not in existing_labels:
@@ -326,9 +316,6 @@ def derive_label(
     compressors: CompressorLike | None = None,
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    # Deprecated arguments
-    labels: Sequence[str] | None = None,
-    pixel_size: PixelSize | None = None,
 ) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Derive a new OME-Zarr label from an existing image or label.
 
@@ -361,11 +348,6 @@ def derive_label(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation.
         overwrite (bool): Whether to overwrite an existing label. Defaults to False.
-        labels (Sequence[str] | None): Deprecated. This argument is deprecated,
-            please use channels_meta instead.
-        pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
-            This argument is deprecated, please use pixelsize, z_spacing,
-            and time_spacing instead.
 
     Returns:
         tuple[ZarrGroupHandler, AxesSetup]: The group handler of the new label
@@ -394,8 +376,6 @@ def derive_label(
         compressors=compressors,
         extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
-        labels=labels,
-        pixel_size=pixel_size,
     )
     return group_handler, axes_setup
 

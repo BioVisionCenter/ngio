@@ -1,4 +1,4 @@
-"""Coverage tests for error paths and deprecated shims in OmeZarrContainer."""
+"""Coverage tests for error paths in OmeZarrContainer."""
 
 from pathlib import Path
 
@@ -17,11 +17,7 @@ from ngio import (
 from ngio.images import Label
 from ngio.ome_zarr_meta.ngio_specs import Channel
 from ngio.tables import ConditionTable, FeatureTable, MaskingRoiTable, RoiTable
-from ngio.utils import (
-    NgioDeprecationWarning,
-    NgioValidationError,
-    NgioValueError,
-)
+from ngio.utils import NgioValidationError, NgioValueError
 
 
 def _make_container(store=None, channels=("DAPI", "GFP")):
@@ -66,29 +62,9 @@ def test_repr_many_labels_and_tables():
     assert "#tables=3" in repr_str
 
 
-def test_deprecated_image_meta_property():
-    ome_zarr = _make_container()
-    with pytest.warns(NgioDeprecationWarning, match="image_meta"):
-        meta = ome_zarr.image_meta
-    assert meta.paths == ome_zarr.meta.paths
-
-
-def test_deprecated_levels_paths_property():
-    ome_zarr = _make_container()
-    with pytest.warns(NgioDeprecationWarning, match="levels_paths"):
-        paths = ome_zarr.levels_paths
-    assert paths == ome_zarr.level_paths
-
-
 def test_axes_setup_property():
     ome_zarr = _make_container()
     assert ome_zarr.axes_setup == ome_zarr.images_container.axes_setup
-
-
-def test_deprecated_set_channel_percentiles():
-    ome_zarr = _make_container()
-    with pytest.warns(NgioDeprecationWarning, match="set_channel_percentiles"):
-        ome_zarr.set_channel_percentiles(start_percentile=1.0, end_percentile=99.0)
 
 
 def test_set_axes_units_updates_labels():
@@ -167,12 +143,6 @@ def test_get_condition_table(container_with_tables):
         container_with_tables.get_condition_table("roi")
 
 
-def test_get_table_check_type_deprecated(container_with_tables):
-    with pytest.warns(NgioDeprecationWarning, match="check_type"):
-        table = container_with_tables.get_table("roi", check_type="roi_table")
-    assert isinstance(table, RoiTable)
-
-
 def test_get_table_as(container_with_tables):
     table = container_with_tables.get_table_as("roi", RoiTable)
     assert isinstance(table, RoiTable)
@@ -201,61 +171,6 @@ def test_open_label(images_all_versions_readonly: dict[str, Path], zarr_key: str
     assert isinstance(label_by_name, Label)
     assert label_by_name.path == label.path
     assert label_by_name.shape == label.shape
-
-
-def test_create_empty_deprecated_xy_pixelsize():
-    with pytest.warns(NgioDeprecationWarning, match="xy_pixelsize"):
-        ome_zarr = create_empty_ome_zarr(
-            MemoryStore(), shape=(8, 8), xy_pixelsize=0.5, levels=2
-        )
-    assert ome_zarr.get_image().pixel_size.x == 0.5
-
-
-def test_create_empty_deprecated_scaling_factors_2d():
-    with pytest.warns(NgioDeprecationWarning, match="xy_scaling_factor"):
-        ome_zarr = create_empty_ome_zarr(
-            MemoryStore(),
-            shape=(16, 16),
-            pixelsize=0.5,
-            xy_scaling_factor=2.0,
-            levels=2,
-        )
-    assert ome_zarr.levels == 2
-    assert ome_zarr.get_image(path="1").shape == (8, 8)
-
-
-def test_create_empty_deprecated_scaling_factors_3d():
-    with pytest.warns(NgioDeprecationWarning, match="z_scaling_factor"):
-        ome_zarr = create_empty_ome_zarr(
-            MemoryStore(),
-            shape=(4, 16, 16),
-            pixelsize=0.5,
-            z_scaling_factor=1.0,
-            levels=2,
-        )
-    assert ome_zarr.get_image(path="1").shape == (4, 8, 8)
-
-
-def test_create_empty_deprecated_channel_args():
-    with pytest.warns(NgioDeprecationWarning):
-        ome_zarr = create_empty_ome_zarr(
-            MemoryStore(),
-            shape=(2, 8, 8),
-            axes_names=("c", "y", "x"),
-            pixelsize=0.5,
-            levels=2,
-            channel_labels=["ch_a", "ch_b"],
-            channel_wavelengths=["w1", "w2"],
-            channel_colors=["FF0000", "00FF00"],
-            channel_active=[True, False],
-        )
-    assert ome_zarr.channel_labels == ["ch_a", "ch_b"]
-    assert ome_zarr.wavelength_ids == ["w1", "w2"]
-
-
-def test_create_empty_requires_pixelsize():
-    with pytest.raises(NgioValueError, match="pixelsize must be provided"):
-        create_empty_ome_zarr(MemoryStore(), shape=(8, 8), levels=2)
 
 
 def test_create_from_array_bad_percentiles():

@@ -1,7 +1,6 @@
 """Utility functions for working with OME-Zarr images."""
 
 import logging
-import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal, TypeVar
 
@@ -30,7 +29,6 @@ from ngio.ome_zarr_meta.ngio_specs import (
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import (
-    NgioDeprecationWarning,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -56,64 +54,13 @@ def _align_to_axes(
     return tuple(aligned_values)
 
 
-def _check_deprecated_scaling_factors(
-    *,
-    yx_scaling_factor: float | tuple[float, float] | None = None,
-    z_scaling_factor: float | None = None,
-    scaling_factors: Sequence[float] | Literal["auto"] = "auto",
-    shape: tuple[int, ...],
-) -> Sequence[float] | Literal["auto"]:
-    if yx_scaling_factor is not None or z_scaling_factor is not None:
-        warnings.warn(
-            "The 'yx_scaling_factor' and 'z_scaling_factor' arguments are deprecated "
-            "and will be removed in ngio=0.6. Please use the 'scaling_factors' "
-            "argument instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        if scaling_factors != "auto":
-            raise NgioValueError(
-                "Cannot use both 'scaling_factors' and deprecated "
-                "'yx_scaling_factor'/'z_scaling_factor' arguments."
-            )
-        if isinstance(yx_scaling_factor, tuple):
-            if len(yx_scaling_factor) != 2:
-                raise NgioValueError(
-                    "yx_scaling_factor tuple must have length 2 for y and x scaling."
-                )
-            y_scale = yx_scaling_factor[0]
-            x_scale = yx_scaling_factor[1]
-        else:
-            y_scale = yx_scaling_factor if yx_scaling_factor is not None else 2.0
-            x_scale = yx_scaling_factor if yx_scaling_factor is not None else 2.0
-        z_scale = z_scaling_factor if z_scaling_factor is not None else 1.0
-        scaling_factors = (z_scale, y_scale, x_scale)
-        if len(scaling_factors) < len(shape):
-            padding = (1.0,) * (len(shape) - len(scaling_factors))
-            scaling_factors = padding + scaling_factors
-        elif len(scaling_factors) > len(shape):
-            scaling_factors = scaling_factors[len(scaling_factors) - len(shape) :]
-
-        return scaling_factors
-    return scaling_factors
-
-
 def _compute_scaling_factors(
     *,
     scaling_factors: Sequence[float] | Literal["auto"],
     shape: tuple[int, ...],
     axes_handler: AxesHandler,
-    xy_scaling_factor: float | tuple[float, float] | None = None,
-    z_scaling_factor: float | None = None,
 ) -> tuple[float, ...]:
     """Compute scaling factors for given axes names."""
-    # TODO remove with ngio 0.6
-    scaling_factors = _check_deprecated_scaling_factors(
-        yx_scaling_factor=xy_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
-        scaling_factors=scaling_factors,
-        shape=shape,
-    )
     if scaling_factors == "auto":
         return _align_to_axes(
             values={
@@ -274,9 +221,6 @@ def init_image_like(
     axes_setup: AxesSetup | None = None,
     # Whether to overwrite existing image
     overwrite: bool = False,
-    # Deprecated arguments
-    yx_scaling_factor: float | tuple[float, float] | None = None,
-    z_scaling_factor: float | None = None,
 ) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image with the given shape and metadata."""
     shape = tuple(shape)
@@ -303,8 +247,6 @@ def init_image_like(
         scaling_factors=scaling_factors,
         shape=shape,
         axes_handler=axes_handler,
-        xy_scaling_factor=yx_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
     )
     if isinstance(levels, int):
         levels_paths = tuple(str(i) for i in range(levels))

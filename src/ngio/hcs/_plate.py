@@ -2,7 +2,6 @@
 
 import asyncio
 import logging
-import warnings
 from collections.abc import Sequence
 from typing import Literal
 
@@ -42,7 +41,6 @@ from ngio.tables import (
 from ngio.utils import (
     AccessModeLiteral,
     NgioCache,
-    NgioDeprecationWarning,
     NgioError,
     NgioValueError,
     StoreOrGroup,
@@ -783,7 +781,6 @@ class OmeZarrPlate:
         self,
         store: StoreOrGroup,
         plate_name: str | None = None,
-        version: NgffVersions | None = None,
         ngff_version: NgffVersions | None = None,
         keep_acquisitions: bool = False,
         cache: bool = False,
@@ -794,7 +791,6 @@ class OmeZarrPlate:
         Args:
             store (StoreOrGroup): The Zarr store or group that stores the plate.
             plate_name (str | None): The name of the new plate.
-            version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
             ngff_version (NgffVersion): The NGFF version to use for the new plate.
             keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
             cache (bool): Whether to use a cache for the zarr group metadata.
@@ -805,7 +801,6 @@ class OmeZarrPlate:
             store=store,
             plate_name=plate_name,
             ngff_version=ngff_version,
-            version=version,
             keep_acquisitions=keep_acquisitions,
             cache=cache,
             overwrite=overwrite,
@@ -911,24 +906,12 @@ class OmeZarrPlate:
             )
         return table
 
-    def get_table(self, name: str, check_type: TypedTable | None = None) -> Table:
+    def get_table(self, name: str) -> Table:
         """Get a table from the image.
 
         Args:
             name (str): The name of the table.
-            check_type (TypedTable | None): Deprecated. Please use
-                'get_table_as' instead, or one of the type specific
-                get_*table() methods.
-
         """
-        if check_type is not None:
-            warnings.warn(
-                "The 'check_type' argument is deprecated and will be removed in "
-                "ngio=0.6. Please use 'get_table_as' instead or one of the "
-                "type specific get_*table() methods.",
-                NgioDeprecationWarning,
-                stacklevel=2,
-            )
         return self.tables_container.get(name=name, strict=False)
 
     def get_table_as(
@@ -1212,7 +1195,6 @@ def create_empty_plate(
     store: StoreOrGroup,
     name: str,
     images: list[ImageInWellPath] | None = None,
-    version: NgffVersions | None = None,
     ngff_version: NgffVersions = DefaultNgffVersion,
     cache: bool = False,
     overwrite: bool = False,
@@ -1224,19 +1206,10 @@ def create_empty_plate(
         name (str): The name of the plate.
         images (list[ImageInWellPath] | None): A list of images to add to the plate.
             If None, no images are added. Defaults to None.
-        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
         ngff_version (NgffVersion): The NGFF version to use for the new plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing plate.
     """
-    if version is not None:
-        warnings.warn(
-            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        ngff_version = version
     plate_meta = NgioPlateMeta.default_init(
         name=name,
         ngff_version=ngff_version,
@@ -1268,7 +1241,6 @@ def derive_ome_zarr_plate(
     ome_zarr_plate: OmeZarrPlate,
     store: StoreOrGroup,
     plate_name: str | None = None,
-    version: NgffVersions | None = None,
     ngff_version: NgffVersions | None = None,
     keep_acquisitions: bool = False,
     cache: bool = False,
@@ -1280,21 +1252,11 @@ def derive_ome_zarr_plate(
         ome_zarr_plate (OmeZarrPlate): The existing OME-Zarr plate.
         store (StoreOrGroup): The Zarr store or group that stores the plate.
         plate_name (str | None): The name of the new plate.
-        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
         ngff_version (NgffVersion): The NGFF version to use for the new plate.
         keep_acquisitions (bool): Whether to keep the acquisitions in the new plate.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing plate.
     """
-    if version is not None:
-        warnings.warn(
-            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        ngff_version = version
-
     if ngff_version is None:
         ngff_version = ome_zarr_plate.meta.plate.version or DefaultNgffVersion
 
@@ -1340,7 +1302,6 @@ def open_ome_zarr_well(
 
 def create_empty_well(
     store: StoreOrGroup,
-    version: NgffVersions | None = None,
     ngff_version: NgffVersions = DefaultNgffVersion,
     cache: bool = False,
     overwrite: bool = False,
@@ -1349,19 +1310,10 @@ def create_empty_well(
 
     Args:
         store (StoreOrGroup): The Zarr store or group that stores the well.
-        version (NgffVersion | None): Deprecated. Please use 'ngff_version' instead.
         ngff_version (NgffVersion): The version of the new well.
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing well.
     """
-    if version is not None:
-        warnings.warn(
-            "The 'version' argument is deprecated and will be removed in ngio=0.6. "
-            "Please use 'ngff_version' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        ngff_version = version
     group_handler = ZarrGroupHandler(
         store=store, cache=True, mode="w" if overwrite else "w-"
     )

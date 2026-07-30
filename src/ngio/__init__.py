@@ -31,6 +31,12 @@ from ngio.images import (
     open_label,
     open_ome_zarr_container,
 )
+from ngio.iterators import (
+    FeatureExtractorIterator,
+    ImageProcessingIterator,
+    MaskedSegmentationIterator,
+    SegmentationIterator,
+)
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesSetup,
     DefaultNgffVersion,
@@ -45,9 +51,12 @@ __all__ = [
     "ChannelSelectionModel",
     "DefaultNgffVersion",
     "Dimensions",
+    "FeatureExtractorIterator",
     "Image",
     "ImageInWellPath",
+    "ImageProcessingIterator",
     "Label",
+    "MaskedSegmentationIterator",
     "NgffVersions",
     "NgioConfig",
     "NgioSupportedStore",
@@ -58,6 +67,7 @@ __all__ = [
     "RetryConfig",
     "Roi",
     "RoiSlice",
+    "SegmentationIterator",
     "StoreOrGroup",
     "create_empty_ome_zarr",
     "create_empty_plate",

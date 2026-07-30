@@ -61,7 +61,7 @@ def create_test_images_dataset(version: NgffVersions) -> None:
         image_path = base_dir / spec["name"]
         ome_zarr = create_empty_ome_zarr(
             store=image_path,
-            xy_pixelsize=0.5,
+            pixelsize=0.5,
             shape=spec["shape"],
             axes_names=spec["axes"],
             ngff_version=version,

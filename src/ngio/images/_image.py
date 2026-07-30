@@ -1,7 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
-import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -37,7 +36,6 @@ from ngio.ome_zarr_meta.ngio_specs import (
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import (
-    NgioDeprecationWarning,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -454,17 +452,6 @@ class ImagesContainer:
         return self.meta.paths
 
     @property
-    def levels_paths(self) -> list[str]:
-        """Deprecated: use 'level_paths' instead."""
-        warnings.warn(
-            "'levels_paths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'level_paths' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        return self.level_paths
-
-    @property
     def levels(self) -> int:
         """Return the number of levels in the image."""
         return self.meta.levels
@@ -532,166 +519,21 @@ class ImagesContainer:
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
-    def _set_channel_meta(
-        self,
-        channels_meta: ChannelsMeta | None = None,
-    ) -> None:
-        """Set the channels metadata."""
-        if channels_meta is None:
-            channels_meta = ChannelsMeta.default_init(labels=self.num_channels)
-        meta = self.meta
-        meta.set_channels_meta(channels_meta)
-        self._meta_handler.update_meta(meta)
-
-    def _set_channel_meta_legacy(
-        self,
-        labels: Sequence[str | None] | int | None = None,
-        wavelength_id: Sequence[str | None] | None = None,
-        start: Sequence[float | None] | None = None,
-        end: Sequence[float | None] | None = None,
-        percentiles: tuple[float, float] | None = None,
-        colors: Sequence[str | None] | None = None,
-        active: Sequence[bool | None] | None = None,
-        **omero_kwargs: dict,
-    ) -> None:
-        """Create a ChannelsMeta object with the default unit.
-
-        Args:
-            labels(Sequence[str | None] | int): The list of channels names
-                in the image. If an integer is provided, the channels will
-                be named "channel_i".
-            wavelength_id(Sequence[str | None]): The wavelength ID of the channel.
-                If None, the wavelength ID will be the same as the channel name.
-            start(Sequence[float | None]): The start value for each channel.
-                If None, the start value will be computed from the image.
-            end(Sequence[float | None]): The end value for each channel.
-                If None, the end value will be computed from the image.
-            percentiles(tuple[float, float] | None): The start and end
-                percentiles for each channel. If None, the percentiles will
-                not be computed.
-            colors(Sequence[str | None]): The list of colors for the
-                channels. If None, the colors will be random.
-            active (Sequence[bool | None]): Whether the channel should
-                be shown by default.
-            omero_kwargs(dict): Extra fields to store in the omero attributes.
-        """
-        low_res_dataset = self.meta.get_lowest_resolution_dataset()
-        ref_image = self.get(path=low_res_dataset.path)
-
-        if start is not None and end is None:
-            raise NgioValueError("If start is provided, end must be provided as well.")
-        if end is not None and start is None:
-            raise NgioValueError("If end is provided, start must be provided as well.")
-
-        if start is not None and percentiles is not None:
-            raise NgioValueError(
-                "If start and end are provided, percentiles must be None."
-            )
-
-        elif start is not None and end is not None:
-            if len(start) != len(end):
-                raise NgioValueError(
-                    "The start and end lists must have the same length."
-                )
-            if len(start) != self.num_channels:
-                raise NgioValueError(
-                    "The start and end lists must have the same length as "
-                    "the number of channels."
-                )
-
-            start = list(start)
-            end = list(end)
-
-        else:
-            start, end = None, None
-
-        if labels is None:
-            labels = ref_image.num_channels
-
-        channel_meta = ChannelsMeta.default_init(
-            labels=labels,
-            wavelength_id=wavelength_id,
-            colors=colors,
-            start=start,
-            end=end,
-            active=active,
-            data_type=ref_image.dtype,
-            **omero_kwargs,
-        )
-        self._set_channel_meta(channel_meta)
-        if percentiles is not None:
-            self.set_channel_windows_with_percentiles(percentiles=percentiles)
-
     def set_channel_meta(
         self,
         channel_meta: ChannelsMeta | None = None,
-        labels: Sequence[str | None] | int | None = None,
-        wavelength_id: Sequence[str | None] | None = None,
-        start: Sequence[float | None] | None = None,
-        end: Sequence[float | None] | None = None,
-        percentiles: tuple[float, float] | None = None,
-        colors: Sequence[str | None] | None = None,
-        active: Sequence[bool | None] | None = None,
-        **omero_kwargs: dict,
     ) -> None:
-        """Create a ChannelsMeta object with the default unit.
+        """Set the channels metadata.
 
         Args:
-            channel_meta (ChannelsMeta | None): The channels metadata to set.
-                If none, it will fall back to the deprecated parameters.
-            labels(Sequence[str | None] | int): Deprecated. The list of channels names
-                in the image. If an integer is provided, the channels will
-                be named "channel_i".
-            wavelength_id(Sequence[str | None]): Deprecated. The wavelength ID of the
-                channel. If None, the wavelength ID will be the same as
-                the channel name.
-            start(Sequence[float | None]): Deprecated. The start value for each channel.
-                If None, the start value will be computed from the image.
-            end(Sequence[float | None]): Deprecated. The end value for each channel.
-                If None, the end value will be computed from the image.
-            percentiles(tuple[float, float] | None): Deprecated. The start and end
-                percentiles for each channel. If None, the percentiles will
-                not be computed.
-            colors(Sequence[str | None]): Deprecated. The list of colors for the
-                channels. If None, the colors will be random.
-            active (Sequence[bool | None]): Deprecated. Whether the channel should
-                be shown by default.
-            omero_kwargs(dict): Deprecated. Extra fields to store in the omero
-                attributes.
+            channel_meta: The channels metadata to set. If `None`, a default
+                metadata is created from the number of channels in the image.
         """
-        _is_legacy = any(
-            param is not None
-            for param in [
-                labels,
-                wavelength_id,
-                start,
-                end,
-                percentiles,
-                colors,
-                active,
-            ]
-        )
-        if _is_legacy:
-            warnings.warn(
-                "The following parameters are deprecated and will be removed in "
-                "ngio=0.6: labels, wavelength_id, start, end, percentiles, "
-                "colors, active, omero_kwargs. Please use the "
-                "'channel_meta' parameter instead.",
-                NgioDeprecationWarning,
-                stacklevel=2,
-            )
-            self._set_channel_meta_legacy(
-                labels=labels,
-                wavelength_id=wavelength_id,
-                start=start,
-                end=end,
-                percentiles=percentiles,
-                colors=colors,
-                active=active,
-                **omero_kwargs,
-            )
-            return None
-        self._set_channel_meta(channel_meta)
+        if channel_meta is None:
+            channel_meta = ChannelsMeta.default_init(labels=self.num_channels)
+        meta = self.meta
+        meta.set_channels_meta(channel_meta)
+        self._meta_handler.update_meta(meta)
 
     def set_channel_labels(
         self,
@@ -712,7 +554,7 @@ class ImagesContainer:
             channel = ch.model_copy(update={"label": label})
             new_channels.append(channel)
         new_meta = channels_meta.model_copy(update={"channels": new_channels})
-        self._set_channel_meta(new_meta)
+        self.set_channel_meta(new_meta)
 
     def set_channel_colors(
         self,
@@ -736,28 +578,7 @@ class ImagesContainer:
             channel = ch.model_copy(update={"channel_visualisation": ch_visualisation})
             new_channels.append(channel)
         new_meta = channel_meta.model_copy(update={"channels": new_channels})
-        self._set_channel_meta(new_meta)
-
-    def set_channel_percentiles(
-        self,
-        start_percentile: float = 0.1,
-        end_percentile: float = 99.9,
-    ) -> None:
-        """Deprecated: Update the channel windows using percentiles.
-
-        Args:
-            start_percentile (float): The start percentile.
-            end_percentile (float): The end percentile.
-        """
-        warnings.warn(
-            "The 'set_channel_percentiles' method is deprecated and will be removed in "
-            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        self.set_channel_windows_with_percentiles(
-            percentiles=(start_percentile, end_percentile)
-        )
+        self.set_channel_meta(new_meta)
 
     def set_channel_windows(
         self,
@@ -883,9 +704,6 @@ class ImagesContainer:
         compressors: CompressorLike = "auto",
         extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
-        # Deprecated arguments
-        labels: Sequence[str] | None = None,
-        pixel_size: PixelSize | None = None,
     ) -> "ImagesContainer":
         """Create an empty OME-Zarr image from an existing image.
 
@@ -922,11 +740,6 @@ class ImagesContainer:
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
             overwrite (bool): Whether to overwrite an existing image.
-            labels (Sequence[str] | None): The labels of the new image.
-                This argument is deprecated please use channels_meta instead.
-            pixel_size (PixelSize | None): The pixel size of the new image.
-                This argument is deprecated please use pixelsize, z_spacing,
-                and time_spacing instead.
 
         Returns:
             ImagesContainer: The new derived image.
@@ -952,8 +765,6 @@ class ImagesContainer:
             compressors=compressors,
             extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
-            labels=labels,
-            pixel_size=pixel_size,
         )
 
     def get(
@@ -1065,9 +876,6 @@ def derive_image_container(
     compressors: CompressorLike | None = None,
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    # Deprecated arguments
-    labels: Sequence[str] | None = None,
-    pixel_size: PixelSize | None = None,
 ) -> ImagesContainer:
     """Derive a new OME-Zarr image container from an existing image.
 
@@ -1104,11 +912,6 @@ def derive_image_container(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation.
         overwrite (bool): Whether to overwrite an existing image. Defaults to False.
-        labels (Sequence[str] | None): Deprecated. This argument is deprecated,
-            please use channels_meta instead.
-        pixel_size (PixelSize | None): Deprecated. The pixel size of the new image.
-            This argument is deprecated, please use pixelsize, z_spacing,
-            and time_spacing instead.
 
     Returns:
         ImagesContainer: The new derived image container.
@@ -1135,8 +938,6 @@ def derive_image_container(
         compressors=compressors,
         extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
-        labels=labels,
-        pixel_size=pixel_size,
     )
     return ImagesContainer(group_handler=group_handler, axes_setup=axes_setup)
 

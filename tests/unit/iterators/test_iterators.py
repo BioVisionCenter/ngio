@@ -6,7 +6,7 @@ import pytest
 from zarr.storage import MemoryStore
 
 from ngio import open_ome_zarr_container
-from ngio.experimental.iterators import (
+from ngio.iterators import (
     FeatureExtractorIterator,
     ImageProcessingIterator,
     MaskedSegmentationIterator,

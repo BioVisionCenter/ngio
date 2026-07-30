@@ -11,7 +11,7 @@ is also runnable on its own:
 from pathlib import Path
 
 from ngio import open_ome_zarr_container
-from ngio.experimental.iterators import ImageProcessingIterator
+from ngio.iterators import ImageProcessingIterator
 from ngio.utils import download_ome_zarr_dataset
 
 download_dir = Path("./data").absolute()

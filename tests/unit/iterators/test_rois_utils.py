@@ -3,7 +3,7 @@ import pytest
 from zarr.storage import MemoryStore
 
 from ngio import Roi, create_ome_zarr_from_array
-from ngio.experimental.iterators._rois_utils import by_chunks, grid
+from ngio.iterators._rois_utils import by_chunks, grid
 from ngio.utils import NgioValueError
 
 

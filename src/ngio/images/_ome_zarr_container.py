@@ -1,7 +1,6 @@
 """Abstract class for handling OME-NGFF images."""
 
 import logging
-import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -43,7 +42,6 @@ from ngio.tables import (
 )
 from ngio.utils import (
     AccessModeLiteral,
-    NgioDeprecationWarning,
     NgioError,
     NgioValidationError,
     NgioValueError,
@@ -206,17 +204,6 @@ class OmeZarrContainer:
         return self.images_container.meta
 
     @property
-    def image_meta(self) -> NgioImageMeta:
-        """Return the image metadata."""
-        warnings.warn(
-            "'image_meta' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        return self.images_container.meta
-
-    @property
     def axes_setup(self) -> AxesSetup:
         """Return the axes setup."""
         return self.images_container.axes_setup
@@ -229,17 +216,6 @@ class OmeZarrContainer:
     @property
     def level_paths(self) -> list[str]:
         """Return the paths of the levels in the image."""
-        return self.images_container.level_paths
-
-    @property
-    def levels_paths(self) -> list[str]:
-        """Deprecated: use 'level_paths' instead."""
-        warnings.warn(
-            "'levels_paths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'level_paths' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
         return self.images_container.level_paths
 
     @property
@@ -308,51 +284,14 @@ class OmeZarrContainer:
     def set_channel_meta(
         self,
         channel_meta: ChannelsMeta | None = None,
-        labels: Sequence[str | None] | int | None = None,
-        wavelength_id: Sequence[str | None] | None = None,
-        start: Sequence[float | None] | None = None,
-        end: Sequence[float | None] | None = None,
-        percentiles: tuple[float, float] | None = None,
-        colors: Sequence[str | None] | None = None,
-        active: Sequence[bool | None] | None = None,
-        **omero_kwargs: dict,
     ) -> None:
-        """Create a ChannelsMeta object with the default unit.
+        """Set the channels metadata.
 
         Args:
-            channel_meta (ChannelsMeta | None): The channels metadata to set.
-                If none, it will fall back to the deprecated parameters.
-            labels(Sequence[str | None] | int): Deprecated. The list of channels names
-                in the image. If an integer is provided, the channels will
-                be named "channel_i".
-            wavelength_id(Sequence[str | None]): Deprecated. The wavelength ID of the
-                channel. If None, the wavelength ID will be the same as
-                the channel name.
-            start(Sequence[float | None]): Deprecated. The start value for each channel.
-                If None, the start value will be computed from the image.
-            end(Sequence[float | None]): Deprecated. The end value for each channel.
-                If None, the end value will be computed from the image.
-            percentiles(tuple[float, float] | None): Deprecated. The start and end
-                percentiles for each channel. If None, the percentiles will
-                not be computed.
-            colors(Sequence[str | None]): Deprecated. The list of colors for the
-                channels. If None, the colors will be random.
-            active (Sequence[bool | None]): Deprecated. Whether the channel should
-                be shown by default.
-            omero_kwargs(dict): Deprecated. Extra fields to store in the omero
-                attributes.
+            channel_meta: The channels metadata to set. If `None`, a default
+                metadata is created from the number of channels in the image.
         """
-        self._images_container.set_channel_meta(
-            channel_meta=channel_meta,
-            labels=labels,
-            wavelength_id=wavelength_id,
-            start=start,
-            end=end,
-            percentiles=percentiles,
-            colors=colors,
-            active=active,
-            **omero_kwargs,
-        )
+        self._images_container.set_channel_meta(channel_meta=channel_meta)
 
     def set_channel_labels(
         self,
@@ -375,27 +314,6 @@ class OmeZarrContainer:
             colors (Sequence[str]): The new colors for the channels.
         """
         self._images_container.set_channel_colors(colors=colors)
-
-    def set_channel_percentiles(
-        self,
-        start_percentile: float = 0.1,
-        end_percentile: float = 99.9,
-    ) -> None:
-        """Deprecated: Update the channel windows using percentiles.
-
-        Args:
-            start_percentile (float): The start percentile.
-            end_percentile (float): The end percentile.
-        """
-        warnings.warn(
-            "The 'set_channel_percentiles' method is deprecated and will be removed in "
-            "ngio=0.6. Please use 'set_channel_windows_with_percentiles' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        self._images_container.set_channel_windows_with_percentiles(
-            percentiles=(start_percentile, end_percentile)
-        )
 
     def set_channel_windows(
         self,
@@ -607,9 +525,6 @@ class OmeZarrContainer:
         # Copy from current image
         copy_labels: bool = False,
         copy_tables: bool = False,
-        # Deprecated arguments
-        labels: Sequence[str] | None = None,
-        pixel_size: PixelSize | None = None,
     ) -> "OmeZarrContainer":
         """Derive a new OME-Zarr container from the current image.
 
@@ -650,11 +565,6 @@ class OmeZarrContainer:
                 Defaults to False.
             copy_tables (bool): Whether to copy the tables from the current image.
                 Defaults to False.
-            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
-                please use channels_meta instead.
-            pixel_size (PixelSize | None): Deprecated. The pixel size of the new image.
-                This argument is deprecated, please use pixelsize, z_spacing,
-                and time_spacing instead.
 
         Returns:
             OmeZarrContainer: The new derived OME-Zarr container.
@@ -679,8 +589,6 @@ class OmeZarrContainer:
             compressors=compressors,
             extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
-            labels=labels,
-            pixel_size=pixel_size,
         )
         new_ome_zarr = OmeZarrContainer(
             group_handler=new_container._group_handler,
@@ -782,24 +690,12 @@ class OmeZarrContainer:
             )
         return table
 
-    def get_table(self, name: str, check_type: TypedTable | None = None) -> Table:
+    def get_table(self, name: str) -> Table:
         """Get a table from the image.
 
         Args:
             name (str): The name of the table.
-            check_type (TypedTable | None): Deprecated. Please use
-                'get_table_as' instead, or one of the type specific
-                get_*table() methods.
-
         """
-        if check_type is not None:
-            warnings.warn(
-                "The 'check_type' argument is deprecated and will be removed in "
-                "ngio=0.6. Please use 'get_table_as' instead or one of the "
-                "type specific get_*table() methods.",
-                NgioDeprecationWarning,
-                stacklevel=2,
-            )
         return self.tables_container.get(name=name, strict=False)
 
     def get_table_as(
@@ -968,9 +864,6 @@ class OmeZarrContainer:
         compressors: CompressorLike | None = None,
         extra_array_kwargs: Mapping[str, Any] | None = None,
         overwrite: bool = False,
-        # Deprecated arguments
-        labels: Sequence[str] | None = None,
-        pixel_size: PixelSize | None = None,
     ) -> "Label":
         """Derive a new label from an existing image or label.
 
@@ -1005,11 +898,6 @@ class OmeZarrContainer:
             extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
                 the zarr array creation.
             overwrite (bool): Whether to overwrite an existing label. Defaults to False.
-            labels (Sequence[str] | None): Deprecated. This argument is deprecated,
-                please use channels_meta instead.
-            pixel_size (PixelSize | None): Deprecated. The pixel size of the new label.
-                This argument is deprecated, please use pixelsize, z_spacing,
-                and time_spacing instead.
 
         Returns:
             Label: The new derived label.
@@ -1034,8 +922,6 @@ class OmeZarrContainer:
             compressors=compressors,
             extra_array_kwargs=extra_array_kwargs,
             overwrite=overwrite,
-            labels=labels,
-            pixel_size=pixel_size,
         )
 
 
@@ -1137,7 +1023,7 @@ def open_label(
 def create_empty_ome_zarr(
     store: StoreOrGroup,
     shape: Sequence[int],
-    pixelsize: float | tuple[float, float] | None = None,
+    pixelsize: float | tuple[float, float],
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
@@ -1157,14 +1043,6 @@ def create_empty_ome_zarr(
     compressors: CompressorLike = "auto",
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    # Deprecated arguments
-    xy_pixelsize: float | None = None,
-    xy_scaling_factor: float | None = None,
-    z_scaling_factor: float | None = None,
-    channel_labels: list[str] | None = None,
-    channel_wavelengths: list[str] | None = None,
-    channel_colors: Sequence[str] | None = None,
-    channel_active: Sequence[bool] | None = None,
 ) -> OmeZarrContainer:
     """Create an empty OME-Zarr image with the given shape and metadata.
 
@@ -1201,71 +1079,7 @@ def create_empty_ome_zarr(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation. Defaults to None.
         overwrite (bool): Whether to overwrite an existing image. Defaults to False.
-        xy_pixelsize (float | None): Deprecated. Use pixelsize instead.
-        xy_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
-        z_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
-        channel_labels (list[str] | None): Deprecated. Use channels_meta instead.
-        channel_wavelengths (list[str] | None): Deprecated. Use channels_meta instead.
-        channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.
-        channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
-    if xy_pixelsize is not None:
-        warnings.warn(
-            "'xy_pixelsize' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'pixelsize' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        pixelsize = xy_pixelsize
-    if xy_scaling_factor is not None or z_scaling_factor is not None:
-        warnings.warn(
-            "'xy_scaling_factor' and 'z_scaling_factor' are deprecated and will be "
-            "removed in ngio=0.6. Please use 'scaling_factors' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        xy_scaling_factor_ = xy_scaling_factor or 2.0
-        z_scaling_factor_ = z_scaling_factor or 1.0
-        if len(shape) == 2:
-            scaling_factors = (xy_scaling_factor_, xy_scaling_factor_)
-        else:
-            zyx_factors = (z_scaling_factor_, xy_scaling_factor_, xy_scaling_factor_)
-            scaling_factors = (1.0,) * (len(shape) - 3) + zyx_factors
-
-    if channel_labels is not None:
-        warnings.warn(
-            "'channel_labels' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        channels_meta = channel_labels
-
-    if channel_wavelengths is not None:
-        warnings.warn(
-            "'channel_wavelengths' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-    if channel_colors is not None:
-        warnings.warn(
-            "'channel_colors' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-    if channel_active is not None:
-        warnings.warn(
-            "'channel_active' is deprecated and will be removed in ngio=0.6. "
-            "Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-
-    if pixelsize is None:
-        raise NgioValueError("pixelsize must be provided.")
-
     handler, axes_setup = init_image_like(
         store=store,
         meta_type=NgioImageMeta,
@@ -1292,29 +1106,13 @@ def create_empty_ome_zarr(
         overwrite=overwrite,
     )
 
-    ome_zarr = OmeZarrContainer(group_handler=handler, axes_setup=axes_setup)
-    if (
-        channel_labels is not None
-        or channel_wavelengths is not None
-        or channel_colors is not None
-        or channel_active is not None
-    ):
-        # Deprecated way of setting channel metadata
-        # we set it here for backward compatibility
-        ome_zarr.set_channel_meta(
-            labels=channel_labels,
-            wavelength_id=channel_wavelengths,
-            percentiles=None,
-            colors=channel_colors,
-            active=channel_active,
-        )
-    return ome_zarr
+    return OmeZarrContainer(group_handler=handler, axes_setup=axes_setup)
 
 
 def create_ome_zarr_from_array(
     store: StoreOrGroup,
     array: np.ndarray,
-    pixelsize: float | tuple[float, float] | None = None,
+    pixelsize: float | tuple[float, float],
     z_spacing: float = 1.0,
     time_spacing: float = 1.0,
     scaling_factors: Sequence[float] | Literal["auto"] = "auto",
@@ -1334,14 +1132,6 @@ def create_ome_zarr_from_array(
     compressors: CompressorLike = "auto",
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
-    # Deprecated arguments
-    xy_pixelsize: float | None = None,
-    xy_scaling_factor: float | None = None,
-    z_scaling_factor: float | None = None,
-    channel_labels: list[str] | None = None,
-    channel_wavelengths: list[str] | None = None,
-    channel_colors: Sequence[str] | None = None,
-    channel_active: Sequence[bool] | None = None,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
@@ -1379,13 +1169,6 @@ def create_ome_zarr_from_array(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation. Defaults to None.
         overwrite (bool): Whether to overwrite an existing image. Defaults to False.
-        xy_pixelsize (float | None): Deprecated. Use pixelsize instead.
-        xy_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
-        z_scaling_factor (float | None): Deprecated. Use scaling_factors instead.
-        channel_labels (list[str] | None): Deprecated. Use channels_meta instead.
-        channel_wavelengths (list[str] | None): Deprecated. Use channels_meta instead.
-        channel_colors (Sequence[str] | None): Deprecated. Use channels_meta instead.
-        channel_active (Sequence[bool] | None): Deprecated. Use channels_meta instead.
     """
     if len(percentiles) != 2:
         raise NgioValueError(
@@ -1414,13 +1197,6 @@ def create_ome_zarr_from_array(
         compressors=compressors,
         extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
-        xy_pixelsize=xy_pixelsize,
-        xy_scaling_factor=xy_scaling_factor,
-        z_scaling_factor=z_scaling_factor,
-        channel_labels=channel_labels,
-        channel_wavelengths=channel_wavelengths,
-        channel_colors=channel_colors,
-        channel_active=channel_active,
     )
     image = ome_zarr.get_image()
     image.set_array(array)
