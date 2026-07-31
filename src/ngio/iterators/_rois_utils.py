@@ -1,4 +1,4 @@
-from ngio import Roi
+from ngio.common import Roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.utils import NgioValueError
 

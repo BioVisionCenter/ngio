@@ -65,7 +65,11 @@ class Dataset:
         # Mandatory axes: x, y
         for ax in ["x", "y"]:
             index = self.axes_handler.get_index(ax)
-            assert index is not None
+            if index is None:
+                raise NgioValidationError(
+                    f"Dataset is missing the mandatory '{ax}' axis, so its "
+                    "pixel size cannot be computed."
+                )
             pix_size_dict[ax] = scale[index]
 
         for ax in ["z", "t"]:

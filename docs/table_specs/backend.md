@@ -17,12 +17,18 @@ In particular, the metadata describes the intended index key and type of the tab
     convention is `{backend_name}_v{version}`, so a backend that declares a version is
     recorded under it — `anndata_v1` — and one that does not under its plain name.
     A table saved without an explicit `backend=` is written by whichever backend
-    `DefaultTableBackend` names.
+    `DefaultTableBackend` names, which is `anndata_v1`.
 
     `experimental_json_v1`, `experimental_csv_v1` and `experimental_parquet_v1` are legacy
     aliases for the JSON, CSV and Parquet backends, kept so that tables written by older
     ngio releases still load. They are accepted wherever a backend name is, and resolve to
     the same backends; passing one stores that backend's current name.
+
+    `anndata` and `anndata_v1` name the same format and the same reader. ngio writes
+    `anndata_v1` because every ngio release since `0.2.0` can read that name, whereas
+    `anndata` was only registered from `0.3.4` on (and, in the `0.2` line, in `0.2.11` and
+    `0.2.14` alone). Passing `backend="anndata"` explicitly is honoured and records
+    `anndata`.
 
 ## AnnData backend
 
@@ -39,7 +45,7 @@ AnnData backend metadata:
 ```json5
 {
     // Backend metadata
-    "backend": "anndata", // the backend used to store the table, e.g. "anndata", "parquet", etc..
+    "backend": "anndata_v1", // the backend used to store the table, e.g. "anndata_v1", "parquet", etc..
     "index_key": "index", // The default index key for the table, which is used to identify each row.
     "index_type": "str" // Either "int" or "str"
 }

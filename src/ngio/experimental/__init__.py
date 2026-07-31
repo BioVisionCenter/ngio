@@ -1,5 +1,5 @@
-"""This module provides experimental features.
+"""Deprecated namespace for features that have since graduated.
 
-Use with caution as these features may change or be removed in future releases
-without notice.
+`ngio.experimental.iterators` is a shim for `ngio.iterators` and will be
+removed in ngio 1.1.
 """

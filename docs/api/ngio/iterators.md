@@ -1,3 +1,3 @@
-# ngio.experimental.iterators API reference
+# ngio.iterators API reference
 
-::: ngio.experimental.iterators
+::: ngio.iterators

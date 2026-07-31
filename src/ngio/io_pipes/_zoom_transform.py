@@ -12,6 +12,7 @@ from ngio.common._zoom import (
 )
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.utils import NgioValueError
 
 
 class BaseZoomTransform:
@@ -55,7 +56,12 @@ class BaseZoomTransform:
         axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(axes_ops.output_axes)
+        if len(array_shape) != len(axes_ops.output_axes):
+            raise NgioValueError(
+                f"Array has {len(array_shape)} dimensions but the transform "
+                f"declares {len(axes_ops.output_axes)} output axes "
+                f"({axes_ops.output_axes})."
+            )
 
         target_shape = []
         for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
@@ -86,7 +92,12 @@ class BaseZoomTransform:
         axes_ops: AxesOps,
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        assert len(array_shape) == len(axes_ops.output_axes)
+        if len(array_shape) != len(axes_ops.output_axes):
+            raise NgioValueError(
+                f"Array has {len(array_shape)} dimensions but the transform "
+                f"declares {len(axes_ops.output_axes)} output axes "
+                f"({axes_ops.output_axes})."
+            )
 
         target_shape = []
         for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):

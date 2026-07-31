@@ -18,12 +18,12 @@ name = "ngio"
 dynamic = ["version"]
 description = "Next Generation file format IO"
 readme = "README.md"
-requires-python = ">=3.11,<3.15"
+requires-python = ">=3.11"
 license = { text = "BSD-3-Clause" }
 authors = [{ name = "Lorenzo Cerrone", email = "lorenzo.cerrone@uzh.ch" }]
 # https://pypi.org/classifiers/
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "License :: OSI Approved :: BSD License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -33,38 +33,51 @@ classifiers = [
     "Typing :: Typed",
 ]
 # add your package dependencies here
+# Every floor below is exercised by the `test-min-deps` CI leg, which installs
+# exactly these versions. Do not lower one without re-running that leg.
 dependencies = [
-    "numpy",
-    "filelock",
-    "zarr>3",
-    "scipy",
-    "fsspec",
-    "anndata>=0.12.0,<0.13.0",
-    "pydantic",
-    "pandas>=1.2.0,<3.0.0",
-    "requests",
-    "aiohttp",
-    "dask[array]",
-    "dask[distributed]",
+    "numpy>=2.0",             # zarr 3.1.6 requires numpy>=2
+    "filelock>=3.12",
+    # `zarr>3` excluded 3.0.0 itself. ngio needs `WrapperStore` and the
+    # `is_group_listable` behaviour, both of which land in 3.1.6.
+    "zarr>=3.1.6",
+    "scipy>=1.14",            # first release supporting numpy 2
+    # Below 2025.3 `NgioStore.sync_fs_and_path` returns an async filesystem and
+    # zarr's FsspecStore rejects it.
+    "fsspec>=2025.3",
+    # Floor: `settings.auto_shard_zarr_v3` (used by the AnnData backend) appears
+    # in 0.12.5. Upper cap is deliberate: `_anndata_utils.py` imports six private
+    # anndata symbols and vendors a copy of its zarr reader.
+    "anndata>=0.12.5,<0.14.0",
+    "pydantic>=2.11.5",       # required by ome-zarr-models
+    "pandas>=2.2.2",          # first 2.2.x supporting numpy 2 on py3.11
+    "aiohttp>=3.9",
+    "dask[array]>=2024.1",
     # "xarray", still not used
-    "ome-zarr-models",
-    "pooch",
-    "polars",
-    "pyarrow",
-    "pillow",
+    "ome-zarr-models>=1.4",   # `ValidTransform` was added in 1.4
+    "pooch>=1.8",
+    "polars>=1.0",
+    "pyarrow>=16",            # 15 caps numpy<2
+    "pillow>=10",
 ]
 
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies
 # "extras" (e.g. for `pip install .[test]`)
 [project.optional-dependencies]
+# S3 streaming, as advertised in the README. Without this extra `s3fs` only
+# arrives transitively via `test`, so following the README raises ImportError.
+# The floor is not cosmetic: `refresh_s3fs_config` runs at import of
+# `ngio.utils._zarr_utils` and calls `s3fs.set_custom_error_handler`, which was
+# added in s3fs 2026.2.0. With an older s3fs installed, `import ngio` raises
+# AttributeError.
+s3 = ["s3fs>=2026.2.0"]
+
 test = [
     "pytest",
     "pytest-cov",
     "pytest-xdist",
     "scikit-image",
     "boto3",
-    "pytest_httpserver",
-    "devtools",
     # aiomoto brings moto[server] + s3fs + fsspec + pyarrow, and caps
     # aiobotocore<=3.7.0 / moto<=5.2.1 so the universal solve can't backtrack
     # s3fs to the ancient 0.4.2 (see error_report.md).
@@ -216,7 +229,7 @@ tag_format = "v$version"
 version_scheme = "pep440"
 version_provider = "scm"          # reads current version from git tags; no file to mutate
 update_changelog_on_bump = false  # keep manual CHANGELOG for now
-major_version_zero = true         # 0.x bumps don't require breaking-change commits
+major_version_zero = false        # 1.x: breaking changes drive the major bump
 
 [tool.check-manifest]
 ignore = [

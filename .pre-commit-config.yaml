@@ -51,3 +51,8 @@ repos:
     rev: 0.9.1
     hooks:
       - id: nbstripout
+
+# `ty` is deliberately not a hook here: it needs the locked pixi environment to
+# resolve ngio's dependencies, which neither the `lint` job nor pre-commit.ci
+# provides. It runs in the `typecheck` job in ci.yml instead, which `deploy`
+# depends on. Locally: `pixi run -e dev ty check src/`.

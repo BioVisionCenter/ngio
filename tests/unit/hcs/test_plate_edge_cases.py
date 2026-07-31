@@ -9,7 +9,6 @@ import pytest
 from ngio import (
     Roi,
     create_empty_plate,
-    create_empty_well,
     open_ome_zarr_plate,
 )
 from ngio.tables import (
@@ -19,7 +18,7 @@ from ngio.tables import (
     MaskingRoiTable,
     RoiTable,
 )
-from ngio.utils import NgioDeprecationWarning, NgioValueError
+from ngio.utils import NgioValueError
 
 
 def _make_roi(name: str, label: int | None = None) -> Roi:
@@ -111,14 +110,6 @@ def test_typed_table_getters(tmp_path: Path):
         plate.get_condition_table("roi")
 
 
-def test_get_table_check_type_deprecated(tmp_path: Path):
-    plate = create_empty_plate(tmp_path / "plate.zarr", name="plate")
-    plate.add_table("roi", RoiTable(rois=[_make_roi("roi_1")]))
-    with pytest.warns(NgioDeprecationWarning, match="'check_type' argument"):
-        table = plate.get_table("roi", check_type="roi_table")
-    assert isinstance(table, RoiTable)
-
-
 def test_get_table_as(tmp_path: Path):
     plate = create_empty_plate(tmp_path / "plate.zarr", name="plate")
     plate.add_table("roi", RoiTable(rois=[_make_roi("roi_1")]))
@@ -127,6 +118,7 @@ def test_get_table_as(tmp_path: Path):
     assert len(table.rois()) == 1
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_concatenate_image_tables_as(cardiomyocyte_small_mip_path_readonly: Path):
     plate = open_ome_zarr_plate(cardiomyocyte_small_mip_path_readonly, mode="r")
     table = plate.concatenate_image_tables_as(
@@ -141,27 +133,6 @@ def test_concatenate_image_tables_as(cardiomyocyte_small_mip_path_readonly: Path
     )
     assert isinstance(async_table, FeatureTable)
     assert set(table.dataframe.columns) == set(async_table.dataframe.columns)
-
-
-def test_create_empty_plate_version_deprecated(tmp_path: Path):
-    with pytest.warns(NgioDeprecationWarning, match="'version' argument"):
-        plate = create_empty_plate(tmp_path / "plate.zarr", name="plate", version="0.4")
-    assert plate.meta.version == "0.4"
-
-
-def test_derive_plate_version_deprecated(tmp_path: Path):
-    plate = create_empty_plate(
-        tmp_path / "plate.zarr", name="plate", ngff_version="0.5"
-    )
-    with pytest.warns(NgioDeprecationWarning, match="'version' argument"):
-        derived = plate.derive_plate(tmp_path / "derived.zarr", version="0.4")
-    assert derived.meta.version == "0.4"
-
-
-def test_create_empty_well_version_deprecated(tmp_path: Path):
-    with pytest.warns(NgioDeprecationWarning, match="'version' argument"):
-        well = create_empty_well(tmp_path / "well.zarr", version="0.4")
-    assert well.meta.version == "0.4"
 
 
 def test_get_well_returns_cached_instance(tmp_path: Path):

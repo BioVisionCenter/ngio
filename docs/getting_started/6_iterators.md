@@ -8,13 +8,6 @@ description: The four ngio iterators for building scalable image-processing pipe
 
 When building image processing pipelines it is often useful to iterate over specific regions of the image, for example to process the image in smaller tiles or to process only specific regions of interest (ROIs). Iterators also let you set broadcasting rules for the iteration, for example to iterate over all z-planes or over all timepoints.
 
-!!! warning "Experimental API"
-
-    The iterators live in `ngio.experimental.iterators`, outside the stability guarantee
-    that covers the rest of ngio: they may change or be removed in a future release
-    without notice. Everything on this page works today, but pin your ngio version if you
-    depend on it.
-
 <!-- Figure 05 — how an iterator walks -->
 <div class="ngio-diagram">
 <svg viewBox="0 0 640 232" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f5t f5d">
@@ -100,8 +93,8 @@ When building image processing pipelines it is often useful to iterate over spec
         </svg>
 </div>
 
-ngio provides four basic `Iterator` classes, all imported from
-`ngio.experimental.iterators`:
+ngio provides four basic `Iterator` classes, all imported from `ngio.iterators` (or from
+the top-level `ngio` namespace):
 
 <!-- Figure 06 — which iterator do I want -->
 <div class="ngio-diagram">

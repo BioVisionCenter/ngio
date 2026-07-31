@@ -5,8 +5,8 @@ https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/
 """
 
 import logging
-from collections.abc import Iterable
-from typing import Literal
+from collections.abc import Iterable, Mapping
+from typing import Any, Literal
 from uuid import uuid4
 
 import pandas as pd
@@ -106,7 +106,10 @@ def _dataframe_to_rois(
     extras = {}
 
     rois = {}
-    for row in dataframe.itertuples(index=True):
+    # `itertuples` yields namedtuples, but pandas stubs it as `tuple[Any, ...]`,
+    # so attribute access on the rows is invisible to the type checker.
+    rows: Iterable[Any] = dataframe.itertuples(index=True)
+    for row in rows:
         # check if optional columns are present
         if len(extra_columns) > 0:
             extras = {col: getattr(row, col, None) for col in extra_columns}
@@ -118,7 +121,7 @@ def _dataframe_to_rois(
         t_length_second = getattr(row, "len_t_second", None)
 
         if label_is_index:
-            label = int(row.Index)  # type: ignore (type can not be known here, but should be castable to int)
+            label = int(row.Index)
         else:
             label = getattr(row, "label", None)
 
@@ -129,19 +132,24 @@ def _dataframe_to_rois(
         }
         if t_second is not None or t_length_second is not None:
             slices["t"] = (t_second, t_length_second)
-        roi = Roi.from_values(
-            name=str(row.Index),
+        name = str(row.Index)
+        rois[name] = Roi.from_values(
+            name=name,
             slices=slices,
             space="world",
             label=label,
             **extras,
         )
-        rois[roi.name] = roi
     return rois
 
 
-def _rois_to_dataframe(rois: dict[str, Roi], index_key: str | None) -> pd.DataFrame:
-    """Convert a list of WorldCooROI objects to a DataFrame."""
+def _rois_to_dataframe(
+    rois: Mapping[str | None, Roi], index_key: str | None
+) -> pd.DataFrame:
+    """Convert a list of WorldCooROI objects to a DataFrame.
+
+    Only the values are read; `Roi.name` is optional, so the keys may be `None`.
+    """
     data = []
     for roi in rois.values():
         # This normalization is necessary for backward compatibility

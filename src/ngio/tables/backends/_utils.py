@@ -271,7 +271,9 @@ def normalize_anndata(
     """
     if index_key is None:
         return anndata
-    obs = _validate_index_key_df(anndata.obs, index_key)
+    # anndata>=0.12 types `.obs` as DataFrame | Dataset2D; ngio only ever
+    # builds in-memory AnnData, so it is always a DataFrame here.
+    obs = _validate_index_key_df(anndata.obs, index_key)  # type: ignore
     obs = _validate_cast_index_dtype_df(obs, "str")
 
     if obs.equals(anndata.obs):

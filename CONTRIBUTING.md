@@ -68,10 +68,10 @@ CI runs the linters and the test matrix automatically.
 Versions are derived from git tags via `hatch-vcs`. Use the Pixi bump tasks in the `dev` environment:
 
 ```bash
-pixi run -e dev bump-patch    # 0.5.7 → 0.5.8
-pixi run -e dev bump-minor    # 0.5.7 → 0.6.0
-pixi run -e dev bump-major    # 0.5.7 → 1.0.0
-pixi run -e dev bump-alpha    # → 0.6.0a1  (pre-release)
+pixi run -e dev bump-patch    # 1.0.0 → 1.0.1
+pixi run -e dev bump-minor    # 1.0.0 → 1.1.0
+pixi run -e dev bump-major    # 1.0.0 → 2.0.0
+pixi run -e dev bump-alpha    # → 1.1.0a1  (pre-release)
 ```
 
 Append `-- --dry-run` to preview without creating a tag. Once tagged, CI builds and publishes to PyPI automatically.

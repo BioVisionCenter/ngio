@@ -52,7 +52,7 @@ def test_backend_manager(tmp_path: Path):
     backend = manager.get_backend(backend_name="json", group_handler=handler)
     assert isinstance(backend, JsonTableBackend)
 
-    backend = manager.get_backend(group_handler=handler)
+    backend = manager.get_backend(backend_name="anndata", group_handler=handler)
     assert isinstance(backend, AnnDataBackend)
 
     with pytest.raises(NgioValueError):

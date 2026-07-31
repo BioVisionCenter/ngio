@@ -5,6 +5,7 @@ from ngio.hcs._plate import (
     OmeZarrWell,
     create_empty_plate,
     create_empty_well,
+    derive_ome_zarr_plate,
     open_ome_zarr_plate,
     open_ome_zarr_well,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "OmeZarrWell",
     "create_empty_plate",
     "create_empty_well",
+    "derive_ome_zarr_plate",
     "open_ome_zarr_plate",
     "open_ome_zarr_well",
 ]

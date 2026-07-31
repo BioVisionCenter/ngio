@@ -29,7 +29,7 @@ def _stacked_zoom(x, zoom_y, zoom_x, order=1, mode="grid-constant", grid_mode=Tr
         scipy_zoom(x[i], scale_xy, order=order, mode=mode, grid_mode=grid_mode)
         for i in range(x.shape[0])
     ]
-    x_out = np.stack(_x_out)  # type: ignore (scipy_zoom returns np.ndarray, but type is not inferred correctly)
+    x_out = np.stack(_x_out)
     return x_out.reshape(*rest, *x_out.shape[1:])
 
 
@@ -61,7 +61,7 @@ def fast_zoom(x, zoom, order=1, mode="grid-constant", grid_mode=True, auto_stack
         )
     else:
         xs = scipy_zoom(xs, new_zoom, order=order, mode=mode, grid_mode=grid_mode)
-    x = np.expand_dims(xs, axis=singletons)  # type: ignore (scipy_zoom returns np.ndarray, but type is not inferred correctly)
+    x = np.expand_dims(xs, axis=singletons)
     return x
 
 
@@ -131,7 +131,7 @@ def dask_zoom(
     source_chunks = np.array(source_array.chunksize)  # type: ignore (da.Array.chunksize is a tuple of ints)
     better_source_chunks = np.maximum(1, np.round(source_chunks * _scale) / _scale)
     better_source_chunks = better_source_chunks.astype(int)
-    source_array = source_array.rechunk(better_source_chunks)  # type: ignore (better_source_chunks is a valid input for rechunk)
+    source_array = source_array.rechunk(better_source_chunks)
 
     # Calculate the block output shape
     block_output_shape = tuple(np.ceil(better_source_chunks * _scale).astype(int))

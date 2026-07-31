@@ -66,7 +66,7 @@ def _merge_slices(
 @delayed
 def _collect_slices(
     local_slices: list[dict[int, tuple[slice, ...]]],
-) -> dict[int, tuple[slice]]:
+) -> dict[int, tuple[slice, ...]]:
     """Collect the slices from the delayed results."""
     global_slices = {}
     for result in local_slices:
@@ -156,7 +156,11 @@ def compute_masking_roi(
 
     rois = []
     for label, slice_ in slices.items():
-        assert len(slice_) == len(axes_order)
+        if len(slice_) != len(axes_order):
+            raise NgioValueError(
+                f"Label {label} produced {len(slice_)} slices but the "
+                f"segmentation has {len(axes_order)} axes ({axes_order})."
+            )
         slices = dict(zip(axes_order, slice_, strict=True))
         roi = Roi.from_values(
             name=str(label), slices=slices, label=label, space="pixel"

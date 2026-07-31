@@ -16,6 +16,7 @@ from ngio.common._zoom import (
 )
 from ngio.utils import (
     NgioValueError,
+    deprecated_alias,
 )
 
 
@@ -44,7 +45,7 @@ def _on_disk_dask_zoom(
     # re-derives chunks via normalize_chunks(chunks="auto", ...) and warns
     # (treated as error by our filterwarnings) when the result isn't a
     # multiple of the zarr target's chunks. da.store writes blocks 1:1.
-    da.store(target_array, target, lock=False)
+    da.store(target_array, target, lock=False)  # type: ignore
 
 
 def _on_disk_coarsen(
@@ -70,9 +71,11 @@ def _on_disk_coarsen(
         source_array=source_array, scale=None, target_shape=target.shape
     )
 
-    assert _target_shape == target.shape, (
-        "Target shape must match the target array shape"
-    )
+    if _target_shape != target.shape:
+        raise NgioValueError(
+            f"Coarsening would produce shape {_target_shape}, but the target "
+            f"array has shape {target.shape}."
+        )
 
     if aggregation_function is None:
         if order == "linear":
@@ -95,7 +98,7 @@ def _on_disk_coarsen(
     )
     out_target = out_target.rechunk(target.chunks)
     # See _on_disk_dask_zoom for rationale.
-    da.store(out_target, target, lock=False)
+    da.store(out_target, target, lock=False)  # type: ignore
 
 
 def on_disk_zoom(
@@ -152,9 +155,9 @@ def _find_closest_arrays(
                 )
             )
 
-    indices = np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
-    assert len(indices) == 2, "Indices must be of length 2"
-    return indices
+    # `dist_matrix` is 2-D by construction, so unravel_index yields a 2-tuple.
+    row, column = np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
+    return row, column
 
 
 def consolidate_pyramid(
@@ -344,9 +347,10 @@ class ImagePyramidBuilder(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
+    @deprecated_alias(levels_paths="level_paths")
     def from_scaling_factors(
         cls,
-        levels_paths: tuple[str, ...],
+        level_paths: tuple[str, ...],
         scaling_factors: tuple[float, ...],
         base_shape: tuple[int, ...],
         base_scale: tuple[float, ...],
@@ -368,7 +372,7 @@ class ImagePyramidBuilder(BaseModel):
         shapes = compute_shapes_from_scaling_factors(
             base_shape=base_shape,
             scaling_factors=scaling_factors,
-            num_levels=len(levels_paths),
+            num_levels=len(level_paths),
         )
 
         if precision_scale:
@@ -384,7 +388,7 @@ class ImagePyramidBuilder(BaseModel):
             base_scale_ = _compute_scales_from_factors(
                 base_scale=base_scale,
                 scaling_factors=scaling_factors,
-                num_levels=len(levels_paths),
+                num_levels=len(level_paths),
             )
 
         return cls.from_shapes(
@@ -392,7 +396,7 @@ class ImagePyramidBuilder(BaseModel):
             base_scale=base_scale_,
             axes=axes,
             base_translation=base_translation,
-            levels_paths=levels_paths,
+            level_paths=level_paths,
             chunks=chunks,
             shards=shards,
             data_type=data_type,
@@ -403,13 +407,14 @@ class ImagePyramidBuilder(BaseModel):
         )
 
     @classmethod
+    @deprecated_alias(levels_paths="level_paths")
     def from_shapes(
         cls,
         shapes: Sequence[tuple[int, ...]],
         base_scale: tuple[float, ...] | list[tuple[float, ...]],
         axes: tuple[str, ...],
         base_translation: Sequence[float] | None = None,
-        levels_paths: Sequence[str] | None = None,
+        level_paths: Sequence[str] | None = None,
         chunks: ChunksLike = "auto",
         shards: ShardsLike | None = None,
         data_type: str = "uint16",
@@ -419,8 +424,8 @@ class ImagePyramidBuilder(BaseModel):
         other_array_kwargs: Mapping[str, Any] | None = None,
     ) -> "ImagePyramidBuilder":
         levels = []
-        if levels_paths is None:
-            levels_paths = tuple(str(i) for i in range(len(shapes)))
+        if level_paths is None:
+            level_paths = tuple(str(i) for i in range(len(shapes)))
 
         _check_order(shapes)
         if isinstance(base_scale, tuple) and all(
@@ -442,7 +447,7 @@ class ImagePyramidBuilder(BaseModel):
 
         translations = _compute_translations_from_shapes(scales, base_translation)
         for level_path, shape, scale, translation in zip(
-            levels_paths,
+            level_paths,
             shapes,
             scales,
             translations,
@@ -474,7 +479,10 @@ class ImagePyramidBuilder(BaseModel):
         Args:
             group (zarr.Group): The Zarr group to save the pyramid specification to.
         """
-        array_static_kwargs = {
+        # Heterogeneous by construction, and `other_array_kwargs` lets callers
+        # pass through any `create_array` parameter, so the values cannot be
+        # narrowed to a useful union.
+        array_static_kwargs: dict[str, Any] = {
             "dtype": self.data_type,
             "overwrite": True,
             "compressors": self.compressors,

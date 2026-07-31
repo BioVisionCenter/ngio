@@ -161,7 +161,10 @@ def require_rescalable(reference: "Dimensions", other: "Dimensions") -> None:
         if ax_r.axis_type == "channel":
             continue
         ax_o = other.axes_handler.get_axis(ax_r.name)
-        assert ax_o is not None, "Axes do not match."
+        if ax_o is None:
+            raise NgioValueError(
+                f"Axis '{ax_r.name}' is missing from the other dimensions."
+            )
         px_r = reference.pixel_size.get(ax_r.name, default=1.0)
         px_o = other.pixel_size.get(ax_o.name, default=1.0)
         shape_r = reference.get(ax_r.name, default=1)

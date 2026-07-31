@@ -80,7 +80,9 @@ def custom_anndata_read_zarr(
     # Read with handling for backwards compat
     def callback(func: Callable, elem_name: str, elem: Any, iospec: Any) -> Any:
         if iospec.encoding_type == "anndata" or elem_name.endswith("/"):
-            ad_kwargs = {}
+            # Heterogeneous by construction: the keys are AnnData field names
+            # and the values whatever `read_dispatched` returns for each.
+            ad_kwargs: dict[str, Any] = {}
             # Some of these elem fail on https
             # So we only include the ones that are strictly necessary
             # for fractal tables

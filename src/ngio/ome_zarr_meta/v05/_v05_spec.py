@@ -156,7 +156,7 @@ def _v05_to_ngio_datasets(
                 axis_type=AxisType(v05_axis.type),
                 # (for some reason the type is a generic JsonValue,
                 # but it should be a string or None)
-                unit=unit,  # type: ignore
+                unit=unit,
             )
         )
     axes_handler = AxesHandler(

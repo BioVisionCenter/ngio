@@ -59,7 +59,7 @@ class PixelSize(BaseModel):
             z=0,
             t=0,
             space_unit=self.space_unit,
-            time_unit=self.time_unit,  # type: ignore
+            time_unit=self.time_unit,
         )
         return self.distance(ref) < other.distance(ref)
 

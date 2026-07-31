@@ -521,6 +521,12 @@ def refresh_s3fs_config(config: NgioConfig) -> None:
     Safe to call repeatedly, e.g. after mutating ``get_config().s3fs``: each call
     fully replaces s3fs's custom error handler, resetting it to a no-op when there
     are no configured retry markers instead of leaving a stale handler in place.
+
+    A no-op when s3fs is absent, or when it predates `set_custom_error_handler`
+    (added in s3fs 2026.2.0). This runs at import of `ngio.utils._zarr_utils`, and
+    s3fs is not an ngio dependency, so an s3fs installed for something else must
+    never break `import ngio`. The warning fires only if retry markers were
+    actually configured, since otherwise there is nothing to lose.
     """
     try:
         import s3fs
@@ -530,6 +536,18 @@ def refresh_s3fs_config(config: NgioConfig) -> None:
     custom_retry_markers = (
         config.s3fs.custom_retry_markers if config.s3fs is not None else []
     )
+
+    if not hasattr(s3fs, "set_custom_error_handler"):
+        if custom_retry_markers:
+            warnings.warn(
+                "s3fs.custom_retry_markers requires s3fs>=2026.2.0, but s3fs "
+                f"{getattr(s3fs, '__version__', 'unknown')} is installed. The "
+                "configured retry markers are ignored. Install ngio[s3] to get a "
+                "supported s3fs.",
+                NgioUserWarning,
+                stacklevel=2,
+            )
+        return
 
     def custom_retry_handler(e: Exception) -> bool:
         """Custom s3fs retry predicate: retry errors matching a configured marker.

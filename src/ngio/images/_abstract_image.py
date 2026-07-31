@@ -1,7 +1,6 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
-import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
@@ -62,11 +61,11 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
 )
 from ngio.tables import RoiTable
 from ngio.utils import (
-    NgioDeprecationWarning,
     NgioFileExistsError,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
+    deprecated,
 )
 from ngio.utils._zarr_utils import find_dimension_separator
 
@@ -221,20 +220,29 @@ class AbstractImage(ABC):
         """Return True if the image has the given axis."""
         return self.axes_handler.has_axis(axis)
 
+    def set_axes_units(
+        self,
+        space_unit: SpaceUnits = DefaultSpaceUnit,
+        time_unit: TimeUnits = DefaultTimeUnit,
+    ) -> None:
+        """Set the space and time units of the image axes.
+
+        Args:
+            space_unit: The space unit of the image.
+            time_unit: The time unit of the image.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
+        self._meta_handler.update_meta(meta)
+
+    @deprecated(replacement="set_axes_units()")
     def set_axes_unit(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the axes unit of the image.
-
-        Args:
-            space_unit (SpaceUnits): The space unit of the image.
-            time_unit (TimeUnits): The time unit of the image.
-        """
-        meta = self._meta_handler.get_meta()
-        meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.update_meta(meta)  # type: ignore
+        """Deprecated alias for `set_axes_units`."""
+        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(self, axes_names: Sequence[str]) -> None:
         """Set the axes names of the label.
@@ -245,7 +253,7 @@ class AbstractImage(ABC):
         meta = self._meta_handler.get_meta()
         meta = meta.rename_axes(axes_names=axes_names)
         self._meta_handler._axes_setup = meta.axes_handler.axes_setup
-        self._meta_handler.update_meta(meta)  # type: ignore
+        self._meta_handler.update_meta(meta)
 
     def set_name(
         self,
@@ -260,7 +268,7 @@ class AbstractImage(ABC):
         """
         meta = self._meta_handler.get_meta()
         meta = meta.rename_image(name=name)
-        self._meta_handler.update_meta(meta)  # type: ignore
+        self._meta_handler.update_meta(meta)
 
     def _get_as_numpy(
         self,
@@ -966,9 +974,6 @@ def abstract_derive(
     dimension_separator: Literal[".", "/"] | None = None,
     compressors: CompressorLike | None = None,
     extra_array_kwargs: Mapping[str, Any] | None = None,
-    # Deprecated arguments
-    labels: Sequence[str] | None = None,
-    pixel_size: PixelSize | None = None,
 ) -> tuple[ZarrGroupHandler, AxesSetup]:
     """Create an empty OME-Zarr image from an existing image.
 
@@ -981,6 +986,8 @@ def abstract_derive(
         overwrite (bool): Whether to overwrite an existing image.
         shape (Sequence[int] | None): The shape of the new image.
         pixelsize (float | tuple[float, float] | None): The pixel size of the new image.
+            A value to write, not a lookup key; to select an existing
+            level see `pixel_size` on the getters.
         z_spacing (float | None): The z spacing of the new image.
         time_spacing (float | None): The time spacing of the new image.
         name (str | None): The name of the new image.
@@ -1004,35 +1011,11 @@ def abstract_derive(
         compressors (CompressorLike | None): The compressors to use.
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation.
-        labels (Sequence[str] | None): The labels of the new image.
-            This argument is DEPRECATED please use channels_meta instead.
-        pixel_size (PixelSize | None): The pixel size of the new image.
-            This argument is DEPRECATED please use pixelsize, z_spacing,
-            and time_spacing instead.
 
     Returns:
         ImagesContainer: The new derived image.
 
     """
-    # TODO: remove in ngio 0.6
-    if labels is not None:
-        warnings.warn(
-            "The 'labels' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'channels_meta' instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        channels_meta = list(labels)
-    if pixel_size is not None:
-        warnings.warn(
-            "The 'pixel_size' argument is deprecated and will be removed in "
-            "ngio=0.6. Please use 'pixelsize', 'z_spacing', and 'time_spacing'"
-            "instead.",
-            NgioDeprecationWarning,
-            stacklevel=2,
-        )
-        pixelsize = (pixel_size.y, pixel_size.x)
-    # End of deprecated arguments handling
     ref_meta = ref_image.meta
 
     shape = _normalize_shape_for_channel_policy(

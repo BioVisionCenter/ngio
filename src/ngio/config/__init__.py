@@ -7,6 +7,7 @@ from ngio.config._config import (
     LinearBackoff,
     NgioConfig,
     RetryConfig,
+    S3FSConfig,
     get_config,
 )
 
@@ -17,5 +18,6 @@ __all__ = [
     "LinearBackoff",
     "NgioConfig",
     "RetryConfig",
+    "S3FSConfig",
     "get_config",
 ]

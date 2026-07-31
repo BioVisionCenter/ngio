@@ -2,18 +2,18 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from typing import Generic, Literal, Self, TypeVar, overload
 
-from ngio import Roi
-from ngio.experimental.iterators._mappers import BasicMapper, MapperProtocol
-from ngio.experimental.iterators._rois_utils import (
+from ngio.common import Roi
+from ngio.images._abstract_image import AbstractImage
+from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
+from ngio.iterators._mappers import BasicMapper, MapperProtocol
+from ngio.iterators._rois_utils import (
     by_chunks,
     by_yx,
     by_zyx,
     grid,
     rois_product,
 )
-from ngio.images._abstract_image import AbstractImage
-from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
-from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
 from ngio.tables import GenericRoiTable
 from ngio.utils import NgioValueError
 

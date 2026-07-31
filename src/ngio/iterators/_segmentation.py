@@ -4,7 +4,6 @@ import dask.array as da
 import numpy as np
 
 from ngio.common import Roi
-from ngio.experimental.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.images import Image, Label
 from ngio.images._image import (
     ChannelSlicingInputType,
@@ -23,6 +22,7 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 
 class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
@@ -125,6 +125,10 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 
 class MaskedSegmentationIterator(SegmentationIterator):
     """Base class for iterators over ROIs."""
+
+    # Narrows the base class's `Image`: this iterator needs the masking label
+    # and ROI table that only a `MaskedImage` carries.
+    _input: MaskedImage
 
     def __init__(
         self,
