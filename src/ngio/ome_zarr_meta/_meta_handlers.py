@@ -3,6 +3,8 @@
 from collections.abc import Callable
 from typing import TypeVar
 
+from pydantic import ValidationError
+
 from ngio.ome_zarr_meta.ngio_specs import (
     AxesSetup,
     NgioImageMeta,
@@ -37,6 +39,7 @@ from ngio.ome_zarr_meta.v05 import (
     v05_to_ngio_well_meta,
 )
 from ngio.utils import (
+    NgioError,
     NgioValidationError,
     NgioValueError,
     ZarrGroupHandler,
@@ -180,7 +183,11 @@ def get_ngio_meta(
         try:
             ngio_meta = decoder(attrs, **kwargs)
             return ngio_meta
-        except Exception as e:
+        except (ValidationError, NgioError) as e:
+            # Only a failed spec check means "these attrs are not this version",
+            # so only that is worth trying the next decoder for. Anything else
+            # is a bug in the decoder and must not be reported as unreadable
+            # metadata.
             all_errors.append(f"Version {version}: {e}")
     error_message = (
         f"Failed to decode NGIO {meta_type.__name__} metadata:\n"

@@ -71,9 +71,11 @@ def _on_disk_coarsen(
         source_array=source_array, scale=None, target_shape=target.shape
     )
 
-    assert _target_shape == target.shape, (
-        "Target shape must match the target array shape"
-    )
+    if _target_shape != target.shape:
+        raise NgioValueError(
+            f"Coarsening would produce shape {_target_shape}, but the target "
+            f"array has shape {target.shape}."
+        )
 
     if aggregation_function is None:
         if order == "linear":
@@ -153,9 +155,9 @@ def _find_closest_arrays(
                 )
             )
 
-    indices = np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
-    assert len(indices) == 2, "Indices must be of length 2"
-    return indices
+    # `dist_matrix` is 2-D by construction, so unravel_index yields a 2-tuple.
+    row, column = np.unravel_index(dist_matrix.argmin(), dist_matrix.shape)
+    return row, column
 
 
 def consolidate_pyramid(

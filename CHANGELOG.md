@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [v1.0.0]
 
 ### API Breaking Changes
 
@@ -139,10 +139,6 @@ These are what stop the lists above from regrowing.
 - **A `test-min-deps` CI leg installs the exact declared floors** from `.github/min-constraints.txt` and runs the suite, so the bounds are tested rather than asserted. `.github/check_min_deps.py` fails if that file drifts from `pyproject.toml`, if a floor is missing a pin, or if a pin did not take effect.
 - **`deploy` is gated on every check**, not just the test matrix: `lint`, `check-manifest`, `typecheck`, `docs` and `test-min-deps` must all pass. It also runs under the `pypi` environment, runs `twine check dist/*`, and asserts the git tag matches the built wheel version before publishing.
 
-### Fix
-
-- **`import ngio` no longer fails when an old `s3fs` is installed.** `refresh_s3fs_config` runs at import of `ngio.utils._zarr_utils` and called `s3fs.set_custom_error_handler`, which only exists in s3fs 2026.2.0 and later — so any environment holding an older s3fs, for any reason, raised `AttributeError` on `import ngio`. s3fs is not an ngio dependency, so it now degrades instead: the custom handler is skipped, and an `NgioUserWarning` is emitted only if `s3fs.custom_retry_markers` was actually configured.
-
 ### Features
 - The iterators graduated out of `ngio.experimental`: they now live in `ngio.iterators` and are re-exported from the top-level namespace, so `from ngio import SegmentationIterator` works. `ngio.experimental.iterators` still resolves the four classes but emits `NgioDeprecationWarning` on attribute access; it will be removed in `ngio=1.1`.
 - Add a configurable IO retry policy: `NgioConfig.io_retry` (`RetryConfig`) with `max_retries` (default `0`), a backoff strategy (`ConstantBackoff`, `LinearBackoff`, `ExponentialBackoff`), and error matching via `retry_on` substrings or the discouraged blanket `retry_all_errors`. Ngio's own `NgioError`s are never retried. The public `ngio.utils.retry_io` decorator reads the global config at call time.
@@ -156,7 +152,8 @@ These are what stop the lists above from regrowing.
 - Add `ngio.utils.deprecated_alias` and `ngio.utils.deprecated`, the decorators behind ngio's own deprecations. `deprecated_alias(old="new")` forwards a renamed keyword and raises `NgioValueError` if both spellings are passed; `deprecated(replacement=...)` warns when a callable is invoked. Both emit `NgioDeprecationWarning` naming the removal version (default `1.1`) and report the caller's stack frame; on `async def` callables the warning fires when the coroutine is created, not when it is awaited.
 
 ### Fix
-- `add_table` and `write_table` now preserve the input table's backend instead of rewriting with `anndata_v1` ([#207](https://github.com/BioVisionCenter/ngio/issues/207)); `backend` defaults to `None`, meaning "use the table's own". **Behavior change**: copying a `parquet`/`csv`/`json` table via `get_table` + `add_table` now keeps that backend.
+- **`import ngio` no longer fails when an old `s3fs` is installed.** `refresh_s3fs_config` runs at import of `ngio.utils._zarr_utils` and called `s3fs.set_custom_error_handler`, which only exists in s3fs 2026.2.0 and later — so any environment holding an older s3fs, for any reason, raised `AttributeError` on `import ngio`. s3fs is not an ngio dependency, so it now degrades instead: the custom handler is skipped, and an `NgioUserWarning` is emitted only if `s3fs.custom_retry_markers` was actually configured.
+- `add_table` (`OmeZarrContainer`, `OmeZarrPlate`, `TablesContainer.add`) and `write_table` now preserve the input table's backend instead of always rewriting with the default `anndata_v1` backend ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). The `backend` parameter now defaults to `None`, meaning "use the table's own backend" (`meta.backend`, which is `anndata_v1` for tables created in memory); pass a backend name explicitly to convert. Supporting changes: `Table.backend_name` now falls back to `meta.backend` instead of returning `None` for in-memory tables, `set_backend(backend=...)` can declare a backend preference (with early name validation and alias normalization) on a table not yet attached to a store, and passing `backend=None` no longer raises. **Behavior change**: copying a table stored with a non-default backend (e.g. `parquet`/`csv`/`json`) via `get_table` + `add_table` now keeps that backend on the destination.
 - `concatenate_image_tables` (and variants) built a wrong index: the name was never set, `mode="lazy"` duplicated values and `mode="eager"` hashed the original index. Both now produce the same unique per-row index, and the async variant forwards `mode` so lazy prefetching stays lazy.
 - `Roi.union`/`Roi.intersection` dropped ROI name `""` and label `0` (truthiness instead of `None` checks); joined slices now keep a deterministic axis order.
 - `Roi.from_values` now validates its inputs — it used `model_construct`, which skips pydantic validation entirely.
@@ -171,7 +168,7 @@ These are what stop the lists above from regrowing.
 - Duplicate ROI names did not survive a write/read roundtrip — the dedup renamed only the internal dict key.
 - `OmeZarrPlate.get_well` never returned the instance it cached; repeated calls now return the cached one, matching `get_image`.
 - A negative index inside a slicing sequence (e.g. `get_array(y=[-1, 0])`) raised a bare `AssertionError` (which vanishes under `python -O`); it now raises `NgioValueError`.
-- Fix the broken run link in the scheduled-CI failure issue: `{{ repo }}` is a context object, so the URL rendered as `[object Object]`. Now uses `{{ repo.owner }}/{{ repo.repo }}`.
+- Fix the broken run link in the scheduled-CI failure issue (`.github/TEST_FAIL_TEMPLATE.md`). The template interpolated `{{ repo }}`, which is the `@actions/github` context object `{ owner, repo }` rather than a string, so `JasonEtco/create-an-issue` rendered it as `[object Object]` (e.g. `https://github.com/[object Object]/actions/runs/...`). It now uses `{{ repo.owner }}/{{ repo.repo }}`.
 
 ### Tests
 - Raise coverage from 91% to 95%: new unit tests for the v0.5 metadata codec, container/image error paths, ROI-table and plate edge cases, `NgioCache`, the `FeatureExtractorIterator` dask path, and io_pipes error branches.
@@ -185,7 +182,7 @@ These are what stop the lists above from regrowing.
 ### Chores
 - Speed up CI: run with `pytest-xdist` (`-n 4`), collect coverage on the ubuntu/`test11` leg only, add `--durations=10`. The Zenodo download is guarded by a `FileLock` and no longer re-extracts an already-unzipped dataset.
 - Fix the CI data-cache `restore-keys` fallback never matching (double quotes are literal inside a YAML block scalar), which made every PR job re-download ~160 MB. The key now hashes the dataset registry instead of `tests/conftest.py`.
-- Centralize concrete-store dispatch behind `NgioStore` services, so the group handler, `copy_group`, `is_group_listable`, and the table backends no longer isinstance-check store types or reach into internals. Note: AnnData fsspec writes now use a synchronous clone of the store's filesystem.
+- Centralize concrete-store dispatch behind `NgioStore` services: `ZarrGroupHandler.full_url`, the file-lock path resolution, `copy_group`'s fsspec fast path, `is_group_listable`, and the pyarrow/anndata table backends no longer isinstance-check store types or reach into store internals (`store.root`/`store.fs`/`store._store_dict`). The JSON table backend and table metadata writes now go through the handler's `load_attrs`/`write_attrs` instead of raw `.attrs` access. One behavior note: AnnData fsspec writes now use a synchronous clone of the store's filesystem (as the pyarrow paths already did) instead of the store's own, possibly async, filesystem instance.
 - Shrink the store-matrix test payload from `(3, 5, 64, 64)`/3 levels to `(3, 2, 32, 32)`/2 levels — same monitored behaviors, far fewer round-trips through the mocked S3/HTTP stores.
 - Slim the iterator tests: the two mutating tests copy only the image they write to, and run the full 9-axes matrix on v0.5 plus a v0.4 smoke subset instead of both versions × 9.
 - `NgioDeprecationWarning` is kept in `ngio.utils`, but `import warnings` and its import are gone from `_plate.py`, `_ome_zarr_container.py`, `_image.py`, `_abstract_image.py`, and `_create_utils.py`. The private `_set_channel_meta`/`_set_channel_meta_legacy` pair collapsed into the public `set_channel_meta`.
@@ -198,13 +195,6 @@ These are what stop the lists above from regrowing.
 - Add `CODE_OF_CONDUCT.md` and `CITATION.cff`, and move `CONTRIBUTING.md` to the repository root, single-sourced into the docs so GitHub's community widgets pick them up.
 - Add a "Configuration" getting-started page documenting the config file location (`~/.ngio/ngio_config.json` / `NGIO_CONFIG_PATH`), the `io_retry` policy (fields, backoff strategies, marker matching, snapshot-at-open vs read-at-call semantics), and its relationship to the lower-level `s3fs.custom_retry_markers` mechanism. `NgioConfig`, `RetryConfig`, and `get_config` are now listed in the top-level API reference.
 - Point the iterator pages, the three iterator tutorials and the Getting Started iterators page at `ngio.iterators`, and drop the "Experimental API" warnings now that the iterators are part of the stable API.
-
-### Fix
-- `add_table` (`OmeZarrContainer`, `OmeZarrPlate`, `TablesContainer.add`) and `write_table` now preserve the input table's backend instead of always rewriting with the default `anndata_v1` backend ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). The `backend` parameter now defaults to `None`, meaning "use the table's own backend" (`meta.backend`, which is `anndata_v1` for tables created in memory); pass a backend name explicitly to convert. Supporting changes: `Table.backend_name` now falls back to `meta.backend` instead of returning `None` for in-memory tables, `set_backend(backend=...)` can declare a backend preference (with early name validation and alias normalization) on a table not yet attached to a store, and passing `backend=None` no longer raises. **Behavior change**: copying a table stored with a non-default backend (e.g. `parquet`/`csv`/`json`) via `get_table` + `add_table` now keeps that backend on the destination.
-- Fix the broken run link in the scheduled-CI failure issue (`.github/TEST_FAIL_TEMPLATE.md`). The template interpolated `{{ repo }}`, which is the `@actions/github` context object `{ owner, repo }` rather than a string, so `JasonEtco/create-an-issue` rendered it as `[object Object]` (e.g. `https://github.com/[object Object]/actions/runs/...`). It now uses `{{ repo.owner }}/{{ repo.repo }}`.
-
-### Chores
-- Centralize concrete-store dispatch behind `NgioStore` services: `ZarrGroupHandler.full_url`, the file-lock path resolution, `copy_group`'s fsspec fast path, `is_group_listable`, and the pyarrow/anndata table backends no longer isinstance-check store types or reach into store internals (`store.root`/`store.fs`/`store._store_dict`). The JSON table backend and table metadata writes now go through the handler's `load_attrs`/`write_attrs` instead of raw `.attrs` access. One behavior note: AnnData fsspec writes now use a synchronous clone of the store's filesystem (as the pyarrow paths already did) instead of the store's own, possibly async, filesystem instance.
 
 ## [v0.5.14]
 

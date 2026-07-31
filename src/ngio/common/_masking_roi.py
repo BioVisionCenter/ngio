@@ -156,7 +156,11 @@ def compute_masking_roi(
 
     rois = []
     for label, slice_ in slices.items():
-        assert len(slice_) == len(axes_order)
+        if len(slice_) != len(axes_order):
+            raise NgioValueError(
+                f"Label {label} produced {len(slice_)} slices but the "
+                f"segmentation has {len(axes_order)} axes ({axes_order})."
+            )
         slices = dict(zip(axes_order, slice_, strict=True))
         roi = Roi.from_values(
             name=str(label), slices=slices, label=label, space="pixel"
