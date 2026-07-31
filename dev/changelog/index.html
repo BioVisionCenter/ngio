@@ -4255,6 +4255,7 @@
 </ul>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
+<li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. Windows refuses to replace or remove a file while another handle to it is open, so a concurrent <em>reader</em> of <code>zarr.json</code> could break a writer's atomic rename — including between parallel <code>atomic_add_image</code> workers, which ngio's lock cannot prevent since opening a group reads metadata before any lock exists. Store operations now absorb these transient conflicts with a short bounded retry, always on and independent of <code>io_retry</code>; the original error is raised once the bound is reached. No behaviour change on Linux or macOS.</li>
 <li><code>import ngio</code> no longer raises <code>AttributeError</code> when an s3fs older than 2026.2.0 is installed.</li>
 <li><code>concatenate_image_tables</code> built a wrong index: unnamed, and duplicated under <code>mode="lazy"</code>.</li>
 <li><code>Roi.union</code>/<code>intersection</code> dropped <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> name <code>""</code> and label <code>0</code>; <code>Roi.from_values</code> now validates its inputs.</li>
