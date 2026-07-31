@@ -66,7 +66,8 @@ class AnnDataBackend(AbstractTableBackend):
             raise NgioValueError(
                 f"Cannot resolve a local path for store {store} at {path}."
             )
-        table.write_zarr(url)
+        # ty resolves AnnData.write_zarr as an unbound function, not a method.
+        table.write_zarr(url)  # type: ignore
 
     @retry_io
     def _write_to_fsspec_store(
@@ -77,12 +78,12 @@ class AnnDataBackend(AbstractTableBackend):
         AnnData writes through a raw fsspec mapper, bypassing the (retrying)
         `NgioStore`, so the `io_retry` policy is applied here.
         """
-        table.write_zarr(store.get_mapper(path))
+        table.write_zarr(store.get_mapper(path))  # type: ignore
 
     def _write_to_memory_store(self, table: AnnData) -> None:
         """Write the AnnData table to a MemoryStore."""
         scratch_store = MemoryStore()
-        table.write_zarr(scratch_store)
+        table.write_zarr(scratch_store)  # type: ignore
         anndata_group = zarr.open_group(scratch_store, mode="r")
         copy_group(
             anndata_group,

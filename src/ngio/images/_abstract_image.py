@@ -233,7 +233,7 @@ class AbstractImage(ABC):
         """
         meta = self._meta_handler.get_meta()
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
-        self._meta_handler.update_meta(meta)  # type: ignore
+        self._meta_handler.update_meta(meta)
 
     @deprecated(replacement="set_axes_units()")
     def set_axes_unit(
@@ -253,7 +253,7 @@ class AbstractImage(ABC):
         meta = self._meta_handler.get_meta()
         meta = meta.rename_axes(axes_names=axes_names)
         self._meta_handler._axes_setup = meta.axes_handler.axes_setup
-        self._meta_handler.update_meta(meta)  # type: ignore
+        self._meta_handler.update_meta(meta)
 
     def set_name(
         self,
@@ -268,7 +268,7 @@ class AbstractImage(ABC):
         """
         meta = self._meta_handler.get_meta()
         meta = meta.rename_image(name=name)
-        self._meta_handler.update_meta(meta)  # type: ignore
+        self._meta_handler.update_meta(meta)
 
     def _get_as_numpy(
         self,

@@ -47,6 +47,67 @@ jobs:
           persist-credentials: false
       - run: pipx run --spec check-manifest==0.51 check-manifest
 
+  typecheck:
+    # `src/` must stay free of type errors. `tests/` is deliberately not gated
+    # yet — see the 1.0 checklist.
+    name: Type check (src)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 🔧 Set up pixi
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          environments: dev
+      - name: 🔍 ty
+        run: pixi run -e dev ty check src/
+      - name: 📝 Public API docstrings
+        # Ruff's D1xx cannot cover this: it treats every symbol in a
+        # `_`-prefixed module as private, and every ngio module is `_`-prefixed.
+        run: pixi run -e dev python .github/check_docstrings.py
+
+  docs:
+    # Build the docs and run every snippet on PRs. Kept here rather than in
+    # docs.yml so the deploy workflow's `contents: write` is not extended to
+    # pull requests.
+    name: Docs build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: 🔧 Set up pixi
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          environments: docs
+      - name: 📄 Run docs snippets
+        run: pixi run -e docs test_snippets
+      - name: 📚 Build docs
+        run: pixi run -e docs build_docs
+
+  test-min-deps:
+    # Installs the exact lower bounds declared in pyproject so the floors are
+    # tested rather than asserted. Lowering a floor without updating this job
+    # will not be caught anywhere else.
+    name: Minimum dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+      - name: 📦 Install at the declared floors
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -c .github/min-constraints.txt ".[test]"
+      - name: 🔒 Verify the floors actually took effect
+        run: python .github/check_min_deps.py
+      - name: 🧪 Run Tests
+        run: pytest -n 4 --durations=10
+
   setup:
     # Outputs a reduced matrix for PRs, full matrix for main/tags/schedule
     runs-on: ubuntu-latest
@@ -132,9 +193,11 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: test
+    # Every gate must pass before anything reaches PyPI, not just the test matrix.
+    needs: [test, lint, check-manifest, typecheck, docs, test-min-deps]
     if: success() && startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    environment: pypi
 
     permissions:
       # IMPORTANT: this permission is mandatory for trusted publishing on PyPi
@@ -156,8 +219,29 @@ jobs:
 
       - name: 👷 Build
         run: |
-          python -m pip install build
+          python -m pip install build twine
           python -m build
+
+      - name: 🔍 Check the built distributions
+        run: twine check dist/*
+
+      - name: 🏷️ Assert the tag matches the built version
+        # hatch-vcs derives the version from the tag, so a mismatch means the
+        # checkout is not what the tag points at.
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'EOF'
+          import os, pathlib, sys
+          tag = os.environ["TAG"].removeprefix("v")
+          wheels = list(pathlib.Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              sys.exit(f"expected exactly one wheel, found {wheels}")
+          built = wheels[0].name.split("-")[1]
+          if built != tag:
+              sys.exit(f"tag {tag!r} does not match built version {built!r}")
+          print(f"tag and built version agree: {built}")
+          EOF
 
       - name: 🚢 Publish to PyPI
         uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1

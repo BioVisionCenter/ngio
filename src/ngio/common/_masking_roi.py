@@ -66,7 +66,7 @@ def _merge_slices(
 @delayed
 def _collect_slices(
     local_slices: list[dict[int, tuple[slice, ...]]],
-) -> dict[int, tuple[slice]]:
+) -> dict[int, tuple[slice, ...]]:
     """Collect the slices from the delayed results."""
     global_slices = {}
     for result in local_slices:

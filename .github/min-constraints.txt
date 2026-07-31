@@ -1,0 +1,19 @@
+# Lower bounds declared in pyproject.toml's [project.dependencies], pinned exactly.
+# Used by the `test-min-deps` CI leg so the declared floors are tested rather than
+# asserted. Keep in sync with pyproject.toml: if you raise a floor there, raise it
+# here too (and if you lower one, this job is what tells you whether it works).
+numpy==2.0.0
+filelock==3.12.0
+zarr==3.1.6
+scipy==1.14.0
+fsspec==2025.3.0
+anndata==0.12.5
+pydantic==2.11.5
+pandas==2.2.2
+aiohttp==3.9.0
+dask==2024.1.0
+ome-zarr-models==1.4
+pooch==1.8.0
+polars==1.0.0
+pyarrow==16.0.0
+pillow==10.0.0

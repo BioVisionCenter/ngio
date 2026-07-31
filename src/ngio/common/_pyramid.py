@@ -45,7 +45,7 @@ def _on_disk_dask_zoom(
     # re-derives chunks via normalize_chunks(chunks="auto", ...) and warns
     # (treated as error by our filterwarnings) when the result isn't a
     # multiple of the zarr target's chunks. da.store writes blocks 1:1.
-    da.store(target_array, target, lock=False)
+    da.store(target_array, target, lock=False)  # type: ignore
 
 
 def _on_disk_coarsen(
@@ -96,7 +96,7 @@ def _on_disk_coarsen(
     )
     out_target = out_target.rechunk(target.chunks)
     # See _on_disk_dask_zoom for rationale.
-    da.store(out_target, target, lock=False)
+    da.store(out_target, target, lock=False)  # type: ignore
 
 
 def on_disk_zoom(
@@ -477,7 +477,10 @@ class ImagePyramidBuilder(BaseModel):
         Args:
             group (zarr.Group): The Zarr group to save the pyramid specification to.
         """
-        array_static_kwargs = {
+        # Heterogeneous by construction, and `other_array_kwargs` lets callers
+        # pass through any `create_array` parameter, so the values cannot be
+        # narrowed to a useful union.
+        array_static_kwargs: dict[str, Any] = {
             "dtype": self.data_type,
             "overwrite": True,
             "compressors": self.compressors,

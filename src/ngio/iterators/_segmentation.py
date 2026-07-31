@@ -126,6 +126,10 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 class MaskedSegmentationIterator(SegmentationIterator):
     """Base class for iterators over ROIs."""
 
+    # Narrows the base class's `Image`: this iterator needs the masking label
+    # and ROI table that only a `MaskedImage` carries.
+    _input: MaskedImage
+
     def __init__(
         self,
         input_image: MaskedImage,

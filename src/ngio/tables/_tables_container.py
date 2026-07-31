@@ -1,6 +1,6 @@
 """Module for handling the /tables group in an OME-NGFF file."""
 
-from typing import Literal, Protocol, TypeVar
+from typing import Literal, Protocol, Self, TypeVar
 
 import anndata as ad
 import pandas as pd
@@ -104,12 +104,12 @@ class Table(Protocol):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
-    ) -> "Table":
+    ) -> Self:
         """Create a new table from a Zarr group handler."""
         ...
 
     @classmethod
-    def from_table_data(cls, table_data: TabularData, meta: BackendMeta) -> "Table":
+    def from_table_data(cls, table_data: TabularData, meta: BackendMeta) -> Self:
         """Create a new table from a DataFrame."""
         ...
 
@@ -331,7 +331,7 @@ class TablesContainer:
         return table_cls.from_handler(
             handler=table_handler,
             backend=backend,
-        )  # type: ignore[return-value]
+        )
 
     def delete(self, name: str, missing_ok: bool = False) -> None:
         """Delete a table from the group.
@@ -449,7 +449,7 @@ def open_table_as(
     return table_cls.from_handler(
         handler=handler,
         backend=backend,
-    )  # type: ignore[return-value]
+    )
 
 
 def write_table(

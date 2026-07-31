@@ -168,7 +168,8 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
     slicing_tuple = slicing_ops.normalized_slicing_tuple
     # Find if the is any tuple in the slicing tuple
     # If there is one we need to handle it differently
-    return zarr_array[slicing_tuple]
+    # zarr's __getitem__ stub does not model list-of-int fancy indexing.
+    return zarr_array[slicing_tuple]  # type: ignore
 
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
@@ -222,7 +223,8 @@ def set_slice_as_numpy(
 ) -> None:
     slice_tuple = slicing_ops.normalized_slicing_tuple
     _check_compatibility_of_shapes(zarr_array.shape, patch.shape, slice_tuple)
-    zarr_array[slice_tuple] = patch
+    # zarr's __setitem__ stub does not model list-of-int fancy indexing.
+    zarr_array[slice_tuple] = patch  # type: ignore
 
 
 def handle_int_set_as_dask(
@@ -253,7 +255,7 @@ def set_slice_as_dask(
         # da.store instead of da.to_zarr: see ngio.common._pyramid for the
         # dask>=2025.11 PerformanceWarning regression that to_zarr triggers
         # when the input chunks aren't a multiple of the target's chunks.
-        da.store(patch, zarr_array, regions=slice_tuple, lock=False)
+        da.store(patch, zarr_array, regions=slice_tuple, lock=False)  # type: ignore
         return
 
     # Complex case, we have exactly one tuple in the slicing tuple
@@ -262,7 +264,7 @@ def set_slice_as_dask(
         _sub_slice = (*slice_tuple[:ax], slice(idx, idx + 1), *slice_tuple[ax + 1 :])
         sub_patch = da.take(patch, indices=i, axis=ax)
         sub_patch = da.expand_dims(sub_patch, axis=ax)
-        da.store(sub_patch, zarr_array, regions=_sub_slice, lock=False)
+        da.store(sub_patch, zarr_array, regions=_sub_slice, lock=False)  # type: ignore
 
 
 ##############################################################

@@ -326,7 +326,7 @@ class MaskedLabel(Label):
             label_name = self._masking_roi_table.reference_label
         return f"MaskedLabel(path={self.path}, {self.dimensions}, {label_name})"
 
-    def get_roi_as_numpy(
+    def get_roi_as_numpy(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
         zoom_factor: float = 1.0,
@@ -344,7 +344,7 @@ class MaskedLabel(Label):
             **slicing_kwargs,
         )
 
-    def get_roi_as_dask(
+    def get_roi_as_dask(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
         zoom_factor: float = 1.0,
@@ -362,7 +362,7 @@ class MaskedLabel(Label):
             **slicing_kwargs,
         )
 
-    def get_roi(
+    def get_roi(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
         zoom_factor: float = 1.0,
@@ -382,7 +382,7 @@ class MaskedLabel(Label):
             **slicing_kwargs,
         )
 
-    def set_roi(
+    def set_roi(  # type: ignore (this ignore the method override issue)
         self,
         label: int,
         patch: np.ndarray | da.Array,

@@ -43,19 +43,43 @@ from ngio.utils import (
 )
 
 # This could be replaced with a more dynamic registry if needed in the future
-_image_encoder_registry = {"0.4": ngio_to_v04_image_meta, "0.5": ngio_to_v05_image_meta}
-_image_decoder_registry = {"0.4": v04_to_ngio_image_meta, "0.5": v05_to_ngio_image_meta}
-_label_encoder_registry = {"0.4": ngio_to_v04_label_meta, "0.5": ngio_to_v05_label_meta}
-_label_decoder_registry = {"0.4": v04_to_ngio_label_meta, "0.5": v05_to_ngio_label_meta}
-_plate_encoder_registry = {"0.4": ngio_to_v04_plate_meta, "0.5": ngio_to_v05_plate_meta}
-_plate_decoder_registry = {"0.4": v04_to_ngio_plate_meta, "0.5": v05_to_ngio_plate_meta}
-_well_encoder_registry = {"0.4": ngio_to_v04_well_meta, "0.5": ngio_to_v05_well_meta}
-_well_decoder_registry = {"0.4": v04_to_ngio_well_meta, "0.5": v05_to_ngio_well_meta}
-_labels_group_encoder_registry = {
+_image_encoder_registry: dict[str, Callable] = {
+    "0.4": ngio_to_v04_image_meta,
+    "0.5": ngio_to_v05_image_meta,
+}
+_image_decoder_registry: dict[str, Callable] = {
+    "0.4": v04_to_ngio_image_meta,
+    "0.5": v05_to_ngio_image_meta,
+}
+_label_encoder_registry: dict[str, Callable] = {
+    "0.4": ngio_to_v04_label_meta,
+    "0.5": ngio_to_v05_label_meta,
+}
+_label_decoder_registry: dict[str, Callable] = {
+    "0.4": v04_to_ngio_label_meta,
+    "0.5": v05_to_ngio_label_meta,
+}
+_plate_encoder_registry: dict[str, Callable] = {
+    "0.4": ngio_to_v04_plate_meta,
+    "0.5": ngio_to_v05_plate_meta,
+}
+_plate_decoder_registry: dict[str, Callable] = {
+    "0.4": v04_to_ngio_plate_meta,
+    "0.5": v05_to_ngio_plate_meta,
+}
+_well_encoder_registry: dict[str, Callable] = {
+    "0.4": ngio_to_v04_well_meta,
+    "0.5": ngio_to_v05_well_meta,
+}
+_well_decoder_registry: dict[str, Callable] = {
+    "0.4": v04_to_ngio_well_meta,
+    "0.5": v05_to_ngio_well_meta,
+}
+_labels_group_encoder_registry: dict[str, Callable] = {
     "0.4": ngio_to_v04_labels_group_meta,
     "0.5": ngio_to_v05_labels_group_meta,
 }
-_labels_group_decoder_registry = {
+_labels_group_decoder_registry: dict[str, Callable] = {
     "0.4": v04_to_ngio_labels_group_meta,
     "0.5": v05_to_ngio_labels_group_meta,
 }

@@ -105,6 +105,45 @@ create_empty_ome_zarr(store, shape=(2, 64, 64), axes_names=("c", "y", "x"),
 
 `pixel_size=` only ever read `.y` and `.x`; `.z`/`.t` were ignored and z/time spacing came from the reference image. To override those too, pass `z_spacing=`/`time_spacing=` — new behaviour the old argument could not express.
 
+### Packaging
+
+- **Add `src/ngio/py.typed`.** The `Typing :: Typed` classifier has been declared since 0.x but the PEP 561 marker was missing, so every downstream type checker silently ignored ngio's annotations. It now ships in both the wheel and the sdist.
+- `Development Status` moves from `3 - Alpha` to `5 - Production/Stable`, and `[tool.commitizen] major_version_zero` is now `false` so `cz bump` can propose a major version.
+- **Drop the `requires-python` upper cap** (`>=3.11,<3.15` → `>=3.11`). ngio is pure Python; the cap only blocked installs on new interpreters.
+- **Real dependency floors, every one of them tested.** Most declared dependencies had no lower bound at all, and `zarr>3` excluded zarr 3.0.0 itself without expressing what the code actually needs. Each floor below is installed and exercised by a `test-min-deps` CI leg. Several turned out to be forced by ngio's own dependencies rather than by ngio:
+
+  | Package | Floor | Why |
+  | --- | --- | --- |
+  | `numpy` | `>=2.0` | zarr 3.1.6 requires numpy 2 |
+  | `zarr` | `>=3.1.6` | `WrapperStore` and the `is_group_listable` behaviour |
+  | `scipy` | `>=1.14` | first release supporting numpy 2 |
+  | `fsspec` | `>=2025.3` | below this `NgioStore.sync_fs_and_path` returns an async filesystem, which zarr's `FsspecStore` rejects |
+  | `anndata` | `>=0.12.5` | `settings.auto_shard_zarr_v3`, used by the AnnData backend |
+  | `pydantic` | `>=2.11.5` | required by ome-zarr-models |
+  | `pandas` | `>=2.2.2` | first 2.2.x supporting numpy 2 on Python 3.11 |
+  | `ome-zarr-models` | `>=1.4` | `ValidTransform` |
+  | `pyarrow` | `>=16` | 15 caps numpy<2 |
+  | others | `polars>=1.0`, `dask[array]>=2024.1`, `pooch>=1.8`, `pillow>=10`, `filelock>=3.12`, `aiohttp>=3.9` | |
+
+- **`pandas` is no longer capped below 3.0.** The suite passes unmodified against pandas 3.0.3 — including the new default `str` dtype, the arrow→pandas path and always-on copy-on-write — so `pandas>=1.2.0,<3.0.0` becomes `pandas>=2.2.2`.
+- **`anndata`'s cap moves from `<0.13.0` to `<0.14.0`**; the suite passes against anndata 0.13.2. The cap stays because `_anndata_utils.py` imports six private anndata symbols and vendors a copy of its zarr reader. Note anndata 0.13 requires Python >=3.12, so Python 3.11 installs still resolve to 0.12.x.
+- **Add an `s3` extra**: `pip install ngio[s3]`. The README advertises S3 streaming, but `s3fs` was not a declared dependency at all — it only arrived transitively via the `test` extra, so following the README raised `ImportError`. The floor is `s3fs>=2026.2.0`, the release that added `set_custom_error_handler`.
+- **Drop unused hard dependencies.** `requests` and `distributed` are not imported anywhere in `src/`, `tests/` or `docs/`; `dask[array]` and `dask[distributed]` collapse to a single `dask[array]` entry.
+
+### Enforcement
+
+These are what stop the lists above from regrowing.
+
+- **`ty` runs in CI and pre-commit, and `src/` is clean.** It was previously run nowhere, leaving ~120 diagnostics ungated despite the `Typing :: Typed` classifier. `src/` is now at zero and gated; `tests/` is deliberately not gated yet. Most fixes were real typing improvements rather than suppressions — `Table.from_handler`/`from_table_data` now return `Self` (so `get_as` and `open_table_as` are genuinely type-safe instead of carrying `# type: ignore[return-value]`), the metadata encoder/decoder registries are annotated, `MaskedSegmentationIterator._input` is narrowed to `MaskedImage`, and 9 stale `# type: ignore`s are gone. The remaining suppressions are third-party stub gaps (dask's `store`, zarr's fancy-index `__getitem__`, `AnnData.write_zarr`, pooch's `downloader`) and the four known `MaskedImage`/`MaskedLabel` LSP violations.
+- **The docs build and every snippet run on pull requests.** `docs.yml` only triggered on pushes to `main` and tags, so a broken snippet or cross-reference failed only after merge — where it also blocked the dev-docs deploy. The new `docs` job lives in `ci.yml` so the deploy workflow's `contents: write` permission is not extended to PRs.
+- **A `test-min-deps` CI leg installs the exact declared floors** from `.github/min-constraints.txt` and runs the suite, so the bounds are tested rather than asserted. `.github/check_min_deps.py` fails if that file drifts from `pyproject.toml`, if a floor is missing a pin, or if a pin did not take effect.
+- **Public API docstring coverage is gated** by `.github/check_docstrings.py`, against a baseline that may only shrink. Ruff's `D1xx` rules cannot do this: ruff treats every symbol in a `_`-prefixed module as private, and every ngio implementation module is `_`-prefixed, so missing-docstring silently never fired anywhere in `src/`. The gate walks the public `__all__` surface instead. It records 98 existing gaps (79 of them in `ngio.io_pipes`) and fails on anything new.
+- **`deploy` is gated on every check**, not just the test matrix: `lint`, `check-manifest`, `typecheck`, `docs` and `test-min-deps` must all pass. It also runs under the `pypi` environment, runs `twine check dist/*`, and asserts the git tag matches the built wheel version before publishing.
+
+### Fix
+
+- **`import ngio` no longer fails when an old `s3fs` is installed.** `refresh_s3fs_config` runs at import of `ngio.utils._zarr_utils` and called `s3fs.set_custom_error_handler`, which only exists in s3fs 2026.2.0 and later — so any environment holding an older s3fs, for any reason, raised `AttributeError` on `import ngio`. s3fs is not an ngio dependency, so it now degrades instead: the custom handler is skipped, and an `NgioUserWarning` is emitted only if `s3fs.custom_retry_markers` was actually configured.
+
 ### Features
 - The iterators graduated out of `ngio.experimental`: they now live in `ngio.iterators` and are re-exported from the top-level namespace, so `from ngio import SegmentationIterator` works. `ngio.experimental.iterators` still resolves the four classes but emits `NgioDeprecationWarning` on attribute access; it will be removed in `ngio=1.1`.
 - Add a configurable IO retry policy: `NgioConfig.io_retry` (`RetryConfig`) with `max_retries` (default `0`), a backoff strategy (`ConstantBackoff`, `LinearBackoff`, `ExponentialBackoff`), and error matching via `retry_on` substrings or the discouraged blanket `retry_all_errors`. Ngio's own `NgioError`s are never retried. The public `ngio.utils.retry_io` decorator reads the global config at call time.

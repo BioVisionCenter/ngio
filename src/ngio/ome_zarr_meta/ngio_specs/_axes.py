@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 from enum import StrEnum
-from typing import Literal, TypeAlias, TypeVar
+from typing import Any, Literal, TypeAlias, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -191,7 +191,9 @@ class AxesSetup(BaseModel):
         # Canonical names always claim their own slot; non-canonical names
         # fill the remaining slots right-aligned.
         free_slots = [c_ax for c_ax in canonical_order if c_ax not in set(axes_names)]
-        axes_mapping = {}
+        # Only the per-axis string fields are filled in here; which keys are
+        # present depends on the input, so the values cannot be narrowed.
+        axes_mapping: dict[str, Any] = {}
         for ax in reversed(axes_names):
             if ax in chanonical_axes:
                 axes_mapping[ax] = ax
