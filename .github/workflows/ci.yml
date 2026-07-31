@@ -96,13 +96,35 @@ jobs:
         with:
           python-version: "3.11"
       - name: 📦 Install at the declared floors
+        # The `test` extra deliberately is NOT installed here, and cannot be:
+        # test-only dependencies demand versions that contradict ngio's runtime
+        # contract — `aiomoto[pandas]` needs pyarrow>=22 against our pyarrow>=16,
+        # and s3fs pins fsspec to its own date release against our fsspec>=2025.3.
+        # Only the tooling the reduced suite below needs is installed.
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -c .github/min-constraints.txt ".[test]"
+          python -m pip install -c .github/min-constraints.txt . \
+            pytest pytest-xdist scikit-image
       - name: 🔒 Verify the floors actually took effect
         run: python .github/check_min_deps.py
+      - name: Restore shared data cache (read-only)
+        # Read-only, so this job adds no cache-poisoning surface; on a miss the
+        # fixtures are downloaded instead.
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: data/
+          key: "${{ runner.os }}-data-${{ hashFiles('src/ngio/utils/_datasets.py') }}"
+          restore-keys: |
+            ${{ runner.os }}-data-
       - name: 🧪 Run Tests
-        run: pytest -n 4 --durations=10
+        # Scoped to `tests/unit` (overriding `testpaths`) because
+        # `tests/stores/conftest.py` imports aiomoto/boto3 at module level, and
+        # `test_s3fs_config.py` imports s3fs — none of which can be installed
+        # alongside the floors. That excludes 21 of 441 test functions, all of
+        # them exercising s3fs/aiomoto rather than a declared runtime floor.
+        run: |
+          pytest tests/unit -n 4 --durations=10 \
+            --ignore=tests/unit/utils/test_s3fs_config.py
 
   setup:
     # Outputs a reduced matrix for PRs, full matrix for main/tags/schedule

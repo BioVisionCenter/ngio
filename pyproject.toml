@@ -78,8 +78,6 @@ test = [
     "pytest-xdist",
     "scikit-image",
     "boto3",
-    "pytest_httpserver",
-    "devtools",
     # aiomoto brings moto[server] + s3fs + fsspec + pyarrow, and caps
     # aiobotocore<=3.7.0 / moto<=5.2.1 so the universal solve can't backtrack
     # s3fs to the ancient 0.4.2 (see error_report.md).
