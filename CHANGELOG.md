@@ -2,199 +2,83 @@
 
 ## [v1.0.0]
 
-### API Breaking Changes
+First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.
 
-Every API deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.
-
-**Renamed members**
+### Removed
 
 | Removed | Use instead |
 | --- | --- |
 | `OmeZarrContainer.image_meta` | `.meta` |
-| `.levels_paths` on `OmeZarrContainer`, `ImagesContainer` | `.level_paths` |
-| `.set_channel_percentiles(a, b)` on both | `.set_channel_windows_with_percentiles(percentiles=(a, b))` |
+| `.levels_paths` | `.level_paths` |
+| `.set_channel_percentiles(a, b)` | `.set_channel_windows_with_percentiles(percentiles=(a, b))` |
+| `version=` on the plate/well create and derive functions | `ngff_version=` |
+| `check_type=` on `get_table` | `get_table_as(name, TableCls)` or `get_*_table(name)` |
+| `pixel_size=`, `xy_pixelsize=` on create/derive | `pixelsize=` (plus `z_spacing=`, `time_spacing=`) |
+| `xy_scaling_factor=`, `z_scaling_factor=` | `scaling_factors=` |
+| `labels=`, `channel_labels=`, `channel_wavelengths=`, `channel_colors=`, `channel_active=` | `channels_meta=` |
+| `wavelength_id=`, `start=`, `end=`, `percentiles=`, `colors=`, `active=` on `set_channel_meta` | `channel_meta=ChannelsMeta(...)` |
 
-**Renamed / removed arguments**
+`pixelsize` is now **required** on `create_empty_ome_zarr` and `create_ome_zarr_from_array`. The `pixel_size=` argument on the *getters* is unaffected: `pixel_size` selects a pyramid level, `pixelsize` is a value written on create.
 
-| Removed argument | On | Use instead |
-| --- | --- | --- |
-| `version=` | `create_empty_plate`, `create_empty_well`, `derive_ome_zarr_plate`, `OmeZarrPlate.derive_plate` | `ngff_version=` |
-| `check_type=` | `OmeZarrContainer.get_table`, `OmeZarrPlate.get_table` | `get_table_as(name, TableCls)` or `get_*_table(name)` |
-| `labels=`, `pixel_size=` | all derive entry points | `channels_meta=`, `pixelsize=` |
-| `xy_pixelsize=` | `create_empty_ome_zarr`, `create_ome_zarr_from_array` | `pixelsize=` |
-| `xy_scaling_factor=`, `z_scaling_factor=` | same two | `scaling_factors=` |
-| `channel_labels=`, `channel_wavelengths=`, `channel_colors=`, `channel_active=` | same two | `channels_meta=` |
-| `labels=`, `wavelength_id=`, `start=`, `end=`, `percentiles=`, `colors=`, `active=`, `**omero_kwargs` | `set_channel_meta` on `OmeZarrContainer`, `ImagesContainer` | `channel_meta=ChannelsMeta(...)` |
+### Behaviour changes
 
-Derive entry points: `OmeZarrContainer.derive_image`/`derive_label`, `ImagesContainer.derive`, `LabelsContainer.derive`, `derive_image_container`, `derive_label`, `abstract_derive`.
+Same call, different result:
 
-- **`pixelsize` is now required** on `create_empty_ome_zarr` and `create_ome_zarr_from_array`; omitting it raises `TypeError` instead of `NgioValueError: pixelsize must be provided.`.
-- **Not affected**: the `pixel_size=` *lookup* argument on the getters (`get`, `get_image`, `get_label`, ...) stays.
-- Internal: `_check_deprecated_scaling_factors` removed; `init_image_like` and `_compute_scaling_factors` lost their `yx_scaling_factor`/`z_scaling_factor` parameters.
+- `derive_image` now inherits `dtype`, `dimension_separator` and `compressors` from the reference image instead of forcing `uint16`, `"/"` and `"auto"` — deriving from a `float32` image no longer silently downcasts it.
+- `add_table` and `write_table` keep the source table's backend instead of rewriting it as `anndata_v1` ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). Pass `backend=` to convert.
+- Opening a container no longer reads every pyramid level (`validate_arrays=False` by default), so a missing or malformed array fails on first access rather than at open. Pass `validate_arrays=True` for the old eager check.
+- `open_image` and `open_label` default to `strict=False`, matching every other getter.
+- `list_roi_tables` returns `[]` instead of raising when there are no tables.
+- `get_masked_label(path=...)` resolves the masking label at the label's own pixel size, matching `get_masked_image`.
+- `PixelSize`s with different `time_unit`s now compare unequal, and `==` against a non-`PixelSize` returns `NotImplemented` instead of raising `TypeError`.
 
-**Behaviour changes**
+### Deprecated, removal in `ngio=1.1`
 
-- `OmeZarrContainer.derive_image` hardcoded `dtype="uint16"`, `dimension_separator="/"` and `compressors="auto"` while documenting "the value from the reference image will be used", so deriving from a `float32` image silently downcast it. All three are now `None` sentinels and inherit from the reference, matching `derive_label` and `derive_image_container`. `ImagesContainer.derive` carried the same three hardcoded defaults and is fixed with it. `derive_label` is unchanged: it still inherits from a reference `Label` and falls back to `uint32` only when the reference is an `Image`.
-- `get_masked_label` resolved the masking label at the raw `pixel_size` argument rather than at the resolved label's pixel size, so `get_masked_label(path=...)` disagreed with `get_masked_image(path=...)`. It now mirrors `get_masked_image`.
-- `list_roi_tables` returns `[]` on a container or plate with no tables, matching `list_tables`. It previously raised — `NgioValidationError` from `OmeZarrContainer`, `NgioValueError` from `OmeZarrPlate` — and could create the `tables` group as a side effect. Both classes now also return ROI tables in the same order (`roi_table` then `masking_roi_table`); `OmeZarrContainer` previously reversed it.
-- `open_image` and `open_label` now default to `strict=False`, matching `get_image`, `get_label`, `get_masked_image`, `get_masked_label`, `ImagesContainer.get` and `LabelsContainer.get`. They were the only two entry points defaulting to `True`.
-- `OmeZarrContainer.__init__` never forwarded `validate_paths` to its `ImagesContainer`, so passing `False` still validated every level. The flag is now forwarded and named `validate_arrays` everywhere, and defaults to `False` — opening a container no longer touches every pyramid level up front. `open_ome_zarr_container(validate_arrays=True)` restores the eager check. **Behaviour change**: a container whose multiscale metadata references a missing or malformed array now fails on first access to that level rather than at open.
-- `ImplementedTableBackends.get_backend` no longer defaults `backend_name`. The default was dead — every caller passes it explicitly, and it named `"anndata"` while the real default is `"anndata_v1"`.
+`conctatenate_tables` → `concatenate_tables`, `set_axes_unit` → `set_axes_units`, `levels_paths=` → `level_paths=`, `validate_paths=` → `validate_arrays=`, `ngio.experimental.iterators` → `ngio.iterators`, and every `*_async` plate/table function → the sync form with `max_workers=`.
 
-**Renamed, with deprecation warnings (removal in `ngio=1.1`)**
-
-| Deprecated | Use instead |
-| --- | --- |
-| `conctatenate_tables` | `concatenate_tables` (the typo is fixed) |
-| `set_axes_unit` on `AbstractImage`, `ImagesContainer` | `set_axes_units` |
-| `levels_paths=` on `ImagePyramidBuilder.from_scaling_factors`/`from_shapes` | `level_paths=` |
-| `validate_paths=` on `OmeZarrContainer`, `ImagesContainer` | `validate_arrays=` |
-| `OmeZarrPlate.get_images_async`, `get_wells_async`, `images_paths_async`, `list_image_tables_async`, `concatenate_image_tables_async`, `concatenate_image_tables_as_async` | the sync method with `max_workers=` |
-| `list_image_tables_async`, `concatenate_image_tables_async`, `concatenate_image_tables_as_async` in `ngio.images` | the sync function with `max_workers=` |
-
-### Migration Guide (v0.5 → v1.0)
+### Migration (v0.5 → v1.0)
 
 ```python
-# Renamed arguments
-create_empty_plate(store, name="plate", version="0.4")        # before
-create_empty_plate(store, name="plate", ngff_version="0.4")   # after
-
-create_empty_ome_zarr(store, shape=(4, 64, 64), xy_pixelsize=0.5, z_scaling_factor=1.0)
-create_empty_ome_zarr(
-    store, shape=(4, 64, 64), pixelsize=0.5, scaling_factors=(1.0, 2.0, 2.0)
-)
-
-# Table type checking
-table = ome_zarr.get_table("roi", check_type="roi_table")
-table = ome_zarr.get_table_as("roi", RoiTable)   # or ome_zarr.get_roi_table("roi")
-
-# Deriving
-ome_zarr.derive_image(store, labels=["DAPI"], pixel_size=ps)
+create_empty_plate(store, ngff_version="0.4")                  # was version=
+create_empty_ome_zarr(store, pixelsize=0.5,                    # was xy_pixelsize=
+                      scaling_factors=(1.0, 2.0, 2.0))         # was *_scaling_factor=
+ome_zarr.get_table_as("roi", RoiTable)                         # was check_type="roi_table"
 ome_zarr.derive_image(store, channels_meta=["DAPI"], pixelsize=(ps.y, ps.x))
-
-# Iterators (the old path still works until 1.1, with a deprecation warning)
-from ngio.experimental.iterators import SegmentationIterator
-from ngio.iterators import SegmentationIterator   # or: from ngio import ...
-
-# Async -> max_workers (the async forms still work until 1.1, with a warning)
-images = asyncio.run(plate.get_images_async())
-images = plate.get_images(max_workers=8)
-
-paths = asyncio.run(plate.images_paths_async())
-paths = plate.images_paths()          # never did IO worth parallelising
-
-names = asyncio.run(list_image_tables_async(images))
-names = list_image_tables(images, max_workers=8)
-
-table = asyncio.run(concatenate_image_tables_async(images, extras=extras, name="t"))
-table = concatenate_image_tables(images, extras=extras, name="t", max_workers=8)
-
-# Channel metadata
-ome_zarr.set_channel_meta(labels=["DAPI", "GFP"], wavelength_id=["A01", "A02"])
-ome_zarr.set_channel_meta(
-    channel_meta=ChannelsMeta.default_init(
-        labels=["DAPI", "GFP"], wavelength_id=["A01", "A02"]
-    )
-)
-
-create_empty_ome_zarr(store, shape=(2, 64, 64), axes_names=("c", "y", "x"),
-                      pixelsize=0.5, channel_labels=["a", "b"])
-create_empty_ome_zarr(store, shape=(2, 64, 64), axes_names=("c", "y", "x"),
-                      pixelsize=0.5, channels_meta=["a", "b"])
+ome_zarr.set_channel_meta(channel_meta=ChannelsMeta.default_init(labels=["DAPI"]))
+from ngio import SegmentationIterator                          # was ngio.experimental
+plate.get_images(max_workers=8)                                # was get_images_async()
 ```
 
-`pixel_size=` only ever read `.y` and `.x`; `.z`/`.t` were ignored and z/time spacing came from the reference image. To override those too, pass `z_spacing=`/`time_spacing=` — new behaviour the old argument could not express.
+### Features
+
+- The iterators are stable API: `from ngio import SegmentationIterator`.
+- Configurable IO retries: `NgioConfig.io_retry` (`max_retries`, constant/linear/exponential backoff, error matching) plus the `ngio.utils.retry_io` decorator. ngio's own `NgioError`s are never retried. See the Configuration page.
+- `ngio.utils.NgioStore` wraps every zarr store ngio opens and applies that retry policy to all IO — metadata, pixel data, and lazy dask reads on workers. `ZipStore` is now supported.
+- `max_workers=` on the sync plate and table APIs replaces the separate async surface; `None` keeps the serial behaviour.
+- A larger public namespace, including `MaskedImage`, `MaskedLabel`, `Channel`, `S3FSConfig`, `derive_ome_zarr_plate`, `__version__`, the `get_ngio_*_meta` readers and every error class. `AbstractBaseTable`, `ImplementedTables` and `write_table` are exported from `ngio.tables`, so a custom table type can be registered without private imports.
+- `NgioTableValidationError` now subclasses `NgioValidationError`, so `except ValueError` catches it like its siblings; new `NgioKeyError`.
+
+### Fixes
+
+- `import ngio` no longer raises `AttributeError` when an s3fs older than 2026.2.0 is installed.
+- `concatenate_image_tables` built a wrong index: unnamed, and duplicated under `mode="lazy"`.
+- `Roi.union`/`intersection` dropped ROI name `""` and label `0`; `Roi.from_values` now validates its inputs.
+- Plate and well metadata `add_*`/`remove_*` mutated the receiver instead of returning a copy.
+- `AxesSetup.from_ordered_list` silently dropped a non-canonical axis in some orders.
+- Grid iterator ROIs now get unique names, and `by_chunks` with overlap ≥ chunk size raises `NgioValueError`.
+- Also: empty `RoiTable` usability, duplicate ROI names across a roundtrip, labels on read-only images with no `labels` group, `OmeZarrPlate.get_well` caching, and negative indices inside a slicing sequence.
 
 ### Packaging
 
-- **Add `src/ngio/py.typed`.** The `Typing :: Typed` classifier has been declared since 0.x but the PEP 561 marker was missing, so every downstream type checker silently ignored ngio's annotations. It now ships in both the wheel and the sdist.
-- `Development Status` moves from `3 - Alpha` to `5 - Production/Stable`, and `[tool.commitizen] major_version_zero` is now `false` so `cz bump` can propose a major version.
-- **Drop the `requires-python` upper cap** (`>=3.11,<3.15` → `>=3.11`). ngio is pure Python; the cap only blocked installs on new interpreters.
-- **Real dependency floors, every one of them tested.** Most declared dependencies had no lower bound at all, and `zarr>3` excluded zarr 3.0.0 itself without expressing what the code actually needs. Each floor below is installed and exercised by a `test-min-deps` CI leg. Several turned out to be forced by ngio's own dependencies rather than by ngio:
+- Ship `src/ngio/py.typed`. The `Typing :: Typed` classifier was declared since 0.x but the PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.
+- Real lower bounds on every dependency, installed and exercised by a `test-min-deps` CI leg: `zarr>=3.1.6`, `numpy>=2.0`, `fsspec>=2025.3`, `anndata>=0.12.5`, `ome-zarr-models>=1.4` and the rest.
+- `pandas` 3.x and `anndata` 0.13 are now allowed, the `requires-python` upper cap is gone, and unused `requests`/`distributed` are dropped.
+- New `s3` extra: `pip install ngio[s3]`. The README advertised S3 streaming but `s3fs` was never declared.
 
-  | Package | Floor | Why |
-  | --- | --- | --- |
-  | `numpy` | `>=2.0` | zarr 3.1.6 requires numpy 2 |
-  | `zarr` | `>=3.1.6` | `WrapperStore` and the `is_group_listable` behaviour |
-  | `scipy` | `>=1.14` | first release supporting numpy 2 |
-  | `fsspec` | `>=2025.3` | below this `NgioStore.sync_fs_and_path` returns an async filesystem, which zarr's `FsspecStore` rejects |
-  | `anndata` | `>=0.12.5` | `settings.auto_shard_zarr_v3`, used by the AnnData backend |
-  | `pydantic` | `>=2.11.5` | required by ome-zarr-models |
-  | `pandas` | `>=2.2.2` | first 2.2.x supporting numpy 2 on Python 3.11 |
-  | `ome-zarr-models` | `>=1.4` | `ValidTransform` |
-  | `pyarrow` | `>=16` | 15 caps numpy<2 |
-  | others | `polars>=1.0`, `dask[array]>=2024.1`, `pooch>=1.8`, `pillow>=10`, `filelock>=3.12`, `aiohttp>=3.9` | |
+### Docs and internal
 
-- **`pandas` is no longer capped below 3.0.** The suite passes unmodified against pandas 3.0.3 — including the new default `str` dtype, the arrow→pandas path and always-on copy-on-write — so `pandas>=1.2.0,<3.0.0` becomes `pandas>=2.2.2`.
-- **`anndata`'s cap moves from `<0.13.0` to `<0.14.0`**; the suite passes against anndata 0.13.2. The cap stays because `_anndata_utils.py` imports six private anndata symbols and vendors a copy of its zarr reader. Note anndata 0.13 requires Python >=3.12, so Python 3.11 installs still resolve to 0.12.x.
-- **Add an `s3` extra**: `pip install ngio[s3]`. The README advertises S3 streaming, but `s3fs` was not a declared dependency at all — it only arrived transitively via the `test` extra, so following the README raised `ImportError`. The floor is `s3fs>=2026.2.0`, the release that added `set_custom_error_handler`.
-- **Drop unused dependencies.** `requests` and `distributed` are not imported anywhere in `src/`, `tests/` or `docs/`; `dask[array]` and `dask[distributed]` collapse to a single `dask[array]` entry. The `test` extra likewise loses `pytest_httpserver` and `devtools`, neither of which is imported by any test — the HTTP fixture uses the standard library's `ThreadingHTTPServer`.
-
-### Enforcement
-
-These are what stop the lists above from regrowing.
-
-- **`ty` runs in CI and pre-commit, and `src/` is clean.** It was previously run nowhere, leaving ~120 diagnostics ungated despite the `Typing :: Typed` classifier. `src/` is now at zero and gated; `tests/` is deliberately not gated yet. Most fixes were real typing improvements rather than suppressions — `Table.from_handler`/`from_table_data` now return `Self` (so `get_as` and `open_table_as` are genuinely type-safe instead of carrying `# type: ignore[return-value]`), the metadata encoder/decoder registries are annotated, `MaskedSegmentationIterator._input` is narrowed to `MaskedImage`, and 9 stale `# type: ignore`s are gone. The remaining suppressions are third-party stub gaps (dask's `store`, zarr's fancy-index `__getitem__`, `AnnData.write_zarr`, pooch's `downloader`) and the four known `MaskedImage`/`MaskedLabel` LSP violations.
-- **The docs build and every snippet run on pull requests.** `docs.yml` only triggered on pushes to `main` and tags, so a broken snippet or cross-reference failed only after merge — where it also blocked the dev-docs deploy. The new `docs` job lives in `ci.yml` so the deploy workflow's `contents: write` permission is not extended to PRs.
-- **A `test-min-deps` CI leg installs the exact declared floors** from `.github/min-constraints.txt` and runs the suite, so the bounds are tested rather than asserted. `.github/check_min_deps.py` fails if that file drifts from `pyproject.toml`, if a floor is missing a pin, or if a pin did not take effect. The job installs the runtime plus `pytest`/`pytest-xdist`/`scikit-image` rather than the `test` extra, which cannot coexist with the floors: `aiomoto[pandas]` requires `pyarrow>=22` against ngio's `pyarrow>=16`, and `s3fs` pins `fsspec` to its own date release against ngio's `fsspec>=2025.3`. It therefore runs `tests/unit` excluding the 21 test functions that need `s3fs`/`aiomoto` — none of which exercise a declared runtime floor.
-- **`deploy` is gated on every check**, not just the test matrix: `lint`, `check-manifest`, `typecheck`, `docs` and `test-min-deps` must all pass. It also runs under the `pypi` environment, runs `twine check dist/*`, and asserts the git tag matches the built wheel version before publishing.
-
-### Features
-- The iterators graduated out of `ngio.experimental`: they now live in `ngio.iterators` and are re-exported from the top-level namespace, so `from ngio import SegmentationIterator` works. `ngio.experimental.iterators` still resolves the four classes but emits `NgioDeprecationWarning` on attribute access; it will be removed in `ngio=1.1`.
-- Add a configurable IO retry policy: `NgioConfig.io_retry` (`RetryConfig`) with `max_retries` (default `0`), a backoff strategy (`ConstantBackoff`, `LinearBackoff`, `ExponentialBackoff`), and error matching via `retry_on` substrings or the discouraged blanket `retry_all_errors`. Ngio's own `NgioError`s are never retried. The public `ngio.utils.retry_io` decorator reads the global config at call time.
-- Add `ngio.utils.NgioStore`, a picklable zarr `WrapperStore` that applies the `io_retry` policy to every store IO call and centralizes store-type dispatch (`store_type`, `full_url`, `sync_fs_and_path`, `get_mapper`, `local_root`, `memory_dict`, `list_dir_collected`, `from_any`/`ensure`). Every group ngio opens is now backed by it, so the policy covers metadata, pixel data, and lazy dask IO on workers. `ZipStore` is now explicitly supported (it previously warned).
-- Apply `io_retry` to the IO paths that bypass the zarr store: the pyarrow backend's dataset load/write, the AnnData backend's direct local/fsspec writes, and the `fractal_fsspec_store` metadata probe (401s become `NgioValueError` inside the retried call, so they are never retried).
-- **Parallelism is now a `max_workers=` argument on the sync API** rather than a separate async surface. `OmeZarrPlate.get_images`, `get_wells`, `list_image_tables`, `concatenate_image_tables`, `concatenate_image_tables_as` and the matching `ngio.images` functions all take `max_workers: int | None = None`; `None` keeps the current serial behaviour. The `_async` counterparts still work but warn, and will be removed in `ngio=1.1`. Note that the async path was never unbounded: `asyncio.to_thread` uses Python's default executor, capped at `min(32, cpu_count + 4)`. `max_workers` exists so the concurrency can be lowered for rate-limited stores and so ngio's IO stops sharing that process-wide pool.
-- Concatenation no longer has two divergent implementations: the sync path now materializes each table (`.dataframe` or `.lazy_frame` per `mode`) before concatenating, which only the async path used to do. Sync and async now produce identical tables with identical laziness.
-- **Public namespace.** `ngio` now exports `MaskedImage`, `MaskedLabel`, `Channel`, `S3FSConfig`, `derive_ome_zarr_plate`, `BasicMapper`, `MapperProtocol`, `get_sample_info`, `__version__`, the six `get_ngio_*_meta` readers (only the `update_*` writers were exported before), and all seven error classes. `AbstractImage` is now importable from `ngio.images`, and `AbstractBaseTable`, `ImplementedTables` and `write_table` from `ngio.tables` — so a third-party table type can be registered without reaching into private modules. Table classes stay in `ngio.tables` and are deliberately not lifted to the top level. `ngio.resources.__all__` was missing `get_sample_info`, its only callable, and `ngio.ome_zarr_meta.__all__` listed `NgffVersions` and `PlateMetaHandler` twice.
-- **Error hierarchy.** `NgioTableValidationError` was the only ngio error that did not subclass a builtin, so `except ValueError` caught its siblings but not it; it now subclasses `NgioValidationError`. New `NgioKeyError` (subclassing `KeyError`, with a `__str__` that does not repr-quote the message). The `NgioValidationError` (data read off disk failed a spec check) versus `NgioValueError` (a caller argument failed a run time check) boundary is now written into their docstrings.
-- `pixel_size` and `pixelsize` are deliberately kept distinct and are now documented as such: `pixel_size` (a `PixelSize`) is a *lookup key* that selects a pyramid level on the getters; `pixelsize` (a float or `(y, x)` tuple) is a *value* written by the create/derive entry points.
-- Add `ngio.utils.deprecated_alias` and `ngio.utils.deprecated`, the decorators behind ngio's own deprecations. `deprecated_alias(old="new")` forwards a renamed keyword and raises `NgioValueError` if both spellings are passed; `deprecated(replacement=...)` warns when a callable is invoked. Both emit `NgioDeprecationWarning` naming the removal version (default `1.1`) and report the caller's stack frame; on `async def` callables the warning fires when the coroutine is created, not when it is awaited.
-
-### Fix
-- **`import ngio` no longer fails when an old `s3fs` is installed.** `refresh_s3fs_config` runs at import of `ngio.utils._zarr_utils` and called `s3fs.set_custom_error_handler`, which only exists in s3fs 2026.2.0 and later — so any environment holding an older s3fs, for any reason, raised `AttributeError` on `import ngio`. s3fs is not an ngio dependency, so it now degrades instead: the custom handler is skipped, and an `NgioUserWarning` is emitted only if `s3fs.custom_retry_markers` was actually configured.
-- `add_table` (`OmeZarrContainer`, `OmeZarrPlate`, `TablesContainer.add`) and `write_table` now preserve the input table's backend instead of always rewriting with the default `anndata_v1` backend ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). The `backend` parameter now defaults to `None`, meaning "use the table's own backend" (`meta.backend`, which is `anndata_v1` for tables created in memory); pass a backend name explicitly to convert. Supporting changes: `Table.backend_name` now falls back to `meta.backend` instead of returning `None` for in-memory tables, `set_backend(backend=...)` can declare a backend preference (with early name validation and alias normalization) on a table not yet attached to a store, and passing `backend=None` no longer raises. **Behavior change**: copying a table stored with a non-default backend (e.g. `parquet`/`csv`/`json`) via `get_table` + `add_table` now keeps that backend on the destination.
-- `concatenate_image_tables` (and variants) built a wrong index: the name was never set, `mode="lazy"` duplicated values and `mode="eager"` hashed the original index. Both now produce the same unique per-row index, and the async variant forwards `mode` so lazy prefetching stays lazy.
-- `Roi.union`/`Roi.intersection` dropped ROI name `""` and label `0` (truthiness instead of `None` checks); joined slices now keep a deterministic axis order.
-- `Roi.from_values` now validates its inputs — it used `model_construct`, which skips pydantic validation entirely.
-- `PixelSize.__eq__` raised `TypeError` against non-`PixelSize` objects; it now returns `NotImplemented`. **Behavior change**: pixel sizes with different `time_unit`s always compare unequal.
-- `NgioWellMeta.add_image`/`remove_image` and `NgioPlateMeta.add_well`/`add_acquisition`/`remove_well` mutated the receiver in place — the returned "copy" shared its lists with the original.
-- `AxesSetup.from_ordered_list` silently dropped a non-canonical axis when a canonical name appeared to its left (e.g. `["z", "custom", "y", "x"]`).
-- `ngio.iterators` grid helpers: `grid()` gave every ROI the same name (now unique per tile, e.g. `t0_z0_y32_x64`), and `by_chunks` with overlap ≥ chunk size raises `NgioValueError` instead of `range() arg 3 must not be zero`.
-- `get_config()` now builds the global config singleton lazily on first call instead of at `ngio.config` import time. Note that `import ngio` still materializes it (`ngio.utils._zarr_utils` applies the s3fs config at module scope), so `NGIO_CONFIG_PATH` must still be set **before** importing ngio — see `docs/getting_started/7_configuration.md`.
-- The v0.5 metadata decoder discarded the normalized value for non-string axis `unit`s.
-- Accessing labels on a read-only image without a `labels` group raised `NgioValueError` instead of degrading gracefully (`list_labels()` → `[]`, `labels_container` → `NgioValidationError`).
-- An empty `RoiTable` with no backend was unusable: `.rois()`/`.add(roi)` raised instead of treating the table as empty.
-- Duplicate ROI names did not survive a write/read roundtrip — the dedup renamed only the internal dict key.
-- `OmeZarrPlate.get_well` never returned the instance it cached; repeated calls now return the cached one, matching `get_image`.
-- A negative index inside a slicing sequence (e.g. `get_array(y=[-1, 0])`) raised a bare `AssertionError` (which vanishes under `python -O`); it now raises `NgioValueError`.
-- Fix the broken run link in the scheduled-CI failure issue (`.github/TEST_FAIL_TEMPLATE.md`). The template interpolated `{{ repo }}`, which is the `@actions/github` context object `{ owner, repo }` rather than a string, so `JasonEtco/create-an-issue` rendered it as `[object Object]` (e.g. `https://github.com/[object Object]/actions/runs/...`). It now uses `{{ repo.owner }}/{{ repo.repo }}`.
-
-### Tests
-- Raise coverage from 91% to 95%: new unit tests for the v0.5 metadata codec, container/image error paths, ROI-table and plate edge cases, `NgioCache`, the `FeatureExtractorIterator` dask path, and io_pipes error branches.
-- Enable `test_derive_from_legacy_images`, never collected due to a missing `test_` prefix; rename `test_fail_derive_singleton` → `test_pyramid_clamps_singleton_dimensions`.
-- Register a `network` marker so `-m "not network"` runs offline, and move the Zenodo downloads from conftest import time into session fixtures — collection no longer blocks on the network.
-- Speed up fixtures: `moto_s3_server` is session-scoped, and read-only consumers of the test images and Zenodo datasets share session-scoped copies instead of re-copying up to 126 MB per test.
-- Drop `--cov` from the default `addopts` (~40% local overhead); CI passes it explicitly on the codecov leg.
-- Deduplicate the 18-item test-image parametrization into a shared `zarr_name` fixture; merge the four per-backend round-trip tests into one parametrized test.
-- Anchor test-data paths to `__file__` so pytest can run from any directory; reduce `test_multiprocessing_safety` from 1000 to 100 tasks.
-
-### Chores
-- Speed up CI: run with `pytest-xdist` (`-n 4`), collect coverage on the ubuntu/`test11` leg only, add `--durations=10`. The Zenodo download is guarded by a `FileLock` and no longer re-extracts an already-unzipped dataset.
-- Fix the CI data-cache `restore-keys` fallback never matching (double quotes are literal inside a YAML block scalar), which made every PR job re-download ~160 MB. The key now hashes the dataset registry instead of `tests/conftest.py`.
-- Centralize concrete-store dispatch behind `NgioStore` services: `ZarrGroupHandler.full_url`, the file-lock path resolution, `copy_group`'s fsspec fast path, `is_group_listable`, and the pyarrow/anndata table backends no longer isinstance-check store types or reach into store internals (`store.root`/`store.fs`/`store._store_dict`). The JSON table backend and table metadata writes now go through the handler's `load_attrs`/`write_attrs` instead of raw `.attrs` access. One behavior note: AnnData fsspec writes now use a synchronous clone of the store's filesystem (as the pyarrow paths already did) instead of the store's own, possibly async, filesystem instance.
-- Shrink the store-matrix test payload from `(3, 5, 64, 64)`/3 levels to `(3, 2, 32, 32)`/2 levels — same monitored behaviors, far fewer round-trips through the mocked S3/HTTP stores.
-- Slim the iterator tests: the two mutating tests copy only the image they write to, and run the full 9-axes matrix on v0.5 plus a v0.4 smoke subset instead of both versions × 9.
-- `NgioDeprecationWarning` is kept in `ngio.utils`, but `import warnings` and its import are gone from `_plate.py`, `_ome_zarr_container.py`, `_image.py`, `_abstract_image.py`, and `_create_utils.py`. The private `_set_channel_meta`/`_set_channel_meta_legacy` pair collapsed into the public `set_channel_meta`.
-
-### Documentation
-- Rebuild the docs on [Zensical](https://zensical.org) instead of MkDocs + Material, and move every executed code block out of the Markdown into standalone scripts under `docs/snippets/`, included via `pymdownx.snippets` and run at build time. The five tutorial notebooks become Markdown pages, and CI builds with `--strict`.
-- Apply a new design system to the docs and the README. The full theme in `docs/stylesheets/ngio.css`.
-- Rewrite the copy to the design system's content conventions across every page, the nav and `llms.txt`, and add a landing page, a glossary, and API cross-references.
-- Correct what the docs claim against what ngio actually does, most substantially on the table specification pages.
-- Add `CODE_OF_CONDUCT.md` and `CITATION.cff`, and move `CONTRIBUTING.md` to the repository root, single-sourced into the docs so GitHub's community widgets pick them up.
-- Add a "Configuration" getting-started page documenting the config file location (`~/.ngio/ngio_config.json` / `NGIO_CONFIG_PATH`), the `io_retry` policy (fields, backoff strategies, marker matching, snapshot-at-open vs read-at-call semantics), and its relationship to the lower-level `s3fs.custom_retry_markers` mechanism. `NgioConfig`, `RetryConfig`, and `get_config` are now listed in the top-level API reference.
-- Point the iterator pages, the three iterator tutorials and the Getting Started iterators page at `ngio.iterators`, and drop the "Experimental API" warnings now that the iterators are part of the stable API.
+- Docs rebuilt on [Zensical](https://zensical.org) with every code block executed at build time, plus new landing, glossary and Configuration pages.
+- `ty` and the docs build now run in CI, coverage is up from 91% to 95%, and concrete-store dispatch is centralized behind `NgioStore`.
 
 ## [v0.5.14]
 
