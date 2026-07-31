@@ -86,6 +86,11 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             "output_transforms": self._output_transforms,
         }
 
+    @property
+    def output_image(self) -> Image:
+        """The image this iterator writes to."""
+        return self._output
+
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
         return NumpyRoiGetter(
             zarr_array=self._input.zarr_array,
