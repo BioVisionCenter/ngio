@@ -1,0 +1,4719 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="A Python library for OME-Zarr bioimage analysis">
+      
+      
+      
+        <link rel="canonical" href="https://biovisioncenter.github.io/ngio/v1.0.0/changelog/">
+      
+      
+        <link rel="prev" href="../api/ngio/utils/">
+      
+      
+        <link rel="next" href="../contributing/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.svg">
+      <meta name="generator" content="zensical-0.0.51">
+    
+    
+      
+        <title>Changelog - ngio: next generation file format IO</title>
+      
+    
+    
+      
+        
+      
+      <link rel="stylesheet" href="../assets/stylesheets/modern/main.62c9b9cc.min.css">
+      
+        
+          
+        
+        <link rel="stylesheet" href="../assets/stylesheets/modern/palette.dfe2e883.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,300i,400,400i,500,500i,700,700i%7CJetBrains+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"IBM Plex Sans";--md-code-font:"JetBrains Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/ngio.css">
+    
+    <script>__md_scope=new URL("..",location),__md_scope.pathname.endsWith("/")||(__md_scope=new URL(__md_scope.pathname+"/",location)),__md_hash=e=>[...e].reduce(((e,t)=>(e<<5)-e+t.charCodeAt(0)),0),__md_get=(e,t=localStorage,_=__md_scope)=>JSON.parse(t.getItem(_.pathname+"."+e)),__md_set=(e,t,_=localStorage,a=__md_scope)=>{try{_.setItem(a.pathname+"."+e,JSON.stringify(t))}catch(e){}},document.documentElement.setAttribute("data-platform",navigator.platform)</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer" aria-label="Navigation"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="https://biovisioncenter.github.io/ngio/" title="ngio: next generation file format IO" class="md-header__button md-logo" aria-label="ngio: next generation file format IO" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="ngio: next generation file format IO">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer" aria-label="Navigation">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-menu" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            ngio: next generation file format IO
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="none" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="teal"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search" aria-label="Search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-search" viewBox="0 0 24 24"><path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog" aria-label="Search">
+  <button type="button" class="md-search__button">
+    Search
+  </button>
+</div>
+      
+    
+    <div class="md-header__source">
+      
+        <a href="https://github.com/BioVisionCenter/ngio" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ngio
+  </div>
+</a>
+      
+    </div>
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="./.." class="md-tabs__link">
+        
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../getting_started/0_quickstart/" class="md-tabs__link">
+          
+  
+  Getting started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../tutorials/create_ome_zarr/" class="md-tabs__link">
+          
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../table_specs/overview/" class="md-tabs__link">
+          
+  
+  Table specifications
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+      
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../api/ome_zarr_container/" class="md-tabs__link">
+          
+  
+  API reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+      
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-tabs__item">
+        <a href="../contributing/" class="md-tabs__link">
+          
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="https://biovisioncenter.github.io/ngio/" title="ngio: next generation file format IO" class="md-nav__button md-logo" aria-label="ngio: next generation file format IO" data-md-component="logo">
+      
+  <img src="../assets/logo.svg" alt="ngio: next generation file format IO">
+
+    </a>
+    ngio: next generation file format IO
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/BioVisionCenter/ngio" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    ngio
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="./.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Home
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Getting started
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Getting started
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/0_quickstart/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Quickstart
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/1_ome_zarr_containers/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  OME-Zarr containers
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/2_images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Images and labels
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/3_tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/4_masked_images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Masked images and labels
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/5_hcs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  HCS plates
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/6_iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Iterators
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting_started/7_configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Configuration
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tutorials
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Tutorials
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/create_ome_zarr/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Create an OME-Zarr image
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/image_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Image processing
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/image_segmentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Image segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/feature_extraction/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Feature extraction
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/hcs_exploration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  HCS exploration
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Table specifications
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Table specifications
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Overview
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/backend/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Table backends
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_4_3" id="__nav_4_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Table types
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Table types
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/generic_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Generic table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/roi_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ROI table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/masking_roi_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Masking ROI table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/feature_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Feature table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/condition_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Condition table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../table_specs/table_types/custom_table/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Add a custom table
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  API reference
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  API reference
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ome_zarr_container/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  OmeZarrContainer
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Images
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/hcs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  HCS
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Iterators
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+          
+          
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  ngio
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/ngio/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/common/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.common
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/io_pipes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.io_pipes
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/iterators/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.iterators
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/images/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.images
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.tables
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/hcs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.hcs
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/transforms/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.transforms
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/ngio/utils/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.utils
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="././" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Changelog
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#v100" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v1.0.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v1.0.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Removed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Behaviour changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecated-removal-in-ngio11" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deprecated, removal in <code>ngio=1.1</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-v05-v10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Migration (v0.5 → v1.0)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Packaging
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Docs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0514" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.14]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.14]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0513" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.13]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.13]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Feature
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0512" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.12]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.12]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Refactor
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0511" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.11]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.11]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0510" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.10]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.10]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v059" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.9]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.9]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v058" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.8]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.8]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v057" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.7]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.7]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v056" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.6]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.6]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v055" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.5]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.5]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#054" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.4]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.4]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#053" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#052" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#051" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.1]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.1]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v050" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Breaking Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-guide-v04-v05" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Migration Guide (v0.4 → v0.5)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deprecations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v047" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.7]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.7]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v045" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.5]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.5]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v044" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.4]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.4]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v043" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v042" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v041" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.1]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.1]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Table specs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v035" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.5]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v034" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.4]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v033" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.3.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chores_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v032" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.3.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+  Contributing
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Contributing guide
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code_of_conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Code of Conduct
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  
+                    
+                    
+                    
+                      
+                    
+                    
+                      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+                      <div class="md-sidebar-button__wrapper">
+                        <label class="md-sidebar-button" for="__toc"></label>
+                      </div>
+                    
+                  
+                  <div class="md-sidebar__inner">
+                    
+
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#v100" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v1.0.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v1.0.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#removed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Removed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Behaviour changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecated-removal-in-ngio11" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deprecated, removal in <code>ngio=1.1</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-v05-v10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Migration (v0.5 → v1.0)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#packaging" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Packaging
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Docs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0514" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.14]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.14]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0513" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.13]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.13]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#feature" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Feature
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0512" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.12]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.12]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refactor" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Refactor
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0511" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.11]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.11]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v0510" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.10]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.10]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v059" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.9]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.9]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v058" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.8]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.8]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tests_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v057" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.7]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.7]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v056" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.6]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.6]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v055" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.5]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.5]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#054" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.4]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.4]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#053" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#052" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#051" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [0.5.1]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[0.5.1]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_12" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#chores_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v050" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.5.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.5.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Breaking Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration-guide-v04-v05" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Migration Guide (v0.4 → v0.5)
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#deprecations" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Deprecations
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_13" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Documentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v047" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.7]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.7]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_14" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v045" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.5]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.5]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_15" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v044" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.4]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.4]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_16" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v043" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_17" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v042" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_18" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v041" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.1]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.1]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fix_19" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v040" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.4.0]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.4.0]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#api-changes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#table-specs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Table specs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v035" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.5]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v034" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.4]
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v033" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.3]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.3.3]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#chores_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Chores
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v032" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [v0.3.2]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[v0.3.2]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#api-changes_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        API Changes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fix_20" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fix
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="./.." class="md-path__link">
+        
+  
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+    
+      <li class="md-path__item">
+        <a href="../api/ome_zarr_container/" class="md-path__link">
+          
+  
+  <span class="md-ellipsis">
+    API reference
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+  
+    <a href="https://github.com/BioVisionCenter/ngio/edit/main/docs/changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-pen" viewBox="0 0 24 24"><path d="M12.659 22H18a2 2 0 0 0 2-2V8a2.4 2.4 0 0 0-.706-1.706l-3.588-3.588A2.4 2.4 0 0 0 14 2H6a2 2 0 0 0-2 2v9.34"/><path d="M14 2v5a1 1 0 0 0 1 1h5M10.378 12.622a1 1 0 0 1 3 3.003L8.36 20.637a2 2 0 0 1-.854.506l-2.867.837a.5.5 0 0 1-.62-.62l.836-2.869a2 2 0 0 1 .506-.853z"/></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/BioVisionCenter/ngio/raw/main/docs/changelog.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-file-code-2" viewBox="0 0 24 24"><path d="M4 12.15V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.706.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2h-3.35"/><path d="M14 2v5a1 1 0 0 0 1 1h5M5 16l-3 3 3 3M9 22l3-3-3-3"/></svg>
+    </a>
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="v100">[v1.0.0]<a class="headerlink" href="#v100" title="Permanent link">&para;</a></h2>
+<p>First stable release. Everything deprecated in <code>v0.5.0</code> (each warned "will be removed in <code>ngio=0.6</code>") is now removed — that release became <code>1.0.0</code>.</p>
+<h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>Removed</th>
+<th>Use instead</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OmeZarrContainer.image_meta</code></td>
+<td><code>.meta</code></td>
+</tr>
+<tr>
+<td><code>.levels_paths</code></td>
+<td><code>.level_paths</code></td>
+</tr>
+<tr>
+<td><code>.set_channel_percentiles(a, b)</code></td>
+<td><code>.set_channel_windows_with_percentiles(percentiles=(a, b))</code></td>
+</tr>
+<tr>
+<td><code>version=</code> on the plate/well create and <abbr title="Create a new image or label that inherits metadata and geometry from an existing one">derive</abbr> functions</td>
+<td><code>ngff_version=</code></td>
+</tr>
+<tr>
+<td><code>check_type=</code> on <code>get_table</code></td>
+<td><code>get_table_as(name, TableCls)</code> or <code>get_*_table(name)</code></td>
+</tr>
+<tr>
+<td><code>pixel_size=</code>, <code>xy_pixelsize=</code> on create/<abbr title="Create a new image or label that inherits metadata and geometry from an existing one">derive</abbr></td>
+<td><code>pixelsize=</code> (plus <code>z_spacing=</code>, <code>time_spacing=</code>)</td>
+</tr>
+<tr>
+<td><code>xy_scaling_factor=</code>, <code>z_scaling_factor=</code></td>
+<td><code>scaling_factors=</code></td>
+</tr>
+<tr>
+<td><code>labels=</code>, <code>channel_labels=</code>, <code>channel_wavelengths=</code>, <code>channel_colors=</code>, <code>channel_active=</code></td>
+<td><code>channels_meta=</code></td>
+</tr>
+<tr>
+<td><code>wavelength_id=</code>, <code>start=</code>, <code>end=</code>, <code>percentiles=</code>, <code>colors=</code>, <code>active=</code> on <code>set_channel_meta</code></td>
+<td><code>channel_meta=ChannelsMeta(...)</code></td>
+</tr>
+</tbody>
+</table>
+<p><code>pixelsize</code> is now <strong>required</strong> on <code>create_empty_ome_zarr</code> and <code>create_ome_zarr_from_array</code>. The <code>pixel_size=</code> argument on the <em>getters</em> is unaffected: <code>pixel_size</code> selects a <abbr title="One resolution of the multiscale image pyramid; level 0 is the highest resolution">pyramid level</abbr>, <code>pixelsize</code> is a value written on create.</p>
+<h3 id="behaviour-changes">Behaviour changes<a class="headerlink" href="#behaviour-changes" title="Permanent link">&para;</a></h3>
+<p>Same call, different result:</p>
+<ul>
+<li><code>derive_image</code> inherits <code>dtype</code>, <code>dimension_separator</code> and <code>compressors</code> from the reference image instead of forcing <code>uint16</code> — deriving from a <code>float32</code> image no longer silently downcasts it.</li>
+<li><code>add_table</code> and <code>write_table</code> keep the source table's <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> instead of rewriting it as <code>anndata_v1</code> (<a href="https://github.com/BioVisionCenter/ngio/issues/207">#207</a>). Pass <code>backend=</code> to convert.</li>
+<li>Opening a container no longer reads every <abbr title="One resolution of the multiscale image pyramid; level 0 is the highest resolution">pyramid level</abbr> (<code>validate_arrays=False</code> by default), so a bad array fails on first access rather than at open.</li>
+<li><code>open_image</code> and <code>open_label</code> default to <code>strict=False</code>, matching every other getter.</li>
+<li><code>list_roi_tables</code> returns <code>[]</code> instead of raising when there are no tables.</li>
+<li><code>get_masked_label(path=...)</code> resolves the masking label at the label's own pixel size, matching <code>get_masked_image</code>.</li>
+<li><code>PixelSize</code>s with different <code>time_unit</code>s now compare unequal, and <code>==</code> against a non-<code>PixelSize</code> returns <code>NotImplemented</code>.</li>
+</ul>
+<h3 id="deprecated-removal-in-ngio11">Deprecated, removal in <code>ngio=1.1</code><a class="headerlink" href="#deprecated-removal-in-ngio11" title="Permanent link">&para;</a></h3>
+<p><code>conctatenate_tables</code> → <code>concatenate_tables</code>, <code>set_axes_unit</code> → <code>set_axes_units</code>, <code>levels_paths=</code> → <code>level_paths=</code>, <code>validate_paths=</code> → <code>validate_arrays=</code>, <code>ngio.experimental.iterators</code> → <code>ngio.iterators</code>, and every <code>*_async</code> plate/table function → the sync form with <code>max_workers=</code>.</p>
+<h3 id="migration-v05-v10">Migration (v0.5 → v1.0)<a class="headerlink" href="#migration-v05-v10" title="Permanent link">&para;</a></h3>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">create_empty_plate</span><span class="p">(</span><span class="n">store</span><span class="p">,</span> <span class="n">ngff_version</span><span class="o">=</span><span class="s2">&quot;0.4&quot;</span><span class="p">)</span>                  <span class="c1"># was version=</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">create_empty_ome_zarr</span><span class="p">(</span><span class="n">store</span><span class="p">,</span> <span class="n">pixelsize</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>                    <span class="c1"># was xy_pixelsize=</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>                      <span class="n">scaling_factors</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">))</span>         <span class="c1"># was *_scaling_factor=</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">ome_zarr</span><span class="o">.</span><span class="n">get_table_as</span><span class="p">(</span><span class="s2">&quot;roi&quot;</span><span class="p">,</span> <span class="n">RoiTable</span><span class="p">)</span>                         <span class="c1"># was check_type=&quot;roi_table&quot;</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">ome_zarr</span><span class="o">.</span><span class="n">derive_image</span><span class="p">(</span><span class="n">store</span><span class="p">,</span> <span class="n">channels_meta</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;DAPI&quot;</span><span class="p">],</span> <span class="n">pixelsize</span><span class="o">=</span><span class="p">(</span><span class="n">ps</span><span class="o">.</span><span class="n">y</span><span class="p">,</span> <span class="n">ps</span><span class="o">.</span><span class="n">x</span><span class="p">))</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">ome_zarr</span><span class="o">.</span><span class="n">set_channel_meta</span><span class="p">(</span><span class="n">channel_meta</span><span class="o">=</span><span class="n">ChannelsMeta</span><span class="o">.</span><span class="n">default_init</span><span class="p">(</span><span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;DAPI&quot;</span><span class="p">]))</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">SegmentationIterator</span>                          <span class="c1"># was ngio.experimental</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">plate</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>                                <span class="c1"># was get_images_async()</span>
+</span></code></pre></div>
+<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The iterators are stable API: <code>from ngio import SegmentationIterator</code>.</li>
+<li>Configurable IO retries: <code>NgioConfig.io_retry</code> plus the <code>ngio.utils.retry_io</code> decorator. ngio's own <code>NgioError</code>s are never retried. See the Configuration page.</li>
+<li><code>ngio.utils.NgioStore</code> wraps every zarr store ngio opens and applies that retry policy to all IO. <code>ZipStore</code> is now supported.</li>
+<li><code>max_workers=</code> on the sync plate and table APIs replaces the separate async surface; <code>None</code> keeps the serial behaviour.</li>
+<li>A larger public namespace, including <code>MaskedImage</code>, <code>MaskedLabel</code>, <code>Channel</code>, <code>S3FSConfig</code>, <code>derive_ome_zarr_plate</code>, <code>__version__</code>, the <code>get_ngio_*_meta</code> readers and every error class. <code>AbstractBaseTable</code>, <code>ImplementedTables</code> and <code>write_table</code> are exported from <code>ngio.tables</code>, so a custom table type can be registered without private imports.</li>
+<li><code>NgioTableValidationError</code> now subclasses <code>NgioValidationError</code>, so <code>except ValueError</code> catches it like its siblings; new <code>NgioKeyError</code>.</li>
+</ul>
+<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Dask writes could silently drop data. <code>da.store(..., lock=False)</code> let two blocks read-modify-write the same chunk — or shard, when the target is sharded — concurrently, losing one update. This hit every region write that was not chunk-aligned and every sharded target, including pyramid consolidation. All <code>da.store</code> calls now share a lock; block compute stays parallel.</li>
+<li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. A concurrent reader of <code>zarr.json</code> could break a writer's atomic rename; store operations now absorb these transient conflicts with a short bounded retry. No behaviour change on Linux or macOS.</li>
+<li><code>import ngio</code> no longer raises <code>AttributeError</code> when an s3fs older than 2026.2.0 is installed.</li>
+<li><code>concatenate_image_tables</code> built a wrong index: unnamed, and duplicated under <code>mode="lazy"</code>.</li>
+<li><code>Roi.union</code>/<code>intersection</code> dropped <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> name <code>""</code> and label <code>0</code>; <code>Roi.from_values</code> now validates its inputs.</li>
+<li>Plate and well metadata <code>add_*</code>/<code>remove_*</code> mutated the receiver instead of returning a copy.</li>
+<li><code>AxesSetup.from_ordered_list</code> silently dropped a non-canonical axis in some orders.</li>
+<li>Grid iterator <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> now get unique names, and <code>by_chunks</code> with overlap ≥ chunk size raises <code>NgioValueError</code>.</li>
+</ul>
+<h3 id="packaging">Packaging<a class="headerlink" href="#packaging" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Ship <code>src/ngio/py.typed</code>. The PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.</li>
+<li>Real lower bounds on every dependency, exercised by a <code>test-min-deps</code> CI leg: <code>zarr&gt;=3.1.6</code>, <code>numpy&gt;=2.0</code>, <code>fsspec&gt;=2025.3</code>, <code>anndata&gt;=0.12.5</code>, <code>ome-zarr-models&gt;=1.4</code> and the rest. <code>pandas</code> 3.x and <code>anndata</code> 0.13 are now allowed, the <code>requires-python</code> upper cap is gone, and unused <code>requests</code>/<code>distributed</code> are dropped.</li>
+<li>New <code>s3</code> extra: <code>pip install ngio[s3]</code>.</li>
+</ul>
+<h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Rebuilt on <a href="https://zensical.org">Zensical</a> with every code block executed at build time, plus new landing, glossary and Configuration pages.</li>
+</ul>
+<h2 id="v0514">[v0.5.14]<a class="headerlink" href="#v0514" title="Permanent link">&para;</a></h2>
+<h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix saving empty tables (<a href="https://github.com/BioVisionCenter/ngio/issues/99">#99</a>). Empty tables now round-trip through both backends instead of raising a cryptic pandas error: (1) an empty <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>/masking table (zero <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr>) keeps its schema columns; (2) <code>_validate_cast_index_dtype_df</code> casts an empty index to the requested <code>str</code>/<code>int</code> type instead of rejecting it; (3) an empty <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table with no <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> materializes as an empty table rather than raising; and (4) <code>convert_pandas_to_anndata</code> no longer drops the numeric columns of a zero-row table (it now checks for zero columns rather than <code>DataFrame.empty</code>, which is also true for a zero-row frame).</li>
+<li>Fix <code>write_table</code> writing an empty table (or raising <code>FileNotFoundError</code>) when given a table returned by <code>open_table</code> whose data had not yet been loaded. <code>write_table</code> now materializes the table data before swapping to the destination <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>, mirroring <code>TablesContainer.add</code>, so a table opened from one store can be copied to another via <code>write_table</code> with its data intact.</li>
+<li>Fix tables with missing (<code>None</code>/<code>NaN</code>) values in string columns failing to serialize to the AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>. The <code>_check_for_mixed_types</code> and <code>_check_for_supported_types</code> guards now ignore missing values and classify a column from its non-null contents, so a string column containing <code>None</code> (or an all-missing column) is accepted — matching AnnData's native handling, which stores such columns as a categorical with <code>NaN</code> for the missing entries. This surfaced when copying a condition table (e.g. <code>get_table</code> + <code>add_table</code>), which re-serializes through the default AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>. Note: the round trip normalizes missing-containing string columns from <code>object</code>/<code>None</code> to <code>category</code>/<code>NaN</code>.</li>
+</ul>
+<h2 id="v0513">[v0.5.13]<a class="headerlink" href="#v0513" title="Permanent link">&para;</a></h2>
+<h3 id="feature">Feature<a class="headerlink" href="#feature" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add a global <code>NgioConfig</code> / <code>get_config()</code> configuration system, loaded from <code>~/.ngio_config.json</code> by default or a path set via the <code>NGIO_CONFIG_PATH</code> env var (<code>.json</code> file). Both are exported from the top-level <code>ngio</code> package.</li>
+<li>Add configurable s3fs retry handling: <code>NgioConfig.s3fs.custom_retry_markers</code> lists error substrings that trigger a retry via a custom <code>s3fs.set_custom_error_handler</code>, applied through the new <code>ngio.utils.refresh_s3fs_config()</code>. The motivating use case is AWS clock-skew errors, but any error substring can be configured.</li>
+</ul>
+<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Migrate the S3 store test harness from a <code>moto[server]</code> subprocess to <a href="https://github.com/owenlamont/aiomoto"><code>aiomoto</code></a> in server mode (<code>aiomoto[pandas]</code> in the <code>test</code> extra). This also fixes a CI import crash on Python 3.13/3.14: <code>aiomoto</code> caps <code>aiobotocore</code>/<code>moto</code> and floors <code>s3fs</code>, so the universal (multi-platform) solve no longer backtracks <code>s3fs</code> to the ancient <code>0.4.2</code> (which lacks <code>set_custom_error_handler</code> and crashed <code>import ngio</code> at module load). CSV and Parquet table backends now round-trip on the S3 store under the mock.</li>
+</ul>
+<h3 id="fix_1">Fix<a class="headerlink" href="#fix_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix <code>derive_label</code> (and <code>OmeZarrContainer.derive_label</code>) rejecting an explicit <code>shape</code> that omits the channel axis. When the reference image has a <code>c</code> axis and <code>channels_policy</code> removes or overrides it (<code>"squeeze"</code>, <code>"singleton"</code>, or an integer), the up-front shape-length check failed before the channel policy was applied. The provided shape is now normalized to the reference dimensionality before pyramid computation, so a channel-less shape (e.g. <code>(z, y, x)</code> for a <code>(c, z, y, x)</code> image) is accepted. <code>channels_policy="same"</code> still requires the full shape.</li>
+<li>Fix <code>is_group_listable</code> wrongly reporting <code>True</code> for stores that cannot actually be listed (e.g. HTTP hosts without a directory index): zarr &gt;= 3.1.6 swallows the listing error on <code>FsspecStore</code> and yields an empty listing instead of raising. The check now verifies that the group's own metadata document (<code>zarr.json</code> / <code>.zgroup</code>) — which must exist for any group that was successfully opened — appears in the store listing, distinguishing a broken listing from a genuinely empty group on any store type.</li>
+<li><code>copy_group</code> now raises an error when the source listing does not contain the group's metadata document, instead of silently producing an empty copy from a non-listable store.</li>
+</ul>
+<h3 id="chores">Chores<a class="headerlink" href="#chores" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Harden GitHub Actions and scan workflows through <code>zizmor</code>.</li>
+<li>Rename the <code>pre-commit</code> pixi dev task to <code>lint</code>: the old name shadowed the <code>pre-commit</code> binary in <code>pixi run</code>, and its trailing <code>git add -u</code> silently staged the working tree and masked hook failures in the task's exit code.</li>
+</ul>
+<h2 id="v0512">[v0.5.12]<a class="headerlink" href="#v0512" title="Permanent link">&para;</a></h2>
+<h3 id="fix_2">Fix<a class="headerlink" href="#fix_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix loading v0.4 <abbr title="High-Content Screening — plate-based imaging where each well holds one or more images">HCS</abbr> plates where the <code>version</code> key is absent from the plate-level metadata: the v0.4. V0.4 decoder now explicitly inject the version into the plate dict before constructing <code>PlateWithVersion</code>, so missing or <code>None</code> version values no longer cause a validation error.</li>
+</ul>
+<h3 id="refactor">Refactor<a class="headerlink" href="#refactor" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Remove redundant <code>version</code> field from <code>NgioPlateMeta</code>: the field is now a <code>@computed_field</code> property that delegates to <code>self.plate.version</code>, eliminating the need to keep two copies of the <abbr title="Next Generation File Format — the OME specification that OME-Zarr implements">NGFF</abbr> version in sync. The public <code>.version</code> attribute and <code>model_dump()</code> output are unchanged.</li>
+</ul>
+<h2 id="v0511">[v0.5.11]<a class="headerlink" href="#v0511" title="Permanent link">&para;</a></h2>
+<h3 id="fix_3">Fix<a class="headerlink" href="#fix_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Remove eager uniqueness check on <code>wavelength_id</code> in <code>ChannelsMeta.default_init</code>: duplicate <code>wavelength_id</code> values are now allowed at creation time. <code>get_channel_idx</code> raises a clear error if a lookup by an ambiguous <code>wavelength_id</code> is attempted, directing users to select by label instead.</li>
+</ul>
+<h2 id="v0510">[v0.5.10]<a class="headerlink" href="#v0510" title="Permanent link">&para;</a></h2>
+<h3 id="fix_4">Fix<a class="headerlink" href="#fix_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Replace <code>da.to_zarr</code> with <code>da.store(..., lock=False)</code> in pyramid writes (<code>_on_disk_dask_zoom</code>, <code>_on_disk_coarsen</code>) and region slice writes (<code>_ops_slices</code>). Dask &gt;=2025.11's <code>to_zarr</code> re-derives chunks via <code>normalize_chunks(chunks="auto", ...)</code> and emits a <code>PerformanceWarning</code> (treated as error by ngio's filterwarnings) when the result is not a multiple of the target's chunks; <code>da.store</code> writes blocks 1:1.</li>
+<li>Copy object/string-dtype zarr arrays directly when consolidating groups: dask &gt;=2025.11 raises <code>NotImplementedError</code> from auto-chunking for these dtypes, so they bypass dask and are copied via numpy.</li>
+<li>Set <code>auto_shard_zarr_v3</code> together with <code>zarr_write_format</code> on <code>anndata</code>'s global settings via a new <code>_update_anndata_global_settings</code> helper, so reading/writing tables works correctly when mixing zarr v2 and v3 in the same session on anndata 0.12.</li>
+</ul>
+<h3 id="chores_1">Chores<a class="headerlink" href="#chores_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Pin <code>anndata</code> to <code>&gt;=0.12.0,&lt;0.13.0</code>.</li>
+<li>Unpin <code>dask</code> (remove the <code>&lt;2025.11.0</code> upper bound introduced in v0.4.5).</li>
+</ul>
+<h2 id="v059">[v0.5.9]<a class="headerlink" href="#v059" title="Permanent link">&para;</a></h2>
+<h3 id="fix_5">Fix<a class="headerlink" href="#fix_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix AnnData reading over HTTP when directory listing is disabled: skip optional Zarr groups (<code>uns</code>, <code>obsm</code>, <code>varm</code>, etc.) that cannot be discovered without listing.</li>
+<li>Fix <code>ngff_version</code> not being propagated when deriving a plate: <code>derive_plate()</code> and <code>derive_ome_zarr_plate()</code> now default <code>ngff_version</code> to <code>None</code> and inherit the source plate's version when no version is explicitly provided.</li>
+</ul>
+<h2 id="v058">[v0.5.8]<a class="headerlink" href="#v058" title="Permanent link">&para;</a></h2>
+<h3 id="fix_6">Fix<a class="headerlink" href="#fix_6" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Change tolerance when converting Roi to pixel coordinates to avoid machine precision dependent rounding issues.</li>
+</ul>
+<h3 id="tests_1">Tests<a class="headerlink" href="#tests_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Improve testing for ZoomTransform.</li>
+<li>Remove broad warnings filter for all tests.</li>
+</ul>
+<h3 id="chores_2">Chores<a class="headerlink" href="#chores_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Replace custom logger warnings with standard Python warnings for better integration with user applications.</li>
+</ul>
+<h2 id="v057">[v0.5.7]<a class="headerlink" href="#v057" title="Permanent link">&para;</a></h2>
+<h3 id="fix_7">Fix<a class="headerlink" href="#fix_7" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add docstrings to <code>ChannelSelectionModel</code> to allow for correct json schema generation.</li>
+</ul>
+<h2 id="v056">[v0.5.6]<a class="headerlink" href="#v056" title="Permanent link">&para;</a></h2>
+<h3 id="fix_8">Fix<a class="headerlink" href="#fix_8" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix translation check in <code>_ngio_to_v04_multiscale</code> and <code>_ngio_to_v05_multiscale</code>: translations were incorrectly dropped when all values were negative or when positive and negative values cancelled out.</li>
+<li>Fix shape compatibility check in <code>_check_compatibility_of_shapes</code>: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.</li>
+</ul>
+<h2 id="v055">[v0.5.5]<a class="headerlink" href="#v055" title="Permanent link">&para;</a></h2>
+<h3 id="features_1">Features<a class="headerlink" href="#features_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li><code>Roi</code> now supports dict-like slice access: <code>roi["x"]</code> returns the slice for axis <code>"x"</code> and raises <code>KeyError</code> if the axis is not present.</li>
+<li><code>Roi.get(axis_name, default=None)</code> now accepts an explicit <code>default</code> value, following the <code>dict.get</code> convention.</li>
+<li>New <code>Roi.update_slice(name, new_slice)</code> method: replaces the slice for an existing axis or appends a new one. Returns a new <code>Roi</code> instance.</li>
+<li>New <code>Roi.remove_slice(name)</code> method: removes the slice for a named axis. Returns a new <code>Roi</code> instance. Raises <code>NgioValueError</code> if the axis is not present.</li>
+</ul>
+<h3 id="chores_3">Chores<a class="headerlink" href="#chores_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Pin <code>mkdocs</code> to version &lt;2.0 to avoid build errors in CI due to breaking changes in mkdocs v2, and incompatibility with material design theme.</li>
+</ul>
+<h2 id="054">[0.5.4]<a class="headerlink" href="#054" title="Permanent link">&para;</a></h2>
+<h3 id="fix_9">Fix<a class="headerlink" href="#fix_9" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Remove file locking remove in <code>ZarrGroupHandler</code>, which was not used anywhere and is unnecessary in new lockfile release.</li>
+<li>Correctly set Zarr array dtype to array dtype in <code>create_ome_zarr_from_array</code></li>
+</ul>
+<h2 id="053">[0.5.3]<a class="headerlink" href="#053" title="Permanent link">&para;</a></h2>
+<h3 id="fix_10">Fix<a class="headerlink" href="#fix_10" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> where "raw" entry with encoding-type "null" is written by default in newer anndata versions, which causes compatibility issues with older anndata versions. Now the "raw" entry is removed after writing if it has encoding-type "null".</li>
+</ul>
+<h2 id="052">[0.5.2]<a class="headerlink" href="#052" title="Permanent link">&para;</a></h2>
+<h3 id="fix_11">Fix<a class="headerlink" href="#fix_11" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix critical bug in masking roi image handling causing incorrect results when image and mask have different pixel sizes.</li>
+<li>Fix bug in loading masking roi images when paths other than default are used.</li>
+</ul>
+<h2 id="051">[0.5.1]<a class="headerlink" href="#051" title="Permanent link">&para;</a></h2>
+<h3 id="fix_12">Fix<a class="headerlink" href="#fix_12" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug causing incorrect channel metadata when creating an image.</li>
+<li>Fix correctly setting the space and time units when creating an image.</li>
+<li>Fix minor bug in <code>set_channel_windows_with_percentiles</code> method.</li>
+</ul>
+<h3 id="chores_4">Chores<a class="headerlink" href="#chores_4" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Improve logging consistency across the codebase.</li>
+</ul>
+<h2 id="v050">[v0.5.0]<a class="headerlink" href="#v050" title="Permanent link">&para;</a></h2>
+<h3 id="features_2">Features<a class="headerlink" href="#features_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add support for OME-<abbr title="Next Generation File Format — the OME specification that OME-Zarr implements">NGFF</abbr> v0.5</li>
+<li>Move to zarr-python v3</li>
+<li>API to delete labels and tables from <abbr title="Cloud-optimised file format for bioimaging data, built on Zarr and the OME-NGFF specification">OME-Zarr</abbr> containers and <abbr title="High-Content Screening — plate-based imaging where each well holds one or more images">HCS</abbr> plates.</li>
+<li>Allow to explicitly set axes order when building masking roi tables.</li>
+<li>New metadata modification APIs for <code>Image</code>, <code>Label</code>, and <code>OmeZarrContainer</code>:</li>
+<li><code>set_channel_labels</code> - Update channel labels</li>
+<li><code>set_channel_colors</code> - Update channel colors</li>
+<li><code>set_channel_windows</code> - Update channel display windows (start/end values)</li>
+<li><code>set_channel_windows_with_percentiles</code> - Update display windows based on data percentiles</li>
+<li><code>set_axes_names</code> - Rename axes in the metadata</li>
+<li><code>set_axes_unit</code> - Set space and time units for axes</li>
+<li><code>set_name</code> - Set the image/label name in metadata</li>
+<li>Add translation support in all image/label creation and derivation APIs.</li>
+</ul>
+<h3 id="api-breaking-changes">API Breaking Changes<a class="headerlink" href="#api-breaking-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>New <code>Roi</code> models, now supporting arbitrary axes.</li>
+<li>The <code>compressor</code> argument has been renamed to <code>compressors</code> in all relevant functions and methods to reflect the support for multiple compressors in zarr v3.</li>
+<li>The <code>version</code> argument has been renamed to <code>ngff_version</code> in all relevant functions and methods to specify the OME-<abbr title="Next Generation File Format — the OME specification that OME-Zarr implements">NGFF</abbr> version.</li>
+<li>Remove the <code>parallel_safe</code> argument from all zarr related functions and methods. The locking mechanism is now handled internally and only depends on the
+<code>cache</code>.</li>
+<li>Remove the unused <code>parent</code> argument from <code>ZarrGroupHandler</code>.</li>
+<li>Internal changes to <code>ZarrGroupHandler</code> to support cleanup unused apis.</li>
+<li>Remove <code>ngio_logger</code> in favor of standard warnings module.</li>
+</ul>
+<h3 id="migration-guide-v04-v05">Migration Guide (v0.4 → v0.5)<a class="headerlink" href="#migration-guide-v04-v05" title="Permanent link">&para;</a></h3>
+<h4 id="roi-api-changes">Roi API Changes<a class="headerlink" href="#roi-api-changes" title="Permanent link">&para;</a></h4>
+<p>The <code>Roi</code> class now uses a flexible slice-based model supporting arbitrary axes:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Old (v0.4)</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">roi</span> <span class="o">=</span> <span class="n">Roi</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mf">34.1</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">x_length</span><span class="o">=</span><span class="mf">321.6</span><span class="p">,</span> <span class="n">y_length</span><span class="o">=</span><span class="mi">330</span><span class="p">)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># New (v0.5)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">roi</span> <span class="o">=</span> <span class="n">Roi</span><span class="o">.</span><span class="n">from_values</span><span class="p">(</span><span class="n">slices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mf">34.1</span><span class="p">,</span> <span class="mf">321.6</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">330</span><span class="p">)},</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Accessing coordinates</span>
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="c1"># Old: roi.x, roi.y, roi.x_length, roi.y_length</span>
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="c1"># New: roi.get(&quot;x&quot;).start, roi.get(&quot;y&quot;).start, roi.get(&quot;x&quot;).length, roi.get(&quot;y&quot;).length</span>
+</span></code></pre></div>
+<h4 id="argument-renames">Argument Renames<a class="headerlink" href="#argument-renames" title="Permanent link">&para;</a></h4>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># compressor → compressors</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="c1"># Old (v0.4)</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">create_empty_ome_zarr</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">compressor</span><span class="o">=</span><span class="n">Blosc</span><span class="p">())</span>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># New (v0.5)</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">create_empty_ome_zarr</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">compressors</span><span class="o">=</span><span class="n">Blosc</span><span class="p">())</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># version → ngff_version</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Old (v0.4)</span>
+</span><span id="__span-2-10"><a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">create_empty_ome_zarr</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">version</span><span class="o">=</span><span class="s2">&quot;0.4&quot;</span><span class="p">)</span>
+</span><span id="__span-2-11"><a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>
+</span><span id="__span-2-12"><a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="c1"># New (v0.5)</span>
+</span><span id="__span-2-13"><a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">create_empty_ome_zarr</span><span class="p">(</span><span class="o">...</span><span class="p">,</span> <span class="n">ngff_version</span><span class="o">=</span><span class="s2">&quot;0.4&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<h4 id="removed-arguments">Removed Arguments<a class="headerlink" href="#removed-arguments" title="Permanent link">&para;</a></h4>
+<ul>
+<li><code>parallel_safe</code>: No longer needed, locking is handled internally</li>
+<li><code>ngio_logger</code>: Use Python's standard <code>warnings</code> module instead</li>
+</ul>
+<h3 id="deprecations">Deprecations<a class="headerlink" href="#deprecations" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Standardized all deprecation warnings to indicate removal in <code>ngio=0.6</code>.</li>
+<li>Deprecated <code>set_channel_percentiles</code> method, use <code>set_channel_windows_with_percentiles</code> instead.</li>
+</ul>
+<h3 id="fix_13">Fix<a class="headerlink" href="#fix_13" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in <code>consolidate</code> function when using coarsening mode with non power-of-two shapes.</li>
+<li>Fix <abbr title="High-Content Screening — plate-based imaging where each well holds one or more images">HCS</abbr> plate column name formatting to use standardized zero-padding (e.g., column <code>3</code> is now stored as <code>"03"</code>).</li>
+<li>Fix <code>_stringify_column</code> not passing <code>num_digits</code> parameter to <code>_format_int_column</code>.</li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix incorrect and incomplete docstrings across the codebase:</li>
+<li><code>compute_masking_roi</code>: Added Args/Returns, fixed description (supports 2D, 3D, 4D).</li>
+<li><code>lazy_compute_slices</code>: Added Args/Returns sections.</li>
+<li><code>LabelsContainer.list</code>: Fixed description (was "Create the /labels group").</li>
+<li><code>build_masking_roi_table</code>: Added Args/Returns sections.</li>
+<li><code>TablesContainer</code>: Fixed class and method descriptions (were referencing labels instead of tables).</li>
+<li><code>NgioPlateMeta.add_well</code>: Fixed description (was "Add an image to the well").</li>
+<li><code>NgioPlateMeta.derive</code>: Fixed type annotation in docstring (<code>NgffVersion</code> → <code>NgffVersions</code>).</li>
+<li>Added missing docstrings to several <abbr title="High-Content Screening — plate-based imaging where each well holds one or more images">HCS</abbr> helper functions.</li>
+</ul>
+<h2 id="v047">[v0.4.7]<a class="headerlink" href="#v047" title="Permanent link">&para;</a></h2>
+<h3 id="fix_14">Fix<a class="headerlink" href="#fix_14" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug adding time axis to masking roi tables.</li>
+<li>Fix channel selection from <code>wavelength_id</code></li>
+<li>Fix table opening mode to stop writing groups when opening in append mode.</li>
+</ul>
+<h2 id="v045">[v0.4.5]<a class="headerlink" href="#v045" title="Permanent link">&para;</a></h2>
+<h3 id="fix_15">Fix<a class="headerlink" href="#fix_15" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Pin Dask to version &lt;2025.11 to avoid errors when writing zarr pyramids with dask (see https://github.com/dask/dask/issues/12159#issuecomment-3548421833)</li>
+</ul>
+<h2 id="v044">[v0.4.4]<a class="headerlink" href="#v044" title="Permanent link">&para;</a></h2>
+<h3 id="fix_16">Fix<a class="headerlink" href="#fix_16" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in channel visualization when using hex colors with leading '#'.</li>
+<li>Remove strict range check in channel window.</li>
+</ul>
+<h2 id="v043">[v0.4.3]<a class="headerlink" href="#v043" title="Permanent link">&para;</a></h2>
+<h3 id="fix_17">Fix<a class="headerlink" href="#fix_17" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in deriving labels and image from <abbr title="Cloud-optimised file format for bioimaging data, built on Zarr and the OME-NGFF specification">OME-Zarr</abbr> with non standard path names.</li>
+<li>Add missing pillow dependency.</li>
+<li>Update pixi workspace config.</li>
+</ul>
+<h2 id="v042">[v0.4.2]<a class="headerlink" href="#v042" title="Permanent link">&para;</a></h2>
+<h3 id="api-changes">API Changes<a class="headerlink" href="#api-changes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Make roi.to_slicing_dict(pixel_size) always require pixel_size argument for consistency with other roi methods.</li>
+<li>Make PixelSize object a Pydantic model to allow for serialization.</li>
+</ul>
+<h3 id="fix_18">Fix<a class="headerlink" href="#fix_18" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Improve robustness when rounding Rois to pixel coordinates.</li>
+</ul>
+<h2 id="v041">[v0.4.1]<a class="headerlink" href="#v041" title="Permanent link">&para;</a></h2>
+<h3 id="fix_19">Fix<a class="headerlink" href="#fix_19" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Fix bug in zoom transform when input axes contain unknown axes (e.g. virtual axes). Now unknown axes are treated as virtual axes and set to 1 in the target shape.</li>
+</ul>
+<h2 id="v040">[v0.4.0]<a class="headerlink" href="#v040" title="Permanent link">&para;</a></h2>
+<h3 id="features_3">Features<a class="headerlink" href="#features_3" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add Iterators for image processing pipelines</li>
+<li>Add support for time in rois and roi-tables</li>
+<li>Building masking roi tables expanded to time series data</li>
+<li>Add zoom transformation</li>
+<li>Add support for rescaling on-the-fly masks for masked images</li>
+<li>Big refactor of the io pipeline to support iterators and lazy loading</li>
+<li>Add support for customize dimension separators and compression codecs</li>
+<li>Simplify AxesHandler and Dataset Classes</li>
+</ul>
+<h3 id="api-changes_1">API Changes<a class="headerlink" href="#api-changes_1" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The image-like <code>get_*</code> api have been slightly changed. Now if a single int is passed as slice_kwargs, it is interpreted as a single index. So the dimension is automatically squeezed.</li>
+<li>Remove the <code>get_*_delayed</code> methods, now data cam only be loaded as numpy or dask array.Use the <code>get_as_dask</code> method instead, which returns a dask array that can be used with dask delayed.</li>
+<li>A new model for channel selection is available. Now channels can be selected by name, index or with <code>ChannelSelectionModel</code> object.</li>
+<li>Change <code>table_name</code> keyword argument to <code>name</code> for consistency in all table concatenation functions, e.g. <code>concatenate_image_tables</code>,  <code>concatenate_image_tables_as</code>, etc.</li>
+<li>Change to <code>Dimension</code> class. <code>get_shape</code> and <code>get_canonical_shape</code> have been removed, <code>get</code> uses new keyword arguments <code>default</code> instead of <code>strict</code>.</li>
+<li>Image like objects now have a more clean API to load data. Instead of <code>get_array</code> and <code>set_array</code>, they now use <code>get_as_numpy</code>, and <code>get_as_dask</code> for delayed arrays.</li>
+<li>Also for <code>get_roi</code> now specific methods are available. For <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> objects, the <code>get_roi_as_numpy</code>, and <code>get_roi_as_dask</code> methods.</li>
+<li>Table ops moved to <code>ngio.images</code></li>
+<li>int <code>label</code> as an explicit attribute in <code>Roi</code> objects (previously only in stored in name and relying on convention)</li>
+<li>Slight changes to <code>Image</code> and <code>Label</code> objects. Some minor attributes have been renamed for consistency.</li>
+</ul>
+<h3 id="table-specs">Table specs<a class="headerlink" href="#table-specs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add <code>t_second</code> and <code>len_t_second</code> to <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> tables and <abbr title="A ROI table indexed by label id, mapping each segmented object to its bounding region">masking ROI</abbr> tables</li>
+</ul>
+<h2 id="v035">[v0.3.5]<a class="headerlink" href="#v035" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Remove path normalization for images in wells. While the spec requires paths to be alphanumeric, this patch removes the normalization to allow for arbitrary image paths.</li>
+</ul>
+<h2 id="v034">[v0.3.4]<a class="headerlink" href="#v034" title="Permanent link">&para;</a></h2>
+<ul>
+<li>allow to write as <code>anndata_v1</code> for backward compatibility with older ngio versions.</li>
+</ul>
+<h2 id="v033">[v0.3.3]<a class="headerlink" href="#v033" title="Permanent link">&para;</a></h2>
+<h3 id="chores_5">Chores<a class="headerlink" href="#chores_5" title="Permanent link">&para;</a></h3>
+<ul>
+<li>improve dataset download process and streamline the CI workflows</li>
+</ul>
+<h2 id="v032">[v0.3.2]<a class="headerlink" href="#v032" title="Permanent link">&para;</a></h2>
+<h3 id="api-changes_2">API Changes<a class="headerlink" href="#api-changes_2" title="Permanent link">&para;</a></h3>
+<ul>
+<li>change table <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> default to <code>anndata_v1</code> for backward compatibility. This will be chaanged again when ngio <code>v0.2.x</code> is no longer supported.</li>
+</ul>
+<h3 id="fix_20">Fix<a class="headerlink" href="#fix_20" title="Permanent link">&para;</a></h3>
+<ul>
+<li>fix <a href="https://github.com/BioVisionCenter/fractal-converters-tools/issues/13">#13</a> (converters tools)</li>
+<li>fix <a href="https://github.com/BioVisionCenter/ngio/issues/88">#88</a></li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-circle-arrow-up" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m16 12-4-4-4 4M12 16V8"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../api/ngio/utils/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ngio.utils">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-left" viewBox="0 0 24 24"><path d="m12 19-7-7 7-7M19 12H5"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                ngio.utils
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../contributing/" class="md-footer__link md-footer__link--next" aria-label="Next: Contributing guide">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Contributing guide
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" class="lucide lucide-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2024-2026, BioVisionCenter UZH
+    </div>
+  
+  
+    Made with
+    <a href="https://zensical.org/" target="_blank" rel="noopener">
+      Zensical
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/BioVisionCenter/ngio" target="_blank" rel="noopener" title="ngio on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://pypi.org/project/ngio/" target="_blank" rel="noopener" title="ngio on PyPI" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://www.biovisioncenter.uzh.ch/en.html" target="_blank" rel="noopener" title="BioVisionCenter, University of Zurich" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2026 Fonticons, Inc.--><path fill="currentColor" d="M176 0c-26.5 0-48 21.5-48 48v208c0 26.5 21.5 48 48 48h64c26.5 0 48-21.5 48-48v-64h32c70.7 0 128 57.3 128 128s-57.3 128-128 128H32c-17.7 0-32 14.3-32 32s14.3 32 32 32h448c17.7 0 32-14.3 32-32s-14.3-32-32-32h-16.9c30.4-34 48.9-78.8 48.9-128 0-106-86-192-192-192h-32V48c0-26.5-21.5-48-48-48zm-56 352c-13.3 0-24 10.7-24 24s10.7 24 24 24h176c13.3 0 24-10.7 24-24s-10.7-24-24-24z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+      <div class="md-progress" data-md-component="progress" role="progressbar"></div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate":null,"base":"..","features":["announce.dismiss","content.action.edit","content.action.view","content.code.annotate","content.tabs.link","content.tooltips","navigation.footer","navigation.indexes","navigation.instant.progress","navigation.path","navigation.sections","navigation.tabs","navigation.tabs.sticky","navigation.top"],"search":"../assets/javascripts/workers/search.b6b7e04f.min.js","tags":null,"translations":{"clipboard.copied":"Copied to clipboard","clipboard.copy":"Copy to clipboard","search.result.more.one":"1 more on this page","search.result.more.other":"# more on this page","search.result.none":"No matching documents","search.result.one":"1 matching document","search.result.other":"# matching documents","search.result.placeholder":"Type to start searching","search.result.term.missing":"Missing","select.version":"Select version"},"version":{"provider":"mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7f30b55.min.js"></script>
+      
+    
+  </body>
+</html>
