@@ -1993,10 +1993,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#docs-and-internal" class="md-nav__link">
+  <a href="#docs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Docs and internal
+        Docs
       </span>
     </span>
   </a>
@@ -3163,10 +3163,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#docs-and-internal" class="md-nav__link">
+  <a href="#docs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Docs and internal
+        Docs
       </span>
     </span>
   </a>
@@ -4224,13 +4224,13 @@
 <h3 id="behaviour-changes">Behaviour changes<a class="headerlink" href="#behaviour-changes" title="Permanent link">&para;</a></h3>
 <p>Same call, different result:</p>
 <ul>
-<li><code>derive_image</code> now inherits <code>dtype</code>, <code>dimension_separator</code> and <code>compressors</code> from the reference image instead of forcing <code>uint16</code>, <code>"/"</code> and <code>"auto"</code> — deriving from a <code>float32</code> image no longer silently downcasts it.</li>
+<li><code>derive_image</code> inherits <code>dtype</code>, <code>dimension_separator</code> and <code>compressors</code> from the reference image instead of forcing <code>uint16</code> — deriving from a <code>float32</code> image no longer silently downcasts it.</li>
 <li><code>add_table</code> and <code>write_table</code> keep the source table's <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> instead of rewriting it as <code>anndata_v1</code> (<a href="https://github.com/BioVisionCenter/ngio/issues/207">#207</a>). Pass <code>backend=</code> to convert.</li>
-<li>Opening a container no longer reads every <abbr title="One resolution of the multiscale image pyramid; level 0 is the highest resolution">pyramid level</abbr> (<code>validate_arrays=False</code> by default), so a missing or malformed array fails on first access rather than at open. Pass <code>validate_arrays=True</code> for the old eager check.</li>
+<li>Opening a container no longer reads every <abbr title="One resolution of the multiscale image pyramid; level 0 is the highest resolution">pyramid level</abbr> (<code>validate_arrays=False</code> by default), so a bad array fails on first access rather than at open.</li>
 <li><code>open_image</code> and <code>open_label</code> default to <code>strict=False</code>, matching every other getter.</li>
 <li><code>list_roi_tables</code> returns <code>[]</code> instead of raising when there are no tables.</li>
 <li><code>get_masked_label(path=...)</code> resolves the masking label at the label's own pixel size, matching <code>get_masked_image</code>.</li>
-<li><code>PixelSize</code>s with different <code>time_unit</code>s now compare unequal, and <code>==</code> against a non-<code>PixelSize</code> returns <code>NotImplemented</code> instead of raising <code>TypeError</code>.</li>
+<li><code>PixelSize</code>s with different <code>time_unit</code>s now compare unequal, and <code>==</code> against a non-<code>PixelSize</code> returns <code>NotImplemented</code>.</li>
 </ul>
 <h3 id="deprecated-removal-in-ngio11">Deprecated, removal in <code>ngio=1.1</code><a class="headerlink" href="#deprecated-removal-in-ngio11" title="Permanent link">&para;</a></h3>
 <p><code>conctatenate_tables</code> → <code>concatenate_tables</code>, <code>set_axes_unit</code> → <code>set_axes_units</code>, <code>levels_paths=</code> → <code>level_paths=</code>, <code>validate_paths=</code> → <code>validate_arrays=</code>, <code>ngio.experimental.iterators</code> → <code>ngio.iterators</code>, and every <code>*_async</code> plate/table function → the sync form with <code>max_workers=</code>.</p>
@@ -4247,34 +4247,32 @@
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The iterators are stable API: <code>from ngio import SegmentationIterator</code>.</li>
-<li>Configurable IO retries: <code>NgioConfig.io_retry</code> (<code>max_retries</code>, constant/linear/exponential backoff, error matching) plus the <code>ngio.utils.retry_io</code> decorator. ngio's own <code>NgioError</code>s are never retried. See the Configuration page.</li>
-<li><code>ngio.utils.NgioStore</code> wraps every zarr store ngio opens and applies that retry policy to all IO — metadata, pixel data, and lazy dask reads on workers. <code>ZipStore</code> is now supported.</li>
+<li>Configurable IO retries: <code>NgioConfig.io_retry</code> plus the <code>ngio.utils.retry_io</code> decorator. ngio's own <code>NgioError</code>s are never retried. See the Configuration page.</li>
+<li><code>ngio.utils.NgioStore</code> wraps every zarr store ngio opens and applies that retry policy to all IO. <code>ZipStore</code> is now supported.</li>
 <li><code>max_workers=</code> on the sync plate and table APIs replaces the separate async surface; <code>None</code> keeps the serial behaviour.</li>
 <li>A larger public namespace, including <code>MaskedImage</code>, <code>MaskedLabel</code>, <code>Channel</code>, <code>S3FSConfig</code>, <code>derive_ome_zarr_plate</code>, <code>__version__</code>, the <code>get_ngio_*_meta</code> readers and every error class. <code>AbstractBaseTable</code>, <code>ImplementedTables</code> and <code>write_table</code> are exported from <code>ngio.tables</code>, so a custom table type can be registered without private imports.</li>
 <li><code>NgioTableValidationError</code> now subclasses <code>NgioValidationError</code>, so <code>except ValueError</code> catches it like its siblings; new <code>NgioKeyError</code>.</li>
 </ul>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. Windows refuses to replace or remove a file while another handle to it is open, so a concurrent <em>reader</em> of <code>zarr.json</code> could break a writer's atomic rename — including between parallel <code>atomic_add_image</code> workers, which ngio's lock cannot prevent since opening a group reads metadata before any lock exists. Store operations now absorb these transient conflicts with a short bounded retry, always on and independent of <code>io_retry</code>; the original error is raised once the bound is reached. No behaviour change on Linux or macOS.</li>
+<li>Dask writes could silently drop data. <code>da.store(..., lock=False)</code> let two blocks read-modify-write the same chunk — or shard, when the target is sharded — concurrently, losing one update. This hit every region write that was not chunk-aligned and every sharded target, including pyramid consolidation. All <code>da.store</code> calls now share a lock; block compute stays parallel.</li>
+<li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. A concurrent reader of <code>zarr.json</code> could break a writer's atomic rename; store operations now absorb these transient conflicts with a short bounded retry. No behaviour change on Linux or macOS.</li>
 <li><code>import ngio</code> no longer raises <code>AttributeError</code> when an s3fs older than 2026.2.0 is installed.</li>
 <li><code>concatenate_image_tables</code> built a wrong index: unnamed, and duplicated under <code>mode="lazy"</code>.</li>
 <li><code>Roi.union</code>/<code>intersection</code> dropped <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> name <code>""</code> and label <code>0</code>; <code>Roi.from_values</code> now validates its inputs.</li>
 <li>Plate and well metadata <code>add_*</code>/<code>remove_*</code> mutated the receiver instead of returning a copy.</li>
 <li><code>AxesSetup.from_ordered_list</code> silently dropped a non-canonical axis in some orders.</li>
 <li>Grid iterator <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> now get unique names, and <code>by_chunks</code> with overlap ≥ chunk size raises <code>NgioValueError</code>.</li>
-<li>Also: empty <code>RoiTable</code> usability, duplicate <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> names across a roundtrip, labels on read-only images with no <code>labels</code> group, <code>OmeZarrPlate.get_well</code> caching, and negative indices inside a slicing sequence.</li>
 </ul>
 <h3 id="packaging">Packaging<a class="headerlink" href="#packaging" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Ship <code>src/ngio/py.typed</code>. The <code>Typing :: Typed</code> classifier was declared since 0.x but the PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.</li>
-<li>Real lower bounds on every dependency, installed and exercised by a <code>test-min-deps</code> CI leg: <code>zarr&gt;=3.1.6</code>, <code>numpy&gt;=2.0</code>, <code>fsspec&gt;=2025.3</code>, <code>anndata&gt;=0.12.5</code>, <code>ome-zarr-models&gt;=1.4</code> and the rest.</li>
-<li><code>pandas</code> 3.x and <code>anndata</code> 0.13 are now allowed, the <code>requires-python</code> upper cap is gone, and unused <code>requests</code>/<code>distributed</code> are dropped.</li>
-<li>New <code>s3</code> extra: <code>pip install ngio[s3]</code>. The README advertised S3 streaming but <code>s3fs</code> was never declared.</li>
+<li>Ship <code>src/ngio/py.typed</code>. The PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.</li>
+<li>Real lower bounds on every dependency, exercised by a <code>test-min-deps</code> CI leg: <code>zarr&gt;=3.1.6</code>, <code>numpy&gt;=2.0</code>, <code>fsspec&gt;=2025.3</code>, <code>anndata&gt;=0.12.5</code>, <code>ome-zarr-models&gt;=1.4</code> and the rest. <code>pandas</code> 3.x and <code>anndata</code> 0.13 are now allowed, the <code>requires-python</code> upper cap is gone, and unused <code>requests</code>/<code>distributed</code> are dropped.</li>
+<li>New <code>s3</code> extra: <code>pip install ngio[s3]</code>.</li>
 </ul>
-<h3 id="docs-and-internal">Docs and internal<a class="headerlink" href="#docs-and-internal" title="Permanent link">&para;</a></h3>
+<h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Docs rebuilt on <a href="https://zensical.org">Zensical</a> with every code block executed at build time, plus new landing, glossary and Configuration pages.</li>
-<li><code>ty</code> and the docs build now run in CI, coverage is up from 91% to 95%, and concrete-store dispatch is centralized behind <code>NgioStore</code>.</li>
+<li>Rebuilt on <a href="https://zensical.org">Zensical</a> with every code block executed at build time, plus new landing, glossary and Configuration pages.</li>
 </ul>
 <h2 id="v0514">[v0.5.14]<a class="headerlink" href="#v0514" title="Permanent link">&para;</a></h2>
 <h3 id="fix">Fix<a class="headerlink" href="#fix" title="Permanent link">&para;</a></h3>
