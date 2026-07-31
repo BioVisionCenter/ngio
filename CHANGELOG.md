@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fix
+
+- Dask writes (`set_array(..., mode="dask")`, masked dask setters, pyramid consolidation) could silently drop data when the patch's block grid was misaligned with the target's chunk grid — or, for sharded targets, its shard grid: `da.store(lock=False)` let two blocks read-modify-write the same chunk concurrently. All dask store flushes now serialise behind a shared lock; block compute stays parallel.
+
 ## [v1.0.0]
 
 First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.
