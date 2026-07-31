@@ -55,7 +55,7 @@ ome_zarr = open_ome_zarr_container(image_path)
 # --8<-- [end:open_container]
 
 # --8<-- [start:segment]
-from ngio.experimental.iterators import SegmentationIterator
+from ngio.iterators import SegmentationIterator
 
 # Take the image to read from, and the FOV table naming the regions to walk
 image = ome_zarr.get_image()
@@ -140,7 +140,7 @@ print(figure_html(fig))
 # --8<-- [end:plot_mask]
 
 # --8<-- [start:masked_segment]
-from ngio.experimental.iterators import MaskedSegmentationIterator
+from ngio.iterators import MaskedSegmentationIterator
 
 # Take a masked image, which carries its masking ROI table with it
 image = ome_zarr.get_masked_image(masking_label_name="mask")

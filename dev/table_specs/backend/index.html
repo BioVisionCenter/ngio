@@ -1773,7 +1773,7 @@
   <span class="md-ellipsis">
     
   
-  ngio.experimental.iterators
+  ngio.iterators
 
     
   </span>
@@ -2267,11 +2267,16 @@ On top of that, ngio adds a thin layer of metadata and table normalisation, so t
 convention is <code>{backend_name}_v{version}</code>, so a <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> that declares a version is
 recorded under it — <code>anndata_v1</code> — and one that does not under its plain name.
 A table saved without an explicit <code>backend=</code> is written by whichever <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>
-<code>DefaultTableBackend</code> names.</p>
+<code>DefaultTableBackend</code> names, which is <code>anndata_v1</code>.</p>
 <p><code>experimental_json_v1</code>, <code>experimental_csv_v1</code> and <code>experimental_parquet_v1</code> are legacy
 aliases for the JSON, CSV and Parquet backends, kept so that tables written by older
 ngio releases still load. They are accepted wherever a <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> name is, and resolve to
 the same backends; passing one stores that <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>'s current name.</p>
+<p><code>anndata</code> and <code>anndata_v1</code> name the same format and the same reader. ngio writes
+<code>anndata_v1</code> because every ngio release since <code>0.2.0</code> can read that name, whereas
+<code>anndata</code> was only registered from <code>0.3.4</code> on (and, in the <code>0.2</code> line, in <code>0.2.11</code> and
+<code>0.2.14</code> alone). Passing <code>backend="anndata"</code> explicitly is honoured and records
+<code>anndata</code>.</p>
 </div>
 <h2 id="anndata-backend">AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr><a class="headerlink" href="#anndata-backend" title="Permanent link">&para;</a></h2>
 <p>AnnData is a widely used format in single-cell genomics, and can natively store complex tabular data in a Zarr group. The AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> in ngio is a wrapper around the <code>anndata</code> library, and applies some table normalisation for consistency and compatibility with the ngio table specifications.</p>
@@ -2284,7 +2289,7 @@ the same backends; passing one stores that <abbr title="The on-disk serialisatio
 <p>AnnData <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> metadata:</p>
 <div class="language-json5 highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="c1">// Backend metadata</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nv">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;anndata&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// the backend used to store the table, e.g. &quot;anndata&quot;, &quot;parquet&quot;, etc..</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nv">&quot;backend&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;anndata_v1&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// the backend used to store the table, e.g. &quot;anndata_v1&quot;, &quot;parquet&quot;, etc..</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nv">&quot;index_key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;index&quot;</span><span class="p">,</span><span class="w"> </span><span class="c1">// The default index key for the table, which is used to identify each row.</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">    </span><span class="nv">&quot;index_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;str&quot;</span><span class="w"> </span><span class="c1">// Either &quot;int&quot; or &quot;str&quot;</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">}</span>

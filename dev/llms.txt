@@ -48,7 +48,7 @@ guides and tutorials are executed when the site is built, so the outputs shown a
 - [Images](https://biovisioncenter.github.io/ngio/stable/api/images/): Image and Label objects and their accessors.
 - [HCS](https://biovisioncenter.github.io/ngio/stable/api/hcs/): open_ome_zarr_plate, OmeZarrPlate, open_ome_zarr_well, OmeZarrWell, create_empty_plate, create_empty_well.
 - [Tables](https://biovisioncenter.github.io/ngio/stable/api/tables/): Table classes, the tables container and backends.
-- [Iterators](https://biovisioncenter.github.io/ngio/stable/api/iterators/): ImageProcessingIterator, SegmentationIterator, MaskedSegmentationIterator, FeatureExtractorIterator — experimental, from ngio.experimental.iterators.
+- [Iterators](https://biovisioncenter.github.io/ngio/stable/api/iterators/): ImageProcessingIterator, SegmentationIterator, MaskedSegmentationIterator, FeatureExtractorIterator — from ngio.iterators.
 - [ngio top-level API](https://biovisioncenter.github.io/ngio/stable/api/ngio/ngio/): Roi, PixelSize, Dimensions, NgioConfig and other core types.
 
 ## Optional

@@ -82,7 +82,7 @@ zoom_transform = ZoomTransform(
 # --8<-- [end:setup_transform]
 
 # --8<-- [start:extract]
-from ngio.experimental.iterators import FeatureExtractorIterator
+from ngio.iterators import FeatureExtractorIterator
 from ngio.tables import FeatureTable
 
 iterator = FeatureExtractorIterator(

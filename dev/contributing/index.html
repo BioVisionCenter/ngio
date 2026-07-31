@@ -1674,7 +1674,7 @@
   <span class="md-ellipsis">
     
   
-  ngio.experimental.iterators
+  ngio.iterators
 
     
   </span>
@@ -2361,10 +2361,10 @@
 <p>CI runs the linters and the test matrix automatically.</p>
 <h2 id="releasing-maintainers-only">Releasing <em>(maintainers only)</em><a class="headerlink" href="#releasing-maintainers-only" title="Permanent link">&para;</a></h2>
 <p>Versions are derived from git tags via <code>hatch-vcs</code>. Use the Pixi bump tasks in the <code>dev</code> environment:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-patch<span class="w">    </span><span class="c1"># 0.5.7 → 0.5.8</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-minor<span class="w">    </span><span class="c1"># 0.5.7 → 0.6.0</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-major<span class="w">    </span><span class="c1"># 0.5.7 → 1.0.0</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-alpha<span class="w">    </span><span class="c1"># → 0.6.0a1  (pre-release)</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-patch<span class="w">    </span><span class="c1"># 1.0.0 → 1.0.1</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-minor<span class="w">    </span><span class="c1"># 1.0.0 → 1.1.0</span>
+</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-major<span class="w">    </span><span class="c1"># 1.0.0 → 2.0.0</span>
+</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-alpha<span class="w">    </span><span class="c1"># → 1.1.0a1  (pre-release)</span>
 </span></code></pre></div>
 <p>Append <code>-- --dry-run</code> to preview without creating a tag. Once tagged, CI builds and publishes to PyPI automatically.</p>
 
