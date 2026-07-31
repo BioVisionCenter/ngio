@@ -10,6 +10,7 @@ import zarr
 from pydantic import BaseModel, ConfigDict
 
 from ngio.common._dimensions import Dimensions
+from ngio.common._locks import DASK_STORE_LOCK
 from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioUserWarning, NgioValueError
@@ -255,7 +256,11 @@ def set_slice_as_dask(
         # da.store instead of da.to_zarr: see ngio.common._pyramid for the
         # dask>=2025.11 PerformanceWarning regression that to_zarr triggers
         # when the input chunks aren't a multiple of the target's chunks.
-        da.store(patch, zarr_array, regions=slice_tuple, lock=False)  # type: ignore
+        # The shared lock serialises the flushes: a region write whose blocks
+        # only partially cover a chunk (or, for a sharded target, a shard)
+        # makes zarr read-modify-write it, and two of them racing on the same
+        # key lose an update.
+        da.store(patch, zarr_array, regions=slice_tuple, lock=DASK_STORE_LOCK)  # type: ignore
         return
 
     # Complex case, we have exactly one tuple in the slicing tuple
@@ -264,7 +269,7 @@ def set_slice_as_dask(
         _sub_slice = (*slice_tuple[:ax], slice(idx, idx + 1), *slice_tuple[ax + 1 :])
         sub_patch = da.take(patch, indices=i, axis=ax)
         sub_patch = da.expand_dims(sub_patch, axis=ax)
-        da.store(sub_patch, zarr_array, regions=_sub_slice, lock=False)  # type: ignore
+        da.store(sub_patch, zarr_array, regions=_sub_slice, lock=DASK_STORE_LOCK)  # type: ignore
 
 
 ##############################################################

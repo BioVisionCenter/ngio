@@ -9,7 +9,7 @@ ci:
 
 # Vendored third-party files, kept byte-identical to what upstream ships. The SIL OFL
 # text in particular should not be rewritten by the whitespace hooks.
-exclude: ^brand/fonts/
+exclude: ^docs/assets/fonts/
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -46,11 +46,6 @@ repos:
       - id: ruff
         args: [--fix]  # may also add '--unsafe-fixes'
       - id: ruff-format
-
-  - repo: https://github.com/kynan/nbstripout
-    rev: 0.9.1
-    hooks:
-      - id: nbstripout
 
 # `ty` is deliberately not a hook here: it needs the locked pixi environment to
 # resolve ngio's dependencies, which neither the `lint` job nor pre-commit.ci

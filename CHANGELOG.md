@@ -24,13 +24,13 @@ First stable release. Everything deprecated in `v0.5.0` (each warned "will be re
 
 Same call, different result:
 
-- `derive_image` now inherits `dtype`, `dimension_separator` and `compressors` from the reference image instead of forcing `uint16`, `"/"` and `"auto"` — deriving from a `float32` image no longer silently downcasts it.
+- `derive_image` inherits `dtype`, `dimension_separator` and `compressors` from the reference image instead of forcing `uint16` — deriving from a `float32` image no longer silently downcasts it.
 - `add_table` and `write_table` keep the source table's backend instead of rewriting it as `anndata_v1` ([#207](https://github.com/BioVisionCenter/ngio/issues/207)). Pass `backend=` to convert.
-- Opening a container no longer reads every pyramid level (`validate_arrays=False` by default), so a missing or malformed array fails on first access rather than at open. Pass `validate_arrays=True` for the old eager check.
+- Opening a container no longer reads every pyramid level (`validate_arrays=False` by default), so a bad array fails on first access rather than at open.
 - `open_image` and `open_label` default to `strict=False`, matching every other getter.
 - `list_roi_tables` returns `[]` instead of raising when there are no tables.
 - `get_masked_label(path=...)` resolves the masking label at the label's own pixel size, matching `get_masked_image`.
-- `PixelSize`s with different `time_unit`s now compare unequal, and `==` against a non-`PixelSize` returns `NotImplemented` instead of raising `TypeError`.
+- `PixelSize`s with different `time_unit`s now compare unequal, and `==` against a non-`PixelSize` returns `NotImplemented`.
 
 ### Deprecated, removal in `ngio=1.1`
 
@@ -52,34 +52,32 @@ plate.get_images(max_workers=8)                                # was get_images_
 ### Features
 
 - The iterators are stable API: `from ngio import SegmentationIterator`.
-- Configurable IO retries: `NgioConfig.io_retry` (`max_retries`, constant/linear/exponential backoff, error matching) plus the `ngio.utils.retry_io` decorator. ngio's own `NgioError`s are never retried. See the Configuration page.
-- `ngio.utils.NgioStore` wraps every zarr store ngio opens and applies that retry policy to all IO — metadata, pixel data, and lazy dask reads on workers. `ZipStore` is now supported.
+- Configurable IO retries: `NgioConfig.io_retry` plus the `ngio.utils.retry_io` decorator. ngio's own `NgioError`s are never retried. See the Configuration page.
+- `ngio.utils.NgioStore` wraps every zarr store ngio opens and applies that retry policy to all IO. `ZipStore` is now supported.
 - `max_workers=` on the sync plate and table APIs replaces the separate async surface; `None` keeps the serial behaviour.
 - A larger public namespace, including `MaskedImage`, `MaskedLabel`, `Channel`, `S3FSConfig`, `derive_ome_zarr_plate`, `__version__`, the `get_ngio_*_meta` readers and every error class. `AbstractBaseTable`, `ImplementedTables` and `write_table` are exported from `ngio.tables`, so a custom table type can be registered without private imports.
 - `NgioTableValidationError` now subclasses `NgioValidationError`, so `except ValueError` catches it like its siblings; new `NgioKeyError`.
 
 ### Fixes
 
-- Windows: concurrent access to a store no longer fails with `PermissionError: [WinError 5]`/`[WinError 32]`. Windows refuses to replace or remove a file while another handle to it is open, so a concurrent *reader* of `zarr.json` could break a writer's atomic rename — including between parallel `atomic_add_image` workers, which ngio's lock cannot prevent since opening a group reads metadata before any lock exists. Store operations now absorb these transient conflicts with a short bounded retry, always on and independent of `io_retry`; the original error is raised once the bound is reached. No behaviour change on Linux or macOS.
+- Dask writes could silently drop data. `da.store(..., lock=False)` let two blocks read-modify-write the same chunk — or shard, when the target is sharded — concurrently, losing one update. This hit every region write that was not chunk-aligned and every sharded target, including pyramid consolidation. All `da.store` calls now share a lock; block compute stays parallel.
+- Windows: concurrent access to a store no longer fails with `PermissionError: [WinError 5]`/`[WinError 32]`. A concurrent reader of `zarr.json` could break a writer's atomic rename; store operations now absorb these transient conflicts with a short bounded retry. No behaviour change on Linux or macOS.
 - `import ngio` no longer raises `AttributeError` when an s3fs older than 2026.2.0 is installed.
 - `concatenate_image_tables` built a wrong index: unnamed, and duplicated under `mode="lazy"`.
 - `Roi.union`/`intersection` dropped ROI name `""` and label `0`; `Roi.from_values` now validates its inputs.
 - Plate and well metadata `add_*`/`remove_*` mutated the receiver instead of returning a copy.
 - `AxesSetup.from_ordered_list` silently dropped a non-canonical axis in some orders.
 - Grid iterator ROIs now get unique names, and `by_chunks` with overlap ≥ chunk size raises `NgioValueError`.
-- Also: empty `RoiTable` usability, duplicate ROI names across a roundtrip, labels on read-only images with no `labels` group, `OmeZarrPlate.get_well` caching, and negative indices inside a slicing sequence.
 
 ### Packaging
 
-- Ship `src/ngio/py.typed`. The `Typing :: Typed` classifier was declared since 0.x but the PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.
-- Real lower bounds on every dependency, installed and exercised by a `test-min-deps` CI leg: `zarr>=3.1.6`, `numpy>=2.0`, `fsspec>=2025.3`, `anndata>=0.12.5`, `ome-zarr-models>=1.4` and the rest.
-- `pandas` 3.x and `anndata` 0.13 are now allowed, the `requires-python` upper cap is gone, and unused `requests`/`distributed` are dropped.
-- New `s3` extra: `pip install ngio[s3]`. The README advertised S3 streaming but `s3fs` was never declared.
+- Ship `src/ngio/py.typed`. The PEP 561 marker was missing, so downstream type checkers ignored ngio's annotations.
+- Real lower bounds on every dependency, exercised by a `test-min-deps` CI leg: `zarr>=3.1.6`, `numpy>=2.0`, `fsspec>=2025.3`, `anndata>=0.12.5`, `ome-zarr-models>=1.4` and the rest. `pandas` 3.x and `anndata` 0.13 are now allowed, the `requires-python` upper cap is gone, and unused `requests`/`distributed` are dropped.
+- New `s3` extra: `pip install ngio[s3]`.
 
-### Docs and internal
+### Docs
 
-- Docs rebuilt on [Zensical](https://zensical.org) with every code block executed at build time, plus new landing, glossary and Configuration pages.
-- `ty` and the docs build now run in CI, coverage is up from 91% to 95%, and concrete-store dispatch is centralized behind `NgioStore`.
+- Rebuilt on [Zensical](https://zensical.org) with every code block executed at build time, plus new landing, glossary and Configuration pages.
 
 ## [v0.5.14]
 
