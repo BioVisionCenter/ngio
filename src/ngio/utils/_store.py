@@ -9,6 +9,7 @@ isinstance-checking stores.
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
 import logging
 import warnings
@@ -23,8 +24,9 @@ from zarr.storage import FsspecStore, LocalStore, MemoryStore, WrapperStore, Zip
 from zarr.storage._common import make_store
 
 from ngio.config import RetryConfig, get_config
+from ngio.utils import _retry
 from ngio.utils._errors import NgioValueError
-from ngio.utils._retry import aretry_call
+from ngio.utils._retry import aretry_call, aretry_sharing_violation
 from ngio.utils._warnings import NgioUserWarning
 
 if TYPE_CHECKING:
@@ -237,6 +239,14 @@ class NgioStore(WrapperStore[Store]):
     # ------------------------------------------------------------------
 
     async def _io(self, op_name: str, fn: Callable[[], Awaitable[T]]) -> T:
+        # Windows refuses an atomic rename or a directory removal while any
+        # other handle to the target is open, so a concurrent reader breaks an
+        # unrelated writer. Always retried, independently of `io_retry`: it is a
+        # platform quirk with a millisecond lifetime, not a user IO policy. The
+        # module attribute is read at call time so it stays monkeypatchable and
+        # never travels into a pickled store.
+        if _retry._IS_WINDOWS:
+            fn = functools.partial(aretry_sharing_violation, fn, op_name=op_name)
         if self._retry.max_retries == 0:
             return await fn()
         return await aretry_call(fn, self._retry, op_name=op_name)
@@ -246,14 +256,14 @@ class NgioStore(WrapperStore[Store]):
     ) -> AsyncIterator[str]:
         # A partially-consumed generator cannot be safely retried, so the
         # listing is materialized inside the retried call and re-yielded.
-        if self._retry.max_retries == 0:
+        if self._retry.max_retries == 0 and not _retry._IS_WINDOWS:
             return factory()
 
         async def gen() -> AsyncGenerator[str, None]:
             async def collect() -> list[str]:
                 return [key async for key in factory()]
 
-            for key in await aretry_call(collect, self._retry, op_name=op_name):
+            for key in await self._io(op_name, collect):
                 yield key
 
         return gen()

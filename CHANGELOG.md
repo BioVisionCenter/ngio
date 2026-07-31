@@ -60,6 +60,7 @@ plate.get_images(max_workers=8)                                # was get_images_
 
 ### Fixes
 
+- Windows: concurrent access to a store no longer fails with `PermissionError: [WinError 5]`/`[WinError 32]`. Windows refuses to replace or remove a file while another handle to it is open, so a concurrent *reader* of `zarr.json` could break a writer's atomic rename — including between parallel `atomic_add_image` workers, which ngio's lock cannot prevent since opening a group reads metadata before any lock exists. Store operations now absorb these transient conflicts with a short bounded retry, always on and independent of `io_retry`; the original error is raised once the bound is reached. No behaviour change on Linux or macOS.
 - `import ngio` no longer raises `AttributeError` when an s3fs older than 2026.2.0 is installed.
 - `concatenate_image_tables` built a wrong index: unnamed, and duplicated under `mode="lazy"`.
 - `Roi.union`/`intersection` dropped ROI name `""` and label `0`; `Roi.from_values` now validates its inputs.

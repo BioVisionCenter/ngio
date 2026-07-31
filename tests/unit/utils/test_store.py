@@ -21,8 +21,14 @@ if TYPE_CHECKING:
     from zarr.abc.store import ByteRequest
     from zarr.core.buffer import BufferPrototype
 
+import ngio.utils._retry as retry_mod
 from ngio.config import ConstantBackoff, RetryConfig
-from ngio.utils import NgioStore, NgioUserWarning, NgioValueError
+from ngio.utils import (
+    NgioFileExistsError,
+    NgioStore,
+    NgioUserWarning,
+    NgioValueError,
+)
 
 _RETRY = RetryConfig(
     max_retries=3,
@@ -244,6 +250,123 @@ class TestRetriedIO:
         results = dict(sync(collect()))
         assert results == {"a": None, "b": None}
         assert flaky.attempts["get"] == 3  # 1 failure + 2 successes
+
+
+class SharingViolationStore(MemoryStore):
+    """A MemoryStore raising a Windows sharing violation n times per method."""
+
+    def __init__(self, fail_times: int = 1, winerror: int = 5, exc=None, **kwargs):
+        super().__init__(**kwargs)
+        self.fail_times = fail_times
+        self.winerror = winerror
+        self.exc = exc
+        self.attempts: Counter[str] = Counter()
+
+    def _flake(self, method: str) -> None:
+        self.attempts[method] += 1
+        if self.attempts[method] > self.fail_times:
+            return
+        if self.exc is not None:
+            raise self.exc
+        exc = PermissionError(13, "Access is denied")
+        exc.winerror = self.winerror
+        raise exc
+
+    async def set(
+        self, key: str, value: Buffer, byte_range: tuple[int, int] | None = None
+    ) -> None:
+        self._flake("set")
+        return await super().set(key, value, byte_range)
+
+    async def exists(self, key: str) -> bool:
+        self._flake("exists")
+        return await super().exists(key)
+
+    def list_dir(self, prefix: str) -> AsyncIterator[str]:
+        self._flake("list_dir")
+        return super().list_dir(prefix)
+
+
+class TestSharingViolationRetry:
+    """Windows sharing violations are absorbed independently of `io_retry`."""
+
+    @pytest.fixture(autouse=True)
+    def _simulate_windows(self, monkeypatch):
+        monkeypatch.setattr(retry_mod, "_IS_WINDOWS", True)
+        monkeypatch.setattr(
+            retry_mod,
+            "_SHARING_VIOLATION_BACKOFF",
+            ConstantBackoff(delay_s=0.0, jitter=False),
+        )
+
+    @pytest.mark.parametrize("winerror", [5, 32, 33])
+    def test_recovers_with_retries_disabled(self, winerror):
+        flaky = SharingViolationStore(fail_times=1, winerror=winerror)
+        store = NgioStore(flaky, retry=RetryConfig())
+        assert sync(store.exists("nope")) is False
+        assert flaky.attempts["exists"] == 2
+
+    def test_exhaustion_raises_the_original_error(self):
+        flaky = SharingViolationStore(fail_times=100)
+        store = NgioStore(flaky, retry=RetryConfig())
+        with pytest.raises(PermissionError) as excinfo:
+            sync(store.exists("nope"))
+        assert excinfo.value.winerror == 5
+        assert flaky.attempts["exists"] == retry_mod._SHARING_VIOLATION_ATTEMPTS
+
+    def test_not_retried_off_windows(self, monkeypatch):
+        monkeypatch.setattr(retry_mod, "_IS_WINDOWS", False)
+        flaky = SharingViolationStore(fail_times=1)
+        store = NgioStore(flaky, retry=RetryConfig())
+        with pytest.raises(PermissionError):
+            sync(store.exists("nope"))
+        assert flaky.attempts["exists"] == 1
+
+    @pytest.mark.parametrize(
+        "exc",
+        [
+            PermissionError("Access Denied"),  # the s3fs 403 shape
+            NgioFileExistsError("already there"),
+            OSError("plain"),
+        ],
+    )
+    def test_other_errors_propagate_immediately(self, exc):
+        flaky = SharingViolationStore(fail_times=1, exc=exc)
+        store = NgioStore(flaky, retry=RetryConfig())
+        with pytest.raises(type(exc)):
+            sync(store.exists("nope"))
+        assert flaky.attempts["exists"] == 1
+
+    def test_writes_recover(self):
+        flaky = SharingViolationStore(fail_times=1)
+        store = NgioStore(flaky, retry=RetryConfig())
+        group = zarr.open_group(store=store, mode="a")
+        group.attrs["marker"] = 42
+        assert flaky.attempts["set"] > flaky.fail_times
+
+    def test_listing_recovers(self):
+        flaky = SharingViolationStore(fail_times=1)
+        store = NgioStore(flaky, retry=RetryConfig())
+
+        async def collect():
+            return [k async for k in store.list_dir("")]
+
+        assert sync(collect()) == []
+        assert flaky.attempts["list_dir"] == 2
+
+    def test_composes_multiplicatively_with_io_retry(self):
+        flaky = SharingViolationStore(fail_times=1000)
+        retry = RetryConfig(
+            max_retries=3,
+            retry_on=["PermissionError"],
+            backoff=ConstantBackoff(delay_s=0.0, jitter=False),
+        )
+        store = NgioStore(flaky, retry=retry)
+        with pytest.raises(PermissionError):
+            sync(store.exists("nope"))
+        assert flaky.attempts["exists"] == retry_mod._SHARING_VIOLATION_ATTEMPTS * (
+            retry.max_retries + 1
+        )
 
 
 class TestStoreBehavior:
