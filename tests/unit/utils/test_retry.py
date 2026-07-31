@@ -12,8 +12,14 @@ from ngio.config import (
     NgioConfig,
     RetryConfig,
 )
-from ngio.utils import NgioValueError, retry_io
-from ngio.utils._retry import aretry_call, is_retryable, retry_call
+from ngio.utils import NgioFileExistsError, NgioValueError, retry_io
+from ngio.utils._retry import (
+    _SHARING_VIOLATION_WINERRORS,
+    aretry_call,
+    is_retryable,
+    is_sharing_violation,
+    retry_call,
+)
 
 _NO_BACKOFF = ConstantBackoff(delay_s=0.0, jitter=False)
 
@@ -59,6 +65,40 @@ class TestIsRetryable:
         with pytest.warns(UserWarning):
             policy = _policy(retry_all_errors=True)
         assert not is_retryable(exc, policy)
+
+
+def _win_error(winerror: int) -> PermissionError:
+    """Build the error Windows raises for a file-sharing conflict.
+
+    `winerror` is assignable on any platform, so these tests run everywhere.
+    """
+    exc = PermissionError(13, "Access is denied")
+    exc.winerror = winerror
+    return exc
+
+
+class TestIsSharingViolation:
+    @pytest.mark.parametrize("winerror", sorted(_SHARING_VIOLATION_WINERRORS))
+    def test_matches_win32_codes(self, winerror):
+        assert is_sharing_violation(_win_error(winerror))
+
+    def test_other_win32_code_not_matched(self):
+        assert not is_sharing_violation(_win_error(2))
+
+    def test_permission_error_without_winerror_not_matched(self):
+        # The shape botocore/s3fs raise for an S3 403.
+        assert not is_sharing_violation(PermissionError("Access Denied"))
+
+    def test_ngio_errors_never_matched(self):
+        # NgioFileExistsError is an OSError subclass, so it reaches the check.
+        exc = NgioFileExistsError("already there")
+        exc.winerror = 5
+        assert not is_sharing_violation(exc)
+
+    def test_non_os_error_not_matched(self):
+        exc = ValueError("boom")
+        exc.winerror = 5
+        assert not is_sharing_violation(exc)
 
 
 class TestBackoffStrategies:

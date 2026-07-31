@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Windows: concurrent access to an OME-Zarr store no longer fails with `PermissionError: [WinError 5] Access is denied` (or `[WinError 32]`). Windows refuses to replace or remove a file while any other handle to it is open, so an unrelated concurrent *reader* of `zarr.json` could break a writer's atomic rename — including between parallel workers using `atomic_add_image`, and taking ngio's lock did not help since opening a group reads metadata before any lock exists. Every store operation now absorbs these transient conflicts with a short bounded retry that is always on and independent of `io_retry`; once the bound is reached the original error is raised. No behaviour change on Linux or macOS.
+
 ## [v1.0.0]
 
 First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.
