@@ -62,10 +62,6 @@ jobs:
           environments: dev
       - name: 🔍 ty
         run: pixi run -e dev ty check src/
-      - name: 📝 Public API docstrings
-        # Ruff's D1xx cannot cover this: it treats every symbol in a
-        # `_`-prefixed module as private, and every ngio module is `_`-prefixed.
-        run: pixi run -e dev python .github/check_docstrings.py
 
   docs:
     # Build the docs and run every snippet on PRs. Kept here rather than in

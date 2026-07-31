@@ -67,6 +67,7 @@ def _pinned() -> dict[str, str]:
 
 
 def main() -> int:
+    """Report any floor that is undeclared, mismatched or not actually installed."""
     floors, pins = _declared_floors(), _pinned()
     problems: list[str] = []
 
@@ -81,8 +82,7 @@ def main() -> int:
         # `>=3.9` and `==3.9.0` denote the same release, so compare as versions.
         if Version(pin) != Version(floor):
             problems.append(
-                f"{name}: pyproject floor >={floor} but {CONSTRAINTS.name} pins "
-                f"=={pin}"
+                f"{name}: pyproject floor >={floor} but {CONSTRAINTS.name} pins =={pin}"
             )
             continue
         try:
