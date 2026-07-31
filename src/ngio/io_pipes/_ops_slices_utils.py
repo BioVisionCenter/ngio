@@ -176,25 +176,112 @@ def compute_slice_chunks(
     return {tuple(idx) for idx in product(*per_axis_chunks)}
 
 
+ChunkRect: TypeAlias = tuple[tuple[int, int], ...]
+"""Per-axis inclusive `(first, last)` chunk-index ranges.
+
+Empty selections are represented as `None` wherever a `ChunkRect` is expected,
+never as a `first > last` range: an empty selection touches no chunks and must
+conflict with nothing.
+"""
+
+
+def _chunk_range_for_axis(
+    sel: SlicingType, size: int, csize: int
+) -> tuple[int, int] | None:
+    """The inclusive (first, last) chunk-index range touched on a single axis.
+
+    Exact for `slice` and `int` selections (their chunk footprint is contiguous,
+    see `_chunk_indices_for_axis`). For `list[int]` selections this is the
+    bounding box — a conservative over-approximation. Returns `None` for an
+    empty selection.
+    """
+    if isinstance(sel, slice):
+        start, stop = _normalize_slice(sel, size)
+        if start >= stop:  # empty
+            return None
+        return start // csize, (stop - 1) // csize
+
+    if isinstance(sel, int):
+        if sel < 0 or sel >= size:
+            raise IndexError(f"index {sel} out of bounds for axis of size {size}")
+        return sel // csize, sel // csize
+
+    if isinstance(sel, list):
+        if not sel:
+            return None
+        for v in sel:
+            if not isinstance(v, int):
+                raise TypeError("Only integers allowed inside tuple selections")
+            if v < 0 or v >= size:
+                raise IndexError(f"index {v} out of bounds for axis of size {size}")
+        return min(sel) // csize, max(sel) // csize
+
+    raise TypeError(f"Unsupported index type: {type(sel)!r}")
+
+
+def compute_chunk_rect(
+    shape: tuple[int, ...],
+    chunks: tuple[int, ...],
+    slicing_tuple: tuple[SlicingType, ...],
+) -> ChunkRect | None:
+    """Bounding rectangle, in chunk-index space, of the chunks a selection touches.
+
+    Exact for `slice`/`int` selections; for `list[int]` selections the per-axis
+    bounding box is used — a conservative over-approximation that may include
+    chunks the selection does not touch, never fewer.
+
+    Args:
+        shape: Overall array shape.
+        chunks: Chunk (or shard) shape — the conflict granularity.
+        slicing_tuple: Tuple of slices, ints, or lists of ints.
+
+    Returns:
+        Per-axis inclusive `(first, last)` chunk-index ranges, or `None` when
+        the selection is empty on any axis (touches no chunks).
+    """
+    if len(slicing_tuple) != len(shape):
+        raise NgioValueError(
+            f"key must have {len(shape)} items, got {len(slicing_tuple)}"
+        )
+
+    per_axis_ranges = []
+    for sel, size, csize in zip(slicing_tuple, shape, chunks, strict=True):
+        ax_range = _chunk_range_for_axis(sel, size, csize)
+        if ax_range is None:
+            return None
+        per_axis_ranges.append(ax_range)
+    return tuple(per_axis_ranges)
+
+
+def chunk_rects_intersect(rect_a: ChunkRect | None, rect_b: ChunkRect | None) -> bool:
+    """Whether two chunk rectangles share at least one chunk.
+
+    `None` encodes an empty selection and never intersects anything.
+    """
+    if rect_a is None or rect_b is None:
+        return False
+    if len(rect_a) != len(rect_b):
+        raise NgioValueError("Chunk rectangles must have the same rank")
+    return all(
+        a_first <= b_last and b_first <= a_last
+        for (a_first, a_last), (b_first, b_last) in zip(rect_a, rect_b, strict=True)
+    )
+
+
 def check_if_chunks_overlap(
     slices: Iterable[tuple[SlicingType, ...]],
     shape: tuple[int, ...],
     chunks: tuple[int, ...],
 ) -> bool:
-    """Check for overlaps in a list of slicing tuples using brute-force method.
+    """Check whether any two slicing tuples touch a common chunk.
 
-    This is O(n^2) and not efficient for large lists.
+    This is O(n^2) in the number of slicing tuples, but each pair costs only a
+    per-axis range comparison — nothing is materialised. `list[int]` selections
+    are conservatively bounding-boxed: overlap may be reported for lists whose
+    exact chunk sets are disjoint, never the reverse.
+
     Returns True if any overlaps are found.
     """
-    slices_chunks = (compute_slice_chunks(shape, chunks, si) for si in slices)
-    for it, (si, sj) in enumerate(_pairs_stream(slices_chunks)):
-        if si & sj:
-            return True
-        if it == 10_000:
-            warnings.warn(
-                "Performance Warning check_for_chunks_overlaps is O(n^2) and may be "
-                "slow for large numbers of regions.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
-    return False
+    rects = (compute_chunk_rect(shape, chunks, si) for si in slices)
+    non_empty = (rect for rect in rects if rect is not None)
+    return any(chunk_rects_intersect(ri, rj) for ri, rj in _pairs_stream(non_empty))

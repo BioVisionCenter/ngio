@@ -8,6 +8,7 @@ import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from ngio.common._locks import DASK_STORE_LOCK
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -45,7 +46,10 @@ def _on_disk_dask_zoom(
     # re-derives chunks via normalize_chunks(chunks="auto", ...) and warns
     # (treated as error by our filterwarnings) when the result isn't a
     # multiple of the zarr target's chunks. da.store writes blocks 1:1.
-    da.store(target_array, target, lock=False)  # type: ignore
+    # The shared lock serialises chunk read-modify-writes: for sharded
+    # targets the blocks (aligned to inner chunks) share shard objects and
+    # would otherwise race and silently drop data.
+    da.store(target_array, target, lock=DASK_STORE_LOCK)  # type: ignore
 
 
 def _on_disk_coarsen(
@@ -97,8 +101,8 @@ def _on_disk_coarsen(
         aggregation_function, source_array, coarsening_setup, trim_excess=True
     )
     out_target = out_target.rechunk(target.chunks)
-    # See _on_disk_dask_zoom for rationale.
-    da.store(out_target, target, lock=False)  # type: ignore
+    # See _on_disk_dask_zoom for rationale, including the lock.
+    da.store(out_target, target, lock=DASK_STORE_LOCK)  # type: ignore
 
 
 def on_disk_zoom(

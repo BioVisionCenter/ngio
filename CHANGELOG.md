@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased]
+
+### API Breaking Changes
+
+- `MapperProtocol` and `BasicMapper` are re-typed around the new `IterUnit`: a mapper now receives `(func, units)` instead of `(func, getters, setters)` and returns the results as a list ordered by `unit.index`. A unit whose `setter` is `None` is a read-only unit (compute and collect, never write), no longer an error. `map_as_numpy`/`map_as_dask` call sites are unaffected — only custom mapper implementations need updating:
+
+```python
+def __call__(self, func, units):                       # was (self, func, getters, setters)
+    return [func(unit.getter()) for unit in units]     # was: zip getters/setters, return None
+```
+
+### Behaviour changes
+
+- `by_chunks()` gained a `grid="write" | "read"` parameter, defaulting to `"write"`: tiles now align to the output image's write granularity (shard shape when sharded, chunk shape otherwise) instead of the input chunk grid, so the resulting ROIs pass `check_if_chunks_overlap`. Identical for default-derived outputs; different when the output has custom `chunks=`/`shards=`. Read-only iterators fall back to the input grid; `grid="read"` restores the old tiling.
+
+### Features
+
+- `reduce_as_numpy`/`reduce_as_dask` on all iterators: apply a function to every ROI and collect the results (any return type, e.g. a `DataFrame` per ROI) without writing anything — `results[i]` corresponds to `iterator.rois[i]` regardless of mapper execution order.
+- `IterUnit`: the unit of work a mapper schedules, carrying `index`, `roi`, `getter`, `setter` and `write_footprint` (the chunk/shard rectangle the unit writes — the conflict currency for parallel mappers).
+
+### Fix
+
+- `check_if_chunks_overlap`/`require_no_chunks_overlap` measured the *read* side: slicing from the getters against the input image's chunk grid. They now measure the write target — slicing from the setters against the output array's write granularity, which is the shard shape when the output is sharded (writes are atomic per shard object). This is a behaviour change: layouts that previously passed the gate (finely chunked input with a coarser-chunked or sharded output) may now correctly raise, and read-only iterators now always report no overlap.
+- Dask writes (`set_array(..., mode="dask")`, masked dask setters, pyramid consolidation) could silently drop data when the patch's block grid was misaligned with the target's chunk grid — or, for sharded targets, its shard grid: `da.store(lock=False)` let two blocks read-modify-write the same chunk concurrently. All dask store flushes now serialise behind a shared lock; block compute stays parallel.
+
 ## [v1.0.0]
 
 First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.

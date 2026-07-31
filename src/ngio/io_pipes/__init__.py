@@ -49,9 +49,11 @@ from ngio.io_pipes._io_pipes_roi import (
 )
 from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps, SlicingType
+from ngio.io_pipes._ops_slices_utils import ChunkRect
 from ngio.io_pipes._ops_transforms import TransformProtocol
 
 __all__ = [
+    "ChunkRect",
     "DaskGetter",
     "DaskGetterMasked",
     "DaskRoiGetter",
