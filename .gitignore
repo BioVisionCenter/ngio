@@ -93,5 +93,8 @@ tests/_v01
 # Benchmarks
 benchmark/*
 
+# Local planning notes (maintainer checklists, kept out of the repo on purpose)
+/V1_*.md
+
 # Claude settings
 .claude
