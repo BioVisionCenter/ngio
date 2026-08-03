@@ -1,11 +1,6 @@
-# enable pre-commit.ci at https://pre-commit.ci/
-# it adds:
-# 1. auto fixing pull requests
-# 2. auto updating the pre-commit configuration
-ci:
-  autoupdate_schedule: monthly
-  autofix_commit_msg: "style(pre-commit.ci): auto fixes [...]"
-  autoupdate_commit_msg: "ci(pre-commit.ci): autoupdate"
+# Hooks are run by `prek` (a drop-in reimplementation of pre-commit), both in the
+# `lint` CI job and via `pixi run -e dev lint`. Bump the `rev:` pins with
+# `prek auto-update`.
 
 # Vendored third-party files, kept byte-identical to what upstream ships. The SIL OFL
 # text in particular should not be rewritten by the whitespace hooks.

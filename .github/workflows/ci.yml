@@ -35,7 +35,14 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
-      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+      # prek is a drop-in reimplementation of pre-commit; its action caches the hook
+      # environments itself, unlike pre-commit/action, which is maintenance-only and
+      # hardcodes actions/cache@v4 (Node 20) internally.
+      # `prek-version` defaults to `latest` — pin it, and keep it in step with the
+      # `prek` version resolved in pixi.lock so CI and `pixi run -e dev lint` agree.
+      - uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+        with:
+          prek-version: "0.4.12"
 
   check-manifest:
     # check-manifest is a tool that checks that all files in version control are
@@ -191,16 +198,12 @@ jobs:
       # If something goes wrong with scheduled tests, open an issue in the repo
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
-        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PLATFORM: ${{ matrix.platform }}
-          PYTHON: ${{ matrix.environment }}
-          RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] Scheduled tests are failing"
+        uses: ./.github/actions/report-failure
         with:
-          filename: .github/TEST_FAIL_TEMPLATE.md
-          update_existing: true
+          title: "[test-bot] Scheduled tests are failing"
+          platform: ${{ matrix.platform }}
+          python: ${{ matrix.environment }}
+          token: ${{ github.token }}
 
       - name: Coverage
         if: success() && matrix.platform == 'ubuntu-latest' && matrix.environment == 'test11'
