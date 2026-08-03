@@ -1,9 +1,10 @@
+import multiprocessing
+import os
 import sys
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Literal
 
-import dask
-import dask.delayed
 import fsspec.implementations.http
 import numpy as np
 import pytest
@@ -15,6 +16,7 @@ from ngio.utils import (
     NgioFileNotFoundError,
     NgioValueError,
     ZarrGroupHandler,
+    _retry,
     open_group_wrapper,
 )
 
@@ -150,43 +152,54 @@ def test_open_fail(tmp_path: Path):
         open_group_wrapper(store=read_only_group, mode="w")
 
 
+def _append_under_lock(args: tuple[str, int]) -> int:
+    """Append one item to a shared attrs list, in a worker process.
+
+    Module level and picklable by reference, which is what `spawn` needs.
+    """
+    zarr_store, i = args
+    handler = ZarrGroupHandler(zarr_store, cache=False, mode="a")
+    with handler.lock:
+        attrs = handler.load_attrs()
+        attrs["test_list"].append(i)
+        handler.write_attrs(attrs, overwrite=False)
+    return os.getpid()
+
+
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="the lock is unsupported on Windows; see ZarrGroupHandler._create_lock",
+)
 def test_multiprocessing_safety(tmp_path: Path):
+    """The lock holds between real processes, which is what it claims.
+
+    Runs in separate processes rather than dask's threaded scheduler: this test
+    is the one that has to notice a lock which only excludes threads, and until
+    now it ran entirely in one interpreter despite its name. `spawn`, not
+    `fork` — zarr keeps an IO event loop thread and forking one warns.
+    """
     zarr_store = tmp_path / "test_multiprocessing_safety.zarr"
 
-    @dask.delayed  # type: ignore
-    def add_item(i):
-        handler = ZarrGroupHandler(zarr_store, cache=False, mode="a")
-        assert handler.lock is not None
-
-        with handler.lock:
-            attrs = handler.load_attrs()
-            attrs["test_list"].append(i)
-            handler.write_attrs(attrs, overwrite=False)
-
-        return i
-
     handler = ZarrGroupHandler(zarr_store, cache=False, mode="w")
-    attrs = handler.load_attrs()
-    attrs = {"test_list": []}
-    handler.write_attrs(attrs, overwrite=True)
+    handler.write_attrs({"test_list": []}, overwrite=True)
 
-    results = []
-    num_items = 100
-    for i in range(num_items):
-        results.append(add_item(i))
+    num_items = 40
+    with ProcessPoolExecutor(
+        max_workers=4, mp_context=multiprocessing.get_context("spawn")
+    ) as pool:
+        pids = set(
+            pool.map(
+                _append_under_lock, [(str(zarr_store), i) for i in range(num_items)]
+            )
+        )
 
-    dask.compute(*results)  # type: ignore
+    # Guard against this silently becoming a single-process test again.
+    assert os.getpid() not in pids
+    assert len(pids) > 1
 
-    # The contention above is what produces a real Windows file-sharing
-    # conflict, so this test keeps running there to exercise the retry in
-    # `ngio.utils._retry`. Only the no-lost-update assertions are skipped:
-    # `filelock`'s Windows backend can hand one lock to two workers, so they do
-    # not hold there. See tests/unit/hcs/test_plate_concurrency.py for the
-    # full diagnosis.
-    if sys.platform != "win32":
-        _, counts = np.unique(handler.load_attrs()["test_list"], return_counts=True)
-        assert len(counts) == num_items
-        assert np.all(counts == 1)
+    _, counts = np.unique(handler.load_attrs()["test_list"], return_counts=True)
+    assert len(counts) == num_items
+    assert np.all(counts == 1)
 
     assert handler.lock_path is not None
 
@@ -196,6 +209,82 @@ def test_multiprocessing_safety(tmp_path: Path):
     handler = ZarrGroupHandler(zarr_store, cache=True, mode="r")
     with pytest.raises(NgioValueError):
         handler._create_lock()
+
+
+def test_lock_rejected_on_windows(tmp_path: Path, monkeypatch):
+    """The lock refuses on Windows rather than handing itself to two workers."""
+    handler = ZarrGroupHandler(tmp_path / "win.zarr", cache=False, mode="a")
+
+    monkeypatch.setattr(_retry, "_IS_WINDOWS", True)
+    with pytest.raises(NgioValueError, match="not exclusive on Windows"):
+        handler._create_lock()
+
+
+def test_lock_paths_live_outside_the_store(tmp_path: Path):
+    """Lock files never land inside the store, and never collide.
+
+    `with_suffix('.lock')` used to put a well's lock at `store.zarr/C/03.lock`
+    — a non-Zarr entry inside the store — and mapped `foo.bar` and `foo.baz`
+    onto one `foo.lock`, so two unrelated groups shared a critical section.
+    """
+    store = tmp_path / "store.zarr"
+    handler = ZarrGroupHandler(store, cache=False, mode="a")
+    for path in ("C/03", "C/04", "foo.bar", "foo.baz"):
+        handler.create_group(path)
+
+    lock_paths = {
+        path: handler.get_handler(path).lock_path
+        for path in ("C/03", "C/04", "foo.bar", "foo.baz")
+    }
+    lock_paths["<root>"] = handler.lock_path
+
+    assert len(set(lock_paths.values())) == len(lock_paths)
+    for path, lock_path in lock_paths.items():
+        assert store not in lock_path.parents, f"{path} locks inside the store"
+        # ngio creates the directory itself: no `filelock` makes it at
+        # construction, and versions below 3.12.3 do not make it on acquire
+        # either — which failed only the min-deps CI leg, never the dev env.
+        assert lock_path.parent.is_dir(), f"{path} lock directory not created"
+
+    # Acquiring must not leave anything behind inside the store either.
+    with handler.get_handler("C/03").lock:
+        pass
+    assert list(store.rglob("*.lock")) == []
+
+
+def test_get_group_adopts_a_concurrently_created_group(tmp_path: Path, monkeypatch):
+    """`create_mode=True` is get-or-create, so losing the create race is fine.
+
+    Deterministic stand-in for a real race: the existence probe is forced to
+    miss once, exactly as it would if another worker created the group just
+    after the probe ran. Before this was handled, the loser raised
+    `NgioFileExistsError` — which is how a plate write failed in CI while four
+    workers added images to the same well.
+    """
+    handler = ZarrGroupHandler(tmp_path / "store.zarr", cache=False, mode="a")
+    existing = handler.create_group("C/03")
+
+    real_get = zarr.Group.get
+    missed = []
+
+    def miss_once(self, path, default=None):
+        if path == "C/03" and not missed:
+            missed.append(path)
+            return None
+        return real_get(self, path, default=default)
+
+    monkeypatch.setattr(zarr.Group, "get", miss_once)
+
+    group = handler.get_group("C/03", create_mode=True)
+    assert missed, "the probe was never exercised"
+    assert isinstance(group, zarr.Group)
+    assert group.path == existing.path
+
+    # A group that genuinely is not there must still be created, and a missing
+    # one without create_mode must still raise.
+    assert handler.get_group("D/04", create_mode=True).path == "D/04"
+    with pytest.raises(NgioFileNotFoundError):
+        handler.get_group("E/05", create_mode=False)
 
 
 @pytest.mark.network

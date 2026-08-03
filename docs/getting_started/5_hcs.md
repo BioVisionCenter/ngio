@@ -208,7 +208,7 @@ You can add or remove images.
     !!! warning
         This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_add_image` method instead.
 
-        `atomic_add_image` serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a **local store** — on a remote store there is no lock to take and it raises `NgioValueError` — and on a shared network filesystem it is only as reliable as the mount's `flock` support. It does **not** hold on **Windows**, where `filelock` can hand the same lock to two workers at once and an update is then silently lost; concurrent writers to one plate are unsupported there.
+        `atomic_add_image` serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a **local store** — on a remote store there is no lock to take and it raises `NgioValueError` — and on a shared network filesystem it is only as reliable as the mount's `flock` support. It is unsupported on **Windows**, where `filelock` can hand the same lock to two workers at once: it raises `NgioValueError` there rather than losing an update silently, so use `add_image` from a single worker instead.
 
 === "Remove images"
     To remove images from the plate, use the `remove_image` method. It takes the same arguments as `add_image`.

@@ -4,6 +4,7 @@ import logging
 import warnings
 from pathlib import Path
 from typing import Literal, TypeAlias
+from urllib.parse import quote
 
 import dask.array as da
 import fsspec
@@ -16,6 +17,7 @@ from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
 from ngio.config import NgioConfig, get_config
+from ngio.utils import _retry
 from ngio.utils._cache import NgioCache
 from ngio.utils._errors import (
     NgioFileExistsError,
@@ -171,6 +173,18 @@ class ZarrGroupHandler:
         if self._lock is not None:
             return self._lock
 
+        if _retry._IS_WINDOWS:
+            raise NgioValueError(
+                "The lock mechanism is not exclusive on Windows, so ngio does "
+                "not offer it there. `filelock` unlinks the lock file on "
+                "release without the descriptor check its Unix backend has "
+                "(`_windows.py::_acquire` has no `st_nlink` guard), so one "
+                "worker can lock a file another has already unlinked while a "
+                "third re-creates and locks it: two workers in the critical "
+                "section, one update silently lost. Concurrent writers to one "
+                "store are unsupported on Windows."
+            )
+
         if self.use_cache is True:
             raise NgioValueError(
                 "Lock mechanism is not compatible with caching. "
@@ -184,11 +198,22 @@ class ZarrGroupHandler:
                 f"Instead, got a {self.store.store_type} store."
             )
 
+        # Locks live in a directory beside the store, never inside it: a lock
+        # file under `plate.zarr/` would be a non-Zarr entry every reader has to
+        # tolerate, and it would travel with the data on copy. The group path is
+        # percent-encoded rather than used as-is, so `C/03` stays one flat name
+        # and two groups differing only after a dot (`foo.bar` vs `foo.baz`)
+        # cannot collide onto one lock — `with_suffix` mapped both to `foo.lock`.
+        #
         # `self._group.path`, not `self.group.path`: the latter reopens the
         # group (a full metadata read) when caching is off, and the path is
         # fixed at construction — `reopen_group` passes it through unchanged.
-        store_path = local_root / self._group.path
-        _lock_path = store_path.with_suffix(".lock")
+        locks_root = local_root.with_name(f"{local_root.name}.ngio-locks")
+        # Created here rather than left to `filelock`, which only grew that
+        # behaviour in 3.12.3 while ngio's floor is 3.12. `exist_ok` because
+        # concurrent workers reach this at the same time.
+        locks_root.mkdir(parents=True, exist_ok=True)
+        _lock_path = locks_root / f"{quote(self._group.path, safe='') or 'root'}.lock"
         _lock = FileLock(_lock_path, timeout=10)
         return _lock_path, _lock
 
@@ -320,7 +345,18 @@ class ZarrGroupHandler:
 
         if not create_mode:
             raise NgioFileNotFoundError(f"No group found at {path}")
-        group = self.create_group(path)
+
+        try:
+            group = self.create_group(path)
+        except NgioFileExistsError:
+            # Another worker created the group between the lookup above and
+            # this call. `create_mode=True` means get-or-create, so losing that
+            # race is not an error: adopt the group the winner wrote. Without
+            # this, two workers adding images to the same well would race on
+            # creating it and one would fail outright.
+            group = self.group.get(path, default=None)
+            if not isinstance(group, zarr.Group):
+                raise
         self._group_cache.set(path, group, overwrite=overwrite)
         return group
 

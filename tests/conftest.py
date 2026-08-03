@@ -29,10 +29,12 @@ def _download_dataset(name: str) -> Path:
     cache, and `re_unzip=False` skips re-extracting an existing dataset.
 
     Caveat: `filelock`'s Windows backend can hand one lock to two holders, so
-    on Windows this does not reliably serialize the workers — see the module
-    docstring of tests/unit/hcs/test_plate_concurrency.py. Left as is because
-    CI restores `data/` from a cache before running, making the cold-cache path
-    it guards rare; a concurrent download would corrupt the shared fixtures.
+    on Windows this does not reliably serialize the workers — see the reason
+    text in `ZarrGroupHandler._create_lock`, which is why ngio itself refuses
+    to lock there. This is a raw `FileLock` rather than ngio's, so it is not
+    covered by that refusal. Left as is because CI restores `data/` from a
+    cache before running, making the cold-cache path it guards rare; a
+    concurrent download would corrupt the shared fixtures.
     """
     os.makedirs(ZENODO_DOWNLOAD_DIR, exist_ok=True)
     with FileLock(ZENODO_DOWNLOAD_DIR / f"{name}.lock"):
