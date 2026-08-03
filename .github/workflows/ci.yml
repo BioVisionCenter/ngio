@@ -50,7 +50,7 @@ jobs:
   typecheck:
     # `src/` must stay free of type errors. `tests/` is deliberately not gated
     # yet — see the 1.0 checklist.
-    name: Type check (src)
+    name: type check (src)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,7 +67,7 @@ jobs:
     # Build the docs and run every snippet on PRs. Kept here rather than in
     # docs.yml so the deploy workflow's `contents: write` is not extended to
     # pull requests.
-    name: Docs build
+    name: docs build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,7 +86,7 @@ jobs:
     # Installs the exact lower bounds declared in pyproject so the floors are
     # tested rather than asserted. Lowering a floor without updating this job
     # will not be caught anywhere else.
-    name: Minimum dependencies
+    name: minimum dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -210,7 +210,7 @@ jobs:
           files: /home/runner/work/ngio/ngio/coverage.xml
 
   deploy:
-    name: Deploy
+    name: deploy
     # Every gate must pass before anything reaches PyPI, not just the test matrix.
     needs: [test, lint, check-manifest, typecheck, docs, test-min-deps]
     if: success() && startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule'
