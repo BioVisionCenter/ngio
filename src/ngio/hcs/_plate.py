@@ -189,6 +189,11 @@ class OmeZarrWell:
         machine, and on a shared network filesystem only if the mount honours
         `flock`.
 
+        Note:
+            Not on Windows, where `filelock` can hand the same lock to two
+            workers at once, so a concurrent update can be silently lost.
+            Concurrent writers to one well are unsupported there.
+
         Raises:
             NgioValueError: If the store is not local, or if the well was
                 opened with caching enabled — neither supports the lock.
@@ -626,6 +631,11 @@ class OmeZarrPlate:
         it holds across threads and processes on one machine, and on a shared
         network filesystem only if the mount honours `flock`.
 
+        Note:
+            Not on Windows, where `filelock` can hand the same lock to two
+            workers at once, so a concurrent update can be silently lost.
+            Concurrent writers to one plate are unsupported there.
+
         Raises:
             NgioValueError: If the store is not local, or if the plate was
                 opened with caching enabled — neither supports the lock.
@@ -779,6 +789,11 @@ class OmeZarrPlate:
         lock is an OS file lock: it holds across threads and processes on one
         machine, and on a shared network filesystem only if the mount honours
         `flock`.
+
+        Note:
+            Not on Windows, where `filelock` can hand the same lock to two
+            workers at once, so a concurrent update can be silently lost.
+            Concurrent writers to one plate are unsupported there.
 
         Raises:
             NgioValueError: If the store is not local, or if the plate was
