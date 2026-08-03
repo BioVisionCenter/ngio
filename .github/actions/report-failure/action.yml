@@ -1,0 +1,60 @@
+# Opens (or updates) the [test-bot] issue for a failing scheduled run.
+#
+# Replaces JasonEtco/create-an-issue, which is still `using: node20`. Composite, so
+# it pulls in no Node runtime at all; `gh` and `jq` are preinstalled on the ubuntu,
+# macos and windows runners, and `shell: bash` gives Git Bash on windows.
+name: Report failure
+description: Open a [test-bot] issue for a failing scheduled run, or update the open one.
+
+inputs:
+  title:
+    description: Issue title. An open issue with this exact title is updated in place.
+    required: true
+  platform:
+    description: Runner platform the failure was seen on.
+    required: true
+  python:
+    description: Python environment label, e.g. `test11` or `py3.13, pip stable`.
+    required: true
+  token:
+    description: Token carrying issues-write permission. Needed explicitly because checkout runs without persisted credentials.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      # Every caller-supplied value goes through `env:` rather than `${{ }}`
+      # interpolation into the script body, so nothing can be injected into it.
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        TITLE: ${{ inputs.title }}
+        PLATFORM: ${{ inputs.platform }}
+        PYTHON: ${{ inputs.python }}
+      run: |
+        set -euo pipefail
+
+        # printf rather than a heredoc: a heredoc body inside this block scalar
+        # would carry its YAML indentation into the issue text.
+        body=$(printf '%s\n' \
+          "The ${GITHUB_WORKFLOW} workflow failed on $(date -u '+%Y-%m-%d %H:%M') UTC" \
+          "" \
+          "The most recent failing test was on ${PLATFORM} (${PYTHON})" \
+          "with commit: ${GITHUB_SHA}" \
+          "" \
+          "Full run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+          "" \
+          "(This post will be updated if another test fails, as long as this issue remains open.)")
+
+        # Match the title exactly rather than relying on `--search`, whose tokenizer
+        # does not treat the leading "[test-bot]" as a literal.
+        number=$(gh issue list --state open --label bug --limit 100 --json number,title \
+          | jq -r --arg t "${TITLE}" 'map(select(.title == $t)) | .[0].number // empty')
+
+        if [ -n "${number}" ]; then
+          echo "Updating existing issue #${number}"
+          gh issue edit "${number}" --body "${body}"
+        else
+          echo "Opening a new issue"
+          gh issue create --title "${TITLE}" --label bug --body "${body}"
+        fi

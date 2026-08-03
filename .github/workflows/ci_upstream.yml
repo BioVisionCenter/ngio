@@ -65,16 +65,12 @@ jobs:
 
       - name: 📝 Report Failures
         if: failure() && github.event_name == 'schedule'
-        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PLATFORM: ubuntu-latest
-          PYTHON: "3.13 (pip stable)"
-          RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] pip stable tests are failing"
+        uses: ./.github/actions/report-failure
         with:
-          filename: .github/TEST_FAIL_TEMPLATE.md
-          update_existing: true
+          title: "[test-bot] pip stable tests are failing"
+          platform: ubuntu-latest
+          python: "py3.13, pip stable"
+          token: ${{ github.token }}
 
   test-pip-pre:
     name: pip (--pre)
@@ -118,13 +114,9 @@ jobs:
 
       - name: 📝 Report Failures
         if: failure()
-        uses: JasonEtco/create-an-issue@1b14a70e4d8dc185e5cc76d3bec9eab20257b2c5 # v2.9.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PLATFORM: ubuntu-latest
-          PYTHON: "3.13 (pip --pre)"
-          RUN_ID: ${{ github.run_id }}
-          TITLE: "[test-bot] pip --pre tests are failing"
+        uses: ./.github/actions/report-failure
         with:
-          filename: .github/TEST_FAIL_TEMPLATE.md
-          update_existing: true
+          title: "[test-bot] pip --pre tests are failing"
+          platform: ubuntu-latest
+          python: "py3.13, pip --pre"
+          token: ${{ github.token }}
