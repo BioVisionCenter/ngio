@@ -184,7 +184,10 @@ class ZarrGroupHandler:
                 f"Instead, got a {self.store.store_type} store."
             )
 
-        store_path = local_root / self.group.path
+        # `self._group.path`, not `self.group.path`: the latter reopens the
+        # group (a full metadata read) when caching is off, and the path is
+        # fixed at construction — `reopen_group` passes it through unchanged.
+        store_path = local_root / self._group.path
         _lock_path = store_path.with_suffix(".lock")
         _lock = FileLock(_lock_path, timeout=10)
         return _lock_path, _lock

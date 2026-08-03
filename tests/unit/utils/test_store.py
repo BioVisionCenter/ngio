@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import pickle
 from collections import Counter
 from pathlib import Path
@@ -298,6 +299,19 @@ class TestSharingViolationRetry:
             "_SHARING_VIOLATION_BACKOFF",
             ConstantBackoff(delay_s=0.0, jitter=False),
         )
+
+    def test_recovers_from_the_reader_side_shape(self, tmp_path):
+        # What `open()` raises on Windows for a delete-pending target: errno
+        # only, no winerror. See `_retry.is_sharing_violation`.
+        target = tmp_path / "zarr.json"
+        target.write_text("{}")
+        flaky = SharingViolationStore(
+            fail_times=1,
+            exc=PermissionError(errno.EACCES, "Permission denied", str(target)),
+        )
+        store = NgioStore(flaky, retry=RetryConfig())
+        assert sync(store.exists("nope")) is False
+        assert flaky.attempts["exists"] == 2
 
     @pytest.mark.parametrize("winerror", [5, 32, 33])
     def test_recovers_with_retries_disabled(self, winerror):

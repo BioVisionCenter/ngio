@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Windows: the read side of a concurrent store access could still fail with `PermissionError: [Errno 13] Permission denied` on `zarr.json`. `v1.0.0` retries the conflict only when the error carries a Win32 code, which `os.replace` and `shutil.rmtree` set but `open()` does not — CPython opens files through the C runtime, which reports `EACCES` and no Win32 code. A reader hitting a metadata file that a concurrent writer's atomic rename had left delete-pending therefore raised on the first attempt instead of being retried. Both shapes are now matched.
+- `ZarrGroupHandler.lock` and `.lock_path` no longer reopen the group — a full metadata read — to obtain a path that is fixed at construction.
+
 ## [v1.0.0]
 
 First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.

@@ -1,5 +1,7 @@
 import asyncio
+import errno
 from collections.abc import Mapping
+from pathlib import Path
 
 import pytest
 
@@ -77,6 +79,16 @@ def _win_error(winerror: int) -> PermissionError:
     return exc
 
 
+def _crt_error(filename, err: int = errno.EACCES) -> PermissionError:
+    """Build the error `open()` raises on Windows for the same conflict.
+
+    CPython opens files through the CRT, which sets `errno` and leaves
+    `winerror` unset — hence the shape a concurrent reader of a
+    delete-pending `zarr.json` sees.
+    """
+    return PermissionError(err, "Permission denied", str(filename))
+
+
 class TestIsSharingViolation:
     @pytest.mark.parametrize("winerror", sorted(_SHARING_VIOLATION_WINERRORS))
     def test_matches_win32_codes(self, winerror):
@@ -86,8 +98,22 @@ class TestIsSharingViolation:
         assert not is_sharing_violation(_win_error(2))
 
     def test_permission_error_without_winerror_not_matched(self):
-        # The shape botocore/s3fs raise for an S3 403.
+        # The shape botocore/s3fs raise for an S3 403: no code of either kind.
         assert not is_sharing_violation(PermissionError("Access Denied"))
+
+    def test_matches_crt_eacces(self, tmp_path: Path):
+        target = tmp_path / "zarr.json"
+        target.write_text("{}")
+        assert is_sharing_violation(_crt_error(target))
+
+    def test_directory_eacces_not_matched(self, tmp_path: Path):
+        # Opening a directory is EACCES on Windows too, but permanently so.
+        assert not is_sharing_violation(_crt_error(tmp_path))
+
+    def test_other_errno_not_matched(self, tmp_path: Path):
+        assert not is_sharing_violation(
+            _crt_error(tmp_path / "zarr.json", errno.ENOENT)
+        )
 
     def test_ngio_errors_never_matched(self):
         # NgioFileExistsError is an OSError subclass, so it reaches the check.
