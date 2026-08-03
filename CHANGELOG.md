@@ -6,7 +6,7 @@
 
 - Windows: concurrent *reads* of a metadata file are now retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
 - Documented what `atomic_add_image` / `atomic_remove_image` guarantee: an OS file lock, so one machine and a local store only. Added the missing contention test for it.
-- Known limitation, now documented: the lock does not hold on Windows, where `filelock` can hand it to two workers at once. Concurrent writers to one plate are unsupported there; the contention test is skipped on Windows.
+- Known limitation, now documented: the lock does not hold on Windows, where `filelock` can hand it to two workers at once. Concurrent writers to one plate are unsupported there, and the tests that assert no updates are lost no longer run on Windows.
 
 ## [v1.0.0]
 
