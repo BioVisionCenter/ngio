@@ -2,16 +2,15 @@
 
 ## [Unreleased]
 
-### Fix
-- Two workers adding to the same well no longer race on creating it. `get_group(create_mode=True)` is a get-or-create, so losing the race adopts the other worker's group instead of raising `NgioFileExistsError`; and `atomic_add_image` creates the well group under the plate lock rather than outside it. The first affected every get-or-create caller — wells, `labels`, `tables`.
+### Fixes
+
+- Concurrent writers no longer race on creating a group: `get_group(create_mode=True)` is a get-or-create, and `atomic_add_image` creates the well group under the plate lock. Two workers adding to the same well could fail with `NgioFileExistsError`.
 - Windows: concurrent *reads* of a metadata file are retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
 
 ### Behaviour changes
-- `atomic_add_image` / `atomic_remove_image` now warn on Windows that their lock is best-effort. `filelock` deletes the lock file on release without the descriptor check its Unix backend has, so two concurrent writers can hold one lock and lose an update — which `v1.0.0` did silently. A single writer is unaffected and still correct; run concurrent ones on Linux or macOS.
-- Lock files moved to a `<store>.ngio-locks/` directory beside the store, one file per group path. Nothing is written inside the Zarr store any more, and two groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share one lock. Since the paths changed, a `≤1.0.0` writer would not exclude a newer one — upgrade all writers to a plate together.
 
-### Tests
-- The concurrency tests run their workers in real subprocesses. Both ran on dask's threaded scheduler before — including the one named `test_multiprocessing_safety` — so neither could see a lock that failed only between processes.
+- `atomic_add_image` / `atomic_remove_image` warn on Windows that their lock is best-effort: `filelock` can hand it to two writers at once, so concurrent ones can lose an update — `v1.0.0` lost it silently. A single writer is unaffected.
+- Lock files moved to a `<store>.ngio-locks/` directory beside the store, one per group path. Nothing is written inside the Zarr store any more, and groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share a lock. A `≤1.0.0` writer takes the old paths, so upgrade all writers to a plate together.
 
 ## [v1.0.0]
 
