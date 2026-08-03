@@ -2626,6 +2626,7 @@ This will add a new image to the plate and well metadata.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>This function is not multiprocessing safe. If you are using multiprocessing, you should use the <code>atomic_add_image</code> method instead.</p>
+<p><code>atomic_add_image</code> serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a <strong>local store</strong> — on a remote store there is no lock to take and it raises <code>NgioValueError</code> — and on a shared network filesystem it is only as reliable as the mount's <code>flock</code> support.</p>
 </div>
 </div>
 <div class="tabbed-block">
@@ -2646,7 +2647,7 @@ This will remove the image metadata from the plate and well metadata.</p>
 <p class="admonition-title">Warning</p>
 <p>No data will be removed from the store. If an image is saved in the store it will remain there.
 Also the metadata will only be removed from the plate.well metadata. The number of columns and rows will not be updated.
-This function is not multiprocessing safe. If you are using multiprocessing, you should use the <code>atomic_remove_image</code> method instead.</p>
+This function is not multiprocessing safe. If you are using multiprocessing, you should use the <code>atomic_remove_image</code> method instead, under the same store and platform limits as <code>atomic_add_image</code> above.</p>
 </div>
 </div>
 </div>

@@ -1904,6 +1904,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v100" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3074,6 +3102,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixed
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v100" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -4171,6 +4227,12 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Windows: concurrent <em>reads</em> of a metadata file are now retried too. <code>v1.0.0</code> only matched the conflict when the error carried a Win32 code, which <code>os.replace</code> sets but <code>open()</code> does not.</li>
+<li>Documented what <code>atomic_add_image</code> / <code>atomic_remove_image</code> guarantee: an OS file lock, so one machine and a local store only. Added the missing contention test for it.</li>
+</ul>
 <h2 id="v100">[v1.0.0]<a class="headerlink" href="#v100" title="Permanent link">&para;</a></h2>
 <p>First stable release. Everything deprecated in <code>v0.5.0</code> (each warned "will be removed in <code>ngio=0.6</code>") is now removed — that release became <code>1.0.0</code>.</p>
 <h3 id="removed">Removed<a class="headerlink" href="#removed" title="Permanent link">&para;</a></h3>
