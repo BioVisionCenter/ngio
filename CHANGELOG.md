@@ -7,7 +7,7 @@
 - Windows: concurrent *reads* of a metadata file are retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
 
 ### Behaviour changes
-- `atomic_add_image` / `atomic_remove_image` raise `NgioValueError` on Windows instead of taking a lock `filelock` cannot make exclusive there — it unlinks the lock file on release without the descriptor check its Unix backend has, so two workers could hold one lock and an update was lost silently. Use `add_image` / `remove_image` from a single worker there.
+- `atomic_add_image` / `atomic_remove_image` now warn on Windows that their lock is best-effort. `filelock` deletes the lock file on release without the descriptor check its Unix backend has, so two concurrent writers can hold one lock and lose an update — which `v1.0.0` did silently. A single writer is unaffected and still correct; run concurrent ones on Linux or macOS.
 - Lock files moved to a `<store>.ngio-locks/` directory beside the store, one file per group path. Nothing is written inside the Zarr store any more, and two groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share one lock. Since the paths changed, a `≤1.0.0` writer would not exclude a newer one — upgrade all writers to a plate together.
 
 ### Tests

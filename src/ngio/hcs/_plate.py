@@ -190,14 +190,13 @@ class OmeZarrWell:
         `flock`.
 
         Note:
-            Unsupported on Windows, where `filelock` can hand the same lock to
-            two workers at once. This raises there rather than losing an update
-            silently; use `add_image` from a single worker instead.
+            On Windows the lock is best-effort and warns: `filelock` can hand
+            the same lock to two workers at once, so a single writer is safe but
+            concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: On Windows, if the store is not local, or if the
-                well was opened with caching enabled — none of the three
-                supports the lock.
+            NgioValueError: If the store is not local, or if the well was
+                opened with caching enabled — neither supports the lock.
         """
         return self._add_image(
             image_path=image_path,
@@ -640,14 +639,13 @@ class OmeZarrPlate:
         network filesystem only if the mount honours `flock`.
 
         Note:
-            Unsupported on Windows, where `filelock` can hand the same lock to
-            two workers at once. This raises there rather than losing an update
-            silently; use `add_image` from a single worker instead.
+            On Windows the lock is best-effort and warns: `filelock` can hand
+            the same lock to two workers at once, so a single writer is safe but
+            concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: On Windows, if the store is not local, or if the
-                plate was opened with caching enabled — none of the three
-                supports the lock.
+            NgioValueError: If the store is not local, or if the plate was
+                opened with caching enabled — neither supports the lock.
         """
         if image_path is None:
             raise ValueError(
@@ -802,14 +800,13 @@ class OmeZarrPlate:
         `flock`.
 
         Note:
-            Unsupported on Windows, where `filelock` can hand the same lock to
-            two workers at once. This raises there rather than losing an update
-            silently; use `remove_image` from a single worker instead.
+            On Windows the lock is best-effort and warns: `filelock` can hand
+            the same lock to two workers at once, so a single writer is safe but
+            concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: On Windows, if the store is not local, or if the
-                plate was opened with caching enabled — none of the three
-                supports the lock.
+            NgioValueError: If the store is not local, or if the plate was
+                opened with caching enabled — neither supports the lock.
         """
         return self._remove_image(
             row=row,

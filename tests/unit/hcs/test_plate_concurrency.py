@@ -19,9 +19,10 @@ therefore its own `FileLock` and file descriptor. That is what makes the lock
 genuinely exclusive between workers, and it is also the realistic shape: in a
 distributed run each worker opens the plate itself.
 
-Skipped on Windows, where `atomic_*` raises instead of taking a lock that
-`filelock` cannot make exclusive there — see `ZarrGroupHandler._create_lock`.
-`test_atomic_add_image_rejects_windows` covers that refusal on every platform.
+Skipped on Windows, where `filelock` cannot make the lock exclusive, so ngio
+takes it best-effort and warns instead — see `ZarrGroupHandler._create_lock`.
+Losing no updates is exactly what cannot be promised there, so this assertion
+does not hold; `test_atomic_add_image_warns_on_windows` covers what does.
 """
 
 import multiprocessing
@@ -33,7 +34,7 @@ from pathlib import Path
 import pytest
 
 from ngio import create_empty_plate, open_ome_zarr_plate
-from ngio.utils import NgioValueError
+from ngio.utils import NgioUserWarning
 from ngio.utils import _retry as _retry_module
 
 _WELLS = [("B", "03"), ("B", "04"), ("C", "03"), ("C", "04")]
@@ -61,7 +62,7 @@ def _expected_paths() -> tuple[list[str], list[str]]:
 
 @pytest.mark.skipif(
     sys.platform == "win32",
-    reason="atomic_* is unsupported on Windows; see the module docstring",
+    reason="the lock is only best-effort on Windows; see the module docstring",
 )
 @pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
 def test_atomic_add_image_loses_no_updates(tmp_path: Path, ngff_version):
@@ -92,19 +93,21 @@ def test_atomic_add_image_loses_no_updates(tmp_path: Path, ngff_version):
     assert sorted(plate.images_paths()) == expected_images
 
 
-def test_atomic_add_image_rejects_windows(tmp_path: Path, monkeypatch):
-    """`atomic_*` refuses on Windows rather than losing an update silently.
+def test_atomic_add_image_warns_on_windows(tmp_path: Path, monkeypatch):
+    """On Windows `atomic_*` warns and still does the work.
 
-    Simulated so the refusal is exercised on every platform, not only in the
-    Windows CI jobs where the tests above do not run at all.
+    The warning is the whole contract here: a single writer — which is what
+    Windows is used for — must keep working, while a concurrent one is told the
+    lock cannot protect it. Simulated so this runs on every platform, not only
+    in the Windows CI jobs where the test above does not run at all.
     """
     store = tmp_path / "plate.zarr"
     create_empty_plate(store, name="win_plate", ngff_version="0.5")
     plate = open_ome_zarr_plate(store, mode="r+")
 
     monkeypatch.setattr(_retry_module, "_IS_WINDOWS", True)
-    with pytest.raises(NgioValueError, match="not exclusive on Windows"):
-        plate.atomic_add_image(row="B", column="03", image_path="0")
+    with pytest.warns(NgioUserWarning, match="not exclusive on Windows"):
+        path = plate.atomic_add_image(row="B", column="03", image_path="0")
 
-    # The non-atomic path stays available for single-worker use.
-    assert plate.add_image(row="B", column="03", image_path="0") == "B/03/0"
+    assert path == "B/03/0"
+    assert plate.images_paths() == ["B/03/0"]
