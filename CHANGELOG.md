@@ -2,11 +2,16 @@
 
 ## [Unreleased]
 
-### Fixed
+### Fix
+- Two workers adding to the same well no longer race on creating it. `get_group(create_mode=True)` is a get-or-create, so losing the race adopts the other worker's group instead of raising `NgioFileExistsError`; and `atomic_add_image` creates the well group under the plate lock rather than outside it. The first affected every get-or-create caller — wells, `labels`, `tables`.
+- Windows: concurrent *reads* of a metadata file are retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
 
-- Windows: concurrent *reads* of a metadata file are now retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
-- Documented what `atomic_add_image` / `atomic_remove_image` guarantee: an OS file lock, so one machine and a local store only. Added the missing contention test for it.
-- Known limitation, now documented: the lock does not hold on Windows, where `filelock` can hand it to two workers at once. Concurrent writers to one plate are unsupported there, and the tests that assert no updates are lost no longer run on Windows.
+### Behaviour changes
+- `atomic_add_image` / `atomic_remove_image` raise `NgioValueError` on Windows instead of taking a lock `filelock` cannot make exclusive there — it unlinks the lock file on release without the descriptor check its Unix backend has, so two workers could hold one lock and an update was lost silently. Use `add_image` / `remove_image` from a single worker there.
+- Lock files moved to a `<store>.ngio-locks/` directory beside the store, one file per group path. Nothing is written inside the Zarr store any more, and two groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share one lock. Since the paths changed, a `≤1.0.0` writer would not exclude a newer one — upgrade all writers to a plate together.
+
+### Tests
+- The concurrency tests run their workers in real subprocesses. Both ran on dask's threaded scheduler before — including the one named `test_multiprocessing_safety` — so neither could see a lock that failed only between processes.
 
 ## [v1.0.0]
 
