@@ -190,13 +190,14 @@ class OmeZarrWell:
         `flock`.
 
         Note:
-            Not on Windows, where `filelock` can hand the same lock to two
-            workers at once, so a concurrent update can be silently lost.
-            Concurrent writers to one well are unsupported there.
+            Unsupported on Windows, where `filelock` can hand the same lock to
+            two workers at once. This raises there rather than losing an update
+            silently; use `add_image` from a single worker instead.
 
         Raises:
-            NgioValueError: If the store is not local, or if the well was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: On Windows, if the store is not local, or if the
+                well was opened with caching enabled — none of the three
+                supports the lock.
         """
         return self._add_image(
             image_path=image_path,
@@ -569,6 +570,10 @@ class OmeZarrPlate:
         else:
             plate_lock = MockLock()
 
+        # Lock ordering: the well lock is taken only after the plate lock is
+        # released, never nested inside it. `_remove_image` nests the other way
+        # (well, then plate via `_remove_well`), so acquiring them plate-first
+        # while still holding the plate lock would close a deadlock cycle.
         with plate_lock:
             meta = self.meta
             meta = meta.add_well(row=row, column=column)
@@ -579,8 +584,13 @@ class OmeZarrPlate:
             self.meta_handler.update_meta(meta)
             self.meta_handler._group_handler.clean_cache()
 
-        well_path = self.meta.get_well_path(row=row, column=column)
-        group_handler = self._group_handler.get_handler(well_path)
+            # Creating the well group belongs to the same critical section as
+            # the plate metadata that lists it. Outside the lock, two workers
+            # adding to one well both find it missing and race to create it.
+            # `meta`, not `self.meta`: the path is already in hand, so this
+            # avoids re-reading the plate metadata that was just written.
+            well_path = meta.get_well_path(row=row, column=column)
+            group_handler = self._group_handler.get_handler(well_path)
 
         if atomic:
             well_lock = group_handler.lock
@@ -600,8 +610,6 @@ class OmeZarrPlate:
             else:
                 meta_handler = WellMetaHandler(group_handler=group_handler)
                 well_meta = meta_handler.get_meta()
-
-            group_handler = self._group_handler.get_handler(well_path)
 
             if image_path is not None:
                 well_meta = well_meta.add_image(
@@ -632,13 +640,14 @@ class OmeZarrPlate:
         network filesystem only if the mount honours `flock`.
 
         Note:
-            Not on Windows, where `filelock` can hand the same lock to two
-            workers at once, so a concurrent update can be silently lost.
-            Concurrent writers to one plate are unsupported there.
+            Unsupported on Windows, where `filelock` can hand the same lock to
+            two workers at once. This raises there rather than losing an update
+            silently; use `add_image` from a single worker instead.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: On Windows, if the store is not local, or if the
+                plate was opened with caching enabled — none of the three
+                supports the lock.
         """
         if image_path is None:
             raise ValueError(
@@ -768,6 +777,8 @@ class OmeZarrPlate:
         else:
             well_lock = MockLock()
 
+        # Well, then plate: this is the only place the two nest, and it is the
+        # ordering the rest of the class must not invert. See `_add_image`.
         with well_lock:
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
@@ -791,13 +802,14 @@ class OmeZarrPlate:
         `flock`.
 
         Note:
-            Not on Windows, where `filelock` can hand the same lock to two
-            workers at once, so a concurrent update can be silently lost.
-            Concurrent writers to one plate are unsupported there.
+            Unsupported on Windows, where `filelock` can hand the same lock to
+            two workers at once. This raises there rather than losing an update
+            silently; use `remove_image` from a single worker instead.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: On Windows, if the store is not local, or if the
+                plate was opened with caching enabled — none of the three
+                supports the lock.
         """
         return self._remove_image(
             row=row,

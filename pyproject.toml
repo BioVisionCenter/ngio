@@ -199,6 +199,11 @@ markers = [
 # https://coverage.readthedocs.io/
 [tool.coverage.run]
 source = ["ngio"]
+# The concurrency tests run their workers in real subprocesses, so without this
+# every line they exercise — the file lock, `atomic_add_image` — would read as
+# uncovered. pytest-cov combines the per-process data files.
+concurrency = ["multiprocessing"]
+parallel = true
 
 [tool.coverage.report]
 show_missing = true
