@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- Windows: concurrent *reads* of a metadata file are now retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
+- Documented what `atomic_add_image` / `atomic_remove_image` guarantee: an OS file lock, so one machine and a local store only. Added the missing contention test for it.
+
 ## [v1.0.0]
 
 First stable release. Everything deprecated in `v0.5.0` (each warned "will be removed in `ngio=0.6`") is now removed — that release became `1.0.0`.

@@ -8,11 +8,13 @@ that does not depend on the user policy. See `aretry_sharing_violation`.
 """
 
 import asyncio
+import errno
 import functools
 import logging
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import ParamSpec, TypeVar
 
 from ngio.config import ExponentialBackoff, RetryConfig, get_config
@@ -37,8 +39,11 @@ _NEVER_RETRY: tuple[type[BaseException], ...] = (
     GeneratorExit,
 )
 
-# ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION.
+# ERROR_ACCESS_DENIED, ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION. Set by
+# the Win32 APIs behind `os.replace` and `shutil.rmtree`.
 _SHARING_VIOLATION_WINERRORS = frozenset({5, 32, 33})
+# `open()` reaches the same conflict through the CRT, which sets errno instead.
+_SHARING_VIOLATION_ERRNOS = frozenset({errno.EACCES})
 _SHARING_VIOLATION_ATTEMPTS = 8
 _SHARING_VIOLATION_BACKOFF = ExponentialBackoff(
     delay_s=0.005, max_delay_s=0.2, jitter=True
@@ -62,13 +67,25 @@ def is_retryable(exc: BaseException, policy: RetryConfig) -> bool:
 def is_sharing_violation(exc: BaseException) -> bool:
     """Return whether the error is a transient Windows file-sharing conflict.
 
-    Matches on the Win32 error code rather than on `PermissionError`, so a
-    remote store's 403 (also raised as `PermissionError`) is never mistaken
-    for one. Ngio's own errors are never treated as retryable.
+    The conflict surfaces in two shapes, because the two halves of the race
+    reach the OS differently. `os.replace` and `shutil.rmtree` call Win32
+    directly, so the error carries a `winerror`. `open()` — hence every read —
+    goes through the CRT, which sets `errno` only and leaves `winerror` unset;
+    a delete-pending target then arrives as `EACCES`.
+
+    Matches on the error code rather than on `PermissionError`, so a remote
+    store's 403 (also raised as `PermissionError`, but with no code at all) is
+    never mistaken for one. Ngio's own errors are never treated as retryable.
     """
     if isinstance(exc, _NEVER_RETRY) or not isinstance(exc, OSError):
         return False
-    return getattr(exc, "winerror", None) in _SHARING_VIOLATION_WINERRORS
+    winerror = getattr(exc, "winerror", None)
+    if winerror is not None:
+        return winerror in _SHARING_VIOLATION_WINERRORS
+    if exc.errno not in _SHARING_VIOLATION_ERRNOS:
+        return False
+    # Opening a directory is also EACCES on Windows, and is permanent.
+    return not (exc.filename and Path(exc.filename).is_dir())
 
 
 async def aretry_sharing_violation(
@@ -78,9 +95,11 @@ async def aretry_sharing_violation(
 
     Windows refuses `os.replace` and `shutil.rmtree` on a path while another
     handle to it is open without `FILE_SHARE_DELETE`, which CPython never
-    passes. An unrelated concurrent *reader* therefore breaks a writer's
-    atomic rename. The condition clears in milliseconds, so this retry is
-    always on, unlike `io_retry` which is a user policy and defaults to off.
+    passes, and refuses to open a path that a replace has left delete-pending.
+    An unrelated concurrent *reader* therefore breaks a writer's atomic rename,
+    and that rename in turn breaks concurrent readers. The condition clears in
+    milliseconds, so this retry is always on, unlike `io_retry` which is a user
+    policy and defaults to off.
 
     Bounded: after `_SHARING_VIOLATION_ATTEMPTS` the original error is raised.
 
@@ -95,11 +114,15 @@ async def aretry_sharing_violation(
             if not is_sharing_violation(e):
                 raise
             delay = _SHARING_VIOLATION_BACKOFF.compute_delay(attempt)
+            winerror = getattr(e, "winerror", None)
+            code = (
+                f"winerror {winerror}" if winerror is not None else f"errno {e.errno}"
+            )
             logger.debug(
-                "Windows file-sharing conflict on %s (winerror %s), retrying in "
+                "Windows file-sharing conflict on %s (%s), retrying in "
                 "%.3fs (attempt %d/%d)",
                 op_name or "IO operation",
-                getattr(e, "winerror", None),
+                code,
                 delay,
                 attempt,
                 _SHARING_VIOLATION_ATTEMPTS,
