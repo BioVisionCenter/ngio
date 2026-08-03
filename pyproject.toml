@@ -187,6 +187,11 @@ filterwarnings = [
     "ignore::zarr.errors.ZarrUserWarning",                    # required for anndata
     "ignore::anndata._warnings.ImplicitModificationWarning",  # anndata internal index coercion
     "ignore::UserWarning:anndata._io.zarr",                   # anndata zarr v2→v3 migration notice
+    # Windows only: every atomic_* call warns that its lock is best-effort there.
+    # Global rather than per-test, so a new atomic_* test cannot forget it and
+    # break the Windows jobs. The `warns_on_windows` tests assert the warning
+    # explicitly via pytest.warns, which overrides this filter.
+    "ignore:ngio's file lock is not exclusive on Windows",
 ]
 addopts = [
     "-vv",

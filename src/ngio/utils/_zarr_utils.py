@@ -174,15 +174,19 @@ class ZarrGroupHandler:
             return self._lock
 
         if _retry._IS_WINDOWS:
-            raise NgioValueError(
-                "The lock mechanism is not exclusive on Windows, so ngio does "
-                "not offer it there. `filelock` unlinks the lock file on "
-                "release without the descriptor check its Unix backend has "
-                "(`_windows.py::_acquire` has no `st_nlink` guard), so one "
-                "worker can lock a file another has already unlinked while a "
-                "third re-creates and locks it: two workers in the critical "
-                "section, one update silently lost. Concurrent writers to one "
-                "store are unsupported on Windows."
+            # Warned rather than refused: an *uncontended* lock is exclusive on
+            # Windows too, so a single writer is correct and refusing would
+            # break it for no reason. Only concurrent writers are at risk.
+            warnings.warn(
+                "ngio's file lock is not exclusive on Windows: `filelock` "
+                "deletes the lock file on release without the descriptor check "
+                "its Unix backend has (`_windows.py::_acquire` has no "
+                "`st_nlink` guard), so two concurrent writers can hold it at "
+                "once and one update can be lost. Proceeding with a best-effort "
+                "lock, which is correct for a single writer. Run concurrent "
+                "writers on Linux or macOS.",
+                NgioUserWarning,
+                stacklevel=2,
             )
 
         if self.use_cache is True:

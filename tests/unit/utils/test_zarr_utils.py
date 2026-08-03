@@ -9,11 +9,13 @@ import fsspec.implementations.http
 import numpy as np
 import pytest
 import zarr
+from filelock import BaseFileLock
 from zarr.storage import LocalStore
 
 from ngio.utils import (
     NgioFileExistsError,
     NgioFileNotFoundError,
+    NgioUserWarning,
     NgioValueError,
     ZarrGroupHandler,
     _retry,
@@ -168,7 +170,7 @@ def _append_under_lock(args: tuple[str, int]) -> int:
 
 @pytest.mark.skipif(
     sys.platform == "win32",
-    reason="the lock is unsupported on Windows; see ZarrGroupHandler._create_lock",
+    reason="the lock is only best-effort on Windows, so no-lost-update cannot hold",
 )
 def test_multiprocessing_safety(tmp_path: Path):
     """The lock holds between real processes, which is what it claims.
@@ -211,13 +213,22 @@ def test_multiprocessing_safety(tmp_path: Path):
         handler._create_lock()
 
 
-def test_lock_rejected_on_windows(tmp_path: Path, monkeypatch):
-    """The lock refuses on Windows rather than handing itself to two workers."""
+def test_lock_warns_on_windows(tmp_path: Path, monkeypatch):
+    """On Windows the lock warns and is still handed out, not refused.
+
+    Uncontended it is exclusive there too, so refusing would break every
+    single-writer caller to protect against a race they are not running.
+    Simulated, so the warning is exercised on every platform.
+    """
     handler = ZarrGroupHandler(tmp_path / "win.zarr", cache=False, mode="a")
 
     monkeypatch.setattr(_retry, "_IS_WINDOWS", True)
-    with pytest.raises(NgioValueError, match="not exclusive on Windows"):
-        handler._create_lock()
+    with pytest.warns(NgioUserWarning, match="not exclusive on Windows"):
+        lock_path, lock = handler._create_lock()
+
+    assert isinstance(lock, BaseFileLock)
+    with lock:
+        assert lock_path.exists()
 
 
 def test_lock_paths_live_outside_the_store(tmp_path: Path):
