@@ -2626,7 +2626,7 @@ This will add a new image to the plate and well metadata.</p>
 <div class="admonition warning">
 <p class="admonition-title">Warning</p>
 <p>This function is not multiprocessing safe. If you are using multiprocessing, you should use the <code>atomic_add_image</code> method instead.</p>
-<p><code>atomic_add_image</code> serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a <strong>local store</strong> — on a remote store there is no lock to take and it raises <code>NgioValueError</code> — and on a shared network filesystem it is only as reliable as the mount's <code>flock</code> support. It does <strong>not</strong> hold on <strong>Windows</strong>, where <code>filelock</code> can hand the same lock to two workers at once and an update is then silently lost; concurrent writers to one plate are unsupported there.</p>
+<p><code>atomic_add_image</code> serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a <strong>local store</strong> — on a remote store there is no lock to take and it raises <code>NgioValueError</code> — and on a shared network filesystem it is only as reliable as the mount's <code>flock</code> support. It is unsupported on <strong>Windows</strong>, where <code>filelock</code> can hand the same lock to two workers at once: it raises <code>NgioValueError</code> there rather than losing an update silently, so use <code>add_image</code> from a single worker instead.</p>
 </div>
 </div>
 <div class="tabbed-block">
