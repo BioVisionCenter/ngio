@@ -209,9 +209,11 @@ class ZarrGroupHandler:
         # group (a full metadata read) when caching is off, and the path is
         # fixed at construction — `reopen_group` passes it through unchanged.
         locks_root = local_root.with_name(f"{local_root.name}.ngio-locks")
+        # Created here rather than left to `filelock`, which only grew that
+        # behaviour in 3.12.3 while ngio's floor is 3.12. `exist_ok` because
+        # concurrent workers reach this at the same time.
+        locks_root.mkdir(parents=True, exist_ok=True)
         _lock_path = locks_root / f"{quote(self._group.path, safe='') or 'root'}.lock"
-        # `filelock` creates the parent directory itself on acquire, so an
-        # unused handler never leaves a directory behind.
         _lock = FileLock(_lock_path, timeout=10)
         return _lock_path, _lock
 

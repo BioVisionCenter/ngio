@@ -241,6 +241,10 @@ def test_lock_paths_live_outside_the_store(tmp_path: Path):
     assert len(set(lock_paths.values())) == len(lock_paths)
     for path, lock_path in lock_paths.items():
         assert store not in lock_path.parents, f"{path} locks inside the store"
+        # ngio creates the directory itself: no `filelock` makes it at
+        # construction, and versions below 3.12.3 do not make it on acquire
+        # either — which failed only the min-deps CI leg, never the dev env.
+        assert lock_path.parent.is_dir(), f"{path} lock directory not created"
 
     # Acquiring must not leave anything behind inside the store either.
     with handler.get_handler("C/03").lock:
