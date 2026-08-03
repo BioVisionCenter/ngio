@@ -208,6 +208,8 @@ You can add or remove images.
     !!! warning
         This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_add_image` method instead.
 
+        `atomic_add_image` serialises the update behind an OS file lock, so it holds across threads and processes on one machine. It requires a **local store** — on a remote store there is no lock to take and it raises `NgioValueError` — and on a shared network filesystem it is only as reliable as the mount's `flock` support.
+
 === "Remove images"
     To remove images from the plate, use the `remove_image` method. It takes the same arguments as `add_image`.
     ```python exec="true" source="material-block" session="hcs_plate"
@@ -217,7 +219,7 @@ You can add or remove images.
     !!! warning
         No data will be removed from the store. If an image is saved in the store it will remain there.
         Also the metadata will only be removed from the plate.well metadata. The number of columns and rows will not be updated.
-        This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_remove_image` method instead.
+        This function is not multiprocessing safe. If you are using multiprocessing, you should use the `atomic_remove_image` method instead, under the same store and platform limits as `atomic_add_image` above.
 
 ## Next steps
 

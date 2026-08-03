@@ -181,7 +181,18 @@ class OmeZarrWell:
         acquisition_id: int | None = None,
         strict: bool = True,
     ) -> StoreOrGroup:
-        """Parallel safe version of add_image."""
+        """Parallel safe version of `add_image`.
+
+        Serialises the read-modify-write of the well metadata behind a file
+        lock, so concurrent workers cannot lose each other's updates. The lock
+        is an OS file lock: it holds across threads and processes on one
+        machine, and on a shared network filesystem only if the mount honours
+        `flock`.
+
+        Raises:
+            NgioValueError: If the store is not local, or if the well was
+                opened with caching enabled — neither supports the lock.
+        """
         return self._add_image(
             image_path=image_path,
             acquisition_id=acquisition_id,
@@ -606,7 +617,19 @@ class OmeZarrPlate:
         acquisition_id: int | None = None,
         acquisition_name: str | None = None,
     ) -> str:
-        """Parallel safe version of add_image."""
+        """Parallel safe version of `add_image`.
+
+        Every worker adding to a plate contends on the same two metadata files,
+        the plate's for the well list and the well's for the image list. This
+        serialises both read-modify-writes behind a file lock, so concurrent
+        workers cannot lose each other's updates. The lock is an OS file lock:
+        it holds across threads and processes on one machine, and on a shared
+        network filesystem only if the mount honours `flock`.
+
+        Raises:
+            NgioValueError: If the store is not local, or if the plate was
+                opened with caching enabled — neither supports the lock.
+        """
         if image_path is None:
             raise ValueError(
                 "Image path cannot be None for atomic add_image. "
@@ -749,7 +772,18 @@ class OmeZarrPlate:
         column: int | str,
         image_path: str,
     ):
-        """Parallel safe version of remove_image."""
+        """Parallel safe version of `remove_image`.
+
+        Serialises the read-modify-write of the plate and well metadata behind a
+        file lock, so concurrent workers cannot lose each other's updates. The
+        lock is an OS file lock: it holds across threads and processes on one
+        machine, and on a shared network filesystem only if the mount honours
+        `flock`.
+
+        Raises:
+            NgioValueError: If the store is not local, or if the plate was
+                opened with caching enabled — neither supports the lock.
+        """
         return self._remove_image(
             row=row,
             column=column,
