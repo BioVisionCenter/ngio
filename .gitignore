@@ -90,8 +90,12 @@ data/
 src/ngio/_v01
 tests/_v01
 
-# Benchmarks
-benchmark/*
+# Benchmarks: sources, store profiles, baselines and release history are all
+# tracked. Only the prepared fixture cache and machine-local store profiles
+# (which carry real bucket names and endpoints) stay out.
+benchmarks/.cache/
+benchmarks/stores.local.toml
+.benchmarks/
 
 # Local planning notes (maintainer checklists, kept out of the repo on purpose)
 /V1_*.md

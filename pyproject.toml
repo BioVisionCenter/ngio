@@ -160,6 +160,10 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["D"]
+# Benchmark scenarios are one-liners whose name and comment carry the meaning;
+# a docstring per scenario would only restate the call being measured.
+"benchmarks/scenarios/**/*.py" = ["D"]
+"benchmarks/timing/**/*.py" = ["D"]
 # Doc snippets are split into sections that are rendered as standalone code blocks,
 # so each section repeats the imports it needs.
 "docs/snippets/**/*.py" = ["D", "E402", "F811", "I001"]
@@ -182,6 +186,11 @@ unresolved-import = "warn"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# The op-count gate under tests/benchmarks imports the top-level `benchmarks`
+# package, which is deliberately not installed (it ships with the repo, not the
+# wheel). `benchmarks/timing` stays off testpaths so the default run never
+# collects the wall-clock layer.
+pythonpath = ["."]
 filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning",                    # required for anndata
@@ -251,6 +260,7 @@ ignore = [
     "mkdocs.yml",
     "CHANGELOG.md",
     "tests/**/*",
+    "benchmarks/**/*",
 ]
 
 [tool.pixi.workspace]

@@ -14,6 +14,7 @@
 
 ### Chores
 
+- Added a benchmarking module under `benchmarks/`. It measures *store operations*, not seconds: ngio's performance regressions are algorithmic — metadata re-parsed once per call, one group opened per well — so they show up as exact integers with no variance, which makes them safe to assert on in the ordinary CI matrix. `tests/benchmarks/` compares each scenario against a committed baseline and fails with a readable before/after diff, so a change that multiplies store reads is caught in review rather than in a user's S3 bill. Counts are backend-independent, which is what lets a local-store gate guard remote performance without any credentials in CI.
 - Linting moves from `pre-commit` to [`prek`](https://github.com/j178/prek), a drop-in reimplementation. `.pre-commit-config.yaml` is unchanged apart from dropping a `ci:` block for pre-commit.ci, which was never enabled. `pixi run -e dev lint` is still the entry point; `pre-commit autoupdate` becomes `prek auto-update`.
 - CI no longer depends on any Node 20 action, which GitHub now warns about on every run. `pre-commit/action` is maintenance-only and pins `actions/cache@v4` internally, so it is replaced by `j178/prek-action`; `JasonEtco/create-an-issue` is `using: node20`, so the scheduled-failure issue reporter moves to a local composite action at `.github/actions/report-failure` (and `.github/TEST_FAIL_TEMPLATE.md` goes with it).
 
