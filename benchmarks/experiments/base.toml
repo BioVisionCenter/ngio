@@ -1,0 +1,123 @@
+# Every key `--config` understands, with its default.
+#
+# Copy this file and uncomment what you need. **Every key is optional**, so as
+# shipped — with everything commented out — this file is exactly equivalent to
+# a bare `python -m benchmarks`. That is deliberate: it is a template, not a
+# runnable experiment. `consolidate-ceiling.toml` is the worked example.
+#
+#   pixi run -e dev python -m benchmarks --config benchmarks/experiments/reference.toml --list
+#
+# Any flag on the command line overrides the same key here, so you can pin an
+# experiment in the file and still poke at one axis from the shell.
+#
+# Note the ordering below: every plain setting comes before the first [axes]
+# table. TOML binds a bare key to whichever table precedes it, so a `repeats`
+# uncommented below an [axes.consolidate] header would become an *axis* named
+# `repeats` rather than a setting. Keep new keys above the axes section.
+
+
+# ===========================================================================
+# Settings
+# ===========================================================================
+
+# --- selection -------------------------------------------------------------
+
+# Which blocks to run. Default: all of them.
+# Overridden by --only. An unknown name is an error.
+blocks = ["algorithms", "consolidate", "layout", "roi"]
+
+# --- measurement -----------------------------------------------------------
+
+# Timed runs per case. Default: whatever the block declares — 3 for
+# `algorithms`, `consolidate` and `layout`, 5 for `roi`. Set here to force one
+# number across every block. Overridden by --repeats.
+repeats = 5
+
+# Untimed runs before the timed ones, to warm caches. Default: 1. Zero is
+# valid and means no warmup. Overridden by --warmup.
+warmup = 1
+
+# --- environments ----------------------------------------------------------
+
+# Run the whole experiment once per environment and print a comparison.
+# Default: none — run in the current interpreter only.
+#
+# Each entry is a comma-separated requirement list; `current` means this
+# working tree. Pinning more than ngio is the point: installing an older ngio
+# also resolves *its* zarr, so a difference between versions can come from
+# zarr instead, and pinning both is the only way to tell.
+#
+# Needs `uv` on PATH. An environment that fails to install is reported and
+# skipped rather than aborting the rest. `keep` is never passed to a child.
+# Overridden by --env.
+envs = ["current", "ngio==1.0.0"]
+
+# --- output ----------------------------------------------------------------
+
+# Append results to this CSV. Default: none — print the table only.
+# A relative path resolves against THIS FILE, not the working directory, so a
+# committed experiment writes its results beside itself wherever it is run
+# from. Files under benchmarks/experiments/ ending in .csv are gitignored:
+# the recipe is the committable artefact, the numbers are machine-dependent.
+# A file whose header does not match is an error, not an append.
+# Overridden by --csv.
+csv = "standard.csv"
+
+# Reuse and keep generated fixtures in benchmarks/.data instead of a temp dir.
+# Default: false. Fixture names derive from their spec, so blocks needing the
+# same image share one store. Overridden by --keep / --no-keep.
+keep = false
+
+# Suppress the per-run table; results still reach `csv`. Default: false.
+# Overridden by --quiet / --no-quiet.
+# quiet = false
+
+
+# ===========================================================================
+# Axes — everything below here is inside a table; keep settings above
+# ===========================================================================
+#
+# An axis *replaces* the block's declared values; it never extends them. A
+# config can only replace an axis a block already declares — it cannot invent
+# one, which is what keeps the blocks the single source of truth.
+#
+# Under [axes], a LIST is an axis name and a TABLE is a block name. The form is
+# the meaning, and it settles the one collision in the suite: `layout` is both
+# a block and an axis of that block, so a bare `layout` list under [axes] is
+# the axis, while an [axes.layout] table is the block.
+#
+# Two axis kinds, and the block's declaration decides which:
+#   open   — values are scalars; you may name values that were never declared
+#   closed — values are structures; you may only subset the declared labels
+#
+# Within this file a block-qualified entry always beats a bare one, whatever
+# the file's layout. Values may not contain a comma.
+
+# --- bare entries: apply to every selected block that has such an axis -------
+
+# `z` exists on both `consolidate` and `layout`, so this reaches both. [open]
+# [axes]
+# z = [16, 64, 256]
+
+# --- block-qualified entries ------------------------------------------------
+
+# Pyramid consolidation. Declared: mode of dask/numpy/coarsen, z of 16/64/256.
+[axes.consolidate]
+mode = ["dask", "numpy", "coarsen"]   # [open]  which consolidation mode
+z = [16, 64, 256]                     # [open]  z-depth; 256 is ~128 MB
+
+# Same bytes, different on-disk layout.
+[axes.layout]
+layout = ["chunks512", "chunks128", "sharded", "uncompressed"]  # [closed]
+z = [16]                              # [open]  z-depth of the test image
+
+# Chunk-aligned versus straddling ROI reads.
+[axes.roi]
+alignment = ["aligned", "straddling"]  # [closed] offset relative to chunks
+size = [512]                           # [open]  ROI edge length in pixels
+
+# Scaling curves for ngio's own algorithms. Cases outside a kernel's useful
+# range are skipped and counted, not silently dropped.
+[axes.algorithms]
+kernel = ["overlap", "masking_roi", "roi_table"]   # [open]
+n = [64, 256, 1024, 2048, 4096, 10000, 50000]      # [open]
