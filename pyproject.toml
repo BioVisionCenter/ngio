@@ -182,6 +182,9 @@ unresolved-import = "warn"
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# `tests.performance` is imported as a PEP 420 namespace package by its own
+# modules, which needs the repo root importable.
+pythonpath = ["."]
 filterwarnings = [
     "error",
     "ignore::zarr.errors.ZarrUserWarning",                    # required for anndata
@@ -251,6 +254,7 @@ ignore = [
     "mkdocs.yml",
     "CHANGELOG.md",
     "tests/**/*",
+    "benchmarks/**/*",
 ]
 
 [tool.pixi.workspace]

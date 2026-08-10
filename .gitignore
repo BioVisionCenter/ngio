@@ -90,11 +90,12 @@ data/
 src/ngio/_v01
 tests/_v01
 
-# Benchmarks
-benchmark/*
+# Benchmarks: `benchmarks/measure.py` is tracked; its generated data is not.
+benchmarks/.data/
 
 # Local planning notes (maintainer checklists, kept out of the repo on purpose)
 /V1_*.md
+/performance_todo.md
 
 # Claude settings
 .claude
