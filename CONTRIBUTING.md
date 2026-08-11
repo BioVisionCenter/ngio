@@ -65,6 +65,8 @@ CI runs the linters and the test matrix automatically.
 
 ## Releasing *(maintainers only)*
 
+First, update the changelog: `CHANGELOG.md` is maintained by hand (`update_changelog_on_bump = false`), so rename its `## [Unreleased]` heading to `## [vX.Y.Z]` and commit that before tagging. Nothing automates it, and the GitHub release notes are generated from commit messages rather than from the changelog.
+
 Versions are derived from git tags via `hatch-vcs`. Use the Pixi bump tasks in the `dev` environment:
 
 ```bash

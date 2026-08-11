@@ -173,6 +173,23 @@ class ZarrGroupHandler:
         if self._lock is not None:
             return self._lock
 
+        if self.use_cache is True:
+            raise NgioValueError(
+                "Lock mechanism is not compatible with caching. "
+                "Please set cache=False to use the lock mechanism."
+            )
+
+        local_root = self.store.local_root
+        if local_root is None:
+            raise NgioValueError(
+                "The store needs to be a LocalStore to use the lock mechanism. "
+                f"Instead, got a {self.store.store_type} store."
+            )
+
+        # After the two guards above, not before: under `-W error` a warning
+        # raised first would mask them, so a cached or remote store on Windows
+        # would fail with `NgioUserWarning` where every other platform raises
+        # `NgioValueError`.
         if _retry._IS_WINDOWS:
             # Warned rather than refused: an *uncontended* lock is exclusive on
             # Windows too, so a single writer is correct and refusing would
@@ -187,19 +204,6 @@ class ZarrGroupHandler:
                 "writers on Linux or macOS.",
                 NgioUserWarning,
                 stacklevel=2,
-            )
-
-        if self.use_cache is True:
-            raise NgioValueError(
-                "Lock mechanism is not compatible with caching. "
-                "Please set cache=False to use the lock mechanism."
-            )
-
-        local_root = self.store.local_root
-        if local_root is None:
-            raise NgioValueError(
-                "The store needs to be a LocalStore to use the lock mechanism. "
-                f"Instead, got a {self.store.store_type} store."
             )
 
         # Locks live in a directory beside the store, never inside it: a lock

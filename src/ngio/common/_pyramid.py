@@ -137,6 +137,7 @@ def on_disk_zoom(
             return _on_disk_coarsen(
                 source,
                 target,
+                order,
             )
         case _:
             raise NgioValueError("mode must be either 'dask', 'numpy' or 'coarsen'")

@@ -1,6 +1,7 @@
 import multiprocessing
 import os
 import sys
+import warnings
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Literal
@@ -229,6 +230,23 @@ def test_lock_warns_on_windows(tmp_path: Path, monkeypatch):
     assert isinstance(lock, BaseFileLock)
     with lock:
         assert lock_path.exists()
+
+
+def test_windows_warning_does_not_mask_the_validations(tmp_path: Path, monkeypatch):
+    """A store that cannot be locked at all still raises, on Windows too.
+
+    The warning sits after both guards deliberately. Emitted first, it would
+    turn into the raised exception under `-W error` — so Windows would report
+    `NgioUserWarning` for a cached or remote store where every other platform
+    reports `NgioValueError`.
+    """
+    monkeypatch.setattr(_retry, "_IS_WINDOWS", True)
+    handler = ZarrGroupHandler(tmp_path / "cached.zarr", cache=True, mode="a")
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        with pytest.raises(NgioValueError, match="not compatible with caching"):
+            handler._create_lock()
 
 
 def test_lock_paths_live_outside_the_store(tmp_path: Path):
