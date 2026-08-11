@@ -49,12 +49,12 @@ def _container(ctx, fixture, **kwargs):
     return open_ome_zarr_container(ctx.store(fixture), mode="r", **kwargs)
 
 
-def _image(ctx, fixture, path="1"):
-    return open_image(ctx.store(fixture), path=path, mode="r")
+def _image(ctx, fixture, path="1", **kwargs):
+    return open_image(ctx.store(fixture), path=path, mode="r", **kwargs)
 
 
-def _plate(ctx, fixture="plate"):
-    return open_ome_zarr_plate(ctx.store(fixture), mode="r")
+def _plate(ctx, fixture="plate", **kwargs):
+    return open_ome_zarr_plate(ctx.store(fixture), mode="r", **kwargs)
 
 
 def _consolidation_target(ctx, mode):
@@ -81,9 +81,10 @@ def _consolidation_target(ctx, mode):
 
 SCENARIOS: dict[str, Scenario] = {
     # --- open and metadata ------------------------------------------------
-    # `cache=True` should cost strictly fewer reads than `cache=False`. It
-    # currently costs the same, because `ZarrGroupHandler.load_attrs` reopens
-    # the group unconditionally; the equality of these two is that bug.
+    # `cache=True` must cost strictly fewer reads than `cache=False`. These two
+    # were byte-for-byte identical until `load_attrs` started honouring the
+    # cache instead of reopening the group unconditionally; their *inequality*
+    # is what holds that fix.
     "open_container": Scenario(None, lambda ctx: _container(ctx, "image", cache=False)),
     "open_container_cached": Scenario(
         None, lambda ctx: _container(ctx, "image", cache=True)
@@ -93,10 +94,16 @@ SCENARIOS: dict[str, Scenario] = {
     "open_container_v04": Scenario(
         None, lambda ctx: _container(ctx, "image_v04", cache=False)
     ),
-    # Pure metadata access. Counts should be flat in the number of accesses
-    # once the meta handler caches; today they grow linearly.
+    # Pure metadata access, and the property iterators touch once per ROI --
+    # twice per ROI for a masked one. Uncached it is one full metadata reload
+    # per access and must stay linear; cached it must be flat, and the pair is
+    # what states which of the two is being measured.
     "dimensions_x10": Scenario(
         lambda ctx: _image(ctx, "image"),
+        lambda image: [image.dimensions for _ in range(10)],
+    ),
+    "dimensions_x10_cached": Scenario(
+        lambda ctx: _image(ctx, "image", cache=True),
         lambda image: [image.dimensions for _ in range(10)],
     ),
     # --- reads ------------------------------------------------------------
@@ -123,6 +130,15 @@ SCENARIOS: dict[str, Scenario] = {
     # 0.4 document hits on the first try and never fails.
     "plate_images_paths_v05": Scenario(
         lambda ctx: _plate(ctx, "plate_v05"),
+        lambda plate: plate.images_paths(),
+    ),
+    # The same walk with caching on. `images_paths` reads the plate document
+    # once and then one well document per well; with `cache=False` every one of
+    # those is re-read several times over. The gap between this and the scenario
+    # above is the whole point of the metadata cache, and on a 384-well plate on
+    # S3 it is the difference between seconds and minutes.
+    "plate_images_paths_cached": Scenario(
+        lambda ctx: _plate(ctx, cache=True),
         lambda plate: plate.images_paths(),
     ),
     # --- plate-wide table aggregation --------------------------------------

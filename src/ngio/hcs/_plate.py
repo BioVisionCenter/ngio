@@ -3,6 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Sequence
+from contextlib import AbstractContextManager, nullcontext
 from typing import Literal
 
 from ngio.images import (
@@ -65,17 +66,18 @@ def _try_get_table_container(
         return None
 
 
-# Mock lock class that does nothing
-class MockLock:
-    """A mock lock class that does nothing."""
+def _atomic_scope(
+    group_handler: ZarrGroupHandler, atomic: bool
+) -> AbstractContextManager:
+    """Hold the group's lock for the block when `atomic`, otherwise do nothing.
 
-    def __enter__(self):
-        """Enter the lock."""
-        pass
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """Exit the lock."""
-        pass
+    `ZarrGroupHandler.locked` also refreshes cached metadata on entry and exit,
+    which is what lets these read-modify-writes run with `cache=True`: the value
+    read inside the lock is never one cached before the lock was taken.
+    """
+    if atomic:
+        return group_handler.locked()
+    return nullcontext()
 
 
 class OmeZarrWell:
@@ -161,12 +163,7 @@ class OmeZarrWell:
         """Add an image to an ome-zarr well."""
         image_path = path_in_well_validation(path=image_path)
 
-        if atomic:
-            well_lock = self._group_handler.lock
-        else:
-            well_lock = MockLock()
-
-        with well_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta.add_image(
                 path=image_path, acquisition=acquisition_id, strict=strict
             )
@@ -195,8 +192,8 @@ class OmeZarrWell:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the well was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         return self._add_image(
             image_path=image_path,
@@ -277,6 +274,18 @@ class OmeZarrPlate:
     def __repr__(self) -> str:
         """Return a string representation of the plate."""
         return f"Plate([rows x columns] ({len(self.rows)} x {len(self.columns)}))"
+
+    def refresh(self) -> None:
+        """Re-read metadata that `cache=True` holds for the object's lifetime.
+
+        The answer to "another worker wrote to this plate and I want to see it".
+        A no-op when the plate was opened with `cache=False`, where nothing is
+        held. The atomic operations refresh themselves, so this is only needed
+        for plain reads.
+        """
+        self._group_handler.clean_cache()
+        self._wells_cache.clear()
+        self._images_cache.clear()
 
     @property
     def meta_handler(self):
@@ -564,16 +573,11 @@ class OmeZarrPlate:
         if image_path is not None:
             image_path = path_in_well_validation(path=image_path)
 
-        if atomic:
-            plate_lock = self._group_handler.lock
-        else:
-            plate_lock = MockLock()
-
         # Lock ordering: the well lock is taken only after the plate lock is
         # released, never nested inside it. `_remove_image` nests the other way
         # (well, then plate via `_remove_well`), so acquiring them plate-first
         # while still holding the plate lock would close a deadlock cycle.
-        with plate_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta
             meta = meta.add_well(row=row, column=column)
             if acquisition_id is not None:
@@ -591,12 +595,7 @@ class OmeZarrPlate:
             well_path = meta.get_well_path(row=row, column=column)
             group_handler = self._group_handler.get_handler(well_path)
 
-        if atomic:
-            well_lock = group_handler.lock
-        else:
-            well_lock = MockLock()
-
-        with well_lock:
+        with _atomic_scope(group_handler, atomic):
             attrs = group_handler.load_attrs()
             if len(attrs) == 0:
                 # Initialize the well metadata
@@ -644,8 +643,8 @@ class OmeZarrPlate:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         if image_path is None:
             raise ValueError(
@@ -749,12 +748,7 @@ class OmeZarrPlate:
         atomic: bool = False,
     ):
         """Remove a well from an ome-zarr plate."""
-        if atomic:
-            plate_lock = self._group_handler.lock
-        else:
-            plate_lock = MockLock()
-
-        with plate_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta
             meta = meta.remove_well(row, column)
             self.meta_handler.update_meta(meta)
@@ -770,14 +764,9 @@ class OmeZarrPlate:
         """Remove an image from an ome-zarr plate."""
         well = self.get_well(row, column)
 
-        if atomic:
-            well_lock = well.meta_handler._group_handler.lock
-        else:
-            well_lock = MockLock()
-
         # Well, then plate: this is the only place the two nest, and it is the
         # ordering the rest of the class must not invert. See `_add_image`.
-        with well_lock:
+        with _atomic_scope(well.meta_handler._group_handler, atomic):
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
             well.meta_handler.update_meta(well_meta)
@@ -805,8 +794,8 @@ class OmeZarrPlate:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         return self._remove_image(
             row=row,

@@ -6,8 +6,18 @@
 
 - **ngio's own writes could be invisible to ngio on a store carrying consolidated metadata.** zarr leaves `.zmetadata` untouched when attributes are written and ngio has no way to refresh someone else's, so every read came back from a snapshot taken before ngio's writes — a label ngio had just derived was absent from the very next `list_labels()`. ngio now ignores consolidated metadata everywhere. It never wrote any, so no store ngio produces changes.
 
+### Behaviour changes
+
+- **`cache=True` now actually caches metadata.** `ZarrGroupHandler.load_attrs` reopened the group unconditionally, so the flag was inert for every NGFF document and an outside write showed up whether or not you asked for caching. It now means what it says: metadata is held for the object's lifetime, and a write that goes around the handler is not visible until you call the new `refresh()`. `cache=False` is unchanged and remains the default, so nothing moves unless you were already passing `cache=True`.
+- **Caching and the atomic plate/well operations are no longer mutually exclusive.** `_create_lock` used to refuse outright when caching was on, because a read-modify-write could otherwise be served a value cached from before the lock was taken. Taking the lock now refreshes cached metadata on entry and again on release, so the hazard is handled rather than forbidden — `atomic_add_image` and friends work with `cache=True`. Verified by a 40-item, 4-process no-lost-update test that fails without the invalidation.
+
+### Features
+
+- `OmeZarrContainer.refresh()` and `OmeZarrPlate.refresh()` re-read metadata held under `cache=True`. A no-op with `cache=False`.
+
 ### Performance
 
+- Metadata reads under `cache=True` no longer touch the store at all. Combined with the decode memo below, **`image.dimensions` goes from 520us to 68us on NGFF 0.4 and 379us to 68us on 0.5** — 6–8x, on the property every iterator reads once per ROI and twice per masked ROI. In store-op terms `dimensions_x10` drops from 10 metadata reads and 24,320 bytes to **zero of both**, and walking a 24-well plate with `images_paths()` from 218 reads / 75,862 bytes to **72 / 2,904**. `cache=False` is unaffected and still reads the store every time.
 - Metadata handlers no longer re-run the pydantic decode on every access. `get_meta()` still reads the group every call — so a change made by this process or another is picked up exactly as before — but it now decodes only when the raw attributes have actually moved. Decoding is ~20x the cost of copying the result (~700us against ~37us on a four-level image), and it was paid per access: `image.dimensions`, which every iterator touches once per ROI and twice per masked ROI, goes from **801us to 356us** on NGFF 0.4 and **717us to 268us** on 0.5. In store-op terms `dimensions_x10` and `read_rois` drop to **zero** decodes, `create_container_from_array` from 16 to 1, `plate_images_paths` from 49 to 24, and `create_plate` from 74 to 50.
 - Consolidating a pyramid in the default `dask` mode read every source chunk twice. `compute_chunk_sizes()` ran immediately after an explicit `rechunk(target.chunks)`, executing the whole read → zoom graph purely to re-learn block shapes that rechunk had already fixed, then discarding the pixels for `da.store` to recompute. Halved: `consolidate_dask` goes from 40 chunk reads and 1,316,187 bytes to 20 and 660,827, and `create_container_from_array` from 48 and 1,419,229 to 28 and 763,869. Every writing iterator pays this through `post_consolidate()`.
 - Plate and well metadata handlers now memoise the NGFF version they resolved, as the image handler already did. The decoder registry is 0.4-first, so a 0.5 plate previously paid a complete failed pydantic validation on *every* metadata read rather than once per handler. Walking a 24-well 0.5 plate with `images_paths()` drops from 98 decode attempts (49 failed) to 73 (24 failed).
@@ -15,6 +25,7 @@
 
 ### Chores
 
+- The performance gate gained cached counterparts — `dimensions_x10_cached`, `plate_images_paths_cached` — so the metadata cache is measured rather than asserted. `open_container` and `open_container_cached` were byte-for-byte identical, which was the recorded form of the inert-flag bug; their inequality now holds the fix.
 - The performance gate gained a `plate_images_paths_v05` scenario. Every plate fixture was NGFF 0.4, which is both the default and the first version the decoder registry tries — so no plate scenario could ever record a failed validation, and the version memo above was invisible to the gate. `meta.decode_fail` on the new scenario is what holds it.
 
 ## [v1.0.1]

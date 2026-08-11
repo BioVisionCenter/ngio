@@ -2,6 +2,9 @@
 
 import logging
 import warnings
+from collections.abc import Iterator
+from contextlib import contextmanager
+from copy import deepcopy
 from pathlib import Path
 from typing import Literal, TypeAlias
 from urllib.parse import quote
@@ -153,6 +156,11 @@ class ZarrGroupHandler:
         self._group_cache: NgioCache[zarr.Group] = NgioCache(use_cache=cache)
         self._array_cache: NgioCache[zarr.Array] = NgioCache(use_cache=cache)
         self._handlers_cache: NgioCache[ZarrGroupHandler] = NgioCache(use_cache=cache)
+        # The group's own attributes, which is where every NGFF document lives.
+        # Held separately from `_group_cache` (which holds *children*) because
+        # `load_attrs` is the one choke point every metadata read passes
+        # through, so this is the only place a store round-trip can be saved.
+        self._attrs_cache: dict | None = None
         self._lock: tuple[Path, BaseFileLock] | None = None
 
     def __repr__(self) -> str:
@@ -187,12 +195,9 @@ class ZarrGroupHandler:
         if self._lock is not None:
             return self._lock
 
-        if self.use_cache is True:
-            raise NgioValueError(
-                "Lock mechanism is not compatible with caching. "
-                "Please set cache=False to use the lock mechanism."
-            )
-
+        # Caching used to be refused here. It is compatible now: `locked()`
+        # invalidates on entry and exit, so a read-modify-write under the lock
+        # cannot be served a value cached from before the lock was taken.
         local_root = self.store.local_root
         if local_root is None:
             raise NgioValueError(
@@ -200,10 +205,9 @@ class ZarrGroupHandler:
                 f"Instead, got a {self.store.store_type} store."
             )
 
-        # After the two guards above, not before: under `-W error` a warning
-        # raised first would mask them, so a cached or remote store on Windows
-        # would fail with `NgioUserWarning` where every other platform raises
-        # `NgioValueError`.
+        # After the guard above, not before: under `-W error` a warning raised
+        # first would mask it, so a remote store on Windows would fail with
+        # `NgioUserWarning` where every other platform raises `NgioValueError`.
         if _retry._IS_WINDOWS:
             # Warned rather than refused: an *uncontended* lock is exclusive on
             # Windows too, so a single writer is correct and refusing would
@@ -283,15 +287,64 @@ class ZarrGroupHandler:
             mode=mode,
         )
 
+    def invalidate_meta(self) -> None:
+        """Drop cached metadata, keeping child handlers and the lock alive.
+
+        Narrower than `clean_cache`: it refreshes what a metadata read sees and
+        cascades to child handlers, but does not discard them, and never touches
+        `_lock`. Both matter — `clean_cache` runs inside a held lock in the HCS
+        write paths, where discarding every open well handler per added image
+        would be gratuitous, and re-creating the `FileLock` would hand back a
+        different object for a path this thread already holds.
+        """
+        self._attrs_cache = None
+        if self.use_cache:
+            # Only when caching. With `cache=False` nothing is held: `_group` is
+            # never read for its attributes (`load_attrs` reopens every call)
+            # and the three caches are disabled and empty, so reopening here
+            # would be a pure extra round-trip on every write.
+            self._group = self.reopen_group()
+        self._group_cache.clear()
+        self._array_cache.clear()
+        for handler in self._handlers_cache.cache.values():
+            handler.invalidate_meta()
+
     def clean_cache(self) -> None:
-        """Clear the cached metadata."""
-        group = self.reopen_group()
-        self.__init__(
-            store=group,
-            zarr_format=group.metadata.zarr_format,
-            cache=self.use_cache,
-            mode="r" if self.read_only else "r+",
-        )
+        """Clear every cached object, so the next access reads the store."""
+        self.invalidate_meta()
+        self._handlers_cache.clear()
+
+    def refresh(self) -> None:
+        """Re-read metadata that `cache=True` would otherwise hold indefinitely.
+
+        The answer to "someone else wrote, and I want to see it". A no-op with
+        `cache=False`, where nothing is held in the first place.
+        """
+        self.invalidate_meta()
+
+    @contextmanager
+    def locked(self) -> Iterator[BaseFileLock]:
+        """Hold the group's file lock, with cached metadata refreshed around it.
+
+        Invalidating on the way in is what makes a read-modify-write under the
+        lock correct when caching is on: without it, the value read inside the
+        lock could have been cached before the lock was taken, and the write
+        would silently drop whatever the previous holder did. Invalidating on
+        the way out keeps a later unlocked read from seeing the pre-write state.
+
+        This is why caching and locking are compatible at all — before it, the
+        two were mutually exclusive by an outright refusal in `_create_lock`.
+        """
+        with self.lock:
+            # Inside the lock, never before it. Refreshing on the way to the
+            # lock snapshots a state the previous holder is still editing, and
+            # the read below would then return it — which is precisely the lost
+            # update this is here to prevent.
+            self.invalidate_meta()
+            try:
+                yield self.lock
+            finally:
+                self.invalidate_meta()
 
     @property
     def group(self) -> zarr.Group:
@@ -303,7 +356,26 @@ class ZarrGroupHandler:
         return self._group
 
     def load_attrs(self) -> dict:
-        """Load the attributes of the group."""
+        """Load the attributes of the group.
+
+        With `cache=False` this reads the store every call, which is what makes
+        ngio's metadata unconditionally fresh. With `cache=True` it is served
+        from memory until something invalidates it: a write through this
+        handler, `refresh()`, or taking the group's lock.
+
+        A copy is returned, not the cached dict, so a caller that edits what it
+        was handed cannot corrupt the next reader.
+        """
+        if self._attrs_cache is not None:
+            return deepcopy(self._attrs_cache)
+        if self.use_cache:
+            # `self._group`, not a reopen: it is current by construction and
+            # refreshed by `invalidate_meta`, and its attributes are already in
+            # memory — so the first read of a cached handler costs nothing
+            # either, not just the repeats.
+            attrs = self._group.attrs.asdict()
+            self._attrs_cache = attrs
+            return deepcopy(attrs)
         return self.reopen_group().attrs.asdict()
 
     def write_attrs(self, attrs: dict, overwrite: bool = False) -> None:
@@ -315,6 +387,9 @@ class ZarrGroupHandler:
         if overwrite:
             group.attrs.clear()
         group.attrs.update(attrs)
+        # The write went through a freshly opened group, so `_group` and the
+        # attrs cache both describe the state from before it.
+        self.invalidate_meta()
 
     def create_group(self, path: str, overwrite: bool = False) -> zarr.Group:
         """Create a group in the group."""

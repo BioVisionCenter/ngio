@@ -150,6 +150,14 @@ class OmeZarrContainer:
         base_str += ")"
         return base_str
 
+    def refresh(self) -> None:
+        """Re-read metadata that `cache=True` holds for the object's lifetime.
+
+        The answer to "someone else wrote to this container and I want to see
+        it". A no-op when opened with `cache=False`, where nothing is held.
+        """
+        self._group_handler.clean_cache()
+
     @property
     def images_container(self) -> ImagesContainer:
         """Return the images container.
