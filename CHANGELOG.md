@@ -4,12 +4,17 @@
 
 ### Fixes
 
-- zarr 3.3 support. zarr 3.3 added a coalescing `get_ranges` and a synchronous store surface (`get_sync`, `set_sync`, `delete_sync`); ngio's store inherited all of them from `WrapperStore` forwarded straight to the wrapped store, so they ran with **no retry policy and no Windows sharing-violation retry** — unlike every other IO operation. They are now routed through the same retry path. Nothing reached these methods with zarr's defaults, so no released version could lose data over it; sharded arrays and the opt-in `FusedCodecPipeline` do.
+- **ngio's own writes could be invisible to ngio on a store carrying consolidated metadata.** zarr leaves `.zmetadata` untouched when attributes are written and ngio has no way to refresh someone else's, so every read came back from a snapshot taken before ngio's writes — a label ngio had just derived was absent from the very next `list_labels()`. ngio now ignores consolidated metadata everywhere. It never wrote any, so no store ngio produces changes.
+
+### Performance
+
+- Consolidating a pyramid in the default `dask` mode read every source chunk twice. `compute_chunk_sizes()` ran immediately after an explicit `rechunk(target.chunks)`, executing the whole read → zoom graph purely to re-learn block shapes that rechunk had already fixed, then discarding the pixels for `da.store` to recompute. Halved: `consolidate_dask` goes from 40 chunk reads and 1,316,187 bytes to 20 and 660,827, and `create_container_from_array` from 48 and 1,419,229 to 28 and 763,869. Every writing iterator pays this through `post_consolidate()`.
+- Plate and well metadata handlers now memoise the NGFF version they resolved, as the image handler already did. The decoder registry is 0.4-first, so a 0.5 plate previously paid a complete failed pydantic validation on *every* metadata read rather than once per handler. Walking a 24-well 0.5 plate with `images_paths()` drops from 98 decode attempts (49 failed) to 73 (24 failed).
+- Dropping the consolidated-metadata probe also removes a `.zmetadata` read that missed on every ngio-written NGFF 0.4 store — one wasted round-trip per metadata reload, which matters most remotely. `plate_images_paths` on a 24-well plate goes from 291 metadata reads to 218, and `create_plate` from 733 to 514.
 
 ### Chores
 
-- The performance gate counts zarr 3.3's new store surface, and its instrumentation check now covers `WrapperStore` as well as `Store` — the sync methods arrived on the former and a `Store`-only check could not see them. It also fails when zarr *removes* a hooked method, which would previously have zeroed a counter silently. Op counts are unchanged on zarr 3.1.6, 3.2.1 and 3.3.0.
-- The op-count assertion is skipped when the counts differ *and* zarr is not the version the baselines were generated on, so an upstream zarr release no longer fails `CI (pip)`, which installs dependencies unpinned. The `test11` environment still asserts strictly on every PR.
+- The performance gate gained a `plate_images_paths_v05` scenario. Every plate fixture was NGFF 0.4, which is both the default and the first version the decoder registry tries — so no plate scenario could ever record a failed validation, and the version memo above was invisible to the gate. `meta.decode_fail` on the new scenario is what holds it.
 
 ## [v1.0.1]
 
@@ -25,10 +30,13 @@ Concurrency and Windows fixes. No API change — every `v1.0.0` call keeps worki
 - Concurrent writers no longer race on creating a group: `get_group(create_mode=True)` is a get-or-create, and `atomic_add_image` creates the well group under the plate lock. Two workers adding to the same well could fail with `NgioFileExistsError`.
 - Windows: concurrent *reads* of a metadata file no longer fail with `PermissionError`. `v1.0.0` only retried the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
 - `Label.consolidate(mode="coarsen")` averaged label IDs instead of taking the maximum — the mean of labels 3 and 7 is 5, a label that never existed — and truncated on integer dtypes. `on_disk_zoom` did not forward `order` to the coarsening path.
+- zarr 3.3 support. zarr 3.3 added a coalescing `get_ranges` and a synchronous store surface (`get_sync`, `set_sync`, `delete_sync`); ngio's store inherited all of them from `WrapperStore` forwarded straight to the wrapped store, so they ran with **no retry policy and no Windows sharing-violation retry** — unlike every other IO operation. They are now routed through the same retry path. Nothing reached these methods with zarr's defaults, so no released version could lose data over it; sharded arrays and the opt-in `FusedCodecPipeline` do.
 
 ### Chores
 
 - Added a performance gate at `tests/performance/`: exact store-operation counts asserted against committed baselines, running in CI like any other test. See `tests/performance/README.md`.
+- The performance gate counts zarr 3.3's new store surface, and its instrumentation check now covers `WrapperStore` as well as `Store` — the sync methods arrived on the former and a `Store`-only check could not see them. It also fails when zarr *removes* a hooked method, which would previously have zeroed a counter silently. Op counts are unchanged on zarr 3.1.6, 3.2.1 and 3.3.0.
+- The op-count assertion is skipped when the counts differ *and* zarr is not the version the baselines were generated on, so an upstream zarr release no longer fails `CI (pip)`, which installs dependencies unpinned. The `test11` environment still asserts strictly on every PR.
 - Linting moves from `pre-commit` to [`prek`](https://github.com/j178/prek), a drop-in reimplementation. `pixi run -e dev lint` is still the entry point; `pre-commit autoupdate` becomes `prek auto-update`.
 - CI no longer depends on any Node 20 action.
 
