@@ -19,11 +19,23 @@ from typing import Any, NamedTuple
 import numpy as np
 
 from ngio import (
+    ImageInWellPath,
     create_empty_ome_zarr,
+    create_empty_plate,
+    create_ome_zarr_from_array,
     open_image,
     open_ome_zarr_container,
     open_ome_zarr_plate,
 )
+
+#: The well grid of the `create_plate` scenario. Stated here rather than shared
+#: with the plate fixture: a scenario owns the shape of what it measures, the
+#: same way `_consolidation_target` owns its own create parameters.
+_PLATE_IMAGES = [
+    ImageInWellPath(row=row, column=f"{col + 1:02d}", path="0")
+    for row in ("A", "B", "C", "D")
+    for col in range(6)
+]
 
 
 class Scenario(NamedTuple):
@@ -41,8 +53,8 @@ def _image(ctx, fixture, path="1"):
     return open_image(ctx.store(fixture), path=path, mode="r")
 
 
-def _plate(ctx):
-    return open_ome_zarr_plate(ctx.store("plate"), mode="r")
+def _plate(ctx, fixture="plate"):
+    return open_ome_zarr_plate(ctx.store(fixture), mode="r")
 
 
 def _consolidation_target(ctx, mode):
@@ -103,6 +115,19 @@ SCENARIOS: dict[str, Scenario] = {
     # Calls get_wells internally, so this costs one group open per well to
     # answer a question the plate metadata alone could answer.
     "plate_images_paths": Scenario(_plate, lambda plate: plate.images_paths()),
+    # --- plate-wide table aggregation --------------------------------------
+    # Both open every image container inside the counted block, on top of the
+    # enumeration `plate_images_paths` already gates. That multiplication is
+    # the point: a regression in `open_container` lands here N times over, and
+    # on S3 each of those opens is a round-trip.
+    "plate_list_image_tables": Scenario(
+        lambda ctx: _plate(ctx, "plate_tables"),
+        lambda plate: plate.list_image_tables(),
+    ),
+    "plate_concatenate_tables": Scenario(
+        lambda ctx: _plate(ctx, "plate_tables"),
+        lambda plate: plate.concatenate_image_tables(name="features"),
+    ),
     # --- tables -----------------------------------------------------------
     # csv and parquet are absent on purpose: they go through pyarrow against
     # the filesystem directly, bypassing the zarr store, so no store counter
@@ -118,6 +143,51 @@ SCENARIOS: dict[str, Scenario] = {
     "table_load_roi": Scenario(
         lambda ctx: _container(ctx, "tables"),
         lambda c: c.get_table("well_ROI_table").rois(),
+    ),
+    # --- writes: creation -------------------------------------------------
+    # No pixel data, so the counts are the per-level metadata and empty-array
+    # writes alone. `set.meta` should scale with `levels`, nothing else should.
+    "create_container_empty": Scenario(
+        None,
+        lambda ctx: create_empty_ome_zarr(
+            store=ctx.scratch("create_empty"),
+            shape=(1, 4, 256, 256),
+            axes_names=["c", "z", "y", "x"],
+            channels_meta=["Channel 1"],
+            levels=3,
+            pixelsize=(0.65, 0.65),
+            chunks=(1, 1, 128, 128),
+            compressors=None,
+            overwrite=True,
+        ),
+    ),
+    # Paired with the above: the difference is the pyramid write and the
+    # percentile pass. It therefore overlaps `consolidate_dask` — read the two
+    # together, and expect a fix to one to move this too.
+    "create_container_from_array": Scenario(
+        lambda ctx: (ctx, np.ones((1, 4, 256, 256), dtype=np.uint16)),
+        lambda state: create_ome_zarr_from_array(
+            store=state[0].scratch("create_from_array"),
+            array=state[1],
+            axes_names=["c", "z", "y", "x"],
+            channels_meta=["Channel 1"],
+            levels=3,
+            pixelsize=(0.65, 0.65),
+            chunks=(1, 1, 128, 128),
+            compressors=None,
+            overwrite=True,
+        ),
+    ),
+    # Registers 24 images in one metadata write-out. Costs should be flat in
+    # the image count, not one round-trip per well.
+    "create_plate": Scenario(
+        None,
+        lambda ctx: create_empty_plate(
+            ctx.scratch("create_plate"),
+            name="bench_create_plate",
+            images=_PLATE_IMAGES,
+            overwrite=True,
+        ),
     ),
     # --- writes: pyramid consolidation ------------------------------------
     # The most expensive operation in the library, and every writing iterator

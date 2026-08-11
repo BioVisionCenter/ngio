@@ -28,7 +28,12 @@ from tests.performance._counting import (
 )
 
 import ngio
-from ngio import ImageInWellPath, create_empty_plate, open_ome_zarr_container
+from ngio import (
+    ImageInWellPath,
+    create_empty_ome_zarr,
+    create_empty_plate,
+    open_ome_zarr_container,
+)
 from ngio.images._create_synt_container import create_synthetic_ome_zarr
 from ngio.tables import FeatureTable
 
@@ -47,6 +52,11 @@ _IMAGE = {
     "compressors": None,
     "table_backend": "anndata_v1",
 }
+
+#: The wells of the aggregation fixture. Four images is enough to make the
+#: per-image cost of a plate-wide aggregation legible without paying for a full
+#: plate of real arrays in session setup.
+_AGG_WELLS = (("A", "01"), ("A", "02"), ("B", "01"), ("B", "02"))
 
 
 def pytest_addoption(parser):
@@ -83,17 +93,21 @@ def _build_plate(target):
     create_empty_plate(target, name="bench_plate", images=images, overwrite=True)
 
 
-def _build_tables(target):
+def _feature_frame(rows: int, columns: int):
     import pandas as pd
 
-    _build_image(target)
-    container = open_ome_zarr_container(target, mode="r+")
-    frame = pd.DataFrame(
+    return pd.DataFrame(
         {
-            "label": range(1, 501),
-            **{f"feature_{i}": [float(i)] * 500 for i in range(8)},
+            "label": range(1, rows + 1),
+            **{f"feature_{i}": [float(i)] * rows for i in range(columns)},
         }
     ).set_index("label")
+
+
+def _build_tables(target):
+    _build_image(target)
+    container = open_ome_zarr_container(target, mode="r+")
+    frame = _feature_frame(rows=500, columns=8)
     for backend in ("anndata_v1", "experimental_json_v1"):
         container.add_table(
             name=f"features_{backend}",
@@ -103,10 +117,46 @@ def _build_tables(target):
         )
 
 
+def _build_plate_tables(target):
+    # A plate with real images, unlike `_build_plate`: the aggregation paths
+    # open every container and read a table from each, so registered paths are
+    # not enough. `get_image_store` creates the group in place, keeping the
+    # whole plate on one store (and so on one dict for the memory kind).
+    plate = create_empty_plate(
+        target,
+        name="bench_plate_tables",
+        images=[
+            ImageInWellPath(row=row, column=column, path="0")
+            for row, column in _AGG_WELLS
+        ],
+        overwrite=True,
+    )
+    frame = _feature_frame(rows=100, columns=4)
+    for row, column in _AGG_WELLS:
+        container = create_empty_ome_zarr(
+            store=plate.get_image_store(row=row, column=column, image_path="0"),
+            shape=(1, 1, 64, 64),
+            axes_names=["c", "z", "y", "x"],
+            channels_meta=["Channel 1"],
+            levels=1,
+            pixelsize=(0.65, 0.65),
+            chunks=(1, 1, 64, 64),
+            compressors=None,
+            overwrite=True,
+        )
+        container.add_table(
+            name="features",
+            table=FeatureTable(table_data=frame, reference_label=None),
+            backend="anndata_v1",
+            overwrite=True,
+        )
+
+
 _BUILDERS = {
     "image": lambda t: _build_image(t, ngff_version="0.5"),
     "image_v04": lambda t: _build_image(t, ngff_version="0.4"),
     "plate": _build_plate,
+    "plate_tables": _build_plate_tables,
     "tables": _build_tables,
 }
 
