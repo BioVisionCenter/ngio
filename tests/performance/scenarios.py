@@ -115,6 +115,16 @@ SCENARIOS: dict[str, Scenario] = {
     # Calls get_wells internally, so this costs one group open per well to
     # answer a question the plate metadata alone could answer.
     "plate_images_paths": Scenario(_plate, lambda plate: plate.images_paths()),
+    # The same walk over a 0.5 plate. The decoder registry is 0.4-first, so
+    # every 0.5 document costs a failed pydantic validation before the right
+    # decoder runs; the plate and well handlers memoise the resolved version to
+    # pay that once per handler instead of once per read. `meta.decode_fail`
+    # here is that memo's gate — the 0.4 scenario above cannot see it, since a
+    # 0.4 document hits on the first try and never fails.
+    "plate_images_paths_v05": Scenario(
+        lambda ctx: _plate(ctx, "plate_v05"),
+        lambda plate: plate.images_paths(),
+    ),
     # --- plate-wide table aggregation --------------------------------------
     # Both open every image container inside the counted block, on top of the
     # enumeration `plate_images_paths` already gates. That multiplication is

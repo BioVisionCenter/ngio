@@ -64,6 +64,7 @@ def _check_group(
             path=group.path,
             mode=reopen_mode,
             zarr_format=group.metadata.zarr_format,
+            use_consolidated=False,
         )
     return group
 
@@ -79,6 +80,14 @@ def open_group_wrapper(
     (including dask-worker chunk reads/writes) honors the configured
     `io_retry` policy.
 
+    Consolidated metadata is never used, here or in `reopen_group`. ngio does
+    not write it and cannot refresh someone else's: zarr leaves `.zmetadata`
+    untouched when attributes are written, so trusting it makes ngio read back
+    a snapshot from before its own writes — a label ngio had just created was
+    invisible to the next `list_labels()`. Ignoring it also drops a `.zmetadata`
+    probe that misses on every ngio-written store, which is a wasted round-trip
+    per metadata read remotely.
+
     Args:
         store (StoreOrGroup): The store or group to open.
         mode (AccessModeLiteral): The mode to open the group in.
@@ -93,7 +102,12 @@ def open_group_wrapper(
     try:
         mode = mode if mode is not None else "a"
         ngio_store = NgioStore.from_any(store, mode=mode)
-        group = zarr.open_group(store=ngio_store, mode=mode, zarr_format=zarr_format)
+        group = zarr.open_group(
+            store=ngio_store,
+            mode=mode,
+            zarr_format=zarr_format,
+            use_consolidated=False,
+        )
 
     except FileExistsError as e:
         raise NgioFileExistsError(
@@ -251,6 +265,7 @@ class ZarrGroupHandler:
             path=self._group.path,
             mode=mode,
             zarr_format=self._group.metadata.zarr_format,
+            use_consolidated=False,
         )
 
     def reopen_handler(self) -> "ZarrGroupHandler":

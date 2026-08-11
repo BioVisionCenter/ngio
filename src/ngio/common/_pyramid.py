@@ -40,8 +40,11 @@ def _on_disk_dask_zoom(
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
 
+    # No compute_chunk_sizes() here: the rechunk above already fixes every
+    # block shape, so it would execute the whole read -> zoom graph purely to
+    # re-learn them, throw the pixels away, and leave da.store to run the same
+    # graph again -- exactly double the chunk reads.
     target_array = target_array.rechunk(target.chunks)
-    target_array = target_array.compute_chunk_sizes()
     # da.store rather than to_zarr: dask >=2025.11's to_zarr internally
     # re-derives chunks via normalize_chunks(chunks="auto", ...) and warns
     # (treated as error by our filterwarnings) when the result isn't a

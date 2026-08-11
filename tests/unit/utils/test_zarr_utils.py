@@ -412,3 +412,25 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
     assert "array1" in dest_group
     assert "group1" in dest_group
     assert "sub_array1" in dest_group["group1"]
+
+
+def test_writes_are_visible_through_a_stale_consolidated_metadata(tmp_path: Path):
+    """A store carrying `.zmetadata` must not shadow ngio's own writes.
+
+    zarr leaves consolidated metadata untouched when attributes are written, and
+    ngio has no way to refresh someone else's. Trusting it made ngio read back a
+    snapshot from before its own writes: a group ngio had just created was
+    absent from the very next listing.
+    """
+    store = tmp_path / "consolidated.zarr"
+    group = zarr.create_group(store=store, overwrite=True, zarr_format=2)
+    group.attrs.update({"members": []})
+    zarr.consolidate_metadata(str(store))
+    assert (store / ".zmetadata").exists()
+
+    handler = ZarrGroupHandler(store=store, cache=False, mode="r+")
+    handler.write_attrs({"members": ["added_after_consolidation"]})
+    handler.create_group("child")
+
+    assert handler.load_attrs()["members"] == ["added_after_consolidation"]
+    assert "child" in handler.group

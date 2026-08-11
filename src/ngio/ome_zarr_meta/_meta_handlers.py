@@ -394,9 +394,11 @@ class PlateMetaHandler:
         self._version = version
 
         # Validate metadata
-        _ = self.get_meta()
-        # Store the resolved version
-        # self._version = meta.version
+        meta = self.get_meta()
+        # Store the resolved version, so later reads go straight to the right
+        # decoder instead of re-walking the (0.4-first) registry and paying a
+        # full failed validation on every v0.5 document.
+        self._version = meta.version
 
     def get_meta(self) -> NgioPlateMeta:
         """Retrieve the NGIO plate metadata."""
@@ -460,9 +462,11 @@ class WellMetaHandler:
         self._version = version
 
         # Validate metadata
-        _ = self.get_meta()
-        # Store the resolved version
-        # self._version = meta.version
+        meta = self.get_meta()
+        # Store the resolved version, so later reads go straight to the right
+        # decoder instead of re-walking the (0.4-first) registry and paying a
+        # full failed validation on every v0.5 document.
+        self._version = meta.version
 
     def get_meta(self) -> NgioWellMeta:
         """Retrieve the NGIO well metadata."""

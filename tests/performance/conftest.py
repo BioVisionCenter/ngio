@@ -77,16 +77,26 @@ def _build_image(target, **overrides):
     )
 
 
-def _build_plate(target):
+def _build_plate(target, ngff_version="0.4"):
     # Images are registered in plate metadata but no arrays are created: that
     # is enough for the enumeration paths, which is what costs, and it is the
     # only form that builds identically on a MemoryStore.
+    #
+    # 0.4 is `DefaultNgffVersion`, and it is also the version the decoder
+    # registry tries first — so a 0.4 plate never pays a failed validation and
+    # cannot see a regression in the version memo. `plate_v05` exists for that.
     images = [
         ImageInWellPath(row=row, column=f"{col + 1:02d}", path="0")
         for row in ("A", "B", "C", "D")
         for col in range(6)
     ]
-    create_empty_plate(target, name="bench_plate", images=images, overwrite=True)
+    create_empty_plate(
+        target,
+        name="bench_plate",
+        images=images,
+        ngff_version=ngff_version,
+        overwrite=True,
+    )
 
 
 def _feature_frame(rows: int, columns: int):
@@ -152,6 +162,7 @@ _BUILDERS = {
     "image": lambda t: _build_image(t, ngff_version="0.5"),
     "image_v04": lambda t: _build_image(t, ngff_version="0.4"),
     "plate": _build_plate,
+    "plate_v05": lambda t: _build_plate(t, ngff_version="0.5"),
     "plate_tables": _build_plate_tables,
     "tables": _build_tables,
 }
