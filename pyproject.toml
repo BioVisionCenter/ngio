@@ -254,7 +254,6 @@ ignore = [
     "mkdocs.yml",
     "CHANGELOG.md",
     "tests/**/*",
-    "benchmarks/**/*",
 ]
 
 [tool.pixi.workspace]

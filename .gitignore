@@ -90,12 +90,6 @@ data/
 src/ngio/_v01
 tests/_v01
 
-# Benchmarks: the `benchmarks/` package is tracked; its generated data is not.
-# An experiment's recipe is committable, its results are not — they are
-# machine-dependent, and a config's relative `csv` lands beside the config.
-benchmarks/.data/
-benchmarks/experiments/*.csv
-
 # Local planning notes (maintainer checklists, kept out of the repo on purpose)
 /V1_*.md
 /performance_todo.md

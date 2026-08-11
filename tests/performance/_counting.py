@@ -1,6 +1,6 @@
 """Deterministic store-operation counting.
 
-The benchmark gate asserts on *counts*, not seconds: ngio's performance
+The performance gate asserts on *counts*, not seconds: ngio's performance
 regressions are algorithmic (metadata re-parsed N times, one group opened per
 well) and those show up as exact integers with zero variance. Counts are also
 backend-independent, so a local-store measurement predicts what an operation
@@ -302,7 +302,7 @@ def assert_instrumentation_complete() -> None:
     unclassified = members - _COVERED - _NON_IO
     if unclassified:
         raise AssertionError(
-            "zarr's Store has members this benchmark module does not classify: "
+            "zarr's Store has members this module does not classify: "
             f"{sorted(unclassified)}. Hook them in CountingNgioStore (and add "
             "them to COUNTER_KEYS) if they perform IO, otherwise list them in "
             "_NON_IO."
