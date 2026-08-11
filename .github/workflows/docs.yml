@@ -1,7 +1,7 @@
 # Docs — documentation build and deploy
 #
-# Scope:    Runs on push to main and deploys the `dev` alias. Uses the pixi docs
-#           environment for reproducible builds.
+# Scope:    Runs on push to main and publishes the `dev` version. Uses the pixi
+#           docs environment for reproducible builds.
 # Jobs:     deploy (mike + zensical)
 #
 # Note:     The docs are built by Zensical, and versioned with the Zensical maintainers'
@@ -9,10 +9,11 @@
 #           published to PyPI). The mike CLI and the gh-pages layout are unchanged, so
 #           already-published versions stay browsable.
 #
-#           Tags are deliberately NOT handled here. `stable` is published by the
-#           `deploy-docs` job in ci.yml, which runs only after the test matrix has
-#           passed and the release has reached PyPI. Triggering on tags from this
-#           workflow would race those gates.
+#           Tags are deliberately NOT handled here, and neither is the default
+#           version. `stable` and the default are published by the `deploy-docs`
+#           job in ci.yml, which runs only after the test matrix has passed and
+#           the release has reached PyPI. Triggering on tags from this workflow
+#           would race those gates.
 name: Docs
 
 on:
@@ -61,6 +62,9 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+          # Publish `dev`, but do NOT touch the default. The default belongs to
+          # `stable` and is set once per release by ci.yml; setting it here made
+          # every merge to main silently undo that, so the docs landing page
+          # served unreleased docs to everyone from the first merge after a tag.
           pixi run -e docs mike deploy --push dev
-          pixi run -e docs mike set-default --push dev
-          echo "Deployed development version (dev) from main"
+          echo "Deployed development version (dev) from main; default unchanged"
