@@ -464,7 +464,7 @@ class PlateMetaHandler:
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
-        version: str | None = None,
+        version: NgffVersions | None = None,
     ):
         self._group_handler = group_handler
         self._version = version
@@ -476,6 +476,16 @@ class PlateMetaHandler:
         # decoder instead of re-walking the (0.4-first) registry and paying a
         # full failed validation on every v0.5 document.
         self._version = meta.version
+
+    @property
+    def version(self) -> NgffVersions | None:
+        """The NGFF version resolved when this handler was built.
+
+        Free to read, unlike `get_meta().version`, which costs a full metadata
+        reload. Callers that only need the version to hand to another handler
+        should use this.
+        """
+        return self._version
 
     def get_meta(self) -> NgioPlateMeta:
         """Retrieve the NGIO plate metadata."""

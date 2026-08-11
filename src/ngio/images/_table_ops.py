@@ -1,6 +1,7 @@
 """Aggregation and filtering operations for tables."""
 
 import asyncio
+import os
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -17,6 +18,22 @@ from ngio.utils import deprecated
 _T = TypeVar("_T")
 _R = TypeVar("_R")
 
+#: Accepted by every `max_workers` argument. `None` runs serially in the
+#: calling thread; `"auto"` picks a pool sized for round-trip-bound work.
+MaxWorkers = int | Literal["auto"] | None
+
+
+def _resolve_max_workers(max_workers: MaxWorkers) -> int | None:
+    """Turn `"auto"` into a concrete pool size.
+
+    These fan-outs wait on store round-trips rather than on the CPU, so the
+    useful pool is far wider than the core count. This is the same cap asyncio
+    puts on its default executor, which `_gather_bounded` already inherits.
+    """
+    if max_workers == "auto":
+        return min(32, (os.cpu_count() or 1) + 4)
+    return max_workers
+
 
 @dataclass
 class TableWithExtras:
@@ -29,13 +46,15 @@ class TableWithExtras:
 def _map_workers(
     func: Callable[[_T], _R],
     items: Sequence[_T],
-    max_workers: int | None,
+    max_workers: MaxWorkers,
 ) -> list[_R]:
     """Apply `func` to every item, on a thread pool when `max_workers` > 1.
 
     Results keep the order of `items`. With `max_workers=None` (the default)
-    the work runs serially in the calling thread.
+    the work runs serially in the calling thread; `"auto"` sizes the pool for
+    round-trip-bound work.
     """
+    max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 1 or len(items) <= 1:
         return [func(item) for item in items]
 
@@ -45,13 +64,14 @@ def _map_workers(
 
 async def _gather_bounded(
     coro_factories: Sequence[Callable[[], Awaitable[_R]]],
-    max_workers: int | None,
+    max_workers: MaxWorkers,
 ) -> list[_R]:
     """Await every coroutine, at most `max_workers` of them at a time.
 
     With `max_workers=None` the fan-out is left to asyncio's default thread
     executor, which is itself capped at `min(32, cpu_count + 4)`.
     """
+    max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 0:
         return list(await asyncio.gather(*(factory() for factory in coro_factories)))
 
@@ -246,7 +266,7 @@ def _concatenate_image_tables(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table."""
     _check_images_and_extras(images=images, extras=extras)
@@ -276,7 +296,7 @@ def concatenate_image_tables(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table.
 
@@ -314,7 +334,7 @@ def concatenate_image_tables_as(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> TableType:
     """Concatenate tables from different images into a single table.
 
@@ -357,7 +377,7 @@ async def _concatenate_image_tables_async(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table."""
     _check_images_and_extras(images=images, extras=extras)
@@ -393,7 +413,7 @@ async def concatenate_image_tables_async(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table.
 
@@ -434,7 +454,7 @@ async def concatenate_image_tables_as_async(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> TableType:
     """Concatenate tables from different images into a single table.
 
@@ -499,7 +519,7 @@ def list_image_tables(
     images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> list[str]:
     """List all table names in the images.
 
@@ -526,7 +546,7 @@ async def _list_image_tables_async(
     images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> list[str]:
     """List all table names in the images, reading them off the event loop."""
     factories = [
@@ -549,7 +569,7 @@ async def list_image_tables_async(
     images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> list[str]:
     """List all image tables in the images asynchronously.
 

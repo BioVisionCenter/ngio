@@ -142,3 +142,27 @@ def test_get_well_returns_cached_instance(tmp_path: Path):
     well_1 = plate.get_well(row="A", column=1)
     well_2 = plate.get_well(row="A", column=1)
     assert well_1 is well_2
+
+
+@pytest.mark.parametrize("max_workers", [None, 1, 4, "auto"])
+def test_plate_fan_out_agrees_with_serial(tmp_path: Path, max_workers):
+    """Reading the wells concurrently must return exactly the serial answer.
+
+    The fan-out is round-trip bound, so on a remote store it is worth several
+    times its serial cost — but only if the results are identical and ordered
+    the same way, since callers index into them by position.
+    """
+    from ngio.ome_zarr_meta import ImageInWellPath
+
+    images = [
+        ImageInWellPath(row=row, column=f"{col + 1:02d}", path="0")
+        for row in ("A", "B", "C")
+        for col in range(4)
+    ]
+    plate = create_empty_plate(
+        tmp_path / "fanout.zarr", name="plate", images=images, overwrite=True
+    )
+
+    assert plate.images_paths(max_workers=max_workers) == plate.images_paths()
+    assert list(plate.get_wells(max_workers=max_workers)) == list(plate.get_wells())
+    assert len(plate.images_paths(max_workers=max_workers)) == len(images)
