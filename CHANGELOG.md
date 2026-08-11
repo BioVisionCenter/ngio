@@ -14,6 +14,7 @@
 
 ### Chores
 
+- Added a performance gate at `tests/performance/`: exact store-operation counts asserted against committed baselines, running in CI like any other test. ngio's regressions are algorithmic, so the counts are exact integers with zero variance, and they are backend-independent — a local measurement predicts the cost on S3, checked rather than assumed by running every scenario against both a local and an in-memory store. Gated today: creating and opening a container, creating a plate, enumerating its wells and images, aggregating tables across it, loading tables, whole-array and ROI reads, and pyramid consolidation.
 - Linting moves from `pre-commit` to [`prek`](https://github.com/j178/prek), a drop-in reimplementation. `.pre-commit-config.yaml` is unchanged apart from dropping a `ci:` block for pre-commit.ci, which was never enabled. `pixi run -e dev lint` is still the entry point; `pre-commit autoupdate` becomes `prek auto-update`.
 - CI no longer depends on any Node 20 action, which GitHub now warns about on every run. `pre-commit/action` is maintenance-only and pins `actions/cache@v4` internally, so it is replaced by `j178/prek-action`; `JasonEtco/create-an-issue` is `using: node20`, so the scheduled-failure issue reporter moves to a local composite action at `.github/actions/report-failure` (and `.github/TEST_FAIL_TEMPLATE.md` goes with it).
 
