@@ -31,6 +31,41 @@ def test_on_disk_zooms(
     on_disk_zoom(source_array, target_array, order=order, mode=mode)
 
 
+def test_coarsen_nearest_takes_the_max(tmp_path: Path):
+    """`order="nearest"` must take the max over each block, never the mean.
+
+    `Label.consolidate()` passes `order="nearest"` precisely so a label pyramid
+    keeps IDs that were really segmented. Averaging invents ones that were not —
+    the mean of labels 3 and 7 is 5 — and truncates on an integer dtype, so this
+    asserts the blockwise max exactly rather than only that the call returns.
+    """
+    labels = np.array(
+        [
+            [3, 3, 0, 0],
+            [3, 7, 0, 9],
+            [4, 4, 8, 8],
+            [4, 4, 8, 2],
+        ],
+        dtype="uint16",
+    )
+    source_array = zarr.create_array(
+        tmp_path / "source.zarr", shape=(1, 4, 4), dtype="uint16"
+    )
+    source_array[...] = labels[np.newaxis]
+
+    target_array = zarr.create_array(
+        tmp_path / "target.zarr", shape=(1, 2, 2), dtype="uint16"
+    )
+    on_disk_zoom(source_array, target_array, order="nearest", mode="coarsen")
+
+    # Blockwise max. The mean would give [[4, 2], [4, 6]] — three of the four
+    # cells wrong, and 6 is a label that appears nowhere in the source.
+    np.testing.assert_array_equal(
+        target_array[...], np.array([[[7, 9], [4, 8]]], dtype="uint16")
+    )
+    assert set(np.unique(target_array[...])) <= set(np.unique(labels))
+
+
 @pytest.mark.parametrize("mode", ["dask", "coarsen"])
 def test_on_disk_zoom_sharded_matches_unsharded(
     tmp_path: Path, mode: Literal["dask", "coarsen"]

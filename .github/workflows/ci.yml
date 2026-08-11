@@ -55,8 +55,9 @@ jobs:
       - run: pipx run --spec check-manifest==0.51 check-manifest
 
   typecheck:
-    # `src/` must stay free of type errors. `tests/` is deliberately not gated
-    # yet — see the 1.0 checklist.
+    # `src/` must stay free of type errors. `tests/` is deliberately not gated:
+    # the fixtures lean on dynamic construction that `ty` cannot follow, and the
+    # noise would drown the signal from `src/`.
     name: type check (src)
     runs-on: ubuntu-latest
     steps:
@@ -271,3 +272,55 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release create "${GITHUB_REF_NAME}" ./dist/* --generate-notes
+
+  deploy-docs:
+    name: deploy docs (stable)
+    # Runs only once the release has actually reached PyPI. docs.yml deploys the
+    # `dev` alias from main and is deliberately not triggered by tags: publishing
+    # `stable` from there would race the test matrix, so a tag whose tests failed
+    # would still point every reader at a release nobody can install.
+    needs: [deploy]
+    if: success() && startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # mike pushes the built docs to the gh-pages branch
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 🔧 Set up pixi
+        uses: prefix-dev/setup-pixi@a09b6247153796b190642a2b53fac4241043cf6f # v0.10.0
+        with:
+          environments: docs
+
+      # `mike deploy` builds the site itself, but its internal build is not
+      # strict: `zensical build` exits 0 even when a markdown-exec code block
+      # raises, which would publish tracebacks. Build once up front to fail fast.
+      - name: 🔍 Verify docs build
+        run: pixi run -e docs build_docs
+
+      - name: 🚢 Deploy stable docs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # Checkout uses persist-credentials: false; authenticate the push that
+          # mike performs to the gh-pages branch via the gh credential helper.
+          gh auth setup-git
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Only a plain version tag becomes `stable`; a prerelease (v1.1.0a1)
+          # is published under its own name and does not move the alias.
+          if [[ "${VERSION}" =~ ^v[0-9.]+$ ]]; then
+            pixi run -e docs mike deploy --push --update-aliases "${VERSION}" stable
+            pixi run -e docs mike set-default --push stable
+            echo "Deployed stable version ${VERSION} (stable)"
+          else
+            pixi run -e docs mike deploy --push "${VERSION}"
+            echo "Deployed prerelease ${VERSION}; 'stable' unchanged"
+          fi

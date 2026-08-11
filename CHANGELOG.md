@@ -1,22 +1,25 @@
 # Changelog
 
-## [Unreleased]
+## [v1.0.1]
+
+Concurrency and Windows fixes. No API change — every `v1.0.0` call keeps working.
+
+### Behaviour changes
+
+- Lock files moved out of the Zarr store into a `<store>.ngio-locks/` directory beside it. **Upgrade every writer to a plate at the same time:** a `≤1.0.0` writer takes the old in-store paths, so mixed versions never exclude each other and one concurrent update is lost silently. Groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share a lock. Locks are keyed on the store root, so a well opened directly with `open_ome_zarr_well` and the same well reached through its plate no longer share one — take atomic well operations through the plate. Old `.lock` files left inside a store by an earlier version are not cleaned up.
+- `atomic_add_image` / `atomic_remove_image` warn on Windows that their lock is best-effort: `filelock` can hand it to two writers at once, so concurrent ones can lose an update — `v1.0.0` lost it silently. A single writer is unaffected. The warning is an error under `-W error` or `filterwarnings = ["error"]`.
 
 ### Fixes
 
 - Concurrent writers no longer race on creating a group: `get_group(create_mode=True)` is a get-or-create, and `atomic_add_image` creates the well group under the plate lock. Two workers adding to the same well could fail with `NgioFileExistsError`.
-- Windows: concurrent *reads* of a metadata file are retried too. `v1.0.0` only matched the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
-
-### Behaviour changes
-
-- `atomic_add_image` / `atomic_remove_image` warn on Windows that their lock is best-effort: `filelock` can hand it to two writers at once, so concurrent ones can lose an update — `v1.0.0` lost it silently. A single writer is unaffected.
-- Lock files moved to a `<store>.ngio-locks/` directory beside the store, one per group path. Nothing is written inside the Zarr store any more, and groups differing only after a dot (`foo.bar`, `foo.baz`) no longer share a lock. A `≤1.0.0` writer takes the old paths, so upgrade all writers to a plate together.
+- Windows: concurrent *reads* of a metadata file no longer fail with `PermissionError`. `v1.0.0` only retried the conflict when the error carried a Win32 code, which `os.replace` sets but `open()` does not.
+- `Label.consolidate(mode="coarsen")` averaged label IDs instead of taking the maximum — the mean of labels 3 and 7 is 5, a label that never existed — and truncated on integer dtypes. `on_disk_zoom` did not forward `order` to the coarsening path.
 
 ### Chores
 
-- Added a performance gate at `tests/performance/`: exact store-operation counts asserted against committed baselines, running in CI like any other test. ngio's regressions are algorithmic, so the counts are exact integers with zero variance, and they are backend-independent — a local measurement predicts the cost on S3, checked rather than assumed by running every scenario against both a local and an in-memory store. Gated today: creating and opening a container, creating a plate, enumerating its wells and images, aggregating tables across it, loading tables, whole-array and ROI reads, and pyramid consolidation.
-- Linting moves from `pre-commit` to [`prek`](https://github.com/j178/prek), a drop-in reimplementation. `.pre-commit-config.yaml` is unchanged apart from dropping a `ci:` block for pre-commit.ci, which was never enabled. `pixi run -e dev lint` is still the entry point; `pre-commit autoupdate` becomes `prek auto-update`.
-- CI no longer depends on any Node 20 action, which GitHub now warns about on every run. `pre-commit/action` is maintenance-only and pins `actions/cache@v4` internally, so it is replaced by `j178/prek-action`; `JasonEtco/create-an-issue` is `using: node20`, so the scheduled-failure issue reporter moves to a local composite action at `.github/actions/report-failure` (and `.github/TEST_FAIL_TEMPLATE.md` goes with it).
+- Added a performance gate at `tests/performance/`: exact store-operation counts asserted against committed baselines, running in CI like any other test. See `tests/performance/README.md`.
+- Linting moves from `pre-commit` to [`prek`](https://github.com/j178/prek), a drop-in reimplementation. `pixi run -e dev lint` is still the entry point; `pre-commit autoupdate` becomes `prek auto-update`.
+- CI no longer depends on any Node 20 action.
 
 ## [v1.0.0]
 
