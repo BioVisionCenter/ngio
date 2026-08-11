@@ -88,6 +88,21 @@ def is_sharing_violation(exc: BaseException) -> bool:
     return not (exc.filename and Path(exc.filename).is_dir())
 
 
+def _log_sharing_violation(
+    op_name: str, exc: OSError, delay: float, attempt: int
+) -> None:
+    winerror = getattr(exc, "winerror", None)
+    code = f"winerror {winerror}" if winerror is not None else f"errno {exc.errno}"
+    logger.debug(
+        "Windows file-sharing conflict on %s (%s), retrying in %.3fs (attempt %d/%d)",
+        op_name or "IO operation",
+        code,
+        delay,
+        attempt,
+        _SHARING_VIOLATION_ATTEMPTS,
+    )
+
+
 async def aretry_sharing_violation(
     fn: Callable[[], Awaitable[T]], *, op_name: str = ""
 ) -> T:
@@ -114,21 +129,29 @@ async def aretry_sharing_violation(
             if not is_sharing_violation(e):
                 raise
             delay = _SHARING_VIOLATION_BACKOFF.compute_delay(attempt)
-            winerror = getattr(e, "winerror", None)
-            code = (
-                f"winerror {winerror}" if winerror is not None else f"errno {e.errno}"
-            )
-            logger.debug(
-                "Windows file-sharing conflict on %s (%s), retrying in "
-                "%.3fs (attempt %d/%d)",
-                op_name or "IO operation",
-                code,
-                delay,
-                attempt,
-                _SHARING_VIOLATION_ATTEMPTS,
-            )
+            _log_sharing_violation(op_name, e, delay, attempt)
             await asyncio.sleep(delay)
     return await fn()
+
+
+def retry_sharing_violation(fn: Callable[[], T], *, op_name: str = "") -> T:
+    """Call `fn()`, retrying transient Windows file-sharing conflicts.
+
+    The synchronous twin of `aretry_sharing_violation`, for zarr's sync store
+    surface (`get_sync` and friends, added in zarr 3.3). Blocking sleeps are
+    correct here and only here: these calls run on a worker thread, not on
+    zarr's IO event loop.
+    """
+    for attempt in range(1, _SHARING_VIOLATION_ATTEMPTS):
+        try:
+            return fn()
+        except OSError as e:
+            if not is_sharing_violation(e):
+                raise
+            delay = _SHARING_VIOLATION_BACKOFF.compute_delay(attempt)
+            _log_sharing_violation(op_name, e, delay, attempt)
+            _sleep(delay)
+    return fn()
 
 
 def _log_retry(

@@ -11,6 +11,7 @@ import fsspec
 import numpy as np
 import pytest
 import zarr
+from zarr.abc.store import Store as ZarrStore
 from zarr.core.buffer import default_buffer_prototype
 from zarr.core.sync import sync
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, WrapperStore, ZipStore
@@ -36,6 +37,10 @@ _RETRY = RetryConfig(
     retry_on=["OSError"],
     backoff=ConstantBackoff(delay_s=0.0, jitter=False),
 )
+
+#: zarr 3.3 added `get_ranges` and the synchronous store surface. ngio supports
+#: zarr >= 3.1.6, so the tests for them are gated on the capability.
+_HAS_ZARR_33_SURFACE = hasattr(ZarrStore, "get_ranges")
 
 
 class FlakyMemoryStore(MemoryStore):
@@ -77,6 +82,26 @@ class FlakyMemoryStore(MemoryStore):
     def list_dir(self, prefix: str) -> AsyncIterator[str]:
         self._flake("list_dir")
         return super().list_dir(prefix)
+
+    # zarr >= 3.3 only; never reached on older zarr, where `MemoryStore` has no
+    # sync surface and nothing calls these.
+    def get_sync(
+        self,
+        key: str,
+        *,
+        prototype: BufferPrototype | None = None,
+        byte_range: ByteRequest | None = None,
+    ) -> Buffer | None:
+        self._flake("get_sync")
+        return super().get_sync(key, prototype=prototype, byte_range=byte_range)
+
+    def set_sync(self, key: str, value: Buffer) -> None:
+        self._flake("set_sync")
+        return super().set_sync(key, value)
+
+    def delete_sync(self, key: str) -> None:
+        self._flake("delete_sync")
+        return super().delete_sync(key)
 
 
 class TestFromAny:
@@ -251,6 +276,86 @@ class TestRetriedIO:
         results = dict(sync(collect()))
         assert results == {"a": None, "b": None}
         assert flaky.attempts["get"] == 3  # 1 failure + 2 successes
+
+
+@pytest.mark.skipif(
+    not _HAS_ZARR_33_SURFACE,
+    reason="get_ranges and the sync store surface arrived in zarr 3.3",
+)
+class TestRetriedZarr33Surface:
+    """zarr 3.3's additions inherit from `WrapperStore` un-retried unless hooked.
+
+    `WrapperStore` forwards each of these straight to the wrapped store, so
+    without ngio's overrides they would skip the retry policy that every other
+    IO op gets — silently, since nothing fails until a store is flaky.
+    """
+
+    def _prototype(self):
+        return default_buffer_prototype()
+
+    def test_get_ranges_routes_through_retried_get(self):
+        from zarr.abc.store import RangeByteRequest
+
+        flaky = FlakyMemoryStore(fail_times=1)
+        store = NgioStore(flaky, retry=_RETRY)
+        prototype = self._prototype()
+        sync(store.set("k", prototype.buffer.from_bytes(b"0123456789")))
+
+        async def collect():
+            out = []
+            async for group in store.get_ranges(
+                "k",
+                [RangeByteRequest(0, 4), RangeByteRequest(6, 10)],
+                prototype=prototype,
+            ):
+                out.extend((idx, bytes(buf.to_bytes())) for idx, buf in group)
+            return out
+
+        assert sorted(sync(collect())) == [(0, b"0123"), (1, b"6789")]
+        assert flaky.attempts["get"] > flaky.fail_times
+
+    def test_get_sync_retries(self):
+        flaky = FlakyMemoryStore(fail_times=1)
+        store = NgioStore(flaky, retry=_RETRY)
+        prototype = self._prototype()
+        sync(store.set("k", prototype.buffer.from_bytes(b"payload")))
+
+        buffer = store.get_sync("k", prototype=prototype)
+        assert bytes(buffer.to_bytes()) == b"payload"
+        assert flaky.attempts["get_sync"] == 2
+
+    def test_set_sync_and_delete_sync_retry(self):
+        flaky = FlakyMemoryStore(fail_times=1)
+        store = NgioStore(flaky, retry=_RETRY)
+        prototype = self._prototype()
+
+        store.set_sync("k", prototype.buffer.from_bytes(b"v"))
+        assert flaky.attempts["set_sync"] == 2
+
+        store.delete_sync("k")
+        assert flaky.attempts["delete_sync"] == 2
+        assert store.get_sync("k", prototype=prototype) is None
+
+    def test_get_ranges_sync_routes_through_retried_get_sync(self):
+        from zarr.abc.store import RangeByteRequest
+
+        flaky = FlakyMemoryStore(fail_times=1)
+        store = NgioStore(flaky, retry=_RETRY)
+        prototype = self._prototype()
+        sync(store.set("k", prototype.buffer.from_bytes(b"0123456789")))
+
+        result = store.get_ranges_sync(
+            "k", [RangeByteRequest(2, 5)], prototype=prototype
+        )
+        assert [(idx, bytes(buf.to_bytes())) for idx, buf in result] == [(0, b"234")]
+        assert flaky.attempts["get_sync"] > flaky.fail_times
+
+    def test_default_policy_propagates_sync_error(self):
+        flaky = FlakyMemoryStore(fail_times=1)
+        store = NgioStore(flaky, retry=RetryConfig())
+        with pytest.raises(OSError, match="flaky"):
+            store.get_sync("k", prototype=self._prototype())
+        assert flaky.attempts["get_sync"] == 1
 
 
 class SharingViolationStore(MemoryStore):

@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from zarr.abc.store import Store
+from zarr.storage import WrapperStore
 
 from ngio.utils import NgioStore
 
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
         AsyncIterator,
         Iterable,
         Iterator,
+        Sequence,
     )
 
     from zarr.abc.buffer import Buffer
@@ -65,6 +67,7 @@ COUNTER_KEYS: tuple[str, ...] = (
     "get.partial",
     "get_many",
     "get_partial_values",
+    "get_ranges",
     "getsize",
     "getsize_prefix",
     "is_empty",
@@ -144,9 +147,16 @@ def zero_fill(counters: Counter[str]) -> dict[str, int]:
 class CountingNgioStore(NgioStore):
     """An `NgioStore` that tallies each store call into the active recorder.
 
-    Only the async surface is overridden. zarr 3.1 and 3.2 expose no sync IO
-    methods on the `Store` ABC, and the `_get_bytes`/`_get_json` helpers
-    delegate to `get`, so they are counted transitively.
+    The `_get_bytes`/`_get_json` helpers delegate to `get`, so they are counted
+    transitively.
+
+    zarr 3.3 added a second, synchronous IO surface (`get_sync`, `set_sync`,
+    `delete_sync`) and a coalescing `get_ranges`. The sync methods are hooked
+    into the *same* counters as their async twins, so a store whose reads move
+    between the two surfaces — as they do under `FusedCodecPipeline`, opt-in in
+    3.3 — shows the same tally rather than a phantom drop to zero. The
+    overrides are defined unconditionally; on zarr < 3.3 nothing calls them,
+    and `super()` would raise loudly if anything did.
     """
 
     async def get(
@@ -174,10 +184,48 @@ class CountingNgioStore(NgioStore):
         _bump("bytes.read", sum(len(b) for b in buffers if b is not None))
         return buffers
 
+    def get_ranges(
+        self,
+        key: str,
+        byte_ranges: Sequence[ByteRequest | None],
+        *,
+        prototype: BufferPrototype,
+        **kwargs: Any,
+    ) -> AsyncIterator[Sequence[tuple[int, Buffer | None]]]:
+        # Counts batch invocations only. `NgioStore.get_ranges` runs the
+        # coalescer over `self.get`, so the merged fetches and their bytes are
+        # counted there — same arrangement as `_get_many`.
+        _bump("get_ranges")
+        return super().get_ranges(key, byte_ranges, prototype=prototype, **kwargs)
+
+    def get_sync(
+        self,
+        key: str,
+        *,
+        prototype: BufferPrototype | None = None,
+        byte_range: ByteRequest | None = None,
+    ) -> Buffer | None:
+        _bump(f"get.{_kind(key)}")
+        if byte_range is not None:
+            _bump("get.partial")
+        buffer = super().get_sync(key, prototype=prototype, byte_range=byte_range)
+        if buffer is not None:
+            _bump("bytes.read", len(buffer))
+        return buffer
+
     async def set(self, key: str, value: Buffer) -> None:
         _bump(f"set.{_kind(key)}")
         _bump("bytes.written", len(value))
         return await super().set(key, value)
+
+    def set_sync(self, key: str, value: Buffer) -> None:
+        _bump(f"set.{_kind(key)}")
+        _bump("bytes.written", len(value))
+        return super().set_sync(key, value)
+
+    def delete_sync(self, key: str) -> None:
+        _bump("delete")
+        return super().delete_sync(key)
 
     async def set_if_not_exists(self, key: str, value: Buffer) -> None:
         _bump("set_if_not_exists")
@@ -238,8 +286,8 @@ class CountingNgioStore(NgioStore):
         return super().list_dir(prefix)
 
 
-#: Store methods this module hooks explicitly.
-_COVERED = frozenset(
+#: Store methods this module hooks explicitly, on every supported zarr.
+_COVERED_ALWAYS = frozenset(
     {
         "_get_many",
         "_set_many",
@@ -260,6 +308,19 @@ _COVERED = frozenset(
     }
 )
 
+#: Hooked too, but only present on zarr >= 3.3 — ngio supports 3.1.6 upward, so
+#: these are exempt from the "zarr removed a method we hook" check below.
+_COVERED_SINCE_3_3 = frozenset(
+    {
+        "delete_sync",
+        "get_ranges",
+        "get_sync",
+        "set_sync",
+    }
+)
+
+_COVERED = _COVERED_ALWAYS | _COVERED_SINCE_3_3
+
 #: Store members that perform no IO of their own, or reach the store only via a
 #: method in `_COVERED`.
 _NON_IO = frozenset(
@@ -272,7 +333,10 @@ _NON_IO = frozenset(
         "_get_json",  # delegates to get
         "_get_json_sync",  # delegates to get
         "_open",
+        "_supports_sync_io",
+        "_with_store",  # rebuilds the wrapper, no IO
         "close",
+        "get_ranges_sync",  # delegates to get_sync
         "open",
         "read_only",
         "supports_consolidated_metadata",
@@ -285,27 +349,54 @@ _NON_IO = frozenset(
 )
 
 
-def assert_instrumentation_complete() -> None:
-    """Fail if zarr's `Store` grew an IO method this module does not count.
+def _store_members() -> set[str]:
+    """Every callable zarr exposes on the classes `CountingNgioStore` inherits.
 
-    Without this a zarr upgrade would silently drop operations from the tally,
-    which reads as a performance *improvement* in the baseline diff.
+    Both bases matter. `Store` is the ABC, but `NgioStore` subclasses
+    `WrapperStore`, which carries members of its own that forward straight to
+    the wrapped store — zarr 3.3's `get_sync`/`set_sync`/`delete_sync` arrived
+    that way and were invisible to a `Store`-only check.
+
+    `NgioStore` itself is deliberately not inspected: it would drag ngio's own
+    API (`store_type`, `full_url`, `memory_dict`, ...) into the classification
+    and make this guard churn on every ngio change.
+    """
+    return {
+        name
+        for cls in (Store, WrapperStore)
+        for name in dir(cls)
+        if not name.startswith("__") and callable(getattr(cls, name, None))
+    }
+
+
+def assert_instrumentation_complete() -> None:
+    """Fail if zarr's store surface drifted away from what this module counts.
+
+    Guards both directions. A *new* IO method would go uncounted, and a
+    *removed* one would zero its counter — either way a zarr upgrade silently
+    drops operations from the tally, which reads as a performance
+    *improvement* in the baseline diff.
 
     Raises:
-        AssertionError: If an unclassified `Store` member is found.
+        AssertionError: If a store member is unclassified, or a hooked method
+            no longer exists.
     """
-    members: set[str] = {
-        name
-        for name in dir(Store)
-        if not name.startswith("__") and callable(getattr(Store, name, None))
-    }
+    members = _store_members()
     unclassified = members - _COVERED - _NON_IO
     if unclassified:
         raise AssertionError(
-            "zarr's Store has members this module does not classify: "
+            "zarr's store surface has members this module does not classify: "
             f"{sorted(unclassified)}. Hook them in CountingNgioStore (and add "
             "them to COUNTER_KEYS) if they perform IO, otherwise list them in "
             "_NON_IO."
+        )
+    vanished = _COVERED_ALWAYS - members
+    if vanished:
+        raise AssertionError(
+            f"CountingNgioStore hooks methods zarr no longer has: "
+            f"{sorted(vanished)}. Their counters would silently read zero. "
+            "Drop the overrides and the matching COUNTER_KEYS entries, and "
+            "regenerate the baselines."
         )
 
 

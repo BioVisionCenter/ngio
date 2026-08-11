@@ -26,7 +26,12 @@ from zarr.storage._common import make_store
 from ngio.config import RetryConfig, get_config
 from ngio.utils import _retry
 from ngio.utils._errors import NgioValueError
-from ngio.utils._retry import aretry_call, aretry_sharing_violation
+from ngio.utils._retry import (
+    aretry_call,
+    aretry_sharing_violation,
+    retry_call,
+    retry_sharing_violation,
+)
 from ngio.utils._warnings import NgioUserWarning
 
 if TYPE_CHECKING:
@@ -38,6 +43,7 @@ if TYPE_CHECKING:
         Callable,
         Iterable,
         MutableMapping,
+        Sequence,
     )
 
     from zarr.abc.buffer import Buffer
@@ -251,6 +257,16 @@ class NgioStore(WrapperStore[Store]):
             return await fn()
         return await aretry_call(fn, self._retry, op_name=op_name)
 
+    def _sync_io(self, op_name: str, fn: Callable[[], T]) -> T:
+        # The synchronous counterpart of `_io`, for zarr >= 3.3's sync store
+        # surface. Blocking sleeps are fine here: zarr calls these from a worker
+        # thread (`asyncio.to_thread`), never on the IO event loop.
+        if _retry._IS_WINDOWS:
+            fn = functools.partial(retry_sharing_violation, fn, op_name=op_name)
+        if self._retry.max_retries == 0:
+            return fn()
+        return retry_call(fn, self._retry, op_name=op_name)
+
     def _retried_list(
         self, op_name: str, factory: Callable[[], AsyncIterator[str]]
     ) -> AsyncIterator[str]:
@@ -288,6 +304,84 @@ class NgioStore(WrapperStore[Store]):
         return await self._io(
             "get_partial_values",
             lambda: self._store.get_partial_values(prototype, key_ranges),
+        )
+
+    def get_ranges(
+        self,
+        key: str,
+        byte_ranges: Sequence[ByteRequest | None],
+        *,
+        prototype: BufferPrototype,
+        max_concurrency: int | None = None,
+        max_gap_bytes: int | None = None,
+        max_coalesced_bytes: int | None = None,
+    ) -> AsyncIterator[Sequence[tuple[int, Buffer | None]]]:
+        """Read many byte ranges from `key`, coalescing them (zarr >= 3.3).
+
+        Deliberately calls `Store.get_ranges` rather than `super()`:
+        `WrapperStore` forwards the whole call to the wrapped store, whose
+        coalescer would then run over *its* `get` — skipping the retry policy
+        and the Windows sharing-violation retry that every other op gets. The
+        `Store` default runs the same coalescer over `self.get`, so each merged
+        fetch is retried individually.
+
+        The trade-off is that a wrapped store with a backend-native
+        `get_ranges` (none ship in zarr 3.3) would not be used. Revisit if one
+        appears: correctness of the retry contract wins for now.
+
+        As in `WrapperStore`, `None` for a coalescing bound means "keep the
+        default" rather than being forwarded.
+        """
+        kwargs = {
+            name: value
+            for name, value in (
+                ("max_concurrency", max_concurrency),
+                ("max_gap_bytes", max_gap_bytes),
+                ("max_coalesced_bytes", max_coalesced_bytes),
+            )
+            if value is not None
+        }
+        # `ty` resolves against the pinned dev env (zarr 3.1.6), where this and
+        # the three sync methods below do not exist yet. Drop the suppressions
+        # once ngio's zarr floor reaches 3.3.
+        return Store.get_ranges(  # ty: ignore[unresolved-attribute]
+            self, key, byte_ranges, prototype=prototype, **kwargs
+        )
+
+    # `Store.get_ranges_sync` is left alone on purpose: it routes through
+    # `self.get_sync`, which is retried below.
+
+    def get_sync(
+        self,
+        key: str,
+        *,
+        prototype: BufferPrototype | None = None,
+        byte_range: ByteRequest | None = None,
+    ) -> Buffer | None:
+        """Retried `get_sync` (zarr >= 3.3)."""
+        return self._sync_io(
+            f"get_sync '{key}'",
+            lambda: super(  # ty: ignore[unresolved-attribute]
+                NgioStore, self
+            ).get_sync(key, prototype=prototype, byte_range=byte_range),
+        )
+
+    def set_sync(self, key: str, value: Buffer) -> None:
+        """Retried `set_sync` (zarr >= 3.3)."""
+        return self._sync_io(
+            f"set_sync '{key}'",
+            lambda: super(  # ty: ignore[unresolved-attribute]
+                NgioStore, self
+            ).set_sync(key, value),
+        )
+
+    def delete_sync(self, key: str) -> None:
+        """Retried `delete_sync` (zarr >= 3.3)."""
+        return self._sync_io(
+            f"delete_sync '{key}'",
+            lambda: super(  # ty: ignore[unresolved-attribute]
+                NgioStore, self
+            ).delete_sync(key),
         )
 
     async def exists(self, key: str) -> bool:

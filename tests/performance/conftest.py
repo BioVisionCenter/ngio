@@ -22,12 +22,8 @@ import sys
 import pytest
 import zarr
 from tests.performance._baseline import load_baseline, save_baseline
-from tests.performance._counting import (
-    assert_instrumentation_complete,
-    counting_store,
-)
+from tests.performance._counting import counting_store
 
-import ngio
 from ngio import (
     ImageInWellPath,
     create_empty_ome_zarr,
@@ -189,7 +185,6 @@ def store_kind(request):
 @pytest.fixture(scope="session")
 def ctx(store_kind, tmp_path_factory):
     """Build every fixture once per store kind, outside any count block."""
-    assert_instrumentation_complete()
     if store_kind == "memory":
         # A MemoryStore is rooted at its dict, so each fixture needs its own.
         targets = {name: {} for name in _BUILDERS}
@@ -222,6 +217,8 @@ def baseline(request, store_kind):
     collected: dict[str, dict[str, int]] = {}
     data = load_baseline(store_kind)
 
+    baseline_zarr = (data or {}).get("generated_with", {}).get("zarr")
+
     class _Baseline:
         updating = False
 
@@ -235,6 +232,31 @@ def baseline(request, store_kind):
                 )
             return data["scenarios"][name]
 
+        def explain_mismatch(self, name):
+            """Skip a mismatch that an unpinned zarr explains, else return.
+
+            The counts are a property of ngio *and* of the zarr it runs on, and
+            `ci_upstream.yml` installs zarr unpinned — so an upstream release
+            that reshuffles zarr's own IO would fail this gate for a change
+            nobody here made.
+
+            Deliberately conditional on the counts *actually* differing rather
+            than on the version alone: one baseline currently holds across
+            every zarr ngio supports, and a version-only check would quietly
+            stop asserting on the `test12`-`test14` envs, which run a different
+            zarr from the one the baselines were generated on.
+            """
+            if baseline_zarr is None or zarr.__version__ == baseline_zarr:
+                return
+            pytest.skip(
+                f"op counts for {name!r} differ under zarr {zarr.__version__}, "
+                f"but the baseline was generated on zarr {baseline_zarr} — "
+                "treating this as upstream drift, not an ngio regression. If "
+                "ngio now pins this zarr, regenerate:\n"
+                "  pixi run -e test11 pytest tests/performance -p no:xdist "
+                "--update-baseline"
+            )
+
         def record(self, name, counters):
             collected[name] = counters
 
@@ -243,8 +265,11 @@ def baseline(request, store_kind):
     yield holder
 
     if updating:
+        # No ngio version here: `hatch-vcs` stamps it when the editable install
+        # is built, not when the baseline is generated, so it lags the commit
+        # being recorded and churns on a dirty tree. `git log -p` on the
+        # baseline file is the accurate answer to "which change moved this".
         env = {
-            "ngio": ngio.__version__,
             "zarr": zarr.__version__,
             "python": f"{sys.version_info.major}.{sys.version_info.minor}",
             "platform": platform.system().lower(),

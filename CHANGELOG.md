@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- zarr 3.3 support. zarr 3.3 added a coalescing `get_ranges` and a synchronous store surface (`get_sync`, `set_sync`, `delete_sync`); ngio's store inherited all of them from `WrapperStore` forwarded straight to the wrapped store, so they ran with **no retry policy and no Windows sharing-violation retry** — unlike every other IO operation. They are now routed through the same retry path. Nothing reached these methods with zarr's defaults, so no released version could lose data over it; sharded arrays and the opt-in `FusedCodecPipeline` do.
+
+### Chores
+
+- The performance gate counts zarr 3.3's new store surface, and its instrumentation check now covers `WrapperStore` as well as `Store` — the sync methods arrived on the former and a `Store`-only check could not see them. It also fails when zarr *removes* a hooked method, which would previously have zeroed a counter silently. Op counts are unchanged on zarr 3.1.6, 3.2.1 and 3.3.0.
+- The op-count assertion is skipped when the counts differ *and* zarr is not the version the baselines were generated on, so an upstream zarr release no longer fails `CI (pip)`, which installs dependencies unpinned. The `test11` environment still asserts strictly on every PR.
+
 ## [v1.0.1]
 
 Concurrency and Windows fixes. No API change — every `v1.0.0` call keeps working.
