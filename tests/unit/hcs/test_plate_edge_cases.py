@@ -166,3 +166,30 @@ def test_plate_fan_out_agrees_with_serial(tmp_path: Path, max_workers):
     assert plate.images_paths(max_workers=max_workers) == plate.images_paths()
     assert list(plate.get_wells(max_workers=max_workers)) == list(plate.get_wells())
     assert len(plate.images_paths(max_workers=max_workers)) == len(images)
+
+
+def test_a_malformed_well_still_raises_just_later(tmp_path: Path):
+    """Well validation is deferred, not dropped.
+
+    `WellMetaHandler` used to read and decode in its constructor purely to
+    validate, which a plate walking 384 wells paid 384 times for documents it
+    was about to read again. With the version handed down there is nothing left
+    to resolve, so the check moved to first use — but it must still happen.
+    """
+    import zarr
+
+    from ngio.ome_zarr_meta import ImageInWellPath
+    from ngio.utils import NgioValidationError
+
+    images = [ImageInWellPath(row="A", column="01", path="0")]
+    store = tmp_path / "broken.zarr"
+    create_empty_plate(store, name="plate", images=images, overwrite=True)
+
+    # Corrupt the well document behind ngio's back.
+    well = zarr.open_group(str(store / "A" / "01"), mode="r+")
+    well.attrs.clear()
+    well.attrs.update({"well": {"images": "not-a-list"}})
+
+    plate = open_ome_zarr_plate(store, mode="r")
+    with pytest.raises(NgioValidationError):
+        plate.images_paths()

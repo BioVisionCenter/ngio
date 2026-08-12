@@ -603,12 +603,16 @@ class WellMetaHandler:
         self._version = version
         self._memo: _MetaMemo[NgioWellMeta] = _MetaMemo()
 
-        # Validate metadata
-        meta = self.get_meta()
-        # Store the resolved version, so later reads go straight to the right
-        # decoder instead of re-walking the (0.4-first) registry and paying a
-        # full failed validation on every v0.5 document.
-        self._version = meta.version
+        if version is None:
+            # Read once to resolve the version, and store it so later reads go
+            # straight to the right decoder instead of re-walking the
+            # (0.4-first) registry and paying a full failed validation on every
+            # 0.5 document.
+            self._version = self.get_meta().version
+        # With a version in hand there is nothing left to resolve, so this read
+        # would only be validating early. A plate opening 384 wells pays it 384
+        # times for documents it is about to read again anyway, so the check is
+        # left to first use -- where it raises exactly the same error.
 
     def get_meta(self) -> NgioWellMeta:
         """Retrieve the NGIO well metadata."""
