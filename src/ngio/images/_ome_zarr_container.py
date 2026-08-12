@@ -132,6 +132,9 @@ class OmeZarrContainer:
         )
         self._labels_container = label_container
         self._tables_container = table_container
+        # Set when a read-only probe found no `/tables`; see
+        # `_get_tables_container`.
+        self._tables_absent = False
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
@@ -167,6 +170,7 @@ class OmeZarrContainer:
         # Rebuilt on next access against the refreshed handler.
         self._labels_container = None
         self._tables_container = None
+        self._tables_absent = False
 
     @property
     def images_container(self) -> ImagesContainer:
@@ -204,10 +208,18 @@ class OmeZarrContainer:
         if self._tables_container is not None:
             return self._tables_container
 
+        # "This image has no /tables" is worth remembering too. Only the
+        # read-only probe may be remembered: a `create_mode=True` caller is
+        # asking for the group to be made, so it has to try again even though
+        # an earlier read-only probe found nothing.
+        if self._tables_absent and not create_mode:
+            return None
+
         _tables_container = _try_get_table_container(
             self._group_handler, create_mode=create_mode
         )
         self._tables_container = _tables_container
+        self._tables_absent = _tables_container is None
         return self._tables_container
 
     @property
@@ -654,9 +666,15 @@ class OmeZarrContainer:
         if table_container is None:
             return []
 
-        roi = table_container.list(filter_types="roi_table")
-        masking_roi = table_container.list(filter_types="masking_roi_table")
-        return roi + masking_roi
+        # One pass, not one per type: each `list(filter_types=...)` opens every
+        # table to read its type, so asking twice read every document twice to
+        # sort names the first pass had already sorted.
+        types = table_container.table_types()
+        return [
+            name
+            for name, table_type in types.items()
+            if table_type in ("roi_table", "masking_roi_table")
+        ]
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.

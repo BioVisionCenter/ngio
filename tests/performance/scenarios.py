@@ -170,6 +170,25 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _container(ctx, "tables"),
         lambda c: c.get_table("well_ROI_table").rois(),
     ),
+    # Filtering by type is the expensive listing: the type lives in each
+    # table's own attributes, never in the `/tables` group, so it costs one
+    # group open per table. Asking for two types used to walk the whole set
+    # twice; the second call must now be nearly free, and the repeat free.
+    "list_roi_tables": Scenario(
+        lambda ctx: _container(ctx, "tables"),
+        lambda c: c.list_roi_tables(),
+    ),
+    "list_roi_tables_repeated": Scenario(
+        lambda ctx: _container(ctx, "tables"),
+        lambda c: [c.list_roi_tables() for _ in range(3)],
+    ),
+    # An image with no `/tables` at all. Answering "nothing" was the *most*
+    # expensive listing per call, because the failed probe was never
+    # remembered — so this must be flat in the number of calls.
+    "list_tables_absent_x3": Scenario(
+        lambda ctx: _container(ctx, "image_no_tables"),
+        lambda c: [c.list_tables() for _ in range(3)],
+    ),
     # --- writes: creation -------------------------------------------------
     # No pixel data, so the counts are the per-level metadata and empty-array
     # writes alone. `set.meta` should scale with `levels`, nothing else should.

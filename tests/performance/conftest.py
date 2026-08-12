@@ -77,6 +77,21 @@ def _build_image(target, **overrides):
     )
 
 
+def _build_image_no_tables(target):
+    # No `/tables` group at all, which `_build_image` always creates. Answering
+    # "this image has no tables" used to be the most expensive listing there
+    # is, because the failed probe was never remembered.
+    create_empty_ome_zarr(
+        target,
+        shape=(1, 4, 64, 64),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        overwrite=True,
+    )
+
+
 def _build_plate(target, ngff_version="0.4"):
     # Images are registered in plate metadata but no arrays are created: that
     # is enough for the enumeration paths, which is what costs, and it is the
@@ -161,6 +176,7 @@ def _build_plate_tables(target):
 _BUILDERS = {
     "image": lambda t: _build_image(t, ngff_version="0.5"),
     "image_v04": lambda t: _build_image(t, ngff_version="0.4"),
+    "image_no_tables": _build_image_no_tables,
     "plate": _build_plate,
     "plate_v05": lambda t: _build_plate(t, ngff_version="0.5"),
     "plate_tables": _build_plate_tables,

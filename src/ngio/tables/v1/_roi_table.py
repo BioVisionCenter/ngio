@@ -478,11 +478,13 @@ class RoiTableV1(GenericRoiTableV1):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "RoiTableV1":
         table = cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=RoiTableV1Meta,
+            attrs=attrs,
         )
         return table
 
@@ -554,11 +556,13 @@ class MaskingRoiTableV1(GenericRoiTableV1):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "MaskingRoiTableV1":
         table = cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=MaskingRoiTableV1Meta,
+            attrs=attrs,
         )
         return table
 

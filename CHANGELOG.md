@@ -4,6 +4,7 @@
 
 ### Fixes
 
+- Listing tables by type could *create* a group. `TablesContainer.list(filter_types=...)` opened each table through a helper that defaults to creating what it cannot find, so a stale name left in the `tables` attribute made a read write an empty group in `r+`, or raise "cannot create a group in read only mode" in `r`. An unfiltered `list()` returned the same name harmlessly.
 - **ngio's own writes could be invisible to ngio on a store carrying consolidated metadata.** zarr leaves `.zmetadata` untouched when attributes are written and ngio has no way to refresh someone else's, so every read came back from a snapshot taken before ngio's writes — a label ngio had just derived was absent from the very next `list_labels()`. ngio now ignores consolidated metadata everywhere. It never wrote any, so no store ngio produces changes.
 
 ### Behaviour changes
@@ -19,6 +20,9 @@
 
 ### Performance
 
+- Listing tables by type no longer walks every table once per type. The type lives in each table's own attributes, never in the `/tables` group, so filtering costs one group open per table — and `list_roi_tables()` asked for two types, reading every document twice to sort names the first pass had already sorted. It is now one pass, and the result is memoised, so on six tables it drops from **95 store reads to 51** cold and to **2** on a repeat. Three calls in a row go from 187 reads to 41.
+- Answering "this image has no tables" was the *most* expensive listing there is, because the failed probe for the `/tables` group was never remembered. Three `list_tables()` calls on such an image go from **15 reads to 5**, and stay flat however many times you ask.
+- `TablesContainer.get` read each table's attributes twice — once to learn the type, once to build the concrete metadata model. Now read once: `get_table` drops from 18 reads to 16, `table_load_anndata` 57 → 55, and `plate_concatenate_tables` 294 → 286.
 - Deriving `image.dimensions` once instead of per access removes the last metadata reload from the read path. Repeated access drops from **520us to 2.1us** on NGFF 0.4 and 379us to 1.3us on 0.5. In store-op terms `dimensions_x10` goes from 10 metadata reads and 24,320 bytes to **1 and 2,432**, and `read_rois` to **zero** metadata reads. The property is read by every `get_*`/`set_*`, once per ROI by every iterator, and twice per ROI by masked ones — so a 1000-ROI masked segmentation goes from roughly 2,000 metadata reloads before the first pixel to two.
 - `create_empty_plate` no longer grows with the square of the plate. It looped `add_image`, and each iteration re-read the plate document, rewrote it whole, and rewrote the well document — so bytes written per image grew with the plate rather than staying flat. The plate document is now built in memory in one pass and each well document written once. For a 24-image plate: **733 → 178 metadata reads, 246 → 102 writes, and 82,074 → 8,870 bytes written**. The gap widens with size — a 384-image plate went from 14.4 MB written to 128 KB, and bytes-per-image is now flat (~334) instead of climbing from 1,528 to 37,490.
 - Wells are told the NGFF version their plate already resolved, so a 0.5 plate stops paying a failed pydantic validation per well: walking 24 wells drops from 48 decode attempts (24 failed) to 24 (none failed).
@@ -30,6 +34,7 @@
 
 ### Chores
 
+- The performance gate gained `list_roi_tables`, `list_roi_tables_repeated` and `list_tables_absent_x3`, plus an `image_no_tables` fixture. The existing image fixture always builds a `/tables` group, so nothing in the suite could see the cost of answering "no tables" — the same blind spot the `plate_images_paths_v05` scenario was added for.
 - The performance gate gained cached counterparts — `dimensions_x10_cached`, `plate_images_paths_cached` — so the metadata cache is measured rather than asserted. `open_container` and `open_container_cached` were byte-for-byte identical, which was the recorded form of the inert-flag bug; their inequality now holds the fix.
 - The performance gate gained a `plate_images_paths_v05` scenario. Every plate fixture was NGFF 0.4, which is both the default and the first version the decoder registry tries — so no plate scenario could ever record a failed validation, and the version memo above was invisible to the gate. `meta.decode_fail` on the new scenario is what holds it.
 

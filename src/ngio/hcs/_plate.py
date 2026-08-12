@@ -906,9 +906,15 @@ class OmeZarrPlate:
         if tables_container is None:
             return []
 
-        roi = tables_container.list(filter_types="roi_table")
-        masking_roi = tables_container.list(filter_types="masking_roi_table")
-        return roi + masking_roi
+        # One pass, not one per type: each `list(filter_types=...)` opens every
+        # table to read its type, so asking twice read every document twice to
+        # sort names the first pass had already sorted.
+        types = tables_container.table_types()
+        return [
+            name
+            for name, table_type in types.items()
+            if table_type in ("roi_table", "masking_roi_table")
+        ]
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.

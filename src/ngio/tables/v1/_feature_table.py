@@ -84,11 +84,13 @@ class FeatureTableV1(AbstractBaseTable):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "FeatureTableV1":
         return cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=FeatureTableMeta,
+            attrs=attrs,
         )
 
     @property
