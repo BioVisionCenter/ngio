@@ -31,10 +31,12 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
     store = tmp_path / "test_group_handler_creation.zarr"
     handler = ZarrGroupHandler(store=store, cache=cache, mode="a")
 
-    _store = handler.group.store
-    assert isinstance(_store, NgioStore)
-    assert isinstance(_store._store, LocalStore)
-    assert _store.local_root == store
+    # The group holds the bare store under the default retry policy, so that
+    # zarr can dispatch a store-aware codec pipeline on it; the handler still
+    # exposes the `NgioStore` services over it.
+    assert isinstance(handler.group.store, LocalStore)
+    assert isinstance(handler.store, NgioStore)
+    assert handler.store.local_root == store
     assert handler.use_cache == cache
 
     attrs = handler.load_attrs()
@@ -73,11 +75,12 @@ def test_group_handler_from_group(tmp_path: Path):
     group = zarr.group(store=store, overwrite=True)
 
     handler = ZarrGroupHandler(store=group, cache=True, mode="a")
-    # The group is reopened on an NgioStore wrapping the original store,
-    # so compare path and underlying store rather than group identity.
-    assert isinstance(handler.group.store, NgioStore)
-    assert handler.group.store._store == group.store
+    # A plain local store is already the normalized form under the default
+    # retry policy, so the group is adopted rather than reopened onto a wrapper.
+    assert handler.group.store is group.store
     assert handler.group.path == group.path
+    assert isinstance(handler.store, NgioStore)
+    assert handler.store._store is group.store
 
 
 def test_cache_true_holds_until_refreshed(tmp_path: Path):

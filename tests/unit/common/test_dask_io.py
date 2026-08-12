@@ -65,9 +65,7 @@ def test_unit_larger_than_the_dask_budget_still_aligns(tmp_path):
         shards=(2, 512, 512),
     )
     unit_bytes = int(np.prod(write_unit(array))) * array.dtype.itemsize
-    patch = da.from_array(
-        np.ones((4, 512, 512), dtype="uint16"), chunks=(1, 128, 128)
-    )
+    patch = da.from_array(np.ones((4, 512, 512), dtype="uint16"), chunks=(1, 128, 128))
 
     # A budget deliberately below one unit: the configuration the guard exists for.
     with dask.config.set({"array.chunk-size": unit_bytes // 4}):

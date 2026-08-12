@@ -22,6 +22,7 @@ from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 from ngio.config import NgioConfig, get_config
 from ngio.utils import _retry
 from ngio.utils._cache import NgioCache
+from ngio.utils._codec_pipeline import warn_on_codec_pipeline_fallback
 from ngio.utils._errors import (
     NgioFileExistsError,
     NgioFileNotFoundError,
@@ -59,8 +60,11 @@ def _check_group(
         raise NgioValueError(f"The group is read only. Cannot open in mode {mode}.")
 
     needs_read_only_reopen = mode == "r" and not group.read_only
-    if not isinstance(group.store, NgioStore) or needs_read_only_reopen:
-        ngio_store = NgioStore.from_any(group.store)
+    # Not `isinstance(..., NgioStore)`: with the default retry policy a plain
+    # local store is *already* the normalized form, and reopening it here would
+    # cost a full metadata read on every `open_group_wrapper(group)` call.
+    if not NgioStore.is_normalized(group.store) or needs_read_only_reopen:
+        ngio_store = NgioStore.normalize(group.store)
         reopen_mode = "r" if (mode == "r" or group.read_only) else "r+"
         group = zarr.open_group(
             store=ngio_store,
@@ -79,9 +83,15 @@ def open_group_wrapper(
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
-    The group is always opened on an `NgioStore`, so every store IO call
-    (including dask-worker chunk reads/writes) honors the configured
-    `io_retry` policy.
+    The group is opened on an `NgioStore` whenever that wrapper changes
+    behaviour — a configured `io_retry`, or Windows, where the sharing-violation
+    retry is unconditional — so those store IO calls (including dask-worker
+    chunk reads/writes) honor the policy. With the default policy on a plain
+    local store the bare store is handed to zarr instead: `NgioStore` is a
+    `WrapperStore`, and zarr silently falls back to its own codec pipeline for
+    stores a third-party pipeline does not recognise, so wrapping a pass-through
+    would cost `zarrs` for nothing. `ZarrGroupHandler.store` exposes the
+    `NgioStore` services either way.
 
     Consolidated metadata is never used, here or in `reopen_group`. ngio does
     not write it and cannot refresh someone else's: zarr leaves `.zmetadata`
@@ -104,7 +114,7 @@ def open_group_wrapper(
 
     try:
         mode = mode if mode is not None else "a"
-        ngio_store = NgioStore.from_any(store, mode=mode)
+        ngio_store = NgioStore.normalize(store, mode=mode)
         group = zarr.open_group(
             store=ngio_store,
             mode=mode,
@@ -162,6 +172,9 @@ class ZarrGroupHandler:
         # through, so this is the only place a store round-trip can be saved.
         self._attrs_cache: dict | None = None
         self._lock: tuple[Path, BaseFileLock] | None = None
+        # `_group.store` never changes for a handler: `reopen_group` passes the
+        # same object straight through.
+        self._store_facade: NgioStore | None = None
 
     def __repr__(self) -> str:
         """Return a string representation of the handler."""
@@ -172,8 +185,17 @@ class ZarrGroupHandler:
 
     @property
     def store(self) -> NgioStore:
-        """Return the store of the group."""
-        return NgioStore.ensure(self._group.store)
+        """Return the store of the group, as an `NgioStore` facade.
+
+        The group itself may hold a bare store (see `open_group_wrapper`), so
+        this can be a wrapper built purely to expose `full_url`, `get_mapper`
+        and friends. Built once: `NgioStore.__init__` deep-copies the retry
+        config, and `full_url`, `_create_lock` and both table backends read
+        this per call.
+        """
+        if self._store_facade is None:
+            self._store_facade = NgioStore.ensure(self._group.store)
+        return self._store_facade
 
     @property
     def full_url(self) -> str | None:
@@ -465,6 +487,9 @@ class ZarrGroupHandler:
             return array
         array = self.group.get(path, default=None)
         if isinstance(array, zarr.Array):
+            # On the fetch, not on a cache hit: one array per pyramid level per
+            # image, and the warning itself is deduplicated downstream.
+            warn_on_codec_pipeline_fallback(array)
             self._array_cache.set(path, array)
             return array
 

@@ -58,6 +58,38 @@ StoreType = Literal["local", "fsspec", "memory", "zip", "other"]
 _KNOWN_STORES = (LocalStore, FsspecStore, MemoryStore, ZipStore)
 
 
+def _warn_if_unknown_store(store: Store) -> None:
+    if not isinstance(store, _KNOWN_STORES):
+        warnings.warn(
+            f"Store type {type(store)} is not explicitly supported. "
+            f"Supported types are: {_KNOWN_STORES}. "
+            "Proceeding, but this may lead to unexpected behavior.",
+            NgioUserWarning,
+            stacklevel=3,
+        )
+
+
+def _wrapper_changes_behaviour(retry: RetryConfig | None = None) -> bool:
+    """Whether `NgioStore` would do anything a bare store does not."""
+    retry = retry if retry is not None else get_config().io_retry
+    # Windows always needs the wrapper: `_io` retries the sharing violation
+    # unconditionally, independently of `io_retry`.
+    return retry.max_retries > 0 or _retry._IS_WINDOWS
+
+
+def _bypass_is_safe(store: Store) -> bool:
+    """Whether handing this store to zarr unwrapped can pay for itself.
+
+    Deliberately only the exact `LocalStore`, as a finding rather than caution:
+    `zarrs` rejects every other store type it is offered — `MemoryStore`, every
+    `FsspecStore` including S3, and even `LocalStore` *subclasses* — by raising
+    `NotImplementedError`, which zarr catches and ignores. Unwrapping those
+    cannot engage a faster pipeline, so it would trade the retry wrapper for
+    nothing. zarrs is a local-disk win today; S3 gains nothing either way.
+    """
+    return type(store) is LocalStore
+
+
 def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
     fs_dict = json.loads(fs.to_json())
     fs_dict["asynchronous"] = False
@@ -112,14 +144,7 @@ class NgioStore(WrapperStore[Store]):
             return store
         if not isinstance(store, Store):
             store = sync(make_store(store, mode=mode))
-        if not isinstance(store, _KNOWN_STORES):
-            warnings.warn(
-                f"Store type {type(store)} is not explicitly supported. "
-                f"Supported types are: {_KNOWN_STORES}. "
-                "Proceeding, but this may lead to unexpected behavior.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
+        _warn_if_unknown_store(store)
         return cls(store, retry=retry)
 
     @classmethod
@@ -130,6 +155,46 @@ class NgioStore(WrapperStore[Store]):
         if isinstance(store, NgioStore):
             return store
         return cls(store, retry=retry)
+
+    @classmethod
+    def normalize(
+        cls,
+        store: str | Path | fsspec.mapping.FSMap | dict | Store | NgioStore,
+        mode: Literal["r", "r+", "w", "w-", "a"] | None = None,
+        retry: RetryConfig | None = None,
+    ) -> Store:
+        """Normalize any store-like object into the store zarr should be given.
+
+        Like `from_any`, except that it returns the *unwrapped* store when the
+        wrapper would not change behaviour. `NgioStore` is a `WrapperStore`, and
+        zarr's `create_codec_pipeline` silently falls back to its own
+        `BatchedCodecPipeline` for any store a third-party pipeline does not
+        recognise — so wrapping a plain local store costs the user `zarrs`, and
+        with the default policy (`max_retries=0`) buys nothing in return.
+
+        Store *services* are unaffected: `ZarrGroupHandler.store` still exposes
+        an `NgioStore` facade over whatever this returns.
+        """
+        if isinstance(store, NgioStore):
+            return store
+        if not isinstance(store, Store):
+            store = sync(make_store(store, mode=mode))
+        _warn_if_unknown_store(store)
+        if _bypass_is_safe(store) and not _wrapper_changes_behaviour(retry):
+            return store
+        return cls(store, retry=retry)
+
+    @classmethod
+    def is_normalized(cls, store: Store, retry: RetryConfig | None = None) -> bool:
+        """Whether `store` is already what `normalize` would hand zarr.
+
+        Used to decide whether an already-open group has to be reopened.
+        Reopening costs a full metadata read, so getting this wrong is not
+        cosmetic — `meta.group_reopen` in the performance gate holds it.
+        """
+        if isinstance(store, NgioStore):
+            return True
+        return _bypass_is_safe(store) and not _wrapper_changes_behaviour(retry)
 
     def _with_store(self, store: Store) -> NgioStore:
         return type(self)(store=store, retry=self._retry)
