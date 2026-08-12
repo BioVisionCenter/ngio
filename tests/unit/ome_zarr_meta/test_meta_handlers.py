@@ -177,3 +177,38 @@ def test_refresh_drops_the_derived_dimensions(tmp_path: Path):
 
     reader.refresh()
     assert image.dimensions.pixel_size.space_unit == "nanometer"
+
+
+def test_create_from_array_returns_a_container_that_sees_its_own_writes(tmp_path: Path):
+    """The array, the pyramid and the channel windows are written through a
+    cached view, so the container handed back must not predate them."""
+    import numpy as np
+
+    from ngio import create_ome_zarr_from_array
+
+    array = np.linspace(0, 1000, 2 * 4 * 32 * 32, dtype="uint16").reshape(2, 4, 32, 32)
+    container = create_ome_zarr_from_array(
+        tmp_path / "from_array.zarr",
+        array=array,
+        pixelsize=0.5,
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        channels_meta=["Channel 1", "Channel 2"],
+        overwrite=True,
+    )
+
+    # Channel windows are computed and written last, on the cached view.
+    windows = [
+        (c.channel_visualisation.start, c.channel_visualisation.end)
+        for c in container.get_image().channels_meta.channels
+    ]
+    assert windows == [
+        (c.channel_visualisation.start, c.channel_visualisation.end)
+        for c in open_ome_zarr_container(tmp_path / "from_array.zarr", mode="r")
+        .get_image()
+        .channels_meta.channels
+    ]
+    assert any(start != end for start, end in windows)
+
+    # And the pixels really landed.
+    assert container.get_image().get_as_numpy().max() > 0

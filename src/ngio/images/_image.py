@@ -623,9 +623,10 @@ class ImagesContainer:
         else:
             min_max_ = list(min_max)
         channels = []
-        for se, mm, ch in zip(
-            starts_ends, min_max_, self.channels_meta.channels, strict=True
-        ):
+        # `current_channels`, not `self.channels_meta.channels`: that property
+        # opens the image and reloads its metadata, and it is the same value
+        # already bound above.
+        for se, mm, ch in zip(starts_ends, min_max_, current_channels, strict=True):
             updates = {"start": se[0], "end": se[1]}
             if mm is not None:
                 updates.update({"min": mm[0], "max": mm[1]})

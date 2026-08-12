@@ -1272,8 +1272,19 @@ def create_ome_zarr_from_array(
         extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
     )
-    image = ome_zarr.get_image()
+    # Populate through a cached view. Writing the array, building the pyramid
+    # and computing the channel windows re-read the same few documents a dozen
+    # times over, and this function is the only writer for the whole sequence —
+    # the same reason `create_empty_plate` and `create_empty_well` build with
+    # `cache=True`. The caller still gets an uncached container.
+    working = open_ome_zarr_container(store=store, mode="r+", cache=True)
+    image = working.get_image()
     image.set_array(array)
     image.consolidate()
-    ome_zarr.set_channel_windows_with_percentiles(percentiles=percentiles)
+    working.set_channel_windows_with_percentiles(percentiles=percentiles)
+
+    # `ome_zarr` was opened before any of the writes above. It is uncached, so
+    # it re-reads and would see them anyway; this is a guard against that
+    # ceasing to be true, and it costs no store reads.
+    ome_zarr.refresh()
     return ome_zarr
