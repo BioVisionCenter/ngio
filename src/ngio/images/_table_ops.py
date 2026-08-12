@@ -2,10 +2,13 @@
 
 import asyncio
 import os
+import warnings
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from inspect import currentframe
+from pathlib import Path
 from typing import Literal, TypeVar
 
 import pandas as pd
@@ -13,14 +16,61 @@ import polars as pl
 
 from ngio.images._ome_zarr_container import OmeZarrContainer
 from ngio.tables import Table, TableType
-from ngio.utils import deprecated
+from ngio.utils import NgioFutureWarning, deprecated
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
 
-#: Accepted by every `max_workers` argument. `None` runs serially in the
-#: calling thread; `"auto"` picks a pool sized for round-trip-bound work.
+#: Accepted by every `max_workers` argument. `None` means "unspecified" and
+#: currently runs serially; `1` is serial deliberately; `"auto"` picks a pool
+#: sized for round-trip-bound work.
 MaxWorkers = int | Literal["auto"] | None
+
+#: The release in which `max_workers` starts defaulting to `"auto"`.
+_DEFAULT_CHANGES_IN = "1.2"
+
+
+def _stacklevel_of_first_caller() -> int:
+    """Return the `stacklevel` that points at the first frame outside ngio.
+
+    A fixed level cannot work: `get_wells()` reaches the fan-out through two
+    ngio frames and `images_paths()` through three, so any constant blames
+    ngio's own source for one of them. That matters twice over — the reader is
+    told to edit a file they do not own, and the `warnings` module keys its
+    deduplication on the reported location, so every caller would collapse onto
+    one entry.
+    """
+    package_root = str(Path(__file__).parents[1])
+    frame = currentframe()
+    level = 0
+    while frame is not None:
+        level += 1
+        frame = frame.f_back
+        if frame is not None and not frame.f_code.co_filename.startswith(package_root):
+            return level
+    return 2
+
+
+def _warn_default_will_change(n_items: int) -> None:
+    """Announce the coming default, only where it will actually matter.
+
+    Deduplication is left to the `warnings` module, which suppresses repeats
+    per call site. A hand-rolled once-per-process flag would be worse: under
+    `filterwarnings = ["error"]` only the first caller in the process raises,
+    so which test fails depends on collection order.
+    """
+    if n_items <= 1:
+        return
+    warnings.warn(
+        "Plate-wide operations still read one item at a time by default. In "
+        f"ngio={_DEFAULT_CHANGES_IN} the default for `max_workers` changes from "
+        '`None` to `"auto"`, which reads them concurrently -- several times '
+        "faster on a remote store, where these calls are round-trip bound. "
+        'Pass `max_workers="auto"` to opt in now, or `max_workers=1` to keep '
+        "reading serially and silence this.",
+        NgioFutureWarning,
+        stacklevel=_stacklevel_of_first_caller(),
+    )
 
 
 def _resolve_max_workers(max_workers: MaxWorkers) -> int | None:
@@ -52,8 +102,10 @@ def _map_workers(
 
     Results keep the order of `items`. With `max_workers=None` (the default)
     the work runs serially in the calling thread; `"auto"` sizes the pool for
-    round-trip-bound work.
+    round-trip-bound work, and `1` is serial by explicit request.
     """
+    if max_workers is None:
+        _warn_default_will_change(len(items))
     max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 1 or len(items) <= 1:
         return [func(item) for item in items]
@@ -71,6 +123,8 @@ async def _gather_bounded(
     With `max_workers=None` the fan-out is left to asyncio's default thread
     executor, which is itself capped at `min(32, cpu_count + 4)`.
     """
+    if max_workers is None:
+        _warn_default_will_change(len(coro_factories))
     max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 0:
         return list(await asyncio.gather(*(factory() for factory in coro_factories)))

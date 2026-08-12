@@ -195,6 +195,12 @@ filterwarnings = [
     # break the Windows jobs. The `warns_on_windows` tests assert the warning
     # explicitly via pytest.warns, which overrides this filter.
     "ignore:ngio's file lock is not exclusive on Windows",
+    # Announces the coming `max_workers` default on every plate-wide fan-out
+    # that does not pick one. Global rather than per-test: the suite exercises
+    # those paths from a dozen places and ngio's own tests are not the audience
+    # for the notice. `test_max_workers_default.py` asserts it explicitly via
+    # pytest.warns, which overrides this filter.
+    "ignore::ngio.utils._warnings.NgioFutureWarning",
 ]
 addopts = [
     "-vv",

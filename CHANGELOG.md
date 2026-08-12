@@ -14,6 +14,10 @@
 - **A malformed well now raises on first use rather than when the well is opened**, when the well is reached through its plate. Reaching one directly with `open_ome_zarr_well` is unchanged. The exception type and message are the same either way.
 - **Caching and the atomic plate/well operations are no longer mutually exclusive.** `_create_lock` used to refuse outright when caching was on, because a read-modify-write could otherwise be served a value cached from before the lock was taken. Taking the lock now refreshes cached metadata on entry and again on release, so the hazard is handled rather than forbidden — `atomic_add_image` and friends work with `cache=True`. Verified by a 40-item, 4-process no-lost-update test that fails without the invalidation.
 
+### Deprecated
+
+- **`max_workers` will default to `"auto"` in `ngio=1.2`**, so plate-wide operations — `get_wells`, `get_images`, `images_paths`, `list_image_tables`, `concatenate_image_tables` — will read their items concurrently instead of one at a time. Results and their order are unchanged; only the concurrency is. Calling one of these with more than one item and no `max_workers` now emits an `NgioFutureWarning`. Pass `max_workers="auto"` to opt in now, or `max_workers=1` to keep reading serially. `FutureWarning` rather than `DeprecationWarning` because Python hides the latter from end users, which is the wrong audience for a silent behaviour change.
+
 ### Features
 
 - `OmeZarrContainer.refresh()` and `OmeZarrPlate.refresh()` re-read every piece of metadata the object is holding — the raw attributes cached under `cache=True`, the decoded metadata memo, and each image's `dimensions`. The last two are held regardless of the `cache` flag, so `refresh()` is not a no-op under `cache=False`.

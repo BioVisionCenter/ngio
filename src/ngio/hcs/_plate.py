@@ -370,8 +370,9 @@ class OmeZarrPlate:
         Args:
             acquisition: The acquisition id to filter the images.
             max_workers: How many wells to read concurrently. `None` (the
-                default) reads them one after another; `"auto"` sizes a pool for
-                round-trip-bound work.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep reading serially, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         wells = self.get_wells(max_workers=max_workers)
         images = []
@@ -475,7 +476,9 @@ class OmeZarrPlate:
 
         Args:
             max_workers: How many wells to open concurrently. `None` (the
-                default) opens them one at a time in the calling thread.
+                default) opens them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
 
         Returns:
             A dictionary of wells, keyed by well path.
@@ -527,7 +530,9 @@ class OmeZarrPlate:
         Args:
             acquisition: The acquisition id to filter the images.
             max_workers: How many images to open concurrently. `None` (the
-                default) opens them one at a time in the calling thread.
+                default) opens them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
 
         Returns:
             A dictionary of images, keyed by image path.
@@ -1057,7 +1062,9 @@ class OmeZarrPlate:
             mode: Whether to return only tables common to every image
                 (`"common"`) or the union across them (`"all"`).
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = tuple(
             self.get_images(acquisition=acquisition, max_workers=max_workers).values()
@@ -1120,7 +1127,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition, max_workers=max_workers)
         extras = _build_extras(tuple(images.keys()))
@@ -1158,7 +1167,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition, max_workers=max_workers)
         extras = _build_extras(tuple(images.keys()))
@@ -1198,7 +1209,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition)
         extras = _build_extras(tuple(images.keys()))
@@ -1240,7 +1253,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition)
         extras = _build_extras(tuple(images.keys()))
