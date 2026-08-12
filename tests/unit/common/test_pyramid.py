@@ -72,10 +72,12 @@ def test_on_disk_zoom_sharded_matches_unsharded(
 ):
     """A zoom onto a sharded target matches the same zoom onto an unsharded one.
 
-    Both dask paths rechunk to `target.chunks`, which for a sharded array is the
-    *inner* chunk shape, while writes are atomic per shard object. Several blocks
-    therefore read-modify-write one shard and race without the shared `da.store`
-    lock. The unsharded layout is race-free by alignment, so it is the reference.
+    Writes are atomic per shard object, so a block covering only part of a shard
+    makes zarr read-modify-write the whole thing — and several such blocks race.
+    Both dask paths hand the zoomed array to `store_dask`, which rechunks onto
+    the target's write unit (`shards or chunks`) so each shard has exactly one
+    writer. The unsharded layout is race-free by alignment, so it is the
+    reference the sharded result has to match.
     """
     rng = np.random.default_rng(0)
     source_array = zarr.create_array(

@@ -52,7 +52,7 @@ dependencies = [
     "pydantic>=2.11.5",       # required by ome-zarr-models
     "pandas>=2.2.2",          # first 2.2.x supporting numpy 2 on py3.11
     "aiohttp>=3.9",
-    "dask[array]>=2024.1",
+    "dask[array]>=2025.11",
     # "xarray", still not used
     "ome-zarr-models>=1.4",   # `ValidTransform` was added in 1.4
     "pooch>=1.8",
@@ -201,12 +201,6 @@ filterwarnings = [
     # for the notice. `test_max_workers_default.py` asserts it explicitly via
     # pytest.warns, which overrides this filter.
     "ignore::ngio.utils._warnings.NgioFutureWarning",
-    # dask reporting that a region write is not aligned to the target's write
-    # unit -- the shard, or the chunk when the array is unsharded. It fires on
-    # exactly the writes where zarr must read-modify-write that unit, so it is
-    # information for the caller, not a defect: `write_sharded_roi_dask` in the
-    # performance gate exists to hold that case and trips it every run.
-    "default::dask.array.core.PerformanceWarning",
 ]
 addopts = [
     "-vv",

@@ -8,7 +8,7 @@ import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from ngio.common._locks import DASK_STORE_LOCK
+from ngio.common._dask_io import store_dask
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -40,19 +40,14 @@ def _on_disk_dask_zoom(
     source_array = da.from_zarr(source)
     target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
 
-    # No compute_chunk_sizes() here: the rechunk above already fixes every
-    # block shape, so it would execute the whole read -> zoom graph purely to
-    # re-learn them, throw the pixels away, and leave da.store to run the same
-    # graph again -- exactly double the chunk reads.
-    target_array = target_array.rechunk(target.chunks)
-    # da.store rather than to_zarr: dask >=2025.11's to_zarr internally
-    # re-derives chunks via normalize_chunks(chunks="auto", ...) and warns
-    # (treated as error by our filterwarnings) when the result isn't a
-    # multiple of the zarr target's chunks. da.store writes blocks 1:1.
-    # The shared lock serialises the flushes: blocks that only partially cover
-    # a chunk (or, for a sharded target, a shard) make zarr read-modify-write
-    # it, and two of them racing on the same key lose an update.
-    da.store(target_array, target, lock=DASK_STORE_LOCK)  # type: ignore
+    # No compute_chunk_sizes() here: it would execute the whole read -> zoom
+    # graph purely to re-learn block shapes, throw the pixels away, and leave
+    # the write to run the same graph again -- exactly double the chunk reads.
+    # No rechunk either: store_dask rechunks onto the target's write unit,
+    # which is `shards or chunks`. Rechunking to `target.chunks` here was worse
+    # than doing nothing on a sharded target -- that is the shard's *inner*
+    # chunk shape, so every block became a partial shard write.
+    store_dask(target_array, target)
 
 
 def _on_disk_coarsen(
@@ -103,9 +98,8 @@ def _on_disk_coarsen(
     out_target = da.coarsen(
         aggregation_function, source_array, coarsening_setup, trim_excess=True
     )
-    out_target = out_target.rechunk(target.chunks)
-    # See _on_disk_dask_zoom for rationale, including the lock.
-    da.store(out_target, target, lock=DASK_STORE_LOCK)  # type: ignore
+    # See _on_disk_dask_zoom: store_dask owns the rechunk onto the write unit.
+    store_dask(out_target, target)
 
 
 def on_disk_zoom(

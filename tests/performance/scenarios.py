@@ -313,9 +313,9 @@ SCENARIOS: dict[str, Scenario] = {
         lambda state: state[0].set_array(patch=state[1]),
     ),
     # A region write that covers neither shard wholly, which is the case a
-    # caller writing per-ROI actually hits. It is also the only scenario that
-    # emits dask's `PerformanceWarning` (see the filter in `pyproject.toml`):
-    # dask reporting the read-modify-write this write genuinely costs.
+    # caller writing per-ROI actually hits. Its boundary shards are still
+    # read-modify-written -- that part is inherent to the geometry, not a defect
+    # -- so what this holds is that each of them is read *once*.
     "write_sharded_roi_dask": Scenario(
         lambda ctx: (
             _write_target(ctx, "write_sharded_roi_dask", shards=_WRITE_SHARDS),
