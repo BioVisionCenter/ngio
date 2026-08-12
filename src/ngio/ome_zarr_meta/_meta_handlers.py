@@ -223,13 +223,19 @@ class _MetaMemo(Generic[_meta_type]):
 
     would otherwise edit the memo in place -- and a caller who mutates without
     writing back would leave it holding something that is not on disk.
+
+    `generation` moves whenever the decoded value does. It gives objects that
+    derive something from the metadata a free way to notice — reading an int
+    costs nothing, where re-deriving costs a store round-trip. See
+    `AbstractImage.dimensions`.
     """
 
-    __slots__ = ("_attrs", "_meta")
+    __slots__ = ("_attrs", "_meta", "generation")
 
     def __init__(self) -> None:
         self._attrs: dict | None = None
         self._meta: _meta_type | None = None
+        self.generation: int = 0
 
     def get(self, attrs: dict, decode: Callable[[], _meta_type]) -> _meta_type:
         """Return the metadata for `attrs`, decoding only on a miss."""
@@ -238,12 +244,14 @@ class _MetaMemo(Generic[_meta_type]):
         meta = decode()
         self._attrs = deepcopy(attrs)
         self._meta = meta
+        self.generation += 1
         return deepcopy(meta)
 
     def clear(self) -> None:
         """Drop the memo, so the next `get` decodes again."""
         self._attrs = None
         self._meta = None
+        self.generation += 1
 
 
 ##################################################
@@ -313,6 +321,24 @@ class ImageMetaHandler:
         meta = self.get_meta()
         # Store the resolved version
         self._version = meta.version
+
+    def invalidate(self) -> None:
+        """Drop the decoded metadata, so the next read decodes again.
+
+        Moves `generation`, so anything caching a derived value against it --
+        `AbstractImage.dimensions` -- is dropped with it. This is what
+        `OmeZarrContainer.refresh()` reaches for.
+        """
+        self._memo.clear()
+
+    @property
+    def generation(self) -> int:
+        """Moves whenever the decoded metadata does.
+
+        Free to read. Lets a derived value be cached and invalidated without
+        anyone having to call back into this handler on every access.
+        """
+        return self._memo.generation
 
     def get_meta(self) -> NgioImageMeta:
         """Retrieve the NGIO image metadata."""
@@ -396,6 +422,24 @@ class LabelMetaHandler:
         meta = self.get_meta()
         # Store the resolved version
         self._version = meta.version
+
+    def invalidate(self) -> None:
+        """Drop the decoded metadata, so the next read decodes again.
+
+        Moves `generation`, so anything caching a derived value against it --
+        `AbstractImage.dimensions` -- is dropped with it. This is what
+        `OmeZarrContainer.refresh()` reaches for.
+        """
+        self._memo.clear()
+
+    @property
+    def generation(self) -> int:
+        """Moves whenever the decoded metadata does.
+
+        Free to read. Lets a derived value be cached and invalidated without
+        anyone having to call back into this handler on every access.
+        """
+        return self._memo.generation
 
     def get_meta(self) -> NgioLabelMeta:
         """Retrieve the NGIO label metadata."""

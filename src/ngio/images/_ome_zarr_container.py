@@ -151,12 +151,22 @@ class OmeZarrContainer:
         return base_str
 
     def refresh(self) -> None:
-        """Re-read metadata that `cache=True` holds for the object's lifetime.
+        """Re-read every piece of metadata this container is holding.
 
         The answer to "someone else wrote to this container and I want to see
-        it". A no-op when opened with `cache=False`, where nothing is held.
+        it".
+
+        Not a no-op under `cache=False`: the decoded metadata memo and each
+        image's `dimensions` are held regardless of that flag, because both are
+        derived from a `zarr.Array` handle that is itself fixed at construction.
+        `cache=False` only means the raw attributes are re-read; this drops the
+        derived values too.
         """
         self._group_handler.clean_cache()
+        self._images_container._meta_handler.invalidate()
+        # Rebuilt on next access against the refreshed handler.
+        self._labels_container = None
+        self._tables_container = None
 
     @property
     def images_container(self) -> ImagesContainer:

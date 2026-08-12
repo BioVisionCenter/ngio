@@ -101,6 +101,10 @@ class AbstractImage(ABC):
         except NgioFileExistsError as e:
             raise NgioFileExistsError(f"Could not find the dataset at {path}.") from e
 
+        # (meta generation, dataset, dimensions); see
+        # `_resolve_dataset_and_dimensions`.
+        self._dataset_cache: tuple[int, Dataset, Dimensions] | None = None
+
     def __repr__(self) -> str:
         """Return a string representation of the image."""
         return f"Image(path={self.path}, {self.dimensions})"
@@ -125,16 +129,47 @@ class AbstractImage(ABC):
     @property
     def dataset(self) -> Dataset:
         """Return the dataset of the image."""
-        return self.meta_handler.get_meta().get_dataset(path=self.path)
+        return self._resolve_dataset_and_dimensions()[0]
 
     @property
     def dimensions(self) -> Dimensions:
         """Return the dimensions of the image."""
-        return Dimensions(
+        return self._resolve_dataset_and_dimensions()[1]
+
+    def _resolve_dataset_and_dimensions(self) -> tuple[Dataset, Dimensions]:
+        """Return the dataset and dimensions, deriving them at most once.
+
+        Both are fixed for the lifetime of this object, so they are derived on
+        first use and kept. That is not a new assumption: `self._zarr_array` is
+        fetched once in `__init__` and never refreshed, so `shape` and `chunks`
+        are already a construction-time snapshot -- re-reading the dataset on
+        every access froze half the inputs and not the other half.
+
+        Rebuilding cost a full metadata reload, and this is the hottest
+        property in the library: every `get_*`/`set_*` reads it, iterators read
+        it once per ROI, and masked ones twice -- image and label.
+
+        A write through this object moves the meta handler's `generation`, so
+        the pair is re-derived on the next access. A write by *another* process
+        is not seen until the container is reopened or `refresh()` is called,
+        which is exactly the guarantee `zarr_array` already carried.
+        """
+        generation = self.meta_handler.generation
+        cached = self._dataset_cache
+        if cached is not None and cached[0] == generation:
+            return cached[1], cached[2]
+
+        dataset = self.meta_handler.get_meta().get_dataset(path=self.path)
+        dimensions = Dimensions(
             shape=self.zarr_array.shape,
             chunks=self.zarr_array.chunks,
-            dataset=self.dataset,
+            dataset=dataset,
         )
+        # Re-read rather than reuse `generation`: `get_meta` above may have
+        # decoded fresh attributes and moved it, and caching against the older
+        # value would make the next access a miss.
+        self._dataset_cache = (self.meta_handler.generation, dataset, dimensions)
+        return dataset, dimensions
 
     @property
     def pixel_size(self) -> PixelSize:

@@ -98,3 +98,82 @@ def test_memo_survives_a_container_round_trip(tmp_path: Path):
 
     container.set_channel_labels(["first", "second"])
     assert image.channel_labels == ["first", "second"]
+
+
+def test_dimensions_is_derived_once(tmp_path: Path):
+    """`dimensions` is fixed for the object's lifetime, like `zarr_array`.
+
+    It is the hottest property in the library — every `get_*`/`set_*` reads it,
+    iterators once per ROI and masked ones twice — and rebuilding it cost a full
+    metadata reload. Freezing it is not a new assumption: `self._zarr_array` is
+    fetched once in `__init__` and never refreshed, so shape and chunks were
+    already a construction-time snapshot.
+    """
+    store = tmp_path / "dims.zarr"
+    create_empty_ome_zarr(
+        store,
+        shape=(2, 4, 32, 32),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        overwrite=True,
+    )
+    image = open_ome_zarr_container(store, mode="r").get_image()
+
+    first = image.dimensions
+    assert image.dimensions is first
+
+
+def test_a_write_through_the_image_redirives_dimensions(tmp_path: Path):
+    """Writing metadata through this object must invalidate the derived value."""
+    store = tmp_path / "dims_write.zarr"
+    create_empty_ome_zarr(
+        store,
+        shape=(2, 4, 32, 32),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        space_unit="micrometer",
+        overwrite=True,
+    )
+    container = open_ome_zarr_container(store, mode="r+")
+    image = container.get_image()
+
+    assert image.dimensions.pixel_size.space_unit == "micrometer"
+    image.set_axes_units(space_unit="nanometer")
+
+    assert image.dimensions.pixel_size.space_unit == "nanometer"
+
+
+def test_refresh_drops_the_derived_dimensions(tmp_path: Path):
+    """`refresh()` has to reach the derived values, not just the raw attributes.
+
+    `clean_cache()` alone clears the group handler's caches, which is invisible
+    to a `dimensions` already derived — so `refresh()` would silently not
+    refresh the one thing callers reach for it about.
+    """
+    store = tmp_path / "dims_refresh.zarr"
+    create_empty_ome_zarr(
+        store,
+        shape=(2, 4, 32, 32),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        space_unit="micrometer",
+        overwrite=True,
+    )
+    reader = open_ome_zarr_container(store, mode="r")
+    # Held across the refresh on purpose: `get_image()` hands back a fresh
+    # `Image` whose cache is empty, so re-fetching would pass whether or not
+    # `refresh` reached anything.
+    image = reader.get_image()
+    assert image.dimensions.pixel_size.space_unit == "micrometer"
+
+    writer = open_ome_zarr_container(store, mode="r+")
+    writer.get_image().set_axes_units(space_unit="nanometer")
+
+    reader.refresh()
+    assert image.dimensions.pixel_size.space_unit == "nanometer"
