@@ -972,27 +972,32 @@ def derive_image_container(
 
 
 def _parse_str_or_model(
-    image: Image, channel_selection: int | str | ChannelSelectionModel
+    channels_meta: ChannelsMeta, channel_selection: int | str | ChannelSelectionModel
 ) -> int:
-    """Parse a string or ChannelSelectionModel to an integer channel index."""
+    """Parse a string or ChannelSelectionModel to an integer channel index.
+
+    Takes the channels metadata rather than the image: reading it off the image
+    is a full metadata reload, and this runs once per selected channel.
+    """
     if isinstance(channel_selection, int):
+        num_channels = len(channels_meta.channel_labels)
         if channel_selection < 0:
             raise NgioValueError("Channel index must be a non-negative integer.")
-        if channel_selection >= image.num_channels:
+        if channel_selection >= num_channels:
             raise NgioValueError(
                 "Channel index must be less than the number "
-                f"of channels ({image.num_channels})."
+                f"of channels ({num_channels})."
             )
         return channel_selection
     elif isinstance(channel_selection, str):
-        return image.get_channel_idx(channel_label=channel_selection)
+        return channels_meta.get_channel_idx(channel_label=channel_selection)
     elif isinstance(channel_selection, ChannelSelectionModel):
         if channel_selection.mode == "label":
-            return image.get_channel_idx(
+            return channels_meta.get_channel_idx(
                 channel_label=str(channel_selection.identifier)
             )
         elif channel_selection.mode == "wavelength_id":
-            return image.get_channel_idx(
+            return channels_meta.get_channel_idx(
                 wavelength_id=str(channel_selection.identifier)
             )
         elif channel_selection.mode == "index":
@@ -1010,11 +1015,15 @@ def _parse_channel_selection(
     """Parse the channel selection input into a list of channel indices."""
     if channel_selection is None:
         return {}
+    # Read once, then reuse: every path below used to reach through the image to
+    # `channels_meta`, and each of those is a full metadata reload. Selecting
+    # four channels by label cost four of them before a pixel was touched.
+    channels_meta = image.channels_meta
     if isinstance(channel_selection, int | str | ChannelSelectionModel):
-        channel_index = _parse_str_or_model(image, channel_selection)
+        channel_index = _parse_str_or_model(channels_meta, channel_selection)
         return {"c": channel_index}
     elif isinstance(channel_selection, Sequence):
-        _sequence = [_parse_str_or_model(image, cs) for cs in channel_selection]
+        _sequence = [_parse_str_or_model(channels_meta, cs) for cs in channel_selection]
         return {"c": _sequence}
     raise NgioValueError(
         f"Invalid channel selection type {type(channel_selection)}. "

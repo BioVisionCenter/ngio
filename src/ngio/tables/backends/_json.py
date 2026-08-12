@@ -44,7 +44,7 @@ class JsonTableBackend(AbstractTableBackend):
             raise NgioError(
                 "Could not get or create a 'table' group in the store "
                 f"{self._group_handler.store} path "
-                f"{self._group_handler.group.path}/table."
+                f"{self._group_handler.path}/table."
             ) from e
         return table_handler
 

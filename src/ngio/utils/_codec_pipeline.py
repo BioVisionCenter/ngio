@@ -37,7 +37,9 @@ def _configured_codec_pipeline() -> str | None:
         from zarr.core.config import config
 
         path = config.get("codec_pipeline.path", None)
-    except Exception:  # noqa: BLE001 - never break a read over a config probe
+    except Exception:
+        # Deliberately broad: this is a diagnostic probe over a config surface
+        # ngio does not own, and it must never be the reason a read fails.
         return None
     if not isinstance(path, str) or not path:
         return None

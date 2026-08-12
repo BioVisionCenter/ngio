@@ -170,6 +170,15 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _rois(ctx),
         lambda state: [state[0].get_roi_as_numpy(roi) for roi in state[1]],
     ),
+    # Selecting channels by label. Resolving a label needs the channel metadata,
+    # and reading that off the image is a full metadata reload -- so this must
+    # cost one read regardless of how many channels are named, not one each.
+    # `channel_selection=None` short-circuits, so only the selecting path is
+    # measured here.
+    "read_channel_selection": Scenario(
+        lambda ctx: _image(ctx, "image"),
+        lambda image: image.get_as_numpy(channel_selection=["Channel 1", "Channel 2"]),
+    ),
     # --- plate ------------------------------------------------------------
     # Plate metadata only; the well count should not appear in the counts.
     "plate_wells_paths": Scenario(_plate, lambda plate: plate.wells_paths()),
@@ -196,6 +205,21 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _plate(ctx, cache=True),
         lambda plate: plate.images_paths(),
     ),
+    # Enumerating one well's images. The plate metadata already holds the well
+    # path and the well holds its own image list, so this should cost one of
+    # each -- not one plate read per image, which is what resolving the prefix
+    # per image used to cost. Six images in one well; every other plate fixture
+    # has one, which cannot show the difference.
+    "plate_well_images_paths": Scenario(
+        lambda ctx: _plate(ctx, "plate_multi_image"),
+        lambda plate: plate.well_images_paths(row="A", column="01"),
+    ),
+    # The same walk, then opening each container. Sits on top of the scenario
+    # above, so a regression there lands here too.
+    "plate_get_well_images": Scenario(
+        lambda ctx: _plate(ctx, "plate_multi_image"),
+        lambda plate: plate.get_well_images(row="A", column="01"),
+    ),
     # --- plate-wide table aggregation --------------------------------------
     # Both open every image container inside the counted block, on top of the
     # enumeration `plate_images_paths` already gates. That multiplication is
@@ -210,9 +234,15 @@ SCENARIOS: dict[str, Scenario] = {
         lambda plate: plate.concatenate_image_tables(name="features"),
     ),
     # --- tables -----------------------------------------------------------
-    # csv and parquet are absent on purpose: they go through pyarrow against
-    # the filesystem directly, bypassing the zarr store, so no store counter
-    # can see them.
+    # The pyarrow backends read their *payload* against the filesystem directly,
+    # so no store counter sees those bytes -- but the zarr metadata around the
+    # table is still ordinary store IO, and the group reopens behind it are what
+    # `table_load_parquet` holds. csv is absent as a duplicate of parquet: same
+    # backend, same code path.
+    "table_load_parquet": Scenario(
+        lambda ctx: _container(ctx, "tables_parquet"),
+        lambda c: c.get_table("features_parquet").dataframe,
+    ),
     "table_load_anndata": Scenario(
         lambda ctx: _container(ctx, "tables"),
         lambda c: c.get_table("features_anndata_v1").dataframe,

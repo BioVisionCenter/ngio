@@ -198,9 +198,20 @@ class ZarrGroupHandler:
         return self._store_facade
 
     @property
+    def path(self) -> str:
+        """Return the group's path inside the store.
+
+        Reads `_group` rather than the `group` property on purpose: the path is
+        fixed at construction and `reopen_group` carries it through unchanged,
+        while `group` reopens the group -- a full metadata read -- when caching
+        is off. `_create_lock` avoids the same trap the same way.
+        """
+        return self._group.path
+
+    @property
     def full_url(self) -> str | None:
         """Return the store path."""
-        return self.store.full_url(self.group.path)
+        return self.store.full_url(self.path)
 
     @property
     def zarr_format(self) -> Literal[2, 3]:

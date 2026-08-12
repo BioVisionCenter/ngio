@@ -98,7 +98,7 @@ class PyArrowBackend(AbstractTableBackend):
         performed later (e.g. through a polars `LazyFrame`) are not retried.
         """
         store = NgioStore.ensure(self._group_handler.store)
-        path = self._group_handler.group.path
+        path = self._group_handler.path
         if store.store_type == "local":
             return self._load_from_local_store(store, path)
         elif store.store_type == "fsspec":
@@ -189,7 +189,7 @@ class PyArrowBackend(AbstractTableBackend):
         applied here.
         """
         store = NgioStore.ensure(self._group_handler.store)
-        path = self._group_handler.group.path
+        path = self._group_handler.path
         if store.store_type == "local":
             return self._write_to_local_store(store=store, path=path, table=dataset)
         elif store.store_type == "fsspec":

@@ -333,10 +333,13 @@ class OmeZarrPlate:
 
     def _image_path(self, row: str, column: int | str, path: str) -> str:
         """Return the image path in the plate."""
-        well = self.get_well(row, column)
+        # One `_well_path` -- i.e. one plate-metadata read -- not two: `get_well`
+        # resolves it, then the f-string used to resolve it again.
+        well_path = self._well_path(row=row, column=column)
+        well = self._get_well(well_path=well_path)
         if path not in well.paths():
             raise ValueError(f"Image {path} does not exist in well {row}{column}")
-        return f"{self._well_path(row, column)}/{path}"
+        return f"{well_path}/{path}"
 
     def wells_paths(self) -> list[str]:
         """Return the wells paths in the plate."""
@@ -394,11 +397,15 @@ class OmeZarrPlate:
             column (int | str): The column of the well.
             acquisition (int | None): The acquisition id to filter the images.
         """
-        images = []
-        well = self.get_well(row=row, column=column)
-        for path in well.paths(acquisition):
-            images.append(self._image_path(row=row, column=column, path=path))
-        return images
+        # Resolved once, not once per image. This used to call `_image_path`
+        # per path, each of which re-opened the well and re-read the whole plate
+        # document twice -- so the cost grew with the square of the well's image
+        # count, to re-derive a prefix already in hand. The membership check
+        # `_image_path` performs is vacuous here: these paths come from
+        # `well.paths()` itself.
+        well_path = self._well_path(row=row, column=column)
+        well = self._get_well(well_path=well_path)
+        return [f"{well_path}/{path}" for path in well.paths(acquisition)]
 
     def get_image_acquisition_id(
         self, row: str, column: int | str, image_path: str
@@ -580,13 +587,16 @@ class OmeZarrPlate:
             column: The column of the well.
             acquisition: The acquisition id to filter the images.
         """
-        images = {}
-        for image_paths in self.well_images_paths(
-            row=row, column=column, acquisition=acquisition
-        ):
-            group_handler = self._group_handler.get_handler(image_paths)
-            images[image_paths] = OmeZarrContainer(group_handler)
-        return images
+        # `_get_image`, not a fresh container per call: this duplicated it minus
+        # the `_images_cache` lookup, so under `cache=True` it rebuilt the same
+        # container every time and handed back a different object than
+        # `get_images` did for the same path.
+        return {
+            image_path: self._get_image(image_path)
+            for image_path in self.well_images_paths(
+                row=row, column=column, acquisition=acquisition
+            )
+        }
 
     def _add_image(
         self,
