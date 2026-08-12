@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+import dask.array as da
 import numpy as np
 
 from ngio import (
@@ -55,6 +56,60 @@ def _image(ctx, fixture, path="1", **kwargs):
 
 def _plate(ctx, fixture="plate", **kwargs):
     return open_ome_zarr_plate(ctx.store(fixture), mode="r", **kwargs)
+
+
+#: The geometry of the dask-write scenarios. Owned here rather than shared with
+#: the image fixture, which is unsharded and must stay that way: these scenarios
+#: exist because a *sharded* target is the only shape that can see a partial
+#: write unit, and the sharded/unsharded pair is only a clean A/B if nothing
+#: else differs between them. Both run on NGFF 0.5 -- sharding needs zarr v3.
+#:
+#: 128 chunks in 2 shards, so a patch blocked at the chunk shape puts 64 blocks
+#: in each shard: 64 chances to read-modify-write it, against the 1 write the
+#: shard actually needs.
+_WRITE_SHAPE = (1, 8, 256, 256)
+_WRITE_CHUNKS = (1, 1, 64, 64)
+_WRITE_SHARDS = (1, 4, 256, 256)
+
+
+def _write_target(ctx, name, shards=None, levels=1):
+    """An empty image, ready to be written into.
+
+    Built per scenario in `setup` like `_consolidation_target`, so the
+    measurement covers only the write and repeated runs cannot accumulate state.
+    """
+    container = create_empty_ome_zarr(
+        store=ctx.scratch(name),
+        shape=_WRITE_SHAPE,
+        axes_names=["c", "z", "y", "x"],
+        channels_meta=["Channel 1"],
+        levels=levels,
+        pixelsize=(0.65, 0.65),
+        chunks=_WRITE_CHUNKS,
+        shards=shards,
+        ngff_version="0.5",
+        compressors=None,
+        overwrite=True,
+    )
+    return container.get_image(path="0")
+
+
+def _write_patch(shape=_WRITE_SHAPE):
+    # Blocked at the *chunk* shape, which is what a caller who rechunked to
+    # `array.chunks` -- or who never thought about it -- ends up with.
+    return da.from_array(np.ones(shape, dtype=np.uint16), chunks=_WRITE_CHUNKS)
+
+
+def _sharded_consolidation_target(ctx):
+    """A written sharded pyramid, ready to consolidate.
+
+    The level-0 write is numpy on purpose: it happens in `setup`, and going
+    through dask here would put the write path's own amplification into a
+    scenario meant to measure the consolidation's.
+    """
+    image = _write_target(ctx, "consolidate_sharded", shards=_WRITE_SHARDS, levels=3)
+    image.set_array(patch=np.ones(_WRITE_SHAPE, dtype=np.uint16))
+    return image
 
 
 def _consolidation_target(ctx, mode):
@@ -234,16 +289,43 @@ SCENARIOS: dict[str, Scenario] = {
             overwrite=True,
         ),
     ),
+    # --- writes: dask ------------------------------------------------------
+    # The write unit of a zarr array is `shards or chunks`, never `chunks`:
+    # zarr can only skip the read-modify-write when a write covers a *whole*
+    # unit. `da.store` issues one `__setitem__` per dask block, so on a sharded
+    # target a block covering one inner chunk makes zarr read, decode, merge,
+    # re-encode and rewrite the entire shard.
+    #
+    # Read the pair. The unsharded control is the one that must not move; the
+    # sharded one is where `get.chunk` and `bytes.read` should be *zero*, and
+    # zero is a guarantee rather than a speedup -- no read-modify-write means no
+    # lost update, on any machine at any worker count. Every other fixture in
+    # this suite is unsharded, so without these the amplification is invisible.
+    "write_dask": Scenario(
+        lambda ctx: (_write_target(ctx, "write_dask"), _write_patch()),
+        lambda state: state[0].set_array(patch=state[1]),
+    ),
+    "write_sharded_dask": Scenario(
+        lambda ctx: (
+            _write_target(ctx, "write_sharded_dask", shards=_WRITE_SHARDS),
+            _write_patch(),
+        ),
+        lambda state: state[0].set_array(patch=state[1]),
+    ),
+    # A region write that covers neither shard wholly, which is the case a
+    # caller writing per-ROI actually hits. It is also the only scenario that
+    # emits dask's `PerformanceWarning` (see the filter in `pyproject.toml`):
+    # dask reporting the read-modify-write this write genuinely costs.
+    "write_sharded_roi_dask": Scenario(
+        lambda ctx: (
+            _write_target(ctx, "write_sharded_roi_dask", shards=_WRITE_SHARDS),
+            _write_patch((1, 6, 256, 256)),
+        ),
+        lambda state: state[0].set_array(patch=state[1], z=slice(1, 7)),
+    ),
     # --- writes: pyramid consolidation ------------------------------------
     # The most expensive operation in the library, and every writing iterator
     # triggers it implicitly via `post_consolidate`.
-    #
-    # NOTE: the "dask" numbers below record a known 2x waste, not correct
-    # behaviour. `_pyramid.py:44` calls `compute_chunk_sizes()` right after an
-    # explicit `rechunk(target.chunks)`, which executes the whole read -> zoom
-    # graph just to learn block shapes it already knows, then `da.store` runs
-    # the same graph again. Removing that line should roughly halve `get.chunk`
-    # and `bytes.read` here, and that halving is the point of gating it.
     **{
         f"consolidate_{mode}": Scenario(
             lambda ctx, mode=mode: _consolidation_target(ctx, mode),
@@ -251,6 +333,15 @@ SCENARIOS: dict[str, Scenario] = {
         )
         for mode in ("dask", "numpy", "coarsen")
     },
+    # The dask consolidation onto a *sharded* pyramid. `_pyramid.py` rechunks
+    # the zoomed level to `target.chunks`, which on a sharded array is the
+    # inner chunk shape -- so every block is a partial shard write. Pairs with
+    # `consolidate_dask` the same way `write_sharded_dask` pairs with
+    # `write_dask`: the unsharded one must not move.
+    "consolidate_sharded_dask": Scenario(
+        lambda ctx: _sharded_consolidation_target(ctx),
+        lambda image: image.consolidate(mode="dask"),
+    ),
 }
 
 

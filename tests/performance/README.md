@@ -30,6 +30,13 @@ is upstream drift, and `CI (pip)` installs dependencies unpinned, so an upstream
 release must not fail this gate for a change nobody here made. `test11` runs the
 generating version and asserts strictly on every PR.
 
+The `*_sharded_*` scenarios are the likeliest to break that single-baseline
+property first: zarr 3.3 reads shards through `get_ranges` where 3.1/3.2 use
+`get_partial_values`, so their counters land in different columns
+(`test_zarr33_surface.py` pins that surface directly). They agree on 3.1.6 and
+3.2.1 today; on a zarr that moves them, those scenarios skip individually and
+the rest of the gate keeps asserting.
+
 **When a zarr bump lands in `pixi.lock`, regenerate the baselines** — otherwise
 the pinned envs start skipping instead of asserting, and the gate goes quiet.
 `test_instrumentation_complete` is version-agnostic and always runs; it fails
