@@ -154,18 +154,16 @@ class DaskConfig(BaseModel):
     units into one resident block for nothing: the unit grid is what makes the
     write safe, the block grid is only batching.
 
-    Capping it is close to free. Measured on a 3-level pyramid, peak memory
-    against cap:
+    Capping it is close to free. Consolidating a 3-level pyramid, peak memory:
 
-    | cap  | 512 MB | 2 GB  | 4 GB  |
-    |------|--------|-------|-------|
-    | 8MiB |  40.8  |  79.9 | 140.3 |
-    | 16MiB|  77.9  |  95.4 | 161.9 |
-    | none | 273.0  | 370.5 | 565.2 |
+    | cap  | 2 GB      | 4 GB       |
+    |------|-----------|------------|
+    | 8MiB |  87.6 MB  |  141.3 MB  |
+    | none | 370.5 MB  |  565.2 MB  |
 
-    The default of 8 MiB is a 75% cut at 4 GB for +0.37% task count and no
-    measurable wall clock. Below ~4 MiB the curve flattens onto the dask task
-    graph itself, which no cap reaches.
+    The default of 8 MiB is a 75% cut for +0.37% task count and no wall-clock
+    cost (19.16 s against 20.18 s at 4 GB). Below ~4 MiB the gain flattens out,
+    because what remains is the dask task graph itself, which no cap reaches.
 
     `None` defers to dask's `array.chunk-size`. The cap is a ceiling only: it
     never raises a lower `array.chunk-size` you set yourself, and never lowers

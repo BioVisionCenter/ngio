@@ -78,15 +78,14 @@ The two mechanisms are complementary and independent: `s3fs` retries individual 
 
 Every dask write — pyramid consolidation, `set_array`, `set_roi` — goes through `da.to_zarr`, which glues whole *write units* (a shard if the array is sharded, a chunk otherwise) into larger *blocks* sized to dask's own `array.chunk-size`, 128 MiB by default. The unit grid is what makes the write safe; the block grid is only batching. Since a write unit is commonly a few hundred KiB, the dask default packs around a thousand of them into one resident block, and peak memory is roughly the number of blocks in flight times their size.
 
-Capping that is close to free. Consolidating a 3-level pyramid, peak memory against the cap:
+Capping that is close to free. Consolidating a 3-level pyramid, peak memory and wall clock:
 
-| cap | 512 MB image | 2 GB | 4 GB |
-| --- | --- | --- | --- |
-| 8 MiB (default) | 40.8 MB | 79.9 MB | 140.3 MB |
-| 16 MiB | 77.9 MB | 95.4 MB | 161.9 MB |
-| `null` (dask's 128 MiB) | 273.0 MB | 370.5 MB | 565.2 MB |
+| | 2 GB image | 4 GB image |
+| --- | --- | --- |
+| 8 MiB (default) | 87.6 MB, 9.45 s | 141.3 MB, 19.16 s |
+| `null` (dask's 128 MiB) | 370.5 MB, 10.22 s | 565.2 MB, 20.18 s |
 
-The default is a 75% cut at 4 GB for no measurable change in wall clock, and about 0.4% more tasks in the graph. Set it to `null` to defer to dask's `array.chunk-size`, or lower it further to trade a little batching for a little memory — below roughly 4 MiB the curve flattens onto the dask task graph itself, which no cap reaches.
+A 75% cut for no cost in wall clock, and about 0.4% more tasks in the graph. Set it to `null` to defer to dask's `array.chunk-size`, or lower it further to trade a little batching for a little memory — below roughly 4 MiB the gain flattens out, because what remains is the dask task graph itself, which no cap reaches.
 
 ### Semantics worth knowing
 
