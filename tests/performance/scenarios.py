@@ -100,6 +100,33 @@ def _write_patch(shape=_WRITE_SHAPE):
     return da.from_array(np.ones(shape, dtype=np.uint16), chunks=_WRITE_CHUNKS)
 
 
+def _iterator_target(ctx):
+    """A written image plus a derived output label, tiled into 4 chunk ROIs.
+
+    Built per scenario in `setup`, like `_write_target`: the measurement covers
+    only the mapping pass, and repeated runs cannot accumulate state.
+    """
+    from ngio.iterators import SegmentationIterator
+
+    container = create_empty_ome_zarr(
+        store=ctx.scratch("iterator_map"),
+        shape=(128, 128),
+        axes_names=["y", "x"],
+        levels=3,
+        pixelsize=(0.65, 0.65),
+        chunks=(64, 64),
+        compressors=None,
+        overwrite=True,
+    )
+    image = container.get_image(path="0")
+    image.set_array(patch=np.ones((128, 128), dtype=np.uint16))
+    label = container.derive_label("out")
+    # `consolidation_mode` pinned so the tally is stable when the `mode=None`
+    # default changes in 1.2.
+    iterator = SegmentationIterator(image, label, consolidation_mode="dask").by_chunks()
+    return iterator
+
+
 def _sharded_consolidation_target(ctx):
     """A written sharded pyramid, ready to consolidate.
 
@@ -385,6 +412,16 @@ SCENARIOS: dict[str, Scenario] = {
     "consolidate_sharded_dask": Scenario(
         lambda ctx: _sharded_consolidation_target(ctx),
         lambda image: image.consolidate(mode="dask"),
+    ),
+    # --- iterators ---------------------------------------------------------
+    # A writing iterator end to end: per-ROI reads and writes, the per-ROI
+    # metadata probes, and `post_consolidate`'s *whole-pyramid* rebuild -- the
+    # iterator knows exactly which regions it wrote and rebuilds every level
+    # anyway. A future region-scoped consolidation lands here as a
+    # `get.chunk`/`set.chunk` drop; this number is its acceptance meter.
+    "iterator_map_numpy": Scenario(
+        _iterator_target,
+        lambda it: it.map_as_numpy(lambda patch: (patch > 0).astype("uint32")),
     ),
 }
 

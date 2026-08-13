@@ -1,10 +1,24 @@
 # The performance gate
 
-Asserts exact store-operation counts against committed baselines. Answers *"did
-this change make ngio do more work?"* — pass/fail, no thresholds, runs in CI
-with everything else.
+Two deterministic instruments, each blind to what the other measures:
 
-It works as a gate because ngio's regressions are algorithmic — metadata
+1. **Op counts** (`test_op_counts.py` + committed baselines) — *"did this
+   change make ngio do more work?"* Exact integers, zero variance.
+2. **Concurrency** (`test_concurrency.py` + `_concurrency_gate.py`) — *"does
+   the work that should overlap actually overlap?"* Op counts are invariant to
+   concurrency: a serial and a parallel `get_wells` tally identically, so a
+   parallelism regression is invisible to instrument 1. The rendezvous store
+   parks ops on zarr's IO loop until `k` are in flight together and a gauge
+   records the maximum overlap — exact integers again, no wall-clock, no
+   thresholds. Success costs nothing; only a regression pays one bounded
+   timeout before failing legibly.
+
+Neither instrument measures time. Wall-clock and memory benchmarks live in the
+separate `ngio-benchmarks` repo, and the moto/HTTP fixtures under
+`tests/stores/` are correctness fixtures, not performance instruments — a real
+server adds variance, which is exactly what both gates exist to avoid.
+
+The op-count gate works because ngio's regressions are algorithmic — metadata
 re-parsed per call, one group opened per well, a graph executed twice — so they
 are exact integers with zero variance. Counts are also backend-independent, so
 a local measurement predicts the cost on S3 where every op is a network
