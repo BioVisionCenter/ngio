@@ -7,8 +7,6 @@ from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from inspect import currentframe
-from pathlib import Path
 from typing import Literal, TypeVar
 
 import pandas as pd
@@ -16,7 +14,7 @@ import polars as pl
 
 from ngio.images._ome_zarr_container import OmeZarrContainer
 from ngio.tables import Table, TableType
-from ngio.utils import NgioFutureWarning, deprecated
+from ngio.utils import NgioFutureWarning, deprecated, stacklevel_of_first_caller
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
@@ -28,27 +26,6 @@ MaxWorkers = int | Literal["auto"] | None
 
 #: The release in which `max_workers` starts defaulting to `"auto"`.
 _DEFAULT_CHANGES_IN = "1.2"
-
-
-def _stacklevel_of_first_caller() -> int:
-    """Return the `stacklevel` that points at the first frame outside ngio.
-
-    A fixed level cannot work: `get_wells()` reaches the fan-out through two
-    ngio frames and `images_paths()` through three, so any constant blames
-    ngio's own source for one of them. That matters twice over — the reader is
-    told to edit a file they do not own, and the `warnings` module keys its
-    deduplication on the reported location, so every caller would collapse onto
-    one entry.
-    """
-    package_root = str(Path(__file__).parents[1])
-    frame = currentframe()
-    level = 0
-    while frame is not None:
-        level += 1
-        frame = frame.f_back
-        if frame is not None and not frame.f_code.co_filename.startswith(package_root):
-            return level
-    return 2
 
 
 def _warn_default_will_change(n_items: int) -> None:
@@ -69,7 +46,7 @@ def _warn_default_will_change(n_items: int) -> None:
         'Pass `max_workers="auto"` to opt in now, or `max_workers=1` to keep '
         "reading serially and silence this.",
         NgioFutureWarning,
-        stacklevel=_stacklevel_of_first_caller(),
+        stacklevel=stacklevel_of_first_caller(),
     )
 
 

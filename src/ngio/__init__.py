@@ -10,7 +10,13 @@ __author__ = "Lorenzo Cerrone"
 __email__ = "lorenzo.cerrone@uzh.ch"
 
 from ngio.common import Dimensions, Roi, RoiSlice
-from ngio.config import NgioConfig, RetryConfig, S3FSConfig, get_config
+from ngio.config import (
+    ConsolidationConfig,
+    NgioConfig,
+    RetryConfig,
+    S3FSConfig,
+    get_config,
+)
 from ngio.hcs import (
     OmeZarrPlate,
     OmeZarrWell,
@@ -76,6 +82,7 @@ __all__ = [
     "BasicMapper",
     "Channel",
     "ChannelSelectionModel",
+    "ConsolidationConfig",
     "DefaultNgffVersion",
     "Dimensions",
     "FeatureExtractorIterator",

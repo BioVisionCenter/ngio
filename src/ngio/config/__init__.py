@@ -2,6 +2,7 @@
 
 from ngio.config._config import (
     BackoffStrategy,
+    ConsolidationConfig,
     ConstantBackoff,
     ExponentialBackoff,
     LinearBackoff,
@@ -13,6 +14,7 @@ from ngio.config._config import (
 
 __all__ = [
     "BackoffStrategy",
+    "ConsolidationConfig",
     "ConstantBackoff",
     "ExponentialBackoff",
     "LinearBackoff",

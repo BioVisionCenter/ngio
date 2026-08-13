@@ -119,11 +119,37 @@ class RetryConfig(BaseModel):
         return self
 
 
+class ConsolidationConfig(BaseModel):
+    """When `consolidate(mode="auto")` may build a pyramid in memory.
+
+    `mode="numpy"` holds a whole level at once and is 3-5x faster than the
+    chunked path for it; `mode="dask"` stays chunk-bounded whatever the size.
+    `"auto"` takes the fast one only below `numpy_max_bytes`, measured against
+    the source level rather than the whole pyramid -- the chain never holds more
+    than two adjacent levels, and peak is around 1.6x the source.
+
+    Size is necessary but not sufficient. `"auto"` also declines whenever the
+    two paths would not agree exactly: `dask` zooms per block with no halo, so
+    it matches the whole-array zoom only for an integral-ratio downsample at
+    `order` in `{"nearest", "linear"}`. Outside that envelope a size threshold
+    would silently pick between two different answers.
+
+    Example:
+        ```python
+        ConsolidationConfig(numpy_max_bytes=0)  # never build in memory
+        ```
+    """
+
+    numpy_max_bytes: int = Field(default=256 * 2**20, ge=0)
+    model_config = ConfigDict(validate_assignment=True)
+
+
 class NgioConfig(BaseModel):
     """Global configuration for ngio."""
 
     s3fs: S3FSConfig | None = None
     io_retry: RetryConfig = Field(default_factory=RetryConfig)
+    consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
     model_config = ConfigDict(validate_assignment=True)
 
 

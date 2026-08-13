@@ -14,7 +14,7 @@ from ngio.common import (
     InterpolationOrder,
     Roi,
 )
-from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.io_pipes import (
     SlicingInputType,
@@ -408,7 +408,7 @@ class Image(AbstractImage):
     def consolidate(
         self,
         order: InterpolationOrder = "linear",
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
     ) -> None:
         """Consolidate the label on disk."""
         self._consolidate(order=order, mode=mode)

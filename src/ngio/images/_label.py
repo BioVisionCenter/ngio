@@ -6,7 +6,7 @@ from typing import Any, Literal
 from zarr.core.array import CompressorLike
 
 from ngio.common import compute_masking_roi
-from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
@@ -85,7 +85,7 @@ class Label(AbstractImage):
 
     def consolidate(
         self,
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
     ) -> None:
         """Consolidate the label on disk."""
         self._consolidate(

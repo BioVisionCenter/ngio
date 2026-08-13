@@ -1,7 +1,8 @@
 import itertools
 import math
+import warnings
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, Literal
+from typing import Any, Literal, TypeAlias
 
 import dask.array as da
 import numpy as np
@@ -15,60 +16,46 @@ from ngio.common._zoom import (
     dask_zoom,
     numpy_zoom,
 )
+from ngio.config import get_config
 from ngio.utils import (
+    NgioFutureWarning,
     NgioValueError,
     deprecated_alias,
+    stacklevel_of_first_caller,
 )
 
+#: How `consolidate` builds each level. `"auto"` takes the in-memory path only
+#: where it is bit-identical to the chunked one; see `_resolve_auto_mode`.
+ConsolidationMode: TypeAlias = Literal["dask", "numpy", "coarsen", "auto"]
 
-def _on_disk_numpy_zoom(
-    source: zarr.Array,
-    target: zarr.Array,
-    order: InterpolationOrder,
-) -> None:
+#: The release in which `mode` starts defaulting to `"auto"`.
+_DEFAULT_CHANGES_IN = "1.2"
+
+
+def _read_numpy(source: zarr.Array) -> np.ndarray:
     source_array = source[...]
     if not isinstance(source_array, np.ndarray):
         raise NgioValueError("source zarr array could not be read as a numpy array")
-    target[...] = numpy_zoom(source_array, target_shape=target.shape, order=order)
+    return source_array
 
 
-def _on_disk_dask_zoom(
-    source: zarr.Array,
-    target: zarr.Array,
-    order: InterpolationOrder,
-) -> None:
-    source_array = da.from_zarr(source)
-    target_array = dask_zoom(source_array, target_shape=target.shape, order=order)
-
-    # No compute_chunk_sizes() here: it would execute the whole read -> zoom
-    # graph purely to re-learn block shapes, throw the pixels away, and leave
-    # the write to run the same graph again -- exactly double the chunk reads.
-    # No rechunk either: store_dask rechunks onto the target's write unit,
-    # which is `shards or chunks`. Rechunking to `target.chunks` here was worse
-    # than doing nothing on a sharded target -- that is the shard's *inner*
-    # chunk shape, so every block became a partial shard write.
-    store_dask(target_array, target)
-
-
-def _on_disk_coarsen(
-    source: zarr.Array,
+def _coarsen_expr(
+    source_array: da.Array,
     target: zarr.Array,
     order: InterpolationOrder = "linear",
     aggregation_function: Callable | None = None,
-) -> None:
-    """Apply a coarsening operation from a source zarr array to a target zarr array.
+) -> da.Array:
+    """Coarsen a dask array onto a target's shape, as an unevaluated expression.
 
     Args:
-        source (zarr.Array): The source array to coarsen.
-        target (zarr.Array): The target array to save the coarsened result to.
-        order (InterpolationOrder): The order of interpolation is not really implemented
-            for coarsening, but it is kept for compatibility with the zoom function.
+        source_array: The source array to coarsen.
+        target: The array whose shape and dtype the result must match.
+        order: Not really implemented for coarsening, kept for compatibility with
+            the zoom function.
             order="linear" -> linear interpolation ~ np.mean
             order="nearest" -> nearest interpolation ~ np.max
-        aggregation_function (np.ufunc): The aggregation function to use.
+        aggregation_function: The aggregation function to use.
     """
-    source_array = da.from_zarr(source)
-
     _scale, _target_shape = _zoom_inputs_check(
         source_array=source_array, scale=None, target_shape=target.shape
     )
@@ -93,13 +80,102 @@ def _on_disk_coarsen(
 
     coarsening_setup = {}
     for i, s in enumerate(_scale):
-        coarsening_setup[i] = int(np.round(1 / s))
+        factor = int(np.round(1 / s)) if s > 0 else 0
+        if factor < 1:
+            # Coarsening aggregates whole blocks, so it can only ever go down.
+            # Consolidating from a middle level asks for the levels *above* the
+            # source too, and those edges are upsamples. Without this the factor
+            # is 0 and the failure surfaces from inside dask as a divide-by-zero
+            # in `aligned_coarsen_chunks`, which says nothing about the cause.
+            raise NgioValueError(
+                f"Cannot coarsen axis {i} from size {source_array.shape[i]} to "
+                f"{target.shape[i]}: coarsening only downsamples. Use "
+                'mode="dask" or mode="numpy" to build a level larger than its '
+                "source."
+            )
+        coarsening_setup[i] = factor
 
-    out_target = da.coarsen(
+    return da.coarsen(
         aggregation_function, source_array, coarsening_setup, trim_excess=True
     )
+
+
+def _zoom_expr(
+    source_array: da.Array,
+    target: zarr.Array,
+    order: InterpolationOrder,
+    mode: Literal["dask", "coarsen"],
+    aggregation_function: Callable | None = None,
+) -> da.Array:
+    """One pyramid level as an unevaluated dask expression.
+
+    The `astype` is not cosmetic. `da.coarsen(np.mean, ...)` promotes an integer
+    source to float64; written to the store that float is cast back, so the next
+    level down reads the cast value. An expression handed straight to the next
+    level would instead propagate the float, and a mean pyramid built that way
+    differs from a stored one in 28% of level 2 and 63% of level 3. Casting here
+    is what the store would have done anyway, just done early -- which also drops
+    the float64 intermediate and makes coarsening markedly lighter.
+    """
+    if mode == "coarsen":
+        out = _coarsen_expr(source_array, target, order, aggregation_function)
+    else:
+        out = dask_zoom(source_array, target_shape=target.shape, order=order)
+
+    if out.dtype != target.dtype:
+        out = out.astype(target.dtype)
+    return out
+
+
+def _on_disk_numpy_zoom(
+    source: zarr.Array,
+    target: zarr.Array,
+    order: InterpolationOrder,
+) -> None:
+    target[...] = numpy_zoom(
+        _read_numpy(source), target_shape=target.shape, order=order
+    )
+
+
+def _on_disk_dask_zoom(
+    source: zarr.Array,
+    target: zarr.Array,
+    order: InterpolationOrder,
+) -> None:
+    # No compute_chunk_sizes() here: it would execute the whole read -> zoom
+    # graph purely to re-learn block shapes, throw the pixels away, and leave
+    # the write to run the same graph again -- exactly double the chunk reads.
+    # No rechunk either: store_dask rechunks onto the target's write unit,
+    # which is `shards or chunks`. Rechunking to `target.chunks` here was worse
+    # than doing nothing on a sharded target -- that is the shard's *inner*
+    # chunk shape, so every block became a partial shard write.
+    store_dask(_zoom_expr(da.from_zarr(source), target, order, "dask"), target)
+
+
+def _on_disk_coarsen(
+    source: zarr.Array,
+    target: zarr.Array,
+    order: InterpolationOrder = "linear",
+    aggregation_function: Callable | None = None,
+) -> None:
+    """Apply a coarsening operation from a source zarr array to a target zarr array.
+
+    Args:
+        source (zarr.Array): The source array to coarsen.
+        target (zarr.Array): The target array to save the coarsened result to.
+        order (InterpolationOrder): The order of interpolation is not really implemented
+            for coarsening, but it is kept for compatibility with the zoom function.
+            order="linear" -> linear interpolation ~ np.mean
+            order="nearest" -> nearest interpolation ~ np.max
+        aggregation_function (np.ufunc): The aggregation function to use.
+    """
     # See _on_disk_dask_zoom: store_dask owns the rechunk onto the write unit.
-    store_dask(out_target, target)
+    store_dask(
+        _zoom_expr(
+            da.from_zarr(source), target, order, "coarsen", aggregation_function
+        ),
+        target,
+    )
 
 
 def on_disk_zoom(
@@ -162,29 +238,208 @@ def _find_closest_arrays(
     return row, column
 
 
+def _consolidation_plan(
+    source: zarr.Array, targets: list[zarr.Array]
+) -> list[tuple[int, zarr.Array]]:
+    """Order the pyramid as source -> target edges, without touching the store.
+
+    The same greedy nearest-shape walk consolidation has always done -- same
+    `_find_closest_arrays`, same sequence -- it just records the edges instead of
+    executing them, so the caller can build one graph spanning all of them. For a
+    well-formed pyramid the result is two chains rooted at the source: down to the
+    coarsest level, then back up to the finest, each step from its immediate
+    neighbour. Consolidating from a middle level therefore still upsamples the
+    levels above it, as it always has.
+
+    Recording the greedy result rather than replacing it with an explicit sort is
+    deliberate. It costs nothing (see the O(L^3) note on `_find_closest_arrays`:
+    L is 4-6) and it keeps the ordering provably unchanged even for a hand-built
+    pyramid whose shapes are not monotone.
+
+    Returns:
+        `(parent, target)` pairs, where `parent` indexes `[source, *targets in
+        emission order]`. Every parent is emitted before any of its children.
+    """
+    nodes = [source]
+    remaining = list(targets)
+    plan: list[tuple[int, zarr.Array]] = []
+
+    while remaining:
+        source_id, target_id = _find_closest_arrays(nodes, remaining)
+        target = remaining.pop(int(target_id))
+        plan.append((int(source_id), target))
+        nodes.append(target)
+    return plan
+
+
+def _is_integral_downsample(
+    source_shape: tuple[int, ...], target_shape: tuple[int, ...]
+) -> bool:
+    """Whether the blockwise and whole-array zooms agree exactly on this edge.
+
+    `dask_zoom` snaps its block grid to the scaling ratio, so with a 2-tap kernel
+    and an exact integer factor no output sample needs a neighbour from another
+    block and the two paths land on the same pixels. Let the ratio slip off an
+    integer -- 2.004, which is what a 501-pixel axis gives -- and they disagree
+    on 99.9% of the level; upsample instead and they disagree on 1.6%.
+    """
+    return all(
+        t >= 1 and s >= t and s % t == 0
+        for s, t in zip(source_shape, target_shape, strict=True)
+    )
+
+
+def _resolve_auto_mode(
+    source: zarr.Array,
+    plan: list[tuple[int, zarr.Array]],
+    order: InterpolationOrder,
+) -> Literal["numpy", "dask"]:
+    """Choose the in-memory path only where it is bit-identical to the chunked one.
+
+    Size alone would be the wrong test. `numpy` and `dask` are two different
+    algorithms, not one algorithm at two block sizes, and a threshold that
+    silently switched between two different answers would be worse than making
+    the caller pick. So `"auto"` takes `numpy` only inside the envelope where
+    they provably agree, and quietly falls back to `dask` everywhere else.
+    """
+    if source.nbytes > get_config().consolidation.numpy_max_bytes:
+        return "dask"
+
+    if order == "cubic":
+        # A cubic kernel reads four samples per output, so a blockwise zoom with
+        # no halo is wrong at every block boundary -- the paths differ on 10-16%
+        # of pixels even on a plain power-of-two pyramid.
+        return "dask"
+
+    nodes = [source]
+    for parent, target in plan:
+        if not _is_integral_downsample(nodes[parent].shape, target.shape):
+            return "dask"
+        nodes.append(target)
+    return "numpy"
+
+
+def _warn_default_will_change() -> None:
+    """Announce the coming default, only where it will actually change something.
+
+    Fired from the mode resolution rather than from `Image.consolidate`, because
+    only here is the plan known -- and the warning is worth nothing to someone
+    whose pyramid `"auto"` would decline anyway. Deduplication is left to the
+    `warnings` module, which suppresses repeats per call site. A once-per-process
+    flag would be worse: under `filterwarnings = ["error"]` only the first caller
+    raises, so which test fails would depend on collection order.
+    """
+    warnings.warn(
+        "Pyramid consolidation still builds every level through dask by "
+        f"default. In ngio={_DEFAULT_CHANGES_IN} the default for `mode` changes "
+        'from `"dask"` to `"auto"`, which builds a small pyramid in memory '
+        "instead -- 3-5x faster, at a peak of roughly 1.6x the source level. "
+        'This image is inside that envelope. Pass `mode="auto"` to opt in now, '
+        'or `mode="dask"` to keep the current behaviour and silence this.',
+        NgioFutureWarning,
+        stacklevel=stacklevel_of_first_caller(),
+    )
+
+
+def _resolve_mode(
+    source: zarr.Array,
+    plan: list[tuple[int, zarr.Array]],
+    order: InterpolationOrder,
+    mode: ConsolidationMode | None,
+) -> Literal["dask", "numpy", "coarsen"]:
+    if mode == "auto":
+        return _resolve_auto_mode(source, plan, order)
+
+    if mode is None:
+        # An empty plan consolidates nothing, so the coming default cannot
+        # change anything for this caller and the notice would be pure noise.
+        if plan and _resolve_auto_mode(source, plan, order) == "numpy":
+            _warn_default_will_change()
+        return "dask"
+
+    return mode
+
+
+def _consolidate_on_disk(
+    plan: list[tuple[int, zarr.Array]],
+    nodes: list[zarr.Array],
+    order: InterpolationOrder,
+    mode: Literal["dask", "coarsen"],
+) -> None:
+    """One independent read -> zoom -> write per level, each its own compute.
+
+    Level i+1 is written and then read back from the store to build level i+2,
+    which costs 1.33x the pyramid's size in reads to produce 0.33x in writes.
+    Fusing the levels into one graph removes that re-read, and was tried: it
+    bought ~1% of wall clock (the re-read was already overlapped with parallel
+    work, and the larger graph cost back what the IO saved), while roughly
+    doubling peak memory and multiplying an already-untenable task count.
+
+    The task count is the reason this stays serial. A dask graph costs ~2.4 KB
+    and one task per chunk, so at 256x256 chunks a 100 GB image is ~820k tasks
+    and ~1.7 GB of graph *before a byte is read* -- and fusing every level into
+    one graph makes that 1.23M tasks and ~3 GB. Dask's own guidance is to stay
+    under ~100k tasks, which this crosses at 8 GB either way. Keeping the levels
+    separate at least bounds the graph by the largest single level rather than
+    the whole pyramid. The real fix is not to build a graph per chunk at all.
+    """
+    for parent, target in plan:
+        on_disk_zoom(source=nodes[parent], target=target, order=order, mode=mode)
+
+
+def _consolidate_numpy(
+    source: zarr.Array,
+    plan: list[tuple[int, zarr.Array]],
+    order: InterpolationOrder,
+) -> None:
+    levels = {0: _read_numpy(source)}
+
+    for position, (parent, target) in enumerate(plan):
+        out = numpy_zoom(levels[parent], target_shape=target.shape, order=order)
+        target[...] = out
+        levels[position + 1] = out
+
+        # Release levels no later edge reads from. This mode already carries the
+        # most memory of the three -- holding every level to the end would make
+        # the worst case worse for no reason.
+        still_needed = {p for p, _ in plan[position + 1 :]}
+        for index in [i for i in levels if i not in still_needed]:
+            del levels[index]
+
+
 def consolidate_pyramid(
     source: zarr.Array,
     targets: list[zarr.Array],
     order: InterpolationOrder = "linear",
-    mode: Literal["dask", "numpy", "coarsen"] = "dask",
+    mode: ConsolidationMode | None = None,
 ) -> None:
-    """Consolidate the Zarr array."""
-    processed = [source]
-    to_be_processed = targets
+    """Consolidate the Zarr array.
 
-    while to_be_processed:
-        source_id, target_id = _find_closest_arrays(processed, to_be_processed)
+    Args:
+        source: The level to build the others from.
+        targets: Every other level in the multiscale, above the source as well as
+            below it -- levels above are upsampled, as they always have been.
+        order: The interpolation order.
+        mode: `"dask"`, `"numpy"` or `"coarsen"` to pick the path outright, or
+            `"auto"` to take the in-memory path wherever it is bit-identical to
+            the chunked one. `None` means the caller did not choose: it behaves
+            as `"dask"` today and warns where `"auto"` would have differed.
+    """
+    for target in targets:
+        if source.dtype != target.dtype:
+            raise NgioValueError("source and target must have the same dtype")
 
-        source_image = processed[source_id]
-        target_image = to_be_processed.pop(target_id)
+    plan = _consolidation_plan(source, targets)
 
-        on_disk_zoom(
-            source=source_image,
-            target=target_image,
-            mode=mode,
-            order=order,
-        )
-        processed.append(target_image)
+    match resolved := _resolve_mode(source, plan, order, mode):
+        case "numpy":
+            _consolidate_numpy(source, plan, order)
+        case "dask" | "coarsen":
+            _consolidate_on_disk(plan, [source, *(t for _, t in plan)], order, resolved)
+        case _:
+            raise NgioValueError(
+                "mode must be either 'dask', 'numpy', 'coarsen' or 'auto'"
+            )
 
 
 ################################################

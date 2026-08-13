@@ -22,6 +22,7 @@ from ngio.utils._warnings import (
     NgioDeprecationWarning,
     NgioFutureWarning,
     NgioUserWarning,
+    stacklevel_of_first_caller,
 )
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
@@ -61,4 +62,5 @@ __all__ = [
     "print_datasets_infos",
     "refresh_s3fs_config",
     "retry_io",
+    "stacklevel_of_first_caller",
 ]

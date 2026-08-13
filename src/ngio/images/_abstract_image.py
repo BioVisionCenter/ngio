@@ -18,6 +18,7 @@ from ngio.common import (
 )
 from ngio.common._pyramid import (
     ChunksLike,
+    ConsolidationMode,
     ShardsLike,
     compute_scales_from_shapes,
     compute_shapes_from_scaling_factors,
@@ -562,7 +563,7 @@ class AbstractImage(ABC):
     def _consolidate(
         self,
         order: InterpolationOrder = "linear",
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
     ) -> None:
         """Consolidate the image on disk.
 
@@ -692,7 +693,7 @@ class AbstractImage(ABC):
 def consolidate_image(
     image: AbstractImage,
     order: InterpolationOrder = "linear",
-    mode: Literal["dask", "numpy", "coarsen"] = "dask",
+    mode: ConsolidationMode | None = None,
 ) -> None:
     """Consolidate the image on disk."""
     target_paths = image.meta_handler.get_meta().paths
