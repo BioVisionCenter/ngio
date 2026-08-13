@@ -22,6 +22,7 @@ from ngio.tables.v1 import (
 from ngio.tables.v1._roi_table import GenericRoiTableV1
 from ngio.utils import (
     AccessModeLiteral,
+    NgioFileNotFoundError,
     NgioValidationError,
     NgioValueError,
     StoreOrGroup,
@@ -152,11 +153,15 @@ class TableMeta(BackendMeta):
         return f"{self.type}_v{self.table_version}"
 
 
-def _get_meta(handler: ZarrGroupHandler) -> TableMeta:
-    """Get the metadata from the handler."""
-    attrs = handler.load_attrs()
-    meta = TableMeta(**attrs)
-    return meta
+def _get_meta(handler: ZarrGroupHandler, attrs: dict | None = None) -> TableMeta:
+    """Get the metadata from the handler.
+
+    `attrs` are already-loaded group attributes, decoded instead of reading
+    the document again.
+    """
+    if attrs is None:
+        attrs = handler.load_attrs()
+    return TableMeta(**attrs)
 
 
 class ImplementedTables:
@@ -289,9 +294,17 @@ class TablesContainer:
 
         for name in names:
             if name not in self._types_memo:
-                handler = self._get_table_group_handler(name)
+                try:
+                    handler = self._get_table_group_handler(name)
+                except NgioFileNotFoundError:
+                    # A stale name in the `tables` attribute with no group
+                    # behind it. Not memoised: it stays invisible to typed
+                    # listings but keeps raising on a direct `get`.
+                    continue
                 self._types_memo[name] = _get_meta(handler).type
-        return {name: self._types_memo[name] for name in names}
+        return {
+            name: self._types_memo[name] for name in names if name in self._types_memo
+        }
 
     def list(self, filter_types: TypedTable | str | None = None) -> list[str]:
         """List all tables in the group.
@@ -336,7 +349,7 @@ class TablesContainer:
         # Read once: `TableMeta` picks the class, the concrete model is built
         # by the class, and both used to read this same document separately.
         attrs = table_handler.load_attrs()
-        meta = TableMeta(**attrs)
+        meta = _get_meta(table_handler, attrs=attrs)
         return ImplementedTables().get_table(
             meta=meta,
             handler=table_handler,
@@ -468,9 +481,11 @@ def open_table(
         cache=cache,
         mode=mode,
     )
-    meta = _get_meta(handler)
+    # Read once, decode once: the same document picks the class and builds it.
+    attrs = handler.load_attrs()
+    meta = _get_meta(handler, attrs=attrs)
     return ImplementedTables().get_table(
-        meta=meta, handler=handler, backend=backend, strict=False
+        meta=meta, handler=handler, backend=backend, strict=False, attrs=attrs
     )
 
 

@@ -529,8 +529,10 @@ class ZarrGroupHandler:
         handler = ZarrGroupHandler(
             store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode=mode
         )
-        self._handlers_cache.set(path, handler)
-        return handler
+        # `setdefault`, not `set`: a handler that lost this race and stayed
+        # reachable would sit outside `invalidate_meta`'s cascade and keep
+        # serving whatever it cached.
+        return self._handlers_cache.setdefault(path, handler)
 
     @property
     def is_listable(self) -> bool:

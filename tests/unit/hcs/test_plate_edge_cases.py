@@ -168,6 +168,51 @@ def test_plate_fan_out_agrees_with_serial(tmp_path: Path, max_workers):
     assert len(plate.images_paths(max_workers=max_workers)) == len(images)
 
 
+def test_concurrent_gets_return_the_identical_object(
+    cardiomyocyte_tiny_path_readonly: Path,
+):
+    """The cache must hand every racing thread the same well and image.
+
+    `get_well_images` relies on sharing `_images_cache` with `get_images`,
+    and the fan-out builds cache entries from worker threads — so a
+    check-then-act insert would quietly hand two threads two objects.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    plate = open_ome_zarr_plate(cardiomyocyte_tiny_path_readonly, cache=True, mode="r")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        wells = list(pool.map(lambda _: plate._get_well("B/03"), range(32)))
+        imgs = list(pool.map(lambda _: plate._get_image("B/03/0"), range(32)))
+
+    assert all(w is wells[0] for w in wells)
+    assert all(i is imgs[0] for i in imgs)
+
+
+def test_a_well_at_a_different_version_than_its_plate_still_decodes(tmp_path: Path):
+    """The version the plate hands down is a fast path, not a constraint.
+
+    A well rewritten at another NGFF version than its plate used to decode via
+    the registry walk; handing the resolved version down must not turn that
+    tolerance into a raise.
+    """
+    import zarr
+
+    from ngio.ome_zarr_meta import ImageInWellPath
+
+    images = [ImageInWellPath(row="A", column="01", path="0")]
+    store = tmp_path / "mixed.zarr"
+    create_empty_plate(store, name="plate", images=images, overwrite=True)
+
+    # Rewrite the 0.4 well document as 0.5 behind ngio's back.
+    well = zarr.open_group(str(store / "A" / "01"), mode="r+")
+    well.attrs.clear()
+    well.attrs.update({"ome": {"version": "0.5", "well": {"images": [{"path": "0"}]}}})
+
+    plate = open_ome_zarr_plate(store, mode="r")
+    assert plate.images_paths() == ["A/01/0"]
+
+
 def test_a_malformed_well_still_raises_just_later(tmp_path: Path):
     """Well validation is deferred, not dropped.
 

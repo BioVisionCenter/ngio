@@ -4,6 +4,7 @@ import dask.array as da
 import numpy as np
 
 from ngio.common import Roi
+from ngio.common._pyramid import ConsolidationMode
 from ngio.images import Image, Label
 from ngio.images._image import (
     ChannelSlicingInputType,
@@ -36,6 +37,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
+        consolidation_mode: ConsolidationMode | None = None,
     ) -> None:
         """Initialize the iterator with a ROI table and input/output images.
 
@@ -51,11 +53,14 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 transforms to apply to the input image.
             output_transforms (Sequence[TransformProtocol] | None): Optional
                 transforms to apply to the output label.
+            consolidation_mode: How to build the output pyramid after
+                iteration, see `Label.consolidate`. Defaults to `None`.
         """
         self._input = input_image
         self._output = output_label
         self._ref_image = input_image
         self._rois = input_image.build_image_roi_table(name=None).rois()
+        self._consolidation_mode = consolidation_mode
 
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -77,6 +82,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
+            "consolidation_mode": self._consolidation_mode,
         }
 
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
@@ -120,7 +126,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def post_consolidate(self):
-        self._output.consolidate()
+        self._output.consolidate(mode=self._consolidation_mode)
 
 
 class MaskedSegmentationIterator(SegmentationIterator):
@@ -138,6 +144,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
+        consolidation_mode: ConsolidationMode | None = None,
     ) -> None:
         """Initialize the iterator with a ROI table and input/output images.
 
@@ -153,12 +160,15 @@ class MaskedSegmentationIterator(SegmentationIterator):
                 transforms to apply to the input image.
             output_transforms (Sequence[TransformProtocol] | None): Optional
                 transforms to apply to the output label.
+            consolidation_mode: How to build the output pyramid after
+                iteration, see `Label.consolidate`. Defaults to `None`.
         """
         self._input = input_image
         self._output = output_label
 
         self._ref_image = input_image
         self._set_rois(input_image._masking_roi_table.rois())
+        self._consolidation_mode = consolidation_mode
 
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -185,6 +195,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
+            "consolidation_mode": self._consolidation_mode,
         }
 
     def build_numpy_getter(self, roi: Roi):
@@ -234,6 +245,3 @@ class MaskedSegmentationIterator(SegmentationIterator):
             transforms=self._output_transforms,
             remove_channel_selection=True,
         )
-
-    def post_consolidate(self):
-        self._output.consolidate()

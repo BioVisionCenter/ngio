@@ -8,7 +8,7 @@ from ngio.tables._tables_container import (
     TablesContainer,
     open_tables_container,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioFileNotFoundError, NgioValueError
 
 
 def test_table_container(tmp_path: Path):
@@ -32,6 +32,29 @@ def test_table_container(tmp_path: Path):
     expected = DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
     expected = expected.set_index("label")
     assert table.dataframe.equals(expected)
+
+
+def test_a_stale_table_name_does_not_break_typed_listing(tmp_path: Path):
+    """A name in the `tables` attribute with no group behind it is tolerated.
+
+    Another writer (or a crashed one) can leave a dangling entry. A typed
+    listing must still return the tables that do exist; only a direct `get`
+    of the stale name reports the problem.
+    """
+    table_group = open_tables_container(tmp_path / "test.zarr", mode="a")
+    table = FeatureTable(
+        table_data=DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
+    )
+    table_group.add(name="feat_table", table=table)
+
+    # Dangle a name behind the container's back.
+    handler = table_group._group_handler
+    handler.write_attrs({"tables": ["feat_table", "stale"]})
+
+    assert table_group.list() == ["feat_table", "stale"]
+    assert table_group.list(filter_types="feature_table") == ["feat_table"]
+    with pytest.raises(NgioFileNotFoundError):
+        table_group.get("stale")
 
 
 def test_add_explicit_backend_overrides(tmp_path: Path):

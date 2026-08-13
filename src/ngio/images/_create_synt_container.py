@@ -103,6 +103,9 @@ def create_synthetic_ome_zarr(
         dimension_separator=dimension_separator,
         compressors=compressors,
         ngff_version=ngff_version,
+        # Pinned so the synthetic helper keeps its current pyramid path (and
+        # stays silent) when the `mode=None` default changes to "auto".
+        consolidation_mode="dask",
     )
 
     image = ome_zarr.get_image()
@@ -123,7 +126,7 @@ def create_synthetic_ome_zarr(
         )
         ref_label = ref_label.astype(np.uint32)
         label.set_array(ref_label)
-        label.consolidate()
+        label.consolidate(mode="dask")
 
         if label_info.create_masking_table:
             masking_table = label.build_masking_roi_table()

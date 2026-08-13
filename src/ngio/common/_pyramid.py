@@ -334,8 +334,9 @@ def _warn_default_will_change() -> None:
         f"default. In ngio={_DEFAULT_CHANGES_IN} the default for `mode` changes "
         'from `"dask"` to `"auto"`, which builds a small pyramid in memory '
         "instead -- 3-5x faster, at a peak of roughly 1.6x the source level. "
-        'This image is inside that envelope. Pass `mode="auto"` to opt in now, '
-        'or `mode="dask"` to keep the current behaviour and silence this.',
+        'This image is inside that envelope. Pass `mode="auto"` (called '
+        "`consolidation_mode` on creation helpers and iterators) to opt in "
+        'now, or `mode="dask"` to keep the current behaviour and silence this.',
         NgioFutureWarning,
         stacklevel=stacklevel_of_first_caller(),
     )
@@ -529,8 +530,17 @@ class PyramidLevel(BaseModel):
                     f"({len(self.shape)}), got {len(self.shards)}"
                 )
             normalized_shards = []
-            for dim_size, shard_size in zip(self.shape, self.shards, strict=True):
-                normalized_shards.append(min(dim_size, shard_size))
+            for axis, (dim_size, shard_size) in enumerate(
+                zip(self.shape, self.shards, strict=True)
+            ):
+                shard_size = min(dim_size, shard_size)
+                if isinstance(self.chunks, tuple):
+                    # zarr requires the shard extent to be a whole multiple of
+                    # the chunk extent, so a clip that lands between multiples
+                    # rounds down to one — never below a single chunk.
+                    chunk_size = self.chunks[axis]
+                    shard_size = max(chunk_size, shard_size - shard_size % chunk_size)
+                normalized_shards.append(shard_size)
             self.shards = tuple(normalized_shards)
         return self
 

@@ -296,6 +296,9 @@ class OmeZarrPlate:
         self._group_handler.clean_cache()
         self._wells_cache.clear()
         self._images_cache.clear()
+        # Rebuilt on next access against the refreshed handler — it carries a
+        # per-table type memo that would otherwise survive the refresh.
+        self._tables_container = None
 
     @property
     def meta_handler(self):
@@ -442,8 +445,9 @@ class OmeZarrPlate:
         # metadata reload, once per well, which costs more reads than the decode
         # it saves. The handler resolved the version when it was built.
         well = OmeZarrWell(group_handler, version=self._meta_handler.version)
-        self._wells_cache.set(well_path, well)
-        return well
+        # `setdefault`, not `set`: two fan-out threads may build the same well
+        # concurrently, and both must hand back the one that won.
+        return self._wells_cache.setdefault(well_path, well)
 
     def get_well(self, row: str, column: int | str) -> OmeZarrWell:
         """Get a well from the plate.
@@ -505,8 +509,8 @@ class OmeZarrPlate:
             return cached_image
         img_group_handler = self._group_handler.get_handler(image_path)
         image = OmeZarrContainer(img_group_handler)
-        self._images_cache.set(image_path, image)
-        return image
+        # See `_get_well` for why this is `setdefault`.
+        return self._images_cache.setdefault(image_path, image)
 
     @deprecated(replacement="get_images(max_workers=...)")
     async def get_images_async(

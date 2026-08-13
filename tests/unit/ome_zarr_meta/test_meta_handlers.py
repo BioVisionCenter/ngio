@@ -179,6 +179,36 @@ def test_refresh_drops_the_derived_dimensions(tmp_path: Path):
     assert image.dimensions.pixel_size.space_unit == "nanometer"
 
 
+def test_refresh_reaches_a_live_label(tmp_path: Path):
+    """A `Label` held across `refresh()` must re-derive, exactly like an image.
+
+    Labels do not share the images' meta handler — each carries its own — so
+    the refresh has to walk the labels container's handlers to reach them.
+    """
+    store = tmp_path / "label_refresh.zarr"
+    create_empty_ome_zarr(
+        store,
+        shape=(2, 4, 32, 32),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        space_unit="micrometer",
+        overwrite=True,
+    )
+    writer = open_ome_zarr_container(store, mode="r+")
+    writer.derive_label("lbl")
+
+    reader = open_ome_zarr_container(store, mode="r")
+    label = reader.get_label("lbl")
+    assert label.dimensions.pixel_size.space_unit == "micrometer"
+
+    writer.get_label("lbl").set_axes_units(space_unit="nanometer")
+
+    reader.refresh()
+    assert label.dimensions.pixel_size.space_unit == "nanometer"
+
+
 def test_create_from_array_returns_a_container_that_sees_its_own_writes(tmp_path: Path):
     """The array, the pyramid and the channel windows are written through a
     cached view, so the container handed back must not predate them."""
@@ -212,3 +242,38 @@ def test_create_from_array_returns_a_container_that_sees_its_own_writes(tmp_path
 
     # And the pixels really landed.
     assert container.get_image().get_as_numpy().max() > 0
+
+
+def test_memo_never_pairs_new_attrs_with_old_meta():
+    """Concurrent readers must see a matching (attrs, meta) pair.
+
+    Plate fan-out threads share one handler. The memo stores its state as a
+    single tuple precisely so a reader cannot observe one half updated and
+    the other not; this hammers two alternating documents from two threads
+    and fails if a lookup for one document ever returns the other's decode.
+    """
+    import threading
+
+    from ngio.ome_zarr_meta._meta_handlers import _MetaMemo
+
+    memo = _MetaMemo()
+    documents = [{"version": 1}, {"version": 2}]
+    mismatches: list[tuple[int, dict]] = []
+    start = threading.Barrier(2)
+
+    def hammer(which: int) -> None:
+        attrs = documents[which]
+        start.wait()
+        for _ in range(2000):
+            meta = memo.get(attrs, lambda: {"decoded_from": attrs["version"]})
+            if meta["decoded_from"] != attrs["version"]:
+                mismatches.append((which, meta))
+                return
+
+    threads = [threading.Thread(target=hammer, args=(w,)) for w in (0, 1)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert mismatches == []

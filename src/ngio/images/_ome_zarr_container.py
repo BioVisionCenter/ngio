@@ -7,7 +7,7 @@ from typing import Any, Literal
 import numpy as np
 from zarr.core.array import CompressorLike
 
-from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._create_utils import init_image_like
 from ngio.images._image import Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
@@ -167,6 +167,10 @@ class OmeZarrContainer:
         """
         self._group_handler.clean_cache()
         self._images_container._meta_handler.invalidate()
+        # Live `Label` objects hold their own meta handlers; reach them
+        # before dropping the container that knows about them.
+        if self._labels_container is not None:
+            self._labels_container.invalidate()
         # Rebuilt on next access against the refreshed handler.
         self._labels_container = None
         self._tables_container = None
@@ -1204,6 +1208,7 @@ def create_ome_zarr_from_array(
     compressors: CompressorLike = "auto",
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
+    consolidation_mode: ConsolidationMode | None = None,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
@@ -1243,6 +1248,8 @@ def create_ome_zarr_from_array(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation. Defaults to None.
         overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+        consolidation_mode: How to build the pyramid levels, see
+            `Image.consolidate`. Defaults to `None`.
     """
     if len(percentiles) != 2:
         raise NgioValueError(
@@ -1280,7 +1287,7 @@ def create_ome_zarr_from_array(
     working = open_ome_zarr_container(store=store, mode="r+", cache=True)
     image = working.get_image()
     image.set_array(array)
-    image.consolidate()
+    image.consolidate(mode=consolidation_mode)
     working.set_channel_windows_with_percentiles(percentiles=percentiles)
 
     # `ome_zarr` was opened before any of the writes above. It is uncached, so

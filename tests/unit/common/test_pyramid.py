@@ -9,6 +9,7 @@ import zarr
 
 from ngio.common._pyramid import (
     InterpolationOrder,
+    PyramidLevel,
     _consolidation_plan,
     _find_closest_arrays,
     _resolve_auto_mode,
@@ -355,6 +356,45 @@ def test_consolidate_warns_only_where_the_default_will_change(tmp_path: Path):
         consolidate_pyramid(outside[0], outside[1:], order="linear")
         # Nothing to consolidate: the coming default cannot change anything.
         consolidate_pyramid(inside[0], [], order="linear")
+
+
+@pytest.mark.parametrize(
+    "shape, chunks, shards, expected_shards",
+    [
+        # Clip lands between chunk multiples: round down to one.
+        ((1, 15), (1, 10), (1, 20), (1, 10)),
+        ((1, 100), (1, 10), (1, 25), (1, 20)),
+        # A shard below one chunk is bumped up to it.
+        ((1, 100), (1, 10), (1, 5), (1, 10)),
+        # Already valid: untouched.
+        ((1, 100), (1, 10), (1, 40), (1, 40)),
+    ],
+)
+def test_pyramid_level_clips_shards_to_a_chunk_multiple(
+    tmp_path: Path, shape, chunks, shards, expected_shards
+):
+    """zarr requires shard % chunk == 0, so the clip must preserve it.
+
+    Clipping chunks and shards to the shape independently could produce e.g.
+    chunks (1, 10) with shards (1, 15), which `create_array` rejects.
+    """
+    level = PyramidLevel(
+        path="0",
+        shape=shape,
+        scale=(1.0, 1.0),
+        translation=(0.0, 0.0),
+        chunks=chunks,
+        shards=shards,
+    )
+    assert level.shards == expected_shards
+
+    zarr.create_array(
+        tmp_path / "level.zarr",
+        shape=level.shape,
+        chunks=level.chunks,
+        shards=level.shards,
+        dtype="uint16",
+    )
 
 
 def test_coarsen_refuses_to_upsample(tmp_path: Path):

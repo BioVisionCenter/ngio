@@ -178,7 +178,13 @@ def get_ngio_meta(
         decoder = registry.get(version)
         if decoder is None:
             raise NgioValueError(f"Unsupported NGFF version: {version}")
-        versions_to_try = {version: decoder}
+        # The supplied version is a fast path, not a constraint. A document
+        # can legitimately differ from the version handed down — a well
+        # rewritten at another NGFF version than its plate — so on a failed
+        # decode the rest of the registry is still tried.
+        versions_to_try = {version: decoder} | {
+            v: d for v, d in registry.items() if v != version
+        }
     else:
         versions_to_try = registry
 
@@ -230,27 +236,32 @@ class _MetaMemo(Generic[_meta_type]):
     `AbstractImage.dimensions`.
     """
 
-    __slots__ = ("_attrs", "_meta", "generation")
+    __slots__ = ("_snapshot", "generation")
 
     def __init__(self) -> None:
-        self._attrs: dict | None = None
-        self._meta: _meta_type | None = None
+        # (attrs, meta), stored as one tuple so a concurrent reader sees
+        # either the old pair or the new pair, never new attrs with old meta.
+        # Plate fan-out threads share one handler, so this is load-bearing.
+        self._snapshot: tuple[dict, _meta_type] | None = None
         self.generation: int = 0
 
     def get(self, attrs: dict, decode: Callable[[], _meta_type]) -> _meta_type:
         """Return the metadata for `attrs`, decoding only on a miss."""
-        if self._meta is not None and self._attrs == attrs:
-            return deepcopy(self._meta)
+        snapshot = self._snapshot
+        if snapshot is not None and snapshot[0] == attrs:
+            return deepcopy(snapshot[1])
         meta = decode()
-        self._attrs = deepcopy(attrs)
-        self._meta = meta
+        # `attrs` is not copied: `load_attrs` hands out a private dict, and
+        # the memo only ever compares it, never returns it.
+        self._snapshot = (attrs, meta)
+        # Not atomic; a lost increment between racing threads is harmless as
+        # long as the counter moves, which a single racer already guarantees.
         self.generation += 1
         return deepcopy(meta)
 
     def clear(self) -> None:
         """Drop the memo, so the next `get` decodes again."""
-        self._attrs = None
-        self._meta = None
+        self._snapshot = None
         self.generation += 1
 
 

@@ -11,6 +11,7 @@ from dask.array.core import PerformanceWarning
 from dask.utils import parse_bytes
 
 from ngio.config import get_config
+from ngio.utils import NgioValueError
 
 # Structurally `io_pipes._ops_slices.SlicingType`, restated rather than imported:
 # that module is a consumer of this one.
@@ -111,6 +112,15 @@ def store_dask(
         zarr_array: The array to write into. Must already exist.
         region: Where to write, or `None` for the whole array.
     """
+    if region is not None:
+        for index in region:
+            if isinstance(index, slice) and index.step not in (None, 1):
+                # The single-writer-per-unit argument above assumes the region
+                # is a contiguous cut of the unit grid; a stepped slice is not.
+                raise NgioValueError(
+                    f"store_dask does not support stepped slices, got {index}."
+                )
+
     # Both bounds, and why each exists, live in `block_budget`.
     budget = block_budget(zarr_array)
 
@@ -123,6 +133,11 @@ def store_dask(
         # own remedy does not apply either, since no `array.chunk-size` makes a
         # sub-chunk ROI cover a whole chunk. Silencing an unactionable warning
         # per write, not the condition: `filterwarnings("error")` downstream
-        # would otherwise make ordinary ROI writes raise.
-        warnings.simplefilter("ignore", PerformanceWarning)
+        # would otherwise make ordinary ROI writes raise. Matched on the
+        # message, so dask's other `PerformanceWarning`s still surface.
+        warnings.filterwarnings(
+            "ignore",
+            message="The input Dask array will be rechunked",
+            category=PerformanceWarning,
+        )
         da.to_zarr(patch, zarr_array, region=region)
