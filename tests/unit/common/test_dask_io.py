@@ -6,11 +6,22 @@ import zarr
 from dask.array.core import _get_zarr_write_chunks, normalize_chunks
 from dask.utils import parse_bytes
 
-from ngio.common._dask_io import store_dask, write_unit, write_unit_bytes
+from ngio.common._dask_io import (
+    block_budget,
+    store_dask,
+    write_unit,
+    write_unit_bytes,
+)
+from ngio.config import DaskConfig, get_config
 
 
 def _array(tmp_path, name, **kwargs):
     return zarr.create_array(tmp_path / name, dtype="uint16", **kwargs)
+
+
+def _with_cap(monkeypatch, cap):
+    """Pin `write_block_max_bytes` for one test. `None` removes the ceiling."""
+    monkeypatch.setattr(get_config(), "dask", DaskConfig(write_block_max_bytes=cap))
 
 
 def _block(zarr_array):
@@ -132,8 +143,11 @@ def test_an_overhanging_chunk_does_not_inflate_the_budget(tmp_path, monkeypatch)
     the overhang is large enough -- 1,055 MiB here -- and `normalize_chunks`
     spends every byte of it, turning an 84 MiB block into a 791 MiB one. No
     write is performed: `to_zarr` is stubbed so the assertion is about the
-    budget `store_dask` establishes, not about moving 2 GB.
+    budget `store_dask` establishes, not about moving 2 GB. The ceiling is
+    removed so the assertion is about the floor alone; capping is covered
+    separately below, and would otherwise mask the very inflation under test.
     """
+    _with_cap(monkeypatch, None)
     array = _array(
         tmp_path,
         "overhang.zarr",
@@ -175,6 +189,89 @@ def test_overhanging_chunk_writes_correctly(tmp_path):
     resident = [min(u, s) for u, s in zip(write_unit(array), shape, strict=True)]
     for axis, (block, extent) in enumerate(zip(_block(array), resident, strict=True)):
         assert block % extent == 0, f"axis {axis}: block {block} straddles {extent}"
+
+
+def test_the_cap_bounds_the_block_dask_builds(tmp_path, monkeypatch):
+    """A block is capped, and is still a whole number of write units.
+
+    Both halves matter: the cap is what bounds memory, the multiple is what
+    keeps one writer per unit. Asserted with dask's own `normalize_chunks`
+    inside the config context `store_dask` establishes, rather than against a
+    reimplementation of dask's heuristic.
+    """
+    array = _array(tmp_path, "capped.zarr", shape=(64, 512, 512), chunks=(1, 256, 256))
+    unit = write_unit(array)
+    unit_bytes = write_unit_bytes(array)
+    seen = {}
+
+    def _stub(arr, z, region=None, **kwargs):
+        seen["block"] = _block(z)
+
+    monkeypatch.setattr(da, "to_zarr", _stub)
+
+    for cap in (unit_bytes, 2 * unit_bytes, 8 * 2**20, 64 * 2**20):
+        _with_cap(monkeypatch, cap)
+        store_dask(da.zeros(array.shape, chunks=array.chunks, dtype="uint16"), array)
+        block = seen["block"]
+        assert int(np.prod(block)) * array.dtype.itemsize <= cap, f"cap {cap}"
+        for axis, (extent, u) in enumerate(zip(block, unit, strict=True)):
+            assert extent % u == 0, f"cap {cap}, axis {axis}: {extent} straddles {u}"
+
+
+def test_the_floor_wins_over_the_cap(tmp_path, monkeypatch):
+    """A unit larger than the cap gets one unit per block, not a split one.
+
+    The lost-update guard is `max(..., unit_bytes)` and it is applied last, so
+    no configured cap can subdivide a write unit. This is the regime the memory
+    benchmark structurally cannot cover -- lowering dask's own `array.chunk-size`
+    to emulate a cap has no floor -- so it is pinned here instead.
+    """
+    array = _array(
+        tmp_path,
+        "shard.zarr",
+        shape=(4, 512, 512),
+        chunks=(1, 128, 128),
+        shards=(2, 512, 512),
+    )
+    unit_bytes = write_unit_bytes(array)
+    assert unit_bytes == 1024 * 1024  # 1 MiB shard, deliberately above the caps below
+
+    _with_cap(monkeypatch, unit_bytes // 8)
+    assert block_budget(array) == unit_bytes
+
+    # And the write still lands correctly rather than merely being budgeted.
+    patch = np.arange(4 * 512 * 512, dtype="uint16").reshape(4, 512, 512)
+    store_dask(da.from_array(patch, chunks=(1, 128, 128)), array)
+    np.testing.assert_array_equal(array[...], patch)
+
+
+def test_the_cap_never_raises_a_lower_budget_you_set(tmp_path, monkeypatch):
+    """A ceiling, not a target: an `array.chunk-size` below the cap is kept."""
+    array = _array(tmp_path, "low.zarr", shape=(64, 512, 512), chunks=(1, 256, 256))
+    _with_cap(monkeypatch, 64 * 2**20)
+
+    with dask.config.set({"array.chunk-size": "4MiB"}):
+        assert block_budget(array) == 4 * 2**20
+
+
+def test_no_cap_reproduces_the_dask_default(tmp_path, monkeypatch):
+    array = _array(tmp_path, "none.zarr", shape=(64, 512, 512), chunks=(1, 256, 256))
+    _with_cap(monkeypatch, None)
+
+    assert block_budget(array) == parse_bytes(dask.config.get("array.chunk-size"))
+
+
+def test_a_capped_write_still_matches_numpy(tmp_path, monkeypatch):
+    """Batching is an allocation decision; it may not touch the bytes written."""
+    baseline = np.arange(8 * 128 * 128, dtype="uint16").reshape(8, 128, 128)
+    reference = _array(tmp_path, "ref2.zarr", shape=(8, 128, 128), chunks=(1, 64, 64))
+    reference[...] = baseline
+
+    array = _array(tmp_path, "got2.zarr", shape=(8, 128, 128), chunks=(1, 64, 64))
+    _with_cap(monkeypatch, write_unit_bytes(array))  # one unit per block, the extreme
+    store_dask(da.from_array(baseline, chunks=(1, 32, 32)), array)
+
+    np.testing.assert_array_equal(array[...], reference[...])
 
 
 def test_region_write_matches_numpy(tmp_path):

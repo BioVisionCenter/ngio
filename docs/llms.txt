@@ -21,7 +21,7 @@ guides and tutorials are executed when the site is built, so the outputs shown a
 - [Masked images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/4_masked_images/): Label-indexed access to image regions, zoom_factor, and masked read/write operations.
 - [HCS plates](https://biovisioncenter.github.io/ngio/stable/getting_started/5_hcs/): Plate structure, rows, columns and acquisitions, retrieving images, and creating plates.
 - [Iterators](https://biovisioncenter.github.io/ngio/stable/getting_started/6_iterators/): The four iterators for building scalable processing pipelines.
-- [Configuration](https://biovisioncenter.github.io/ngio/stable/getting_started/7_configuration/): The ngio config file and the io_retry policy.
+- [Configuration](https://biovisioncenter.github.io/ngio/stable/getting_started/7_configuration/): The ngio config file, the io_retry policy, and the dask write-block cap.
 
 ## Tutorials
 

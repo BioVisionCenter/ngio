@@ -12,6 +12,7 @@ __email__ = "lorenzo.cerrone@uzh.ch"
 from ngio.common import Dimensions, Roi, RoiSlice
 from ngio.config import (
     ConsolidationConfig,
+    DaskConfig,
     NgioConfig,
     RetryConfig,
     S3FSConfig,
@@ -83,6 +84,7 @@ __all__ = [
     "Channel",
     "ChannelSelectionModel",
     "ConsolidationConfig",
+    "DaskConfig",
     "DefaultNgffVersion",
     "Dimensions",
     "FeatureExtractorIterator",

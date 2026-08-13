@@ -1,5 +1,5 @@
 ---
-description: Configure ngio via ngio_config.json, including the io_retry policy.
+description: Configure ngio via ngio_config.json, including the io_retry policy and the dask write-block cap.
 ---
 
 # 7. Configuration
@@ -21,6 +21,9 @@ By default ngio looks for `~/.ngio/ngio_config.json`. You can point it somewhere
     },
     "s3fs": {
         "custom_retry_markers": ["RequestTimeTooSkewed"]
+    },
+    "dask": {
+        "write_block_max_bytes": 8388608
     }
 }
 ```
@@ -68,6 +71,28 @@ ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never ret
 `s3fs.custom_retry_markers` is a separate, lower-level mechanism: it registers an error handler inside `s3fs` itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew `RequestTimeTooSkewed` errors). Apply changes at runtime with `ngio.utils.refresh_s3fs_config(get_config())`.
 
 The two mechanisms are complementary and independent: `s3fs` retries individual S3 requests inside a single ngio IO call, while `io_retry` retries the whole ngio IO call. If both are enabled and their triggers overlap, an error can be retried at both layers, so the effective number of attempts is multiplicative — keep the two configurations narrow.
+
+## Dask writes (`dask`)
+
+`dask.write_block_max_bytes` caps how much data ngio lets dask assemble in memory before writing it, in bytes. It defaults to **8 MiB**.
+
+Every dask write — pyramid consolidation, `set_array`, `set_roi` — goes through `da.to_zarr`, which glues whole *write units* (a shard if the array is sharded, a chunk otherwise) into larger *blocks* sized to dask's own `array.chunk-size`, 128 MiB by default. The unit grid is what makes the write safe; the block grid is only batching. Since a write unit is commonly a few hundred KiB, the dask default packs around a thousand of them into one resident block, and peak memory is roughly the number of blocks in flight times their size.
+
+Capping that is close to free. Consolidating a 3-level pyramid, peak memory against the cap:
+
+| cap | 512 MB image | 2 GB | 4 GB |
+| --- | --- | --- | --- |
+| 8 MiB (default) | 40.8 MB | 79.9 MB | 140.3 MB |
+| 16 MiB | 77.9 MB | 95.4 MB | 161.9 MB |
+| `null` (dask's 128 MiB) | 273.0 MB | 370.5 MB | 565.2 MB |
+
+The default is a 75% cut at 4 GB for no measurable change in wall clock, and about 0.4% more tasks in the graph. Set it to `null` to defer to dask's `array.chunk-size`, or lower it further to trade a little batching for a little memory — below roughly 4 MiB the curve flattens onto the dask task graph itself, which no cap reaches.
+
+### Semantics worth knowing
+
+- **It is a ceiling, never a floor.** It cannot raise an `array.chunk-size` you set lower yourself, and it never takes the budget below one write unit — a block smaller than a unit would mean two writers on one unit, which is exactly the lost-update hazard the write path is built to make impossible.
+- **A coarse geometry ignores it.** If one write unit is already larger than the cap — a 105 MiB shard, say — every block is exactly one unit whatever the cap says, because that is already the smallest block that can be written safely. Lowering the cap further changes nothing.
+- **In that case memory is set by your chunk shape, not by this setting.** Peak is roughly workers × unit size, so a 256 MiB shard on eight threads is around 2 GB in flight and no value here reaches it. If that is your situation, the lever is the chunk or shard shape you wrote the array with; see the pixel-size and chunking guidance when choosing it.
 
 ## Next steps
 

@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from ngio.config import (
     ConstantBackoff,
+    DaskConfig,
     ExponentialBackoff,
     LinearBackoff,
     NgioConfig,
@@ -176,3 +177,32 @@ def test_get_config_lazy_load_respects_env_var(monkeypatch, tmp_path):
         assert get_config() is get_config()
     finally:
         _reset_config()
+
+
+def test_dask_config_defaults():
+    assert DaskConfig().write_block_max_bytes == 8 * 2**20
+
+
+def test_ngio_config_default_dask():
+    assert NgioConfig().dask == DaskConfig()
+
+
+def test_dask_config_from_json(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text('{"dask": {"write_block_max_bytes": 4194304}}')
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.dask.write_block_max_bytes == 4 * 2**20
+
+
+def test_dask_config_none_disables_the_cap(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text('{"dask": {"write_block_max_bytes": null}}')
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.dask.write_block_max_bytes is None
+
+
+def test_dask_config_rejects_a_negative_cap():
+    with pytest.raises(ValidationError):
+        DaskConfig(write_block_max_bytes=-1)

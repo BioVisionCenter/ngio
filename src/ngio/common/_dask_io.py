@@ -10,6 +10,8 @@ import zarr
 from dask.array.core import PerformanceWarning
 from dask.utils import parse_bytes
 
+from ngio.config import get_config
+
 # Structurally `io_pipes._ops_slices.SlicingType`, restated rather than imported:
 # that module is a consumer of this one.
 RegionType: TypeAlias = slice | list[int] | int
@@ -47,6 +49,38 @@ def write_unit_bytes(zarr_array: zarr.Array) -> int:
     return int(np.prod(resident)) * zarr_array.dtype.itemsize
 
 
+def block_budget(zarr_array: zarr.Array) -> int:
+    """The `array.chunk-size` to build one write block under, in bytes.
+
+    `to_zarr` sizes its blocks with `normalize_chunks("auto", previous_chunks=
+    unit)`, which grows a block in whole multiples of the write unit until it
+    approaches this budget. Bounded on both sides, and the order matters --
+    read it outward from `write_unit_bytes`:
+
+    - **Floor, applied last.** One whole unit must fit. Below that,
+      `normalize_chunks` cannot reach a multiple of the unit and falls back to
+      blocks that *straddle* one -- which `to_zarr` then writes with
+      `lock=False`, i.e. several writers on one shard and a lost update. A
+      256 MiB shard against the 128 MiB default is the case. Because the floor
+      is applied last it cannot be undercut by the ceiling, so the safety
+      property holds at any configured cap.
+    - **Ceiling.** Dask's default is 128 MiB against a unit that is typically a
+      few hundred KiB, so it packs ~1000 units into one resident block for
+      nothing. Peak memory is roughly blocks-in-flight times block size; at the
+      8 MiB default this is a 75% cut on a 4 GB pyramid (565 -> 140 MB) for
+      +0.37% task count and no measurable wall clock. See `DaskConfig`.
+
+    A cap above the unit is therefore inert by construction: a coarse geometry
+    -- a 105 MiB shard, say -- gets exactly one unit per block whatever the cap
+    says, which is already the smallest block that can be written safely.
+    """
+    budget = parse_bytes(dask.config.get("array.chunk-size"))
+    cap = get_config().dask.write_block_max_bytes
+    if cap is not None:
+        budget = min(budget, cap)
+    return max(budget, write_unit_bytes(zarr_array))
+
+
 def store_dask(
     patch: da.Array,
     zarr_array: zarr.Array,
@@ -66,7 +100,8 @@ def store_dask(
     block. That is both the speed fix and the reason no lock is needed: the
     contention is structurally absent rather than serialised away. The one case
     where it does not hold is a write unit larger than dask's `array.chunk-size`
-    budget, which this function removes by raising the budget for the call.
+    budget, which `block_budget` removes by raising the budget for the call --
+    the same function that caps it from above, so blocks stay bounded.
 
     A region that does not cover whole units still costs a read-modify-write on
     its boundary units — unavoidable, and safe, since each has a single writer.
@@ -76,23 +111,9 @@ def store_dask(
         zarr_array: The array to write into. Must already exist.
         region: Where to write, or `None` for the whole array.
     """
-    unit_bytes = write_unit_bytes(zarr_array)
-    budget = max(parse_bytes(dask.config.get("array.chunk-size")), unit_bytes)
+    # Both bounds, and why each exists, live in `block_budget`.
+    budget = block_budget(zarr_array)
 
-    # `to_zarr` sizes its blocks with `normalize_chunks("auto", previous_chunks=
-    # unit)`, which only yields multiples of the unit while one unit fits in the
-    # `array.chunk-size` budget. A shard larger than that budget -- 256 MiB
-    # against the 128 MiB default, say -- makes dask emit blocks that straddle
-    # shards instead, and it stores them with `lock=False`. Several writers per
-    # shard, no lock: that is a lost update. Raising the budget to one unit
-    # removes the case by construction, and costs nothing when the unit is
-    # already smaller (`max`), which is the common configuration.
-    #
-    # One unit means one *resident* unit (`write_unit_bytes`). Measuring the
-    # declared extent instead raises the budget for capacity no write can use,
-    # and on a chunk that overhangs its axis far enough that overshoot clears
-    # dask's own default: chunks `(1, 100, 2160, 2560)` over a single-z image
-    # take the budget to 1,055 MiB and the block from 84 MiB to 791 MiB.
     with dask.config.set({"array.chunk-size": budget}), warnings.catch_warnings():
         # What remains after the guard is dask reporting that the *region* does
         # not cover whole units -- a ROI narrower than a chunk, say. That read-

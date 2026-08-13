@@ -5,6 +5,7 @@
       members:
         - AxesSetup
         - ChannelSelectionModel
+        - DaskConfig
         - DefaultNgffVersion
         - Dimensions
         - ImageInWellPath

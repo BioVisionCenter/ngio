@@ -144,12 +144,51 @@ class ConsolidationConfig(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 
 
+class DaskConfig(BaseModel):
+    """How large a block ngio lets dask assemble in memory before writing it.
+
+    Every dask write goes through `da.to_zarr`, which glues whole write units
+    (`shards or chunks`, often a few hundred KiB) into blocks sized to dask's
+    own `array.chunk-size` -- 128 MiB by default. Peak memory is roughly the
+    number of blocks in flight times their size, so that default packs ~1000
+    units into one resident block for nothing: the unit grid is what makes the
+    write safe, the block grid is only batching.
+
+    Capping it is close to free. Measured on a 3-level pyramid, peak memory
+    against cap:
+
+    | cap  | 512 MB | 2 GB  | 4 GB  |
+    |------|--------|-------|-------|
+    | 8MiB |  40.8  |  79.9 | 140.3 |
+    | 16MiB|  77.9  |  95.4 | 161.9 |
+    | none | 273.0  | 370.5 | 565.2 |
+
+    The default of 8 MiB is a 75% cut at 4 GB for +0.37% task count and no
+    measurable wall clock. Below ~4 MiB the curve flattens onto the dask task
+    graph itself, which no cap reaches.
+
+    `None` defers to dask's `array.chunk-size`. The cap is a ceiling only: it
+    never raises a lower `array.chunk-size` you set yourself, and never lowers
+    the budget below one write unit, since a block smaller than a unit would
+    mean two writers on one unit.
+
+    Example:
+        ```python
+        DaskConfig(write_block_max_bytes=None)  # defer to dask
+        ```
+    """
+
+    write_block_max_bytes: int | None = Field(default=8 * 2**20, ge=0)
+    model_config = ConfigDict(validate_assignment=True)
+
+
 class NgioConfig(BaseModel):
     """Global configuration for ngio."""
 
     s3fs: S3FSConfig | None = None
     io_retry: RetryConfig = Field(default_factory=RetryConfig)
     consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
+    dask: DaskConfig = Field(default_factory=DaskConfig)
     model_config = ConfigDict(validate_assignment=True)
 
 
