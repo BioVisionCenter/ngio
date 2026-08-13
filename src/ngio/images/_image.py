@@ -134,6 +134,8 @@ class Image(AbstractImage):
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
+        # (meta generation, channels meta); same idea as `_dataset_cache`.
+        self._channels_meta_cache: tuple[int, ChannelsMeta] | None = None
 
     @property
     def meta_handler(self) -> ImageMetaHandler:
@@ -150,8 +152,24 @@ class Image(AbstractImage):
 
     @property
     def channels_meta(self) -> ChannelsMeta:
-        """Return the channels metadata."""
-        return _check_channel_meta(self.meta, self.dimensions)
+        """Return the channels metadata.
+
+        Cached against the meta handler's generation, like `dimensions`: this
+        sits on the hot path of every `get_*`/`set_*` with a
+        `channel_selection`, where re-deriving cost a full metadata reload per
+        call. The channel setters go through `update_meta`, which moves the
+        generation, so a write through this image re-derives it.
+        """
+        generation = self.meta_handler.generation
+        cached = self._channels_meta_cache
+        if cached is not None and cached[0] == generation:
+            return cached[1]
+
+        channels_meta = _check_channel_meta(self.meta, self.dimensions)
+        # Re-read rather than reuse `generation`: `self.meta` above may have
+        # decoded fresh attributes and moved it.
+        self._channels_meta_cache = (self.meta_handler.generation, channels_meta)
+        return channels_meta
 
     @property
     def channel_labels(self) -> list[str]:

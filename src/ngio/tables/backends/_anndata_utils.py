@@ -16,7 +16,7 @@ from ngio.utils import (
     StoreOrGroup,
     open_group_wrapper,
 )
-from ngio.utils._zarr_utils import is_group_listable
+from ngio.utils._zarr_utils import list_group_keys
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
@@ -72,12 +72,21 @@ def custom_anndata_read_zarr(
             "layers",
         ]
 
-    if not is_group_listable(group):
+    # One directory listing answers both "can this store list?" and "which
+    # elements exist". Probing an absent element costs a store round-trip
+    # (`elem.get` fetches metadata to miss), so on a listable store the
+    # candidates are cut to what is actually there.
+    keys = list_group_keys(group)
+    if keys is None:
         # If not listable we filter some elements
         non_listable_elems = ["uns", "obsm", "varm", "obsp", "varp", "layers"]
         elem_to_read = [elem for elem in elem_to_read if elem not in non_listable_elems]
+    else:
+        elem_to_read = [elem for elem in elem_to_read if elem in keys]
 
     # Read with handling for backwards compat
+    obs_was_array = False
+
     def callback(func: Callable, elem_name: str, elem: Any, iospec: Any) -> Any:
         if iospec.encoding_type == "anndata" or elem_name.endswith("/"):
             # Heterogeneous by construction: the keys are AnnData field names
@@ -97,6 +106,11 @@ def custom_anndata_read_zarr(
         elif elem_name.startswith("/raw."):
             return None
         elif elem_name in {"/obs", "/var"}:
+            if elem_name == "/obs" and isinstance(elem, zarr.Array):
+                # anndata <0.7 wrote `obs` as an array; remembered here so the
+                # compat path below does not re-fetch the node to find out.
+                nonlocal obs_was_array
+                obs_was_array = True
             return read_dataframe(elem)
         elif elem_name == "/raw":
             # Backwards compat
@@ -105,14 +119,15 @@ def custom_anndata_read_zarr(
 
     adata = read_dispatched(group, callback=callback)  # type: ignore
 
-    # Backwards compat (should figure out which version)
-    if "raw.X" in group:
+    # Backwards compat (should figure out which version). The membership test
+    # is a store probe, skipped when the listing already answered it.
+    if "raw.X" in keys if keys is not None else "raw.X" in group:
         raw = AnnData(**_read_legacy_raw(group, adata.raw, read_dataframe, read_elem))  # type: ignore
         raw.obs_names = adata.obs_names  # type: ignore
         adata.raw = raw  # type: ignore
 
     # Backwards compat for <0.7
-    if isinstance(group["obs"], zarr.Array):
+    if obs_was_array:
         _clean_uns(adata)
 
     if isinstance(adata, dict):

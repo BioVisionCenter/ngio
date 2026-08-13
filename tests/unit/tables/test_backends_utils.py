@@ -173,6 +173,22 @@ def test_normalize_anndata():
         normalize_anndata(adata, index_key="not_exist")
 
 
+def test_normalize_anndata_shares_x_and_leaves_the_caller_alone():
+    """Swapping `obs` must not duplicate `X` — nor touch the input object.
+
+    The old implementation deep-copied the entire AnnData to replace one
+    frame, doubling memory for large feature tables on every load.
+    """
+    adata = sample_anndata()
+    obs_before = adata.obs.copy()
+
+    normalized = normalize_anndata(adata, index_key="str_col")
+
+    assert normalized is not adata
+    assert normalized.X is adata.X
+    pdt.assert_frame_equal(adata.obs, obs_before)
+
+
 def test_convert_pandas_to_anndata_roundtrip():
     """Test the conversion of an AnnData object to a pandas DataFrame."""
     df = sample_pandas_df_no_index()

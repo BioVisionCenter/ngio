@@ -244,6 +244,38 @@ def test_create_from_array_returns_a_container_that_sees_its_own_writes(tmp_path
     assert container.get_image().get_as_numpy().max() > 0
 
 
+def test_channels_meta_is_derived_once_and_invalidated_by_writes(tmp_path: Path):
+    """`channels_meta` is cached like `dimensions` and dropped on a write.
+
+    It sits behind every `get_*`/`set_*` with a `channel_selection`, where
+    re-deriving cost a full metadata reload per call.
+    """
+    import numpy as np
+
+    from ngio import create_ome_zarr_from_array
+
+    container = create_ome_zarr_from_array(
+        tmp_path / "channels.zarr",
+        array=np.zeros((2, 32, 32), dtype="uint16"),
+        pixelsize=0.5,
+        axes_names=["c", "y", "x"],
+        levels=2,
+        channels_meta=["a", "b"],
+        consolidation_mode="dask",
+        overwrite=True,
+    )
+    image = container.get_image()
+
+    first = image.channels_meta
+    assert image.channels_meta is first
+
+    # The setter lives on the container and writes through the meta handler
+    # the image shares, so the write must reach the held image's cache.
+    container.set_channel_labels(["x", "y"])
+    assert image.channels_meta is not first
+    assert image.channel_labels == ["x", "y"]
+
+
 def test_memo_never_pairs_new_attrs_with_old_meta():
     """Concurrent readers must see a matching (attrs, meta) pair.
 

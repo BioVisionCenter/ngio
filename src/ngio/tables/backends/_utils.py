@@ -9,7 +9,6 @@ These functions are used to validate and normalize the tables
 to ensure that conversion between formats is consistent.
 """
 
-from copy import deepcopy
 from typing import Literal
 
 import numpy as np
@@ -136,6 +135,16 @@ def _check_for_mixed_types(series: pd.Series) -> None:
     Raises:
         NgioTableValidationError: If the column has mixed types.
     """
+    if isinstance(series.dtype, pd.CategoricalDtype):
+        # The categories carry every distinct value, so scan those — O(k)
+        # instead of a Python call per element.
+        series = pd.Series(series.cat.categories, name=series.name)
+    elif series.dtype != object:
+        # Any other concrete dtype (int64, float64, bool, datetime, string)
+        # already guarantees homogeneity; only `object` can hide mixed Python
+        # types. The per-cell scan below is a Python call per element, paid
+        # per column on every pandas -> anndata conversion.
+        return
     non_null = series.dropna()
     if non_null.apply(type).nunique() > 1:
         raise NgioTableValidationError(
@@ -279,9 +288,23 @@ def normalize_anndata(
     if obs.equals(anndata.obs):
         return anndata
 
-    anndata = deepcopy(anndata)
-    anndata.obs = obs
-    return anndata
+    # Only `obs` changes, so build a new AnnData around the same `X` (and the
+    # other components) instead of deep-copying the whole object — the copy
+    # duplicated the full matrix in memory to swap one frame. The components
+    # are shared, not copied; nothing downstream mutates them.
+    return AnnData(
+        X=anndata.X,
+        obs=obs,
+        # Same `DataFrame | Dataset2D` union as `.obs` above: ngio only ever
+        # builds in-memory AnnData, so it is always a DataFrame here.
+        var=anndata.var,  # ty: ignore[invalid-argument-type]
+        uns=anndata.uns,
+        obsm=dict(anndata.obsm),
+        varm=dict(anndata.varm),
+        layers=dict(anndata.layers),
+        obsp=dict(anndata.obsp),
+        varp=dict(anndata.varp),
+    )
 
 
 # -----------------

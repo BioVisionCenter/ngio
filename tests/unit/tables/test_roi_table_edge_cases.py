@@ -221,6 +221,25 @@ def test_empty_roi_table_without_backend_is_usable():
     assert [roi.name for roi in table.rois()] == ["r"]
 
 
+def test_table_data_is_rebuilt_only_after_add():
+    """Repeated reads serve the same DataFrame; `add()` invalidates it.
+
+    The rebuild iterates every ROI into a fresh DataFrame, and it used to run
+    on every `table_data`/`dataframe` access — for a masking table with tens
+    of thousands of labels that is hundreds of milliseconds per property read.
+    """
+    table = RoiTableV1(rois=[_make_roi("a"), _make_roi("b")])
+
+    first = table.table_data
+    assert table.table_data is first
+
+    table.add(_make_roi("c"))
+    rebuilt = table.table_data
+    assert rebuilt is not first
+    assert isinstance(rebuilt, pd.DataFrame) and len(rebuilt) == 3
+    assert table.table_data is rebuilt
+
+
 def test_duplicate_roi_names_survive_roundtrip(tmp_path: Path):
     table = RoiTableV1(rois=[_make_roi("roi"), _make_roi("roi")])
     names = [roi.name for roi in table.rois()]

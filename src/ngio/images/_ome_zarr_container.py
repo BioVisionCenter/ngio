@@ -138,18 +138,20 @@ class OmeZarrContainer:
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
-        num_labels = len(self.list_labels())
-        num_tables = len(self.list_tables())
+        # Bound once: each listing costs an attrs read, and a REPL shows this
+        # constantly.
+        labels = self.list_labels()
+        tables = self.list_tables()
 
         base_str = f"OmeZarrContainer(levels={self.levels}"
-        if num_labels > 0 and num_labels < 3:
-            base_str += f", labels={self.list_labels()}"
-        elif num_labels >= 3:
-            base_str += f", #labels={num_labels}"
-        if num_tables > 0 and num_tables < 3:
-            base_str += f", tables={self.list_tables()}"
-        elif num_tables >= 3:
-            base_str += f", #tables={num_tables}"
+        if len(labels) > 0 and len(labels) < 3:
+            base_str += f", labels={labels}"
+        elif len(labels) >= 3:
+            base_str += f", #labels={len(labels)}"
+        if len(tables) > 0 and len(tables) < 3:
+            base_str += f", tables={tables}"
+        elif len(tables) >= 3:
+            base_str += f", #tables={len(tables)}"
         base_str += ")"
         return base_str
 

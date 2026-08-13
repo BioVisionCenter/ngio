@@ -179,6 +179,17 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _image(ctx, "image"),
         lambda image: image.get_as_numpy(channel_selection=["Channel 1", "Channel 2"]),
     ),
+    # The same selection three times on one image. The channel metadata is
+    # cached against the metadata generation, so the metadata cost must be
+    # flat in the call count -- only the chunk reads may scale. A per-ROI
+    # loop with a `channel_selection` is the ordinary shape of this.
+    "read_channel_selection_x3": Scenario(
+        lambda ctx: _image(ctx, "image"),
+        lambda image: [
+            image.get_as_numpy(channel_selection=["Channel 1", "Channel 2"])
+            for _ in range(3)
+        ],
+    ),
     # --- plate ------------------------------------------------------------
     # Plate metadata only; the well count should not appear in the counts.
     "plate_wells_paths": Scenario(_plate, lambda plate: plate.wells_paths()),
@@ -356,12 +367,15 @@ SCENARIOS: dict[str, Scenario] = {
     # --- writes: pyramid consolidation ------------------------------------
     # The most expensive operation in the library, and every writing iterator
     # triggers it implicitly via `post_consolidate`.
+    # `auto` landed on this branch and resolves to numpy on this geometry
+    # (small, dyadic, linear), so its counts must match `consolidate_numpy` --
+    # the resolution itself must not cost a single extra store op.
     **{
         f"consolidate_{mode}": Scenario(
             lambda ctx, mode=mode: _consolidation_target(ctx, mode),
             lambda image, mode=mode: image.consolidate(mode=mode),
         )
-        for mode in ("dask", "numpy", "coarsen")
+        for mode in ("dask", "numpy", "coarsen", "auto")
     },
     # The dask consolidation onto a *sharded* pyramid. `_pyramid.py` rechunks
     # the zoomed level to `target.chunks`, which on a sharded array is the

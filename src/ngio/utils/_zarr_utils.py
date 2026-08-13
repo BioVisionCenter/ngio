@@ -584,8 +584,8 @@ def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
     return separator
 
 
-def is_group_listable(group: zarr.Group) -> bool:
-    """Check whether a Zarr group's contents can actually be enumerated.
+def list_group_keys(group: zarr.Group) -> list[str] | None:
+    """The keys under a group, or `None` when the store cannot enumerate it.
 
     A group that was successfully opened must have its own metadata document
     (``zarr.json`` / ``.zgroup``) in the store, so a directory listing that
@@ -593,23 +593,43 @@ def is_group_listable(group: zarr.Group) -> bool:
     HTTP host with no directory index, where zarr silently yields an empty
     listing). A genuinely empty group still lists its metadata document.
 
+    Callers that need the listing itself use this rather than
+    `is_group_listable`, so the one directory listing answers both "can I
+    list?" and "what is there?".
+
     Args:
-        group (zarr.Group): The Zarr group to check.
+        group (zarr.Group): The Zarr group to list.
 
     Returns:
-        bool: True if the group's contents can be enumerated, False otherwise.
+        The listed keys, or `None` if the group cannot be enumerated.
     """
     store = NgioStore.ensure(group.store)
     if not store.supports_listing:
-        return False
+        return None
     meta_key = "zarr.json" if group.metadata.zarr_format == 3 else ".zgroup"
     try:
         keys = store.list_dir_collected(group.path)
     except Exception:
         # Some stores may raise errors when listing
         # consider those not listable
-        return False
-    return meta_key in keys
+        return None
+    if meta_key not in keys:
+        return None
+    return keys
+
+
+def is_group_listable(group: zarr.Group) -> bool:
+    """Check whether a Zarr group's contents can actually be enumerated.
+
+    See `list_group_keys` for what "listable" means.
+
+    Args:
+        group (zarr.Group): The Zarr group to check.
+
+    Returns:
+        bool: True if the group's contents can be enumerated, False otherwise.
+    """
+    return list_group_keys(group) is not None
 
 
 def _fsspec_copy(

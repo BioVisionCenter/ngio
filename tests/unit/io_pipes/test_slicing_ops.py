@@ -115,6 +115,42 @@ def test_chunk_slice():
     )
 
 
+def test_regions_overlap_sweep_agrees_with_all_pairs():
+    """The sort-and-sweep must answer exactly like the pairwise scan."""
+    import random
+
+    from ngio.io_pipes._ops_slices_utils import (
+        _pairs_stream,
+        check_slicing_tuple_intersection,
+    )
+
+    rng = random.Random(0)
+
+    def brute(regions):
+        return any(
+            check_slicing_tuple_intersection(a, b) for a, b in _pairs_stream(regions)
+        )
+
+    for _ in range(50):
+        regions = []
+        for _ in range(rng.randint(2, 12)):
+            start_y, start_x = rng.randrange(0, 40), rng.randrange(0, 40)
+            regions.append(
+                (
+                    rng.randrange(0, 2),
+                    slice(start_y, start_y + rng.randrange(1, 12)),
+                    slice(start_x, start_x + rng.randrange(1, 12)),
+                )
+            )
+        assert check_if_regions_overlap(regions) == brute(regions), regions
+
+
+def test_regions_overlap_handles_list_only_axes():
+    """List selections are not intervals; the fallback must still answer."""
+    assert check_if_regions_overlap([([0, 1],), ([2, 3],)]) is False
+    assert check_if_regions_overlap([([0, 1],), ([1, 2],)]) is True
+
+
 def test_check_elem_intersection_step_not_implemented():
     with pytest.raises(NotImplementedError):
         check_elem_intersection(slice(0, 5, 2), slice(1, 3))

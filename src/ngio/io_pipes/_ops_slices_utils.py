@@ -73,24 +73,82 @@ def check_slicing_tuple_intersection(
     return all(check_elem_intersection(a, b) for a, b in zip(s1, s2, strict=True))
 
 
-def check_if_regions_overlap(slices: Iterable[tuple[SlicingType, ...]]) -> bool:
-    """Check for overlaps in a list of slicing tuples using brute-force method.
+def _sweep_axis_intervals(
+    slices: list[tuple[SlicingType, ...]], axis: int
+) -> list[tuple[float, float]] | None:
+    """The [start, stop) interval of each region on `axis`, or `None`.
 
-    This is O(n^2) and not efficient for large lists.
-    Returns True if any overlaps are found.
+    `None` means the axis cannot be swept: a list selection is not an
+    interval, and a stepped slice is not contiguous.
     """
-    for it, (si, sj) in enumerate(_pairs_stream(slices)):
-        overalap = check_slicing_tuple_intersection(si, sj)
-        if overalap:
-            return True
+    intervals: list[tuple[float, float]] = []
+    for slicing_tuple in slices:
+        sel = slicing_tuple[axis]
+        if isinstance(sel, slice):
+            if sel.step not in (None, 1):
+                return None
+            start = 0 if sel.start is None else sel.start
+            stop = float("inf") if sel.stop is None else sel.stop
+        elif isinstance(sel, int):
+            start, stop = sel, sel + 1
+        else:
+            return None
+        intervals.append((start, stop))
+    return intervals
 
-        if it == 10_000:
-            warnings.warn(
-                "Performance Warning check_for_overlaps is O(n^2) and may be slow for "
-                "large numbers of regions.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
+
+def check_if_regions_overlap(slices: Iterable[tuple[SlicingType, ...]]) -> bool:
+    """Check whether any two slicing tuples select intersecting regions.
+
+    Sort-and-sweep on the most discriminating axis: regions are sorted by
+    their start there, and each is compared only against the ones still open
+    at that start — for regions laid out on a grid (the iterator case) that
+    is near-linear, where the all-pairs scan was a clean O(n²) and took over
+    a second at ~2000 ROIs. Falls back to all pairs only when no axis is an
+    interval (list selections or stepped slices on every axis).
+    """
+    slices = list(slices)
+    if len(slices) < 2:
+        return False
+    if any(len(s) != len(slices[0]) for s in slices):
+        raise NgioValueError("Slices must have the same length")
+
+    # Sweep the axis with the most distinct starts: an axis every region
+    # spans fully (a channel axis, say) keeps every region open at once and
+    # degrades the sweep back to all pairs.
+    best_intervals, best_distinct = None, 1
+    for axis in range(len(slices[0])):
+        intervals = _sweep_axis_intervals(slices, axis)
+        if intervals is None:
+            continue
+        distinct = len({start for start, _ in intervals})
+        if distinct > best_distinct:
+            best_intervals, best_distinct = intervals, distinct
+
+    if best_intervals is None:
+        for it, (si, sj) in enumerate(_pairs_stream(slices)):
+            if check_slicing_tuple_intersection(si, sj):
+                return True
+            if it == 10_000:
+                warnings.warn(
+                    "Performance Warning check_for_overlaps is O(n^2) and may be "
+                    "slow for large numbers of regions.",
+                    NgioUserWarning,
+                    stacklevel=2,
+                )
+        return False
+
+    order = sorted(range(len(slices)), key=lambda i: best_intervals[i][0])
+    active: list[tuple[float, int]] = []
+    for i in order:
+        start, _ = best_intervals[i]
+        # Regions whose interval closed before this start can never overlap
+        # anything later — the starts only grow from here.
+        active = [(stop, j) for stop, j in active if stop > start]
+        for _, j in active:
+            if check_slicing_tuple_intersection(slices[j], slices[i]):
+                return True
+        active.append((best_intervals[i][1], i))
     return False
 
 
@@ -181,20 +239,16 @@ def check_if_chunks_overlap(
     shape: tuple[int, ...],
     chunks: tuple[int, ...],
 ) -> bool:
-    """Check for overlaps in a list of slicing tuples using brute-force method.
+    """Check whether any two slicing tuples touch a common chunk.
 
-    This is O(n^2) and not efficient for large lists.
-    Returns True if any overlaps are found.
+    Two regions share a chunk exactly when some chunk coordinate appears in
+    more than one region's set, so one accumulated set answers it in a single
+    pass — the pairwise set intersections were O(n²).
     """
-    slices_chunks = (compute_slice_chunks(shape, chunks, si) for si in slices)
-    for it, (si, sj) in enumerate(_pairs_stream(slices_chunks)):
-        if si & sj:
+    seen: set[tuple[int, ...]] = set()
+    for si in slices:
+        slice_chunks = compute_slice_chunks(shape, chunks, si)
+        if not seen.isdisjoint(slice_chunks):
             return True
-        if it == 10_000:
-            warnings.warn(
-                "Performance Warning check_for_chunks_overlaps is O(n^2) and may be "
-                "slow for large numbers of regions.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
+        seen |= slice_chunks
     return False

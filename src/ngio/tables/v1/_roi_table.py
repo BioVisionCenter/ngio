@@ -307,6 +307,9 @@ class GenericRoiTableV1(AbstractBaseTable):
         table = None
 
         self._rois: RoiDictWrapper | None = None
+        # True whenever `_rois` has changed since `_table_data` was last built
+        # from it; see `table_data`.
+        self._rois_dirty = False
         if rois is not None:
             self._rois = RoiDictWrapper(rois)
             table = self._rois.to_dataframe(index_key=meta.index_key)
@@ -333,12 +336,18 @@ class GenericRoiTableV1(AbstractBaseTable):
 
     @property
     def table_data(self) -> TabularData:
-        """Return the table."""
+        """Return the table.
+
+        Rebuilt from the ROIs only when `add()` has changed them since the
+        last build — the rebuild iterates every ROI into a fresh DataFrame,
+        which used to run on *every* access.
+        """
         if self._rois is None:
             return super().table_data
 
-        if len(self.rois()) > 0:
+        if self._rois_dirty:
             self._table_data = self._rois.to_dataframe(index_key=self.meta.index_key)
+            self._rois_dirty = False
         return super().table_data
 
     def set_table_data(
@@ -359,6 +368,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             )
             self._table_data = table_data
             self._rois = rois
+            self._rois_dirty = False
             return None
 
         if self._table_data is not None and not refresh:
@@ -368,6 +378,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             # No backend and no in-memory data: this is an empty ROI table.
             self._rois = RoiDictWrapper([])
             self._table_data = self._rois.to_dataframe(index_key=self.index_key)
+            self._rois_dirty = False
             return None
 
         table_data, rois = _table_to_rois(
@@ -378,6 +389,7 @@ class GenericRoiTableV1(AbstractBaseTable):
         )
         self._table_data = table_data
         self._rois = rois
+        self._rois_dirty = False
 
     def _check_rois(self) -> None:
         """Load the ROIs from the table.
@@ -416,6 +428,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             self._rois = RoiDictWrapper([])
 
         self._rois.add_rois(roi, overwrite=overwrite)
+        self._rois_dirty = True
 
     def get(self, roi_name: str) -> Roi:
         """Get an ROI from the table."""

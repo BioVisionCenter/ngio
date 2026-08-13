@@ -338,6 +338,19 @@ def baseline(request, store_kind):
     yield holder
 
     if updating:
+        # `save_baseline` writes only what this run collected, so a partial
+        # selection (`-k`, `--lf`, `--deselect`) would silently drop every
+        # unrun scenario from the committed file. Refuse instead.
+        from tests.performance.scenarios import SCENARIOS
+
+        missing = sorted(set(SCENARIOS) - set(collected))
+        if missing:
+            pytest.fail(
+                f"--update-baseline collected {len(collected)} of "
+                f"{len(SCENARIOS)} scenarios (missing e.g. {missing[:3]}); "
+                "writing this would drop the rest from the baseline. Rerun "
+                "without -k/--lf/--deselect."
+            )
         # No ngio version here: `hatch-vcs` stamps it when the editable install
         # is built, not when the baseline is generated, so it lags the commit
         # being recorded and churns on a dirty tree. `git log -p` on the
