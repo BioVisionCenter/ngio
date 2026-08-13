@@ -25,6 +25,28 @@ def write_unit(zarr_array: zarr.Array) -> tuple[int, ...]:
     return zarr_array.shards or zarr_array.chunks
 
 
+def write_unit_bytes(zarr_array: zarr.Array) -> int:
+    """Bytes of one write unit *as it can exist in this array*.
+
+    A chunk or shard extent may exceed the array extent it spans — chunks
+    `(1, 10, 2160, 2560)` over a single-z image is an ordinary OME-Zarr shape.
+    Only one, partial, unit can exist on such an axis, so the declared extent
+    overstates what a budget has to hold: 105 MiB against a realisable 10.5 MiB
+    on that geometry.
+
+    Clipping is not a refinement, it is what the consumer already does.
+    `normalize_chunks` clips `previous_chunks` to the shape before it sizes a
+    block, so the grid the write actually lands on is built from the clipped
+    unit — and a budget raised to the declared one raises it past anything the
+    write needs.
+    """
+    unit = write_unit(zarr_array)
+    resident = [
+        min(extent, size) for extent, size in zip(unit, zarr_array.shape, strict=True)
+    ]
+    return int(np.prod(resident)) * zarr_array.dtype.itemsize
+
+
 def store_dask(
     patch: da.Array,
     zarr_array: zarr.Array,
@@ -54,8 +76,7 @@ def store_dask(
         zarr_array: The array to write into. Must already exist.
         region: Where to write, or `None` for the whole array.
     """
-    unit = write_unit(zarr_array)
-    unit_bytes = int(np.prod(unit)) * zarr_array.dtype.itemsize
+    unit_bytes = write_unit_bytes(zarr_array)
     budget = max(parse_bytes(dask.config.get("array.chunk-size")), unit_bytes)
 
     # `to_zarr` sizes its blocks with `normalize_chunks("auto", previous_chunks=
@@ -66,6 +87,12 @@ def store_dask(
     # shard, no lock: that is a lost update. Raising the budget to one unit
     # removes the case by construction, and costs nothing when the unit is
     # already smaller (`max`), which is the common configuration.
+    #
+    # One unit means one *resident* unit (`write_unit_bytes`). Measuring the
+    # declared extent instead raises the budget for capacity no write can use,
+    # and on a chunk that overhangs its axis far enough that overshoot clears
+    # dask's own default: chunks `(1, 100, 2160, 2560)` over a single-z image
+    # take the budget to 1,055 MiB and the block from 84 MiB to 791 MiB.
     with dask.config.set({"array.chunk-size": budget}), warnings.catch_warnings():
         # What remains after the guard is dask reporting that the *region* does
         # not cover whole units -- a ROI narrower than a chunk, say. That read-
