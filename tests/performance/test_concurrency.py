@@ -12,6 +12,7 @@ backend changes.
 import numpy as np
 import pytest
 import zarr
+from tests.performance._concurrency_gate import concurrency_probe, rendezvous_store
 
 from ngio import (
     ImageInWellPath,
@@ -20,7 +21,6 @@ from ngio import (
     open_image,
     open_ome_zarr_plate,
 )
-from tests.performance._concurrency_gate import concurrency_probe, rendezvous_store
 
 _WELLS = [ImageInWellPath(row=row, column="01", path="0") for row in "ABCD"]
 

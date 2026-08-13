@@ -760,4 +760,27 @@ def refresh_s3fs_config(config: NgioConfig) -> None:
     s3fs.set_custom_error_handler(custom_retry_handler)
 
 
+def apply_zarr_config(config: NgioConfig) -> None:
+    """Forward the `zarr` section into zarr's own runtime configuration.
+
+    Only non-`None` fields are applied, so the default ngio config leaves
+    zarr's configuration byte-for-byte as found.
+
+    This runs at import of `ngio.utils._zarr_utils` because
+    `threading.max_workers` is snapshotted by zarr into a process-global
+    executor at the first zarr operation -- import time is the only moment
+    ngio can guarantee is early enough. `async.concurrency` is read by zarr
+    on every call, so re-applying after mutating `get_config().zarr` also
+    works for that field (as does `zarr.config.set` directly).
+    """
+    values: dict[str, int] = {}
+    if config.zarr.async_concurrency is not None:
+        values["async.concurrency"] = config.zarr.async_concurrency
+    if config.zarr.threading_max_workers is not None:
+        values["threading.max_workers"] = config.zarr.threading_max_workers
+    if values:
+        zarr.config.set(values)
+
+
 refresh_s3fs_config(get_config())
+apply_zarr_config(get_config())

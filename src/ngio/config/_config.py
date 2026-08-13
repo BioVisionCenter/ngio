@@ -180,6 +180,34 @@ class DaskConfig(BaseModel):
     model_config = ConfigDict(validate_assignment=True)
 
 
+class ZarrConfig(BaseModel):
+    """Knobs ngio forwards into zarr's own runtime configuration.
+
+    Both default to `None`, which leaves zarr's configuration untouched --
+    the default ngio config changes nothing about how zarr runs.
+
+    `async_concurrency` bounds how many store requests zarr keeps in flight
+    for one operation (zarr's own default is 10). This is the knob that
+    matters on a remote store: a read spanning 64 chunks is otherwise fetched
+    in ~7 serialized waves of 10, each paying a full round-trip. zarr reads
+    it on every call, so `zarr.config.set` later also works.
+
+    `threading_max_workers` sizes zarr's thread executor for decode work.
+    zarr snapshots it into a process-global executor at the first zarr
+    operation, which is why ngio applies this section at import time --
+    changing it afterwards has no effect for the life of the process.
+
+    Example:
+        ```python
+        ZarrConfig(async_concurrency=64)  # for high-latency remote stores
+        ```
+    """
+
+    async_concurrency: int | None = Field(default=None, ge=1)
+    threading_max_workers: int | None = Field(default=None, ge=1)
+    model_config = ConfigDict(validate_assignment=True)
+
+
 class NgioConfig(BaseModel):
     """Global configuration for ngio."""
 
@@ -187,6 +215,7 @@ class NgioConfig(BaseModel):
     io_retry: RetryConfig = Field(default_factory=RetryConfig)
     consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
     dask: DaskConfig = Field(default_factory=DaskConfig)
+    zarr: ZarrConfig = Field(default_factory=ZarrConfig)
     model_config = ConfigDict(validate_assignment=True)
 
 

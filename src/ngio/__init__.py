@@ -16,6 +16,7 @@ from ngio.config import (
     NgioConfig,
     RetryConfig,
     S3FSConfig,
+    ZarrConfig,
     get_config,
 )
 from ngio.hcs import (
@@ -116,6 +117,7 @@ __all__ = [
     "S3FSConfig",
     "SegmentationIterator",
     "StoreOrGroup",
+    "ZarrConfig",
     "__version__",
     "create_empty_ome_zarr",
     "create_empty_plate",

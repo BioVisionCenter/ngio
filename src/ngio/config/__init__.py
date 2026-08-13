@@ -10,6 +10,7 @@ from ngio.config._config import (
     NgioConfig,
     RetryConfig,
     S3FSConfig,
+    ZarrConfig,
     get_config,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "NgioConfig",
     "RetryConfig",
     "S3FSConfig",
+    "ZarrConfig",
     "get_config",
 ]
