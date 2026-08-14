@@ -127,9 +127,7 @@ def test_process_mapper_refuses_memory_stores():
 def test_mapper_and_max_workers_are_mutually_exclusive():
     _, iterator = _segmentation_iterator(MemoryStore())
     with pytest.raises(NgioValueError, match="not both"):
-        iterator.map_as_numpy(
-            _threshold, mapper=ThreadedMapper(), max_workers="auto"
-        )
+        iterator.map_as_numpy(_threshold, mapper=ThreadedMapper(), max_workers="auto")
     # `None` and `1` say "serial", which a custom mapper overrides untroubled.
     iterator.map_as_numpy(_threshold, mapper=ThreadedMapper(), max_workers=1)
 

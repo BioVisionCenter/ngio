@@ -175,6 +175,14 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     """Get a slice of a zarr array as a dask array."""
+    # Deliberately NOT shard-aware (`chunks=shards or chunks`), unlike the
+    # pyramid source reads in `common/_pyramid._read_source_dask`. This path
+    # serves arbitrary ROIs, where the common case is a ROI *smaller* than a
+    # shard — a shard-sized block grid would then fetch the whole shard to
+    # serve a fraction of it, while the inner-chunk grid lets zarr's partial
+    # shard reads fetch only what the ROI covers. Coarser blocks only win
+    # when the read spans whole shards, which is the pyramid's case, not
+    # this one.
     da_array = da.from_zarr(zarr_array)
     slicing_tuple = slicing_ops.normalized_slicing_tuple
     return da_array[slicing_tuple]

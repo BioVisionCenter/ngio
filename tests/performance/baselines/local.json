@@ -131,15 +131,15 @@
       "plate.get_well": 0
     },
     "consolidate_sharded_dask": {
-      "bytes.read": 1459034,
+      "bytes.read": 1321706,
       "bytes.written": 328336,
       "clear": 0,
       "delete": 0,
       "delete_dir": 0,
       "exists": 0,
-      "get.chunk": 324,
+      "get.chunk": 8,
       "get.meta": 5,
-      "get.partial": 320,
+      "get.partial": 0,
       "get_many": 0,
       "get_partial_values": 0,
       "get_ranges": 0,

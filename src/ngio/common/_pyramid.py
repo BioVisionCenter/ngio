@@ -137,6 +137,26 @@ def _on_disk_numpy_zoom(
     )
 
 
+def _read_source_dask(source: zarr.Array) -> da.Array:
+    """The source level as a dask array, fetched at its write unit.
+
+    On a sharded source, blocks sized to the inner chunks make every dask
+    task a *partial-shard* read — a shard-index fetch plus a range request
+    per inner chunk. Reading whole shards costs one coarse fetch each.
+
+    The immediate rechunk back to the inner chunks is load-bearing, not a
+    nicety: `dask_zoom` derives its block grid from the array's chunksize and
+    zooms block-locally, so handing it shard-sized blocks would change output
+    pixels outside the integral-downsample/nearest-linear envelope
+    (`test_consolidation_matches_a_per_level_reference` pins this). Shard →
+    inner-chunk rechunk is pure views — no extra IO. Unsharded sources take
+    the plain path, expression unchanged.
+    """
+    if source.shards is None:
+        return da.from_zarr(source)
+    return da.from_zarr(source, chunks=source.shards).rechunk(source.chunks)
+
+
 def _on_disk_dask_zoom(
     source: zarr.Array,
     target: zarr.Array,
@@ -145,11 +165,11 @@ def _on_disk_dask_zoom(
     # No compute_chunk_sizes() here: it would execute the whole read -> zoom
     # graph purely to re-learn block shapes, throw the pixels away, and leave
     # the write to run the same graph again -- exactly double the chunk reads.
-    # No rechunk either: store_dask rechunks onto the target's write unit,
-    # which is `shards or chunks`. Rechunking to `target.chunks` here was worse
-    # than doing nothing on a sharded target -- that is the shard's *inner*
-    # chunk shape, so every block became a partial shard write.
-    store_dask(_zoom_expr(da.from_zarr(source), target, order, "dask"), target)
+    # No rechunk onto the target either: store_dask rechunks onto the target's
+    # write unit, which is `shards or chunks`. Rechunking to `target.chunks`
+    # here was worse than doing nothing on a sharded target -- that is the
+    # shard's *inner* chunk shape, so every block became a partial shard write.
+    store_dask(_zoom_expr(_read_source_dask(source), target, order, "dask"), target)
 
 
 def _on_disk_coarsen(
@@ -172,7 +192,7 @@ def _on_disk_coarsen(
     # See _on_disk_dask_zoom: store_dask owns the rechunk onto the write unit.
     store_dask(
         _zoom_expr(
-            da.from_zarr(source), target, order, "coarsen", aggregation_function
+            _read_source_dask(source), target, order, "coarsen", aggregation_function
         ),
         target,
     )
