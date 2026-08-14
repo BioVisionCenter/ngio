@@ -85,6 +85,11 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             "consolidation_mode": self._consolidation_mode,
         }
 
+    @property
+    def output_image(self) -> Label:
+        """The label this iterator writes to."""
+        return self._output
+
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
         return NumpyRoiGetter(
             zarr_array=self._input.zarr_array,

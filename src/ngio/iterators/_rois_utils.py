@@ -112,13 +112,26 @@ def by_chunks(
     overlap_xy: int = 0,
     overlap_z: int = 0,
     overlap_t: int = 0,
+    grid_image: AbstractImage | None = None,
 ) -> list[Roi]:
-    """This method is a placeholder for chunked processing."""
-    chunk_size = ref_image.chunks
-    t_axis = ref_image.axes_handler.get_index("t")
-    z_axis = ref_image.axes_handler.get_index("z")
-    y_axis = ref_image.axes_handler.get_index("y")
-    x_axis = ref_image.axes_handler.get_index("x")
+    """Tile the ROIs on a storage grid.
+
+    By default the tiles are sized by `ref_image`'s chunk grid. When
+    `grid_image` is given, its write granularity (shard shape when sharded,
+    chunk shape otherwise) sizes the tiles instead; the ROIs themselves stay
+    in `ref_image`'s space. An axis present on `ref_image` but absent on
+    `grid_image` is left un-tiled (one tile spans it) — coarser, never unsafe.
+    """
+    if grid_image is None:
+        chunk_size = ref_image.chunks
+        axes_handler = ref_image.axes_handler
+    else:
+        chunk_size = grid_image.write_granularity
+        axes_handler = grid_image.axes_handler
+    t_axis = axes_handler.get_index("t")
+    z_axis = axes_handler.get_index("z")
+    y_axis = axes_handler.get_index("y")
+    x_axis = axes_handler.get_index("x")
 
     size_x = chunk_size[x_axis] if x_axis is not None else None
     size_y = chunk_size[y_axis] if y_axis is not None else None

@@ -5,8 +5,17 @@ from typing import Generic, Literal, Self, TypeVar, overload
 from ngio.common import Roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
-from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
-from ngio.iterators._mappers import BasicMapper, MapperProtocol
+from ngio.io_pipes._ops_slices_utils import (
+    _pairs_stream,
+    check_if_regions_overlap,
+    chunk_rects_intersect,
+)
+from ngio.iterators._mappers import (
+    BasicMapper,
+    IterUnit,
+    MapperProtocol,
+    compute_write_footprint,
+)
 from ngio.iterators._rois_utils import (
     by_chunks,
     by_yx,
@@ -19,6 +28,7 @@ from ngio.utils import NgioValueError
 
 NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
+R = TypeVar("R")
 
 
 class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
@@ -52,6 +62,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def ref_image(self) -> AbstractImage:
         """Get the reference image for the iterator."""
         return self._ref_image
+
+    @property
+    def output_image(self) -> AbstractImage | None:
+        """The image this iterator writes to, or `None` for a read-only iterator."""
+        return None
 
     def _new_from_rois(self, rois: list[Roi]) -> Self:
         """Create a new instance of the iterator with a different set of ROIs."""
@@ -104,18 +119,41 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         rois = by_zyx(self.rois, self.ref_image, strict=strict)
         return self._new_from_rois(rois)
 
-    def by_chunks(self, overlap_xy: int = 0, overlap_z: int = 0) -> Self:
-        """Return a new iterator that iterates over ROIs by chunks.
+    def by_chunks(
+        self,
+        overlap_xy: int = 0,
+        overlap_z: int = 0,
+        grid: Literal["read", "write"] = "read",
+    ) -> Self:
+        """Return a new iterator that iterates over ROIs by storage tiles.
 
         Args:
             overlap_xy (int): Overlap in XY dimensions.
             overlap_z (int): Overlap in Z dimension.
+            grid: `"read"` (the default) sizes the tiles by the input image's
+                chunk grid, which is also what this method always did.
+                `"write"` sizes them by the output image's write granularity —
+                the shard shape when the output is sharded, the chunk shape
+                otherwise — so the resulting ROIs pass
+                `check_if_chunks_overlap` by construction, which is what a
+                parallel `map` needs. Falls back to the input chunk grid when
+                the iterator is read-only.
 
         Returns:
-            SegmentationIterator: A new iterator with chunked ROIs.
+            A new iterator with tiled ROIs.
         """
+        if grid == "write":
+            grid_image = self.output_image
+        elif grid == "read":
+            grid_image = None
+        else:
+            raise NgioValueError(f"Invalid grid {grid!r}; expected 'write' or 'read'.")
         rois = by_chunks(
-            self.rois, self.ref_image, overlap_xy=overlap_xy, overlap_z=overlap_z
+            self.rois,
+            self.ref_image,
+            overlap_xy=overlap_xy,
+            overlap_z=overlap_z,
+            grid_image=grid_image,
         )
         return self._new_from_rois(rois)
 
@@ -170,6 +208,30 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     ) -> Generator[DataSetterProtocol[DaskPipeType] | None]:
         """Return a list of dask setter functions for all ROIs."""
         yield from (self.build_dask_setter(roi) for roi in self.rois)
+
+    def _numpy_units_generator(
+        self, with_setters: bool = True
+    ) -> Generator[IterUnit[NumpyPipeType]]:
+        """Yield one numpy `IterUnit` per ROI, in ROI order."""
+        for index, roi in enumerate(self.rois):
+            yield IterUnit(
+                index=index,
+                roi=roi,
+                getter=self.build_numpy_getter(roi),
+                setter=self.build_numpy_setter(roi) if with_setters else None,
+            )
+
+    def _dask_units_generator(
+        self, with_setters: bool = True
+    ) -> Generator[IterUnit[DaskPipeType]]:
+        """Yield one dask `IterUnit` per ROI, in ROI order."""
+        for index, roi in enumerate(self.rois):
+            yield IterUnit(
+                index=index,
+                roi=roi,
+                getter=self.build_dask_getter(roi),
+                setter=self.build_dask_setter(roi) if with_setters else None,
+            )
 
     def _read_and_write_generator(
         self,
@@ -300,41 +362,88 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Create an iterator over the pixels of the ROIs."""
         return self.iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
 
+    def _require_writable_units(
+        self, units: list[IterUnit[NumpyPipeType]] | list[IterUnit[DaskPipeType]]
+    ) -> None:
+        """Raise if every unit is read-only: there is nothing for `map` to write."""
+        if units and all(unit.setter is None for unit in units):
+            name = self.__class__.__name__
+            raise NgioValueError(
+                f"{name} is read-only: map has nothing to write back. "
+                "Use reduce (or iter) to compute without writing."
+            )
+
     def map_as_numpy(
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
-        mapper: MapperProtocol[NumpyPipeType] | None = None,
+        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels."""
+        """Apply a transformation function to the ROI pixels and write it back."""
         if mapper is None:
-            _mapper = BasicMapper[NumpyPipeType]()
+            _mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
         else:
             _mapper = mapper
 
-        _mapper(
-            func=func,
-            getters=self._numpy_getters_generator(),
-            setters=self._numpy_setters_generator(),
-        )
+        units = list(self._numpy_units_generator())
+        self._require_writable_units(units)
+        _mapper(func, units)
         self.post_consolidate()
 
     def map_as_dask(
         self,
         func: Callable[[DaskPipeType], DaskPipeType],
-        mapper: MapperProtocol[DaskPipeType] | None = None,
+        mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels."""
+        """Apply a transformation function to the ROI pixels and write it back."""
         if mapper is None:
-            _mapper = BasicMapper[DaskPipeType]()
+            _mapper = BasicMapper[DaskPipeType, DaskPipeType]()
         else:
             _mapper = mapper
 
-        _mapper(
-            func=func,
-            getters=self._dask_getters_generator(),
-            setters=self._dask_setters_generator(),
-        )
+        units = list(self._dask_units_generator())
+        self._require_writable_units(units)
+        _mapper(func, units)
         self.post_consolidate()
+
+    def reduce_as_numpy(
+        self,
+        func: Callable[[NumpyPipeType], R],
+        mapper: MapperProtocol[NumpyPipeType, R] | None = None,
+    ) -> list[R]:
+        """Apply a function to every ROI and collect the results without writing.
+
+        Units are built read-only even on writable iterators: nothing is
+        written and `post_consolidate` does not run.
+
+        Returns:
+            One result per ROI, in ROI order: `results[i]` corresponds to
+            `self.rois[i]`, regardless of the mapper's execution order.
+        """
+        if mapper is None:
+            _mapper = BasicMapper[NumpyPipeType, R]()
+        else:
+            _mapper = mapper
+        return _mapper(func, list(self._numpy_units_generator(with_setters=False)))
+
+    def reduce_as_dask(
+        self,
+        func: Callable[[DaskPipeType], R],
+        mapper: MapperProtocol[DaskPipeType, R] | None = None,
+    ) -> list[R]:
+        """Apply a function to every ROI and collect the results without writing.
+
+        Units are built read-only even on writable iterators: nothing is
+        written and `post_consolidate` does not run.
+
+        Returns:
+            One result per ROI, in ROI order: `results[i]` corresponds to
+            `self.rois[i]`, regardless of the mapper's execution order.
+        """
+        if mapper is None:
+            _mapper = BasicMapper[DaskPipeType, R]()
+        else:
+            _mapper = mapper
+        return _mapper(func, list(self._dask_units_generator(with_setters=False)))
 
     def check_if_regions_overlap(self) -> bool:
         """Check if any of the ROIs overlap logically.
@@ -362,27 +471,32 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             raise NgioValueError("Some rois overlap.")
 
     def check_if_chunks_overlap(self) -> bool:
-        """Check if any of the ROIs overlap in terms of chunks.
+        """Check if any two ROIs write into the same chunk (or shard) of the output.
 
-        If two ROIs cover the same chunk, they are considered to overlap in chunks.
-        This does not consider pixel-level overlaps.
+        Measured on the write target: slicing tuples come from the setters and
+        the grid is the output array's write granularity — the shard shape when
+        the output is sharded (writes are atomic per shard object), the chunk
+        shape otherwise. Two ROIs sharing a write unit make concurrent writes
+        unsafe: the read-modify-write of that unit can lose data. A read-only
+        iterator has no write hazard and always returns `False`.
+
+        This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a
+        loop.
 
         Returns:
             bool: True if any ROIs overlap in chunks, False otherwise.
         """
-        from ngio.io_pipes._ops_slices_utils import check_if_chunks_overlap
-
         if len(self.rois) < 2:
             # Less than 2 ROIs cannot overlap
             return False
 
-        slicing_tuples = (
-            g.slicing_ops.normalized_slicing_tuple
-            for g in self._numpy_getters_generator()
+        footprints = (
+            compute_write_footprint(setter)
+            for setter in self._numpy_setters_generator()
+            if setter is not None
         )
-        shape = self.ref_image.shape
-        chunks = self.ref_image.chunks
-        return check_if_chunks_overlap(slicing_tuples, shape, chunks)
+        non_empty = (footprint for footprint in footprints if footprint is not None)
+        return any(chunk_rects_intersect(fi, fj) for fi, fj in _pairs_stream(non_empty))
 
     def require_no_chunks_overlap(self) -> None:
         """Ensure that the ROIs do not overlap in terms of chunks."""

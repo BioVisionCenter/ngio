@@ -213,6 +213,15 @@ class AbstractImage(ABC):
         return self.zarr_array.chunks
 
     @property
+    def write_granularity(self) -> tuple[int, ...]:
+        """Return the atomic write unit of the on-disk array.
+
+        The shard shape when the array is sharded (writes are read-modify-writes
+        of whole shard objects), otherwise the chunk shape.
+        """
+        return self.zarr_array.shards or self.zarr_array.chunks
+
+    @property
     def is_3d(self) -> bool:
         """Return True if the image is 3D."""
         return self.dimensions.is_3d

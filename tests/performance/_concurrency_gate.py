@@ -27,12 +27,13 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import threading
-from collections.abc import Iterator
 from typing import TYPE_CHECKING, Literal
 
 from tests.performance._counting import CountingNgioStore, _kind
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from zarr.abc.store import ByteRequest
     from zarr.core.buffer import Buffer, BufferPrototype
 
