@@ -3,6 +3,7 @@ from collections.abc import Callable, Generator
 from typing import Generic, Literal, Self, TypeVar, overload
 
 from ngio.common import Roi
+from ngio.common._concurrency import MaxWorkers
 from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._ops_slices_utils import (
@@ -14,6 +15,7 @@ from ngio.iterators._mappers import (
     BasicMapper,
     IterUnit,
     MapperProtocol,
+    _select_mapper,
     compute_write_footprint,
 )
 from ngio.iterators._rois_utils import (
@@ -377,13 +379,23 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
         mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
+        max_workers: MaxWorkers = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels and write it back."""
-        if mapper is None:
-            _mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
-        else:
-            _mapper = mapper
+        """Apply a transformation function to the ROI pixels and write it back.
 
+        Args:
+            func: The transformation. Under a parallel mapper it runs on
+                worker threads (or processes) and must be safe there.
+            mapper: A custom scheduler; the escape hatch for `ProcessMapper`
+                or your own `MapperProtocol` implementation.
+            max_workers: The convenience spelling for the common case:
+                `None`/`1` runs serially (the default, and it stays the
+                default — parallel writes are explicit opt-in); `"auto"` or
+                an `int` fans out on a `ThreadedMapper`, which first refuses
+                ROIs whose write footprints share a write unit. Mutually
+                exclusive with `mapper`.
+        """
+        _mapper = _select_mapper(mapper, max_workers)
         units = list(self._numpy_units_generator())
         self._require_writable_units(units)
         _mapper(func, units)
@@ -394,7 +406,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         func: Callable[[DaskPipeType], DaskPipeType],
         mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels and write it back."""
+        """Apply a transformation function to the ROI pixels and write it back.
+
+        No `max_workers` here on purpose: the dask pipes are already executed
+        by dask's own scheduler, and stacking a thread pool on top of it
+        oversubscribes rather than accelerates.
+        """
         if mapper is None:
             _mapper = BasicMapper[DaskPipeType, DaskPipeType]()
         else:
@@ -409,20 +426,25 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         self,
         func: Callable[[NumpyPipeType], R],
         mapper: MapperProtocol[NumpyPipeType, R] | None = None,
+        max_workers: MaxWorkers = None,
     ) -> list[R]:
         """Apply a function to every ROI and collect the results without writing.
 
         Units are built read-only even on writable iterators: nothing is
         written and `post_consolidate` does not run.
 
+        Args:
+            func: The function to apply; under a parallel mapper it must be
+                safe on worker threads (or processes).
+            mapper: A custom scheduler (e.g. `ProcessMapper`).
+            max_workers: `None`/`1` serial (default), `"auto"`/`int` fans out
+                on a `ThreadedMapper`. Mutually exclusive with `mapper`.
+
         Returns:
             One result per ROI, in ROI order: `results[i]` corresponds to
             `self.rois[i]`, regardless of the mapper's execution order.
         """
-        if mapper is None:
-            _mapper = BasicMapper[NumpyPipeType, R]()
-        else:
-            _mapper = mapper
+        _mapper = _select_mapper(mapper, max_workers)
         return _mapper(func, list(self._numpy_units_generator(with_setters=False)))
 
     def reduce_as_dask(
@@ -433,7 +455,9 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Apply a function to every ROI and collect the results without writing.
 
         Units are built read-only even on writable iterators: nothing is
-        written and `post_consolidate` does not run.
+        written and `post_consolidate` does not run. No `max_workers` here:
+        the units hand `func` *lazy* dask arrays, so the per-unit work is
+        graph construction, not IO — see `map_as_dask`.
 
         Returns:
             One result per ROI, in ROI order: `results[i]` corresponds to

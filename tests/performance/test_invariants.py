@@ -61,6 +61,16 @@ def test_auto_consolidation_resolution_is_free(scenarios):
     assert scenarios["consolidate_auto"] == scenarios["consolidate_numpy"]
 
 
+def test_op_counts_are_invariant_to_concurrency(scenarios):
+    """The parallel map must tally byte-for-byte like the serial one.
+
+    This is the op-count gate documenting its own blind spot: a thread pool
+    changes *when* the ops happen, never how many — which is why the
+    concurrency gate (`test_concurrency.py`) exists as a second instrument.
+    """
+    assert scenarios["iterator_map_parallel"] == scenarios["iterator_map_numpy"]
+
+
 def test_channel_selection_metadata_is_flat_in_call_count(scenarios):
     """Repeating a channel-selecting read must not repeat the metadata cost.
 

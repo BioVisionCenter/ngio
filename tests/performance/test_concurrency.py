@@ -117,6 +117,49 @@ def test_auto_list_image_tables_reads_images_concurrently(tables_plate_target):
 
 
 @pytest.fixture(scope="module")
+def iterator_target():
+    import numpy as np
+
+    target: dict = {}
+    from ngio import create_ome_zarr_from_array
+
+    container = create_ome_zarr_from_array(
+        rendezvous_store(target),
+        array=np.ones((64, 64), dtype="uint16"),
+        pixelsize=1.0,
+        axes_names="yx",
+        levels=1,  # nothing to consolidate: the probe sees only the map
+        chunks=(32, 32),
+        overwrite=True,
+    )
+    container.derive_label("out")
+    return target
+
+
+def test_threaded_map_overlaps_all_units(iterator_target):
+    """`max_workers` on `map_as_numpy` must put one op in flight per ROI.
+
+    The op-count gate holds the parallel map to the *same tally* as the
+    serial one; this holds the half that tally cannot see.
+    """
+    from ngio import open_ome_zarr_container
+    from ngio.iterators import SegmentationIterator
+
+    container = open_ome_zarr_container(rendezvous_store(iterator_target), mode="r+")
+    iterator = SegmentationIterator(
+        container.get_image(),
+        container.get_label("out"),
+        consolidation_mode="dask",
+    ).by_chunks(grid="write")
+    assert len(iterator.rois) == 4
+
+    with concurrency_probe(rendezvous=4, kind="chunk") as probe:
+        iterator.map_as_numpy(lambda x: x, max_workers=4)
+    assert probe.arrivals > 0
+    assert probe.max_in_flight == 4
+
+
+@pytest.fixture(scope="module")
 def image_target():
     target: dict = {}
     container = create_empty_ome_zarr(

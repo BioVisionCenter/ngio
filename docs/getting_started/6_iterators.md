@@ -207,6 +207,37 @@ a written result.
 
 More complete examples can be found in the [Fractal tasks template](https://github.com/fractal-analytics-platform/fractal-tasks-template).
 
+## Parallel mapping
+
+`map_as_numpy` runs one ROI at a time by default, and that stays the default — parallel writing is explicit opt-in. To fan out:
+
+```python
+# Threads: the fit for IO-bound work and for funcs that release the GIL
+# (most numpy/scipy do).
+iterator.map_as_numpy(run_segmentation, max_workers="auto")
+
+# Processes: the fit for pure-Python, GIL-holding funcs. The func must be
+# picklable (a module-level function, not a lambda), and the store must not
+# be in-memory.
+from ngio import ProcessMapper
+iterator.map_as_numpy(run_segmentation, mapper=ProcessMapper(max_workers=8))
+```
+
+Before fanning out, both parallel mappers check every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image. Disjoint footprints are what make the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer. If two ROIs share a write unit the mapper refuses with an error naming them; the fix it suggests, `by_chunks(grid="write")`, re-tiles the iterator on the output's write grid so collisions are impossible by construction:
+
+```python
+iterator = iterator.by_chunks(grid="write")
+iterator.map_as_numpy(run_segmentation, max_workers="auto")   # cannot collide
+```
+
+Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. `map_as_dask` takes no `max_workers` on purpose: the dask pipes are already executed by dask's own scheduler.
+
+For per-ROI measurement without writing anything, use `reduce_as_numpy` — it returns one result per ROI, in ROI order, and accepts the same `max_workers`/`mapper` arguments:
+
+```python
+means = iterator.reduce_as_numpy(lambda patch: float(patch.mean()))
+```
+
 ## Next steps
 
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.

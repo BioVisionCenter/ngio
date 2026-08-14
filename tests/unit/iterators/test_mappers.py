@@ -61,8 +61,7 @@ def test_reduce_as_numpy_roi_order_and_equivalence():
 
     # Equivalent to the hand-rolled tutorial idiom
     expected = [
-        (roi.name, float(image.mean()))
-        for image, _, roi in iterator.iter_as_numpy()
+        (roi.name, float(image.mean())) for image, _, roi in iterator.iter_as_numpy()
     ]
     assert results == expected
 
@@ -71,7 +70,7 @@ def test_reduce_returns_dataframe():
     iterator = _build_feature_iterator(_build_ome_zarr())
 
     def to_features(data) -> pd.DataFrame:
-        image, label, roi = data
+        image, _label, roi = data
         return pd.DataFrame({"roi": [roi.name], "mean": [image.mean()]})
 
     results = iterator.reduce_as_numpy(to_features)
@@ -125,7 +124,7 @@ def test_map_readonly_raises_before_func_runs():
 
 
 def test_iter_unit_write_footprint():
-    iterator, label = _build_segmentation_iterator(_build_ome_zarr())
+    iterator, _label = _build_segmentation_iterator(_build_ome_zarr())
 
     units = list(iterator._numpy_units_generator())
     assert [unit.index for unit in units] == list(range(len(iterator.rois)))

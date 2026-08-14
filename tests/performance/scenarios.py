@@ -423,6 +423,16 @@ SCENARIOS: dict[str, Scenario] = {
         _iterator_target,
         lambda it: it.map_as_numpy(lambda patch: (patch > 0).astype("uint32")),
     ),
+    # The same map on a thread pool. Op counts are invariant to concurrency
+    # by design -- `test_invariants.py` pins this tally *equal* to the serial
+    # one, which is exactly why the concurrency gate exists as a second
+    # instrument.
+    "iterator_map_parallel": Scenario(
+        _iterator_target,
+        lambda it: it.map_as_numpy(
+            lambda patch: (patch > 0).astype("uint32"), max_workers=4
+        ),
+    ),
 }
 
 
