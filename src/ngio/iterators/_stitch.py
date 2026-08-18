@@ -131,9 +131,32 @@ class StitchPlan:
         self._halo = halo
         self._placements = tile_placements(rois, ref_image, self._axes)
 
+        # Two tiles in one cell means the haloed axes do not distinguish the
+        # tiles (e.g. z-tiled with a halo only on y and x). The neighbour map
+        # is keyed by cell, so the duplicates would silently shadow each other
+        # and whole seams would go unstitched.
+        seen_cells: dict[tuple[int, ...], int] = {}
+        for placement in self._placements:
+            other = seen_cells.setdefault(placement.grid, placement.index)
+            if other != placement.index:
+                raise NgioValueError(
+                    f"Tiles {rois[other].get_name()!r} and "
+                    f"{rois[placement.index].get_name()!r} occupy the same "
+                    f"stitch grid cell over the haloed axes {self._axes}: they "
+                    "differ only along an axis with no halo. Stitching needs "
+                    "the halo to cover every tiled axis — add the missing axis "
+                    "to `with_halo(...)`."
+                )
+
         self._work: dict[str, _TileWork] = {}
         for placement in self._placements:
             roi = rois[placement.index]
+            if roi.get_name() in self._work:
+                raise NgioValueError(
+                    f"Two tiles share the name {roi.get_name()!r}; the stitch "
+                    "plan is keyed by name, so duplicates would silently "
+                    "shadow each other. Give the ROIs unique names."
+                )
             grown = read_roi(roi).to_pixel(pixel_size=ref_image.pixel_size)
             grown_origin = {}
             for axis_name in self._axes:

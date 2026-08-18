@@ -49,7 +49,21 @@ def _merged(
     ctx: IoPipeContext,
     expected_type: type,
 ) -> ArrayT:
-    """Apply the merge policy and verify it stayed on the same backend."""
+    """Apply the merge policy and verify shape, dtype and backend survived it.
+
+    Without a merge a wrong-shaped patch is caught by the write's own shape
+    check; the merge rules are numpy ufuncs, which would *broadcast* the patch
+    against the destination first and hand the check a correctly-shaped result
+    — e.g. a single-channel patch silently replicated across every channel. So
+    the patch is checked against the destination before the rules can touch it.
+    """
+    if tuple(patch.shape) != tuple(existing.shape):
+        raise NgioValueError(
+            f"Cannot merge a patch of shape {tuple(patch.shape)} into a region "
+            f"of shape {tuple(existing.shape)}: a merge combines the two "
+            "element by element, and letting numpy broadcast the difference "
+            "away would silently replicate the patch."
+        )
     merged = cast("ArrayT", merge.reconcile(existing, patch, ctx))
     if not isinstance(merged, expected_type):
         raise NgioValueError(
@@ -57,6 +71,19 @@ def _merged(
             f"{type(merged).__name__} instead of a {expected_type.__name__} — "
             "it does not support this data path (e.g. a numpy-only policy used "
             "through the dask API, or one materializing a dask array)."
+        )
+    if tuple(merged.shape) != tuple(existing.shape):
+        raise NgioValueError(
+            f"Merge policy '{type(merge).__name__}' returned shape "
+            f"{tuple(merged.shape)} for a region of shape "
+            f"{tuple(existing.shape)}; a merge must preserve the region."
+        )
+    if merged.dtype != existing.dtype:
+        raise NgioValueError(
+            f"Merge policy '{type(merge).__name__}' returned dtype "
+            f"{merged.dtype} for a {existing.dtype} destination — the write "
+            "would silently cast it back (wrapping out-of-range values). "
+            "Cast the patch to the destination dtype before writing."
         )
     return merged
 

@@ -77,7 +77,7 @@ class UniqueLabelsTransform:
         )
 
     def _check_fits(self, array: np.ndarray, offset: int) -> None:
-        """Refuse an offset that would not survive the array's dtype."""
+        """Refuse ids that would not survive the array's dtype or its block."""
         dtype = array.dtype
         if not np.issubdtype(dtype, np.integer):
             raise NgioValueError(
@@ -86,6 +86,14 @@ class UniqueLabelsTransform:
                 "means the segmentation was not cast before writing."
             )
         largest = int(np.max(array)) if array.size else 0
+        if largest >= self._block_size:
+            raise NgioValueError(
+                f"This patch holds label id {largest}, which does not fit in "
+                f"a block of {self._block_size} ids: it would spill into the "
+                "next region's block and collide with its labels. Raise "
+                "block_size above the largest id any single region can "
+                "produce."
+            )
         limit = int(np.iinfo(dtype).max)
         if largest + offset > limit:
             raise NgioValueError(
@@ -106,8 +114,19 @@ class UniqueLabelsTransform:
     def on_set(self, array: ArrayLike, ctx: IoPipeContext) -> ArrayLike:
         """Shift the patch's labels up into this region's block."""
         offset = self._offset(ctx)
+        if isinstance(array, np.ndarray):
+            # Checked even when the offset is 0: block 0's ids can still spill
+            # into block 1, and a float patch is wrong in any block.
+            self._check_fits(array, offset)
+        else:
+            # The dask path cannot look at the values now; check each block as
+            # it materializes, so overflow raises at compute time instead of
+            # wrapping silently.
+            def _checked(block: np.ndarray) -> np.ndarray:
+                self._check_fits(block, offset)
+                return block
+
+            array = array.map_blocks(_checked, dtype=array.dtype)
         if offset == 0:
             return array
-        if isinstance(array, np.ndarray):
-            self._check_fits(array, offset)
         return elementwise(np.where, array > 0, array + offset, 0)

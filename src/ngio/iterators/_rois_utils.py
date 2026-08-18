@@ -153,7 +153,7 @@ def by_yx(rois: list[Roi], ref_image: AbstractImage) -> list[Roi]:
 def by_zyx(rois: list[Roi], ref_image: AbstractImage, strict: bool = True) -> list[Roi]:
     """Return a new iterator that iterates over ROIs by ZYX coordinates."""
     if strict and not ref_image.is_3d:
-        raise ValueError(
+        raise NgioValueError(
             "Reference Input image must be 3D to iterate by ZXY coordinates. "
             f"Current dimensions: {ref_image.dimensions}"
         )

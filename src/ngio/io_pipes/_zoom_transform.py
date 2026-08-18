@@ -32,7 +32,10 @@ class BaseZoomTransform:
         self, slice_: slice | int | list[int], scale: float, max_dim: int
     ) -> int:
         if isinstance(slice_, slice):
-            _start = slice_.start or 0
+            # Clamped like the read: a slice reaching past either edge is cut
+            # there by the boundary check, so deriving the target from the
+            # overhang would zoom at a silently wrong factor.
+            _start = max(0.0, slice_.start or 0)
             _start_int = math.floor(_start * scale)
             if slice_.stop is not None:
                 _stop = slice_.stop * scale
@@ -78,6 +81,10 @@ class BaseZoomTransform:
             t_dim = self._target_dimensions.get(ax_name, default=1)
             in_pix = self._input_pixel_size.get(ax_name, default=1.0)
             t_pix = self._target_pixel_size.get(ax_name, default=1.0)
+            # Raw on purpose: the un-normalized slice keeps the ROI's
+            # sub-pixel world bounds, which is what makes the zoomed shape
+            # land exactly on the target grid. Normalizing first would round
+            # to this array's integer pixels and derive a wrong factor.
             slice_ = slicing_ops.get(ax_name, normalize=False)
             scale = in_pix / t_pix
             _target_shape = self._normalize_shape(

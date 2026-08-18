@@ -69,6 +69,12 @@ class _IoPipe:
         )
         self._transforms = _prepare_transforms(transforms)
         self._merge = resolve_merge(merge)
+        if self._merge is not None and isinstance(self, DataGetter):
+            raise NgioValueError(
+                f"{self.__class__.__name__} is a getter: a merge decides how a "
+                "write combines with the destination, so it would be silently "
+                "ignored here. Pass `merge=` on the setter instead."
+            )
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
@@ -105,7 +111,7 @@ class _IoPipe:
     def roi(self) -> Roi:
         if self._ctx.roi is None:
             name = self.__class__.__name__
-            raise ValueError(f"No ROI defined for {name}.")
+            raise NgioValueError(f"No ROI defined for {name}.")
         return self._ctx.roi
 
 

@@ -17,11 +17,12 @@ def offset_labels(array: np.ndarray, offset: int) -> np.ndarray:
 
 
 def check_offset_fits(array: np.ndarray, offset: int, block_size: int) -> None:
-    """Refuse an offset that would not survive the array's dtype.
+    """Refuse an offset that would not survive the array's dtype or its block.
 
     Raises:
-        NgioValueError: If the patch is not integer-typed, or the largest id
-            plus `offset` would exceed what the dtype can hold.
+        NgioValueError: If the patch is not integer-typed, the largest id
+            plus `offset` would exceed what the dtype can hold, or the largest
+            id does not fit inside one block of `block_size` ids.
     """
     dtype = array.dtype
     if not np.issubdtype(dtype, np.integer):
@@ -30,6 +31,13 @@ def check_offset_fits(array: np.ndarray, offset: int, block_size: int) -> None:
             "usually means the segmentation was not cast before writing."
         )
     largest = int(np.max(array)) if array.size else 0
+    if largest >= block_size:
+        raise NgioValueError(
+            f"This patch holds label id {largest}, which does not fit in a "
+            f"block of {block_size} ids: it would spill into the next region's "
+            "block and collide with its labels. Raise block_size above the "
+            "largest id any single region can produce."
+        )
     limit = int(np.iinfo(dtype).max)
     if largest + offset > limit:
         raise NgioValueError(

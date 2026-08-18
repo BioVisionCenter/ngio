@@ -384,6 +384,11 @@ def _clean_slicing_dict(
     for axis_name, slice_ in slicing_dict.items():
         axis = dimensions.axes_handler.get_axis(axis_name)
         if axis is None:
+            if remove_channel_selection and axis_name == "c":
+                # The caller asked for the channel selection to be dropped;
+                # validating it against the virtual-axes rules first would
+                # reject the very entry the flag exists to discard.
+                continue
             # Virtual axes should be allowed to be selected
             # Common use case is still allowing channel_selection
             # When the zarr has not channel axis.

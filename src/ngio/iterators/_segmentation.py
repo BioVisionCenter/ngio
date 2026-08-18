@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import dask.array as da
 import numpy as np
@@ -21,7 +21,9 @@ from ngio.io_pipes import (
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.iterators._mappers import MapperProtocol
 from ngio.iterators._stitch import StitchConfig, StitchingSetter, StitchPlan
+from ngio.utils import NgioValueError
 
 
 class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
@@ -162,6 +164,16 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
+        if self._stitch is not None:
+            # Without this, the dask write path would skip the id offsets and
+            # the band banking, and the resolve afterwards would compact the
+            # colliding tile-local ids into silently wrong labels.
+            raise NgioValueError(
+                "Stitching is only supported on the numpy path: the dask "
+                "setters do not offset ids or bank halo bands, so the resolve "
+                "would corrupt the labels. Use map()/iter(data_mode='numpy'), "
+                "or build the iterator with stitch=False."
+            )
         return self._wrap_setter(
             DaskSetter(
                 zarr_array=self._output.zarr_array,
@@ -173,6 +185,29 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             ),
             roi,
         )
+
+    def map(
+        self,
+        func: Callable[[np.ndarray], np.ndarray],
+        mapper: MapperProtocol[np.ndarray, np.ndarray] | None = None,
+    ) -> None:
+        """See `AbstractIteratorBuilder.map`; also cleans up on failure.
+
+        A failed run cannot be resolved, so the stitch scratch arrays are
+        deleted rather than left as a stray `_ngio_stitch` group beside the
+        resolution levels. The already-written tiles stay: re-running the map
+        recreates the scratch and produces the same ids (the offsets are
+        derived, not counted).
+        """
+        if self._stitch is None:
+            return super().map(func, mapper=mapper)
+        try:
+            return super().map(func, mapper=mapper)
+        except BaseException:
+            if self._stitch_plan is not None:
+                self._stitch_plan.cleanup()
+                self._stitch_plan = None
+            raise
 
     def post_consolidate(self):
         # The relabel has to precede consolidation: every pyramid level is
@@ -233,12 +268,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 
-        # Check compatibility between input and output images
-        # if not self._input.dimensions.is_compatible_with(self._output.dimensions):
-        #    raise NgioValidationError(
-        #        "Input image and output label have incompatible dimensions. "
-        #        f"Input: {self._input.dimensions}, Output: {self._output.dimensions}."
-        #    )
+        self._input.require_dimensions_match(self._output, allow_singleton=False)
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""

@@ -38,6 +38,20 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
+def _validate_max_workers(max_workers: MaxWorkers) -> None:
+    """Refuse a pool size that cannot mean anything.
+
+    `0` or a negative would otherwise be clamped to 1 and run serially — a
+    misconfiguration silently absorbed by the very flag that asked for
+    parallelism.
+    """
+    if isinstance(max_workers, int) and max_workers < 1:
+        raise NgioValueError(
+            f"max_workers must be >= 1, got {max_workers}. Use 1 for serial "
+            'execution, or "auto" to size the pool automatically.'
+        )
+
+
 def compute_write_footprint(setter: DataSetterProtocol[Any]) -> ChunkRect | None:
     """The chunk rectangle a setter will write, at write granularity.
 
@@ -96,6 +110,10 @@ class MapperProtocol(Protocol[T, R]):
       that all writes are complete when `__call__` returns.
     - A unit whose `setter` is `None` is read-only: compute and collect its
       result, never write.
+    - For a unit with a setter the collected result may be `None` instead of
+      the written patch: `map` discards the results, and holding every patch
+      until the call returns would put the whole output in memory at once.
+      ngio's mappers all collect `None` for written units.
     - The returned list is ordered by `unit.index` (`results[i]` corresponds
       to `iterator.rois[i]`), regardless of execution order.
     - `units` is typically a generator and each unit is expensive to build
@@ -128,8 +146,11 @@ class BasicMapper(Generic[T, R]):
             if unit.setter is not None:
                 # map_as_* is the only writing entry point and its func is
                 # Callable[[T], T], so T == R whenever setter is not None;
-                # reduce_as_* always builds units with setter=None.
+                # reduce_as_* always builds units with setter=None. The written
+                # patch is not kept: map discards the results, and holding
+                # every patch until the loop ends is the whole output at once.
                 unit.setter(cast("T", result))
+                result = cast("R", None)
             results.append((unit.index, result))
         results.sort(key=lambda item: item[0])
         return [result for _, result in results]
@@ -216,6 +237,7 @@ class ThreadedMapper(Generic[T, R]):
     """
 
     def __init__(self, max_workers: MaxWorkers = "auto") -> None:
+        _validate_max_workers(max_workers)
         self._max_workers = max_workers
 
     def _resolve(self, n_units: int) -> int:
@@ -242,6 +264,10 @@ class ThreadedMapper(Generic[T, R]):
             result = func(unit.getter())
             if unit.setter is not None:
                 unit.setter(cast("T", result))
+                # The written pixels are not shipped back: map discards them,
+                # and keeping one patch per unit alive until the pool drains
+                # would hold the whole output in memory.
+                return unit.index, cast("R", None)
             return unit.index, result
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -313,6 +339,7 @@ class ProcessMapper(Generic[T, R]):
     """
 
     def __init__(self, max_workers: MaxWorkers = "auto") -> None:
+        _validate_max_workers(max_workers)
         self._max_workers = max_workers
 
     def _resolve(self, n_units: int) -> int:
