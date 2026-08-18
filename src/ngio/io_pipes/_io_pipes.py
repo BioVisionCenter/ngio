@@ -15,6 +15,7 @@ from ngio.io_pipes._io_pipe_ops import (
     write_from_dask,
     write_from_numpy,
 )
+from ngio.io_pipes._mask_transform import BaseMaskTransform
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps
 from ngio.io_pipes._ops_transforms import (
@@ -22,8 +23,25 @@ from ngio.io_pipes._ops_transforms import (
     TransformProtocol,
     normalize_transforms,
 )
+from ngio.utils import NgioValueError
 
 T = TypeVar("T")
+
+
+def _check_mask_transforms_are_terminal(
+    transforms: Sequence[TransformProtocol] | None,
+) -> None:
+    if not transforms:
+        return
+    for transform in transforms[:-1]:
+        if isinstance(transform, BaseMaskTransform):
+            raise NgioValueError(
+                "MaskTransform must be the last transform in the chain: on "
+                "the write path it merges the patch with on-disk data read "
+                "through the transforms placed before it, so any transform "
+                "placed after it would be silently skipped during that read. "
+                "Move it to the end of the transforms list."
+            )
 
 
 class _IoPipe:
@@ -41,6 +59,7 @@ class _IoPipe:
             zarr_array=zarr_array, slicing=slicing_ops, axes_ops=axes_ops, roi=roi
         )
         self._transforms = normalize_transforms(transforms)
+        _check_mask_transforms_are_terminal(self._transforms)
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
