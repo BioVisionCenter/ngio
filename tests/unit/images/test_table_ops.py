@@ -1,12 +1,10 @@
 from pathlib import Path
-from typing import Literal
 
 import pandas as pd
 import pytest
 
 from ngio import OmeZarrContainer, create_empty_ome_zarr
 from ngio.images import (
-    concatenate_image_tables,
     concatenate_image_tables_as,
     list_image_tables,
 )
@@ -77,4 +75,3 @@ def test_cat_eager_lazy_index_parity(sample_ome_zarrs):
     assert eager_df.index.is_unique
     assert lazy_df.index.is_unique
     assert sorted(eager_df.index) == sorted(lazy_df.index)
-

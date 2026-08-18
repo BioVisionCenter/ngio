@@ -1,6 +1,5 @@
 """A module for handling the Plate Sequence in an OME-Zarr file."""
 
-import asyncio
 import logging
 from collections.abc import Sequence
 from contextlib import AbstractContextManager, nullcontext
@@ -14,9 +13,6 @@ from ngio.images import (
 )
 from ngio.images._table_ops import (
     MaxWorkers,
-    _concatenate_image_tables_async,
-    _gather_bounded,
-    _list_image_tables_async,
     _map_workers,
 )
 from ngio.ome_zarr_meta import (
@@ -50,7 +46,6 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
-    deprecated,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")

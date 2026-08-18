@@ -19,7 +19,6 @@ from ngio.common._concurrency import (
 )
 from ngio.images._ome_zarr_container import OmeZarrContainer
 from ngio.tables import Table, TableType
-from ngio.utils import deprecated
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
@@ -377,7 +376,6 @@ async def _concatenate_image_tables_async(
     )
 
 
-
 def _tables_names_coalesce(
     tables_names: list[list[str]],
     mode: Literal["common", "all"] = "common",
@@ -449,5 +447,3 @@ async def _list_image_tables_async(
         tables_names=tables_names,
         mode=mode,
     )
-
-

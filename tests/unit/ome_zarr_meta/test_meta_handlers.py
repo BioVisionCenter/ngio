@@ -142,7 +142,7 @@ def test_a_write_through_the_image_redirives_dimensions(tmp_path: Path):
     image = container.get_image()
 
     assert image.dimensions.pixel_size.space_unit == "micrometer"
-    image.set_axes_units(space_unit="nanometer")
+    image.set_space_unit("nanometer")
 
     assert image.dimensions.pixel_size.space_unit == "nanometer"
 
@@ -173,7 +173,7 @@ def test_refresh_drops_the_derived_dimensions(tmp_path: Path):
     assert image.dimensions.pixel_size.space_unit == "micrometer"
 
     writer = open_ome_zarr_container(store, mode="r+")
-    writer.get_image().set_axes_units(space_unit="nanometer")
+    writer.get_image().set_space_unit("nanometer")
 
     reader.refresh()
     assert image.dimensions.pixel_size.space_unit == "nanometer"
@@ -203,7 +203,7 @@ def test_refresh_reaches_a_live_label(tmp_path: Path):
     label = reader.get_label("lbl")
     assert label.dimensions.pixel_size.space_unit == "micrometer"
 
-    writer.get_label("lbl").set_axes_units(space_unit="nanometer")
+    writer.get_label("lbl").set_space_unit("nanometer")
 
     reader.refresh()
     assert label.dimensions.pixel_size.space_unit == "nanometer"

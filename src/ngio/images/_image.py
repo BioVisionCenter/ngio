@@ -41,7 +41,6 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
     deprecated,
-    deprecated_alias,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")

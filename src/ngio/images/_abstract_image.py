@@ -46,9 +46,9 @@ from ngio.ome_zarr_meta import (
     PixelSize,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
+    Channel,
     DefaultSpaceUnit,
     DefaultTimeUnit,
-    Channel,
     NgffVersions,
     NgioLabelMeta,
 )

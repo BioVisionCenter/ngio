@@ -1,6 +1,5 @@
 """Edge-case coverage tests for `ngio.hcs._plate`."""
 
-import asyncio
 from pathlib import Path
 
 import pandas as pd

@@ -67,7 +67,7 @@ def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
     assert ome_zarr.get_channel_idx("DAPI") == 0
     assert ome_zarr.get_channel_idx(wavelength_id="A01_C01") == 0
     assert ome_zarr.num_channels == 1
-    ome_zarr.set_axes_units(space_unit="micrometer")
+    ome_zarr.set_space_unit("micrometer")
 
     assert ome_zarr.list_tables() == ["FOV_ROI_table", "well_ROI_table"], (
         ome_zarr.list_tables()
@@ -119,7 +119,8 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert ome_zarr.space_unit == "micrometer"
     assert ome_zarr.time_unit is None
 
-    ome_zarr.set_axes_units(space_unit="yoctometer", time_unit="yoctosecond")
+    ome_zarr.set_space_unit("yoctometer")
+    ome_zarr.set_time_unit("yoctosecond")
     assert ome_zarr.space_unit == "yoctometer"
     assert ome_zarr.time_unit is None
 

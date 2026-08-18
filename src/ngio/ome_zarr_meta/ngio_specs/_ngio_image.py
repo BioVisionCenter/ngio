@@ -14,8 +14,6 @@ from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesHandler,
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
     UnitUnchanged,

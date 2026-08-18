@@ -20,7 +20,6 @@ from ngio.config import get_config
 from ngio.utils import (
     NgioFutureWarning,
     NgioValueError,
-    deprecated_alias,
     stacklevel_of_first_caller,
 )
 

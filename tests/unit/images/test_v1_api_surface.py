@@ -1,6 +1,5 @@
 """Regression tests for the API decisions frozen by ngio 1.0."""
 
-import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -124,12 +123,13 @@ def test_v1_promised_removals_are_gone():
     assert not hasattr(ngio.images, "concatenate_image_tables_async")
     assert not hasattr(ngio.images, "concatenate_image_tables_as_async")
     assert not hasattr(ImagesContainer, "set_axes_unit")
-    assert "levels_paths" not in inspect.signature(
-        ImagePyramidBuilder.from_shapes
-    ).parameters
-    assert "validate_paths" not in inspect.signature(
-        ImagesContainer.__init__
-    ).parameters
+    assert (
+        "levels_paths"
+        not in inspect.signature(ImagePyramidBuilder.from_shapes).parameters
+    )
+    assert (
+        "validate_paths" not in inspect.signature(ImagesContainer.__init__).parameters
+    )
 
 
 def test_set_axes_units_is_deprecated(float_container):

@@ -55,7 +55,7 @@ def test_old_name_forwards_and_warns():
     with pytest.warns(NgioDeprecationWarning, match="'old_name'.*deprecated") as record:
         assert _renamed(old_name=3, other=1) == (3, 1)
     message = str(record[0].message)
-    assert "ngio=1.1" in message
+    assert "ngio=1.2" in message
     assert "'new_name'" in message
 
 
@@ -79,7 +79,7 @@ def test_works_on_methods():
 def test_deprecated_callable_warns_and_forwards():
     with pytest.warns(NgioDeprecationWarning, match=r"new_thing\(\)") as record:
         assert _old_thing(4) == 8
-    assert "ngio=1.1" in str(record[0].message)
+    assert "ngio=1.2" in str(record[0].message)
 
 
 def test_deprecated_async_warns_at_call_not_await():
