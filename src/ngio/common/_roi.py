@@ -4,6 +4,7 @@ These are the interfaces between the ROI tables / masking ROI tables and
     the ImageLikeHandler.
 """
 
+import math
 from collections.abc import Callable, Mapping
 from typing import Literal, Self, TypeAlias
 
@@ -478,6 +479,82 @@ class Roi(BaseModel):
             else:
                 new_slices.append(roi_slice)
         return self.model_copy(update={"slices": new_slices})
+
+    def compose(self, local: "Roi", pixel_size: PixelSize) -> "Roi":
+        """Anchor a patch-local pixel ROI inside this region.
+
+        The inverse of handing out a patch: a function that received the
+        pixels of this (world-space) region and found something at pixel
+        offsets `local` gets back that something's absolute, world-space ROI.
+
+        The local starts are counted from the region's first patch pixel —
+        `floor(max(0, start))` of this ROI's pixel coordinates, the origin
+        the read actually used. Axes `local` does not pin inherit this
+        region's slices, so a 2D box found in one z-slab or time frame keeps
+        the slab's extent. `name`, `label` and any extra fields come from
+        `local`.
+
+        Args:
+            local: A pixel-space ROI (`space="pixel"`) with both bounds
+                pinned on each of its axes, relative to this region's patch.
+            pixel_size: Per-axis pixel sizes of the image the patch was
+                read from.
+
+        Returns:
+            A world-space ROI.
+
+        Raises:
+            NgioValueError: If this ROI is not in world space, `local` is
+                not in pixel space (a world ROI is already absolute), or a
+                local slice leaves a bound open.
+
+        Example:
+            ```python
+            box = Roi.from_values(
+                slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel"
+            )
+            abs_roi = tile_roi.compose(box, pixel_size=image.pixel_size)
+            ```
+        """
+        if self.space != "world":
+            raise NgioValueError(
+                "compose anchors a local ROI inside a world-space region, "
+                f"but this ROI is in {self.space!r} space. Convert it with "
+                "to_world() first."
+            )
+        if local.space != "pixel":
+            raise NgioValueError(
+                "The local ROI must be in pixel space (space='pixel'): its "
+                "starts are offsets into this region's patch. A world-space "
+                "ROI is already absolute and needs no composing."
+            )
+        region = self.to_pixel(pixel_size=pixel_size)
+        new_slices = []
+        for local_slice in local.slices:
+            if local_slice.start is None or local_slice.length is None:
+                raise NgioValueError(
+                    f"The local slice along {local_slice.axis_name!r} leaves "
+                    "a bound open; a local region must pin start and length."
+                )
+            region_slice = region.get(local_slice.axis_name)
+            origin = 0.0
+            if region_slice is not None and region_slice.start is not None:
+                origin = float(math.floor(max(0.0, region_slice.start)))
+            new_slices.append(
+                RoiSlice(
+                    axis_name=local_slice.axis_name,
+                    start=origin + local_slice.start,
+                    length=local_slice.length,
+                )
+            )
+        local_axes = {local_slice.axis_name for local_slice in local.slices}
+        new_slices += [
+            region_slice.model_copy()
+            for region_slice in region.slices
+            if region_slice.axis_name not in local_axes
+        ]
+        anchored = local.model_copy(update={"slices": new_slices, "space": "pixel"})
+        return anchored.to_world(pixel_size=pixel_size)
 
     def to_world(self, pixel_size: PixelSize | None = None) -> Self:
         """Convert the ROI to world (physical) coordinate space.

@@ -9,6 +9,7 @@ from ngio.iterators._mappers import (
     ProcessMapper,
     ThreadedMapper,
 )
+from ngio.iterators._object_detection import ObjectDetectionIterator
 from ngio.iterators._segmentation import (
     MaskedSegmentationIterator,
     SegmentationIterator,
@@ -22,6 +23,7 @@ __all__ = [
     "IterUnit",
     "MapperProtocol",
     "MaskedSegmentationIterator",
+    "ObjectDetectionIterator",
     "ProcessMapper",
     "SegmentationIterator",
     "StitchConfig",

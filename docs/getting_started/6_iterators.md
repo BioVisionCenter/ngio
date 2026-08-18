@@ -173,6 +173,7 @@ the top-level `ngio` namespace):
 * The `MaskedSegmentationIterator` is similar to the `SegmentationIterator`, but it uses a masking ROI table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. For a worked example, see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * The `ImageProcessingIterator` is designed to build image processing pipelines, where an input image is processed to produce a new image. For a worked example, see the [image processing tutorial](../tutorials/image_processing.md).
 * The `FeatureExtractorIterator` is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. Its `reduce_to_table` runs a measurement over every region and returns the joined results as a single feature table — parallel per region via `mapper=`, stored by your own `add_table` call. For a worked example, see the [feature extraction tutorial](../tutorials/feature_extraction.md).
+* The `ObjectDetectionIterator` runs a detector (a YOLO model, a maxima finder) tile by tile and returns the found objects as a single masking ROI table — see [Detecting objects into a ROI table](#detecting-objects-into-a-roi-table).
 
 ## Building one
 
@@ -348,7 +349,35 @@ Either way the numbering is assigned in first-encounter order over the chunk gri
 
 If a run is interrupted between the map and the resolve, the label holds a valid but over-split segmentation; re-running the resolve is safe, because it is idempotent.
 
-## Next steps
+## Detecting objects into a ROI table
+
+Not every model produces a mask. An object detector — a YOLO network, a spot finder — reports **bounding boxes**, and the natural home for those is a ROI table, not a label image. The `ObjectDetectionIterator` runs a detector tile by tile and returns one `MaskingRoiTable` of the objects it found:
+
+```python
+from ngio import ObjectDetectionIterator
+
+iterator = ObjectDetectionIterator(
+    image, padding_x=32, padding_y=32
+).by_chunks()
+
+detections = iterator.detect(run_detector, mapper=ThreadedMapper("auto"))
+ome_zarr.add_table("detections", detections)
+```
+
+The detector sees one tile at a time and answers in the tile's own pixels: `(patch, roi) -> DataFrame | dict` with `x_min`/`x_max`/`y_min`/`y_max` columns bounding each box as `[min, max)` (`z_min`/`z_max` for 3D boxes), plus whatever else it reports — confidence, class — which rides along into the table unchanged. The `roi` is the (padded) region the patch covers — the same argument every iterator function receives to identify its region globally. The iterator does the bookkeeping the detector should not: it anchors each tile's boxes into the reference image's world coordinates, and it resolves the boundary problem.
+
+That anchoring is one call you can also use yourself, in a custom flow or the manual pattern: `Roi.compose` turns the region's ROI plus a patch-local pixel box into the absolute world ROI —
+
+```python
+box = Roi.from_values(slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel")
+abs_roi = roi.compose(box, pixel_size=image.pixel_size)
+```
+
+The `space` fields are what keep this honest: `compose` refuses a world-space box (already absolute — composing it would double the offset) and a pixel-space region, so the classic silent frame mix-up raises instead. Axes the box does not pin inherit the region's extent.
+
+That problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a `padding` margin past its edge — the same move as a halo, on a read-only iterator — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box size when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `reduce_to_table`, nothing is written — storing the table is your `add_table` call.
+
+Two contracts worth knowing. Every tile must report the same box dimensionality (all 2D or all 3D, scored or unscored) — mixtures raise. And a 2D detector on a 3D or timelapse image never has its boxes merged across the un-pinned axes: detections from different z-slabs or time points keep their tile's extent along those axes and are deduplicated only within it.
 
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.
 - [Image segmentation tutorial](../tutorials/image_segmentation.md) — segmentation and masked segmentation.

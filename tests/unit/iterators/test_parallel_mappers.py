@@ -184,3 +184,46 @@ def test_reduce_to_table_across_processes(tmp_path: Path):
         _measure_labels, mapper=ProcessMapper(max_workers=2)
     )
     assert from_processes.dataframe.equals(serial.dataframe)
+
+
+def _detect_bright(patch, roi):
+    ys, xs = np.nonzero(patch > 128)
+    if not len(ys):
+        return {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
+    return {
+        "x_min": [int(xs.min())],
+        "x_max": [int(xs.max()) + 1],
+        "y_min": [int(ys.min())],
+        "y_max": [int(ys.max()) + 1],
+        "confidence": [float((patch > 128).mean())],
+    }
+
+
+def test_detect_across_processes(tmp_path: Path):
+    """Per-tile boxes pickle back from the workers; the table matches serial."""
+    from ngio import ObjectDetectionIterator
+
+    data = np.zeros((1, 64, 64), dtype="uint8")
+    data[0, 10:20, 26:38] = 255
+    data[0, 40:50, 8:18] = 255
+    ome_zarr = create_ome_zarr_from_array(
+        store=tmp_path / "detect.zarr",
+        array=data,
+        pixelsize=1.0,
+        axes_names="cyx",
+        levels=1,
+        consolidation_mode="dask",
+    )
+    iterator = ObjectDetectionIterator(
+        ome_zarr.get_image(),
+        channel_selection=0,
+        axes_order="yx",
+        padding_x=8,
+        padding_y=8,
+    ).grid(size_x=32, size_y=32)
+
+    serial = iterator.detect(_detect_bright)
+    from_processes = iterator.detect(
+        _detect_bright, mapper=ProcessMapper(max_workers=2)
+    )
+    assert from_processes.dataframe.equals(serial.dataframe)

@@ -613,3 +613,68 @@ def test_roi_from_values_validates_fields():
 
     with pytest.raises(ValidationError):
         Roi.from_values(name="r", slices={"x": (0, 1)})
+
+
+def test_compose_anchors_a_local_box():
+    """Tile ROI + patch-local pixel box = absolute world ROI."""
+    ps = PixelSize(x=0.5, y=0.5, z=1.0)
+    # A tile whose patch starts at pixel (y=64, x=32).
+    tile = Roi.from_values(
+        name="tile", slices={"y": (64 * 0.5, 32 * 0.5), "x": (32 * 0.5, 32 * 0.5)}
+    )
+    box = Roi.from_values(
+        slices={"y": (4, 10), "x": (6, 8)},
+        name="hit",
+        space="pixel",
+        confidence=0.9,
+    )
+
+    absolute = tile.compose(box, pixel_size=ps)
+
+    assert absolute.space == "world"
+    assert (absolute["y"].start, absolute["y"].length) == ((64 + 4) * 0.5, 10 * 0.5)
+    assert (absolute["x"].start, absolute["x"].length) == ((32 + 6) * 0.5, 8 * 0.5)
+    assert absolute.name == "hit"
+    assert absolute.model_extra is not None
+    assert absolute.model_extra["confidence"] == 0.9
+
+
+def test_compose_inherits_the_axes_the_box_does_not_pin():
+    """A 2D box found in one z-slab keeps the slab's extent."""
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(
+        name="tile", slices={"z": (3, 1), "y": (0, 32), "x": (0, 32)}
+    )
+    box = Roi.from_values(slices={"y": (1, 2), "x": (3, 4)}, name=None, space="pixel")
+
+    absolute = tile.compose(box, pixel_size=ps)
+
+    assert (absolute["z"].start, absolute["z"].length) == (3.0, 1.0)
+
+
+def test_compose_refuses_ambiguous_frames():
+    """The space fields are what make a frame mix-up loud instead of silent."""
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(name="tile", slices={"y": (0, 32), "x": (0, 32)})
+    world_box = Roi.from_values(slices={"y": (1, 2), "x": (3, 4)}, name=None)
+
+    with pytest.raises(NgioValueError, match="already absolute"):
+        tile.compose(world_box, pixel_size=ps)
+
+    pixel_tile = tile.to_pixel(pixel_size=ps)
+    pixel_box = Roi.from_values(
+        slices={"y": (1, 2), "x": (3, 4)}, name=None, space="pixel"
+    )
+    with pytest.raises(NgioValueError, match="world-space region"):
+        pixel_tile.compose(pixel_box, pixel_size=ps)
+
+
+def test_compose_requires_pinned_local_bounds():
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(name="tile", slices={"y": (0, 32), "x": (0, 32)})
+    open_box = Roi.from_values(
+        slices={"y": (1, 2), "x": slice(3, None)}, name=None, space="pixel"
+    )
+
+    with pytest.raises(NgioValueError, match="pin start and length"):
+        tile.compose(open_box, pixel_size=ps)
