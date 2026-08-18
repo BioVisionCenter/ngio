@@ -18,6 +18,8 @@ from ngio.ome_zarr_meta.ngio_specs._axes import (
     DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
+    UnitUnchanged,
+    _UnitUnset,
 )
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.ome_zarr_meta.ngio_specs._dataset import Dataset
@@ -98,17 +100,32 @@ class AbstractNgioImageMeta:
             datasets=datasets,
         )
 
+    def _rebuild(self, *, name: str | None, datasets: list[Dataset]):
+        """Reconstruct this meta with new name/datasets.
+
+        Subclasses carrying extra state (an image's channels, a label's
+        image-label source) MUST override this to pass it through — the
+        reshaping methods (`to_units`, `rename_axes`, `rename_image`) rebuild
+        through here, and state missing from the reconstruction is silently
+        lost on every metadata update.
+        """
+        return type(self)(
+            version=self.version,
+            name=name,
+            datasets=datasets,
+        )
+
     def to_units(
         self,
         *,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
+        space_unit: SpaceUnits | _UnitUnset = UnitUnchanged,
+        time_unit: TimeUnits | _UnitUnset = UnitUnchanged,
     ):
-        """Convert the pixel size to the given units.
+        """Set the units of the space and time axes.
 
         Args:
-            space_unit(str): The space unit to convert to.
-            time_unit(str): The time unit to convert to.
+            space_unit: The space unit to set; omitted means unchanged.
+            time_unit: The time unit to set; omitted means unchanged.
         """
         new_axes_handler = self.axes_handler.to_units(
             space_unit=space_unit,
@@ -124,11 +141,7 @@ class AbstractNgioImageMeta:
             )
             new_datasets.append(new_dataset)
 
-        return type(self)(
-            version=self.version,
-            name=self.name,
-            datasets=new_datasets,
-        )
+        return self._rebuild(name=self.name, datasets=new_datasets)
 
     def rename_axes(self, axes_names: Sequence[str]):
         """Rename axes in the metadata.
@@ -148,11 +161,7 @@ class AbstractNgioImageMeta:
             )
             new_datasets.append(new_dataset)
 
-        return type(self)(
-            version=self.version,
-            name=self.name,
-            datasets=new_datasets,
-        )
+        return self._rebuild(name=self.name, datasets=new_datasets)
 
     def rename_image(self, name: str):
         """Rename the image in the metadata.
@@ -160,11 +169,7 @@ class AbstractNgioImageMeta:
         Args:
             name(str): The new name of the image.
         """
-        return type(self)(
-            version=self.version,
-            name=name,
-            datasets=self.datasets,
-        )
+        return self._rebuild(name=name, datasets=self.datasets)
 
     @property
     def version(self) -> NgffVersions:
@@ -411,6 +416,15 @@ class NgioLabelMeta(AbstractNgioImageMeta):
         """Get the image label metadata."""
         return self._image_label
 
+    def _rebuild(self, *, name: str | None, datasets: list[Dataset]):
+        """Reconstruct, carrying the image-label source through."""
+        return type(self)(
+            version=self.version,
+            name=name,
+            datasets=datasets,
+            image_label=self._image_label,
+        )
+
 
 class NgioImageMeta(AbstractNgioImageMeta):
     """Image metadata model."""
@@ -434,6 +448,19 @@ class NgioImageMeta(AbstractNgioImageMeta):
     def set_channels_meta(self, channels_meta: ChannelsMeta) -> None:
         """Set channels_meta metadata."""
         self._channels_meta = channels_meta
+
+    def _rebuild(self, *, name: str | None, datasets: list[Dataset]):
+        """Reconstruct, carrying the channel metadata through.
+
+        Without this, `to_units`/`rename_axes` silently dropped the OMERO
+        channels on every metadata update (issue #231).
+        """
+        return type(self)(
+            version=self.version,
+            name=name,
+            datasets=datasets,
+            channels=self._channels_meta,
+        )
 
     def init_channels(
         self,

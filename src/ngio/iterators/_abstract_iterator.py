@@ -234,7 +234,24 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         stride_t: int | None = None,
         base_name: str = "",
     ) -> Self:
-        """Create a grid of ROIs based on the input image dimensions."""
+        """Tile the current ROIs with a regular grid.
+
+        Args:
+            size_x: Tile size along x; `None` (default) means the full extent.
+            size_y: Tile size along y; `None` means the full extent.
+            size_z: Tile size along z; `None` means the full extent.
+            size_t: Tile size along t; `None` means the full extent.
+            stride_x: Step between tiles along x; `None` means `size_x`
+                (adjacent tiles). A smaller stride produces overlapping tiles.
+            stride_y: As `stride_x`, along y.
+            stride_z: As `stride_x`, along z.
+            stride_t: As `stride_x`, along t.
+            base_name: Prefix for the generated tile names.
+
+        Returns:
+            A new iterator over the tiled ROIs (the final tile along each
+            axis is clipped against the parent ROI).
+        """
         rois = grid(
             rois=self.rois,
             ref_image=self.ref_image,

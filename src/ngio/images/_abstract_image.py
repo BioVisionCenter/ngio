@@ -46,14 +46,14 @@ from ngio.ome_zarr_meta import (
     PixelSize,
 )
 from ngio.ome_zarr_meta.ngio_specs import (
+    DefaultSpaceUnit,
+    DefaultTimeUnit,
     Channel,
     NgffVersions,
     NgioLabelMeta,
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesSetup,
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
 )
@@ -262,12 +262,38 @@ class AbstractImage(ABC):
         """Return True if the image has the given axis."""
         return self.axes_handler.has_axis(axis)
 
+    def set_space_unit(self, unit: SpaceUnits = DefaultSpaceUnit) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(space_unit=unit)
+        self._meta_handler.update_meta(meta)
+
+    def set_time_unit(self, unit: TimeUnits = DefaultTimeUnit) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(time_unit=unit)
+        self._meta_handler.update_meta(meta)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit` — which is
+        also why this method is deprecated in their favour.
 
         Args:
             space_unit: The space unit of the image.
@@ -276,15 +302,6 @@ class AbstractImage(ABC):
         meta = self._meta_handler.get_meta()
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
         self._meta_handler.update_meta(meta)
-
-    @deprecated(replacement="set_axes_units()")
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Deprecated alias for `set_axes_units`."""
-        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(self, axes_names: Sequence[str]) -> None:
         """Set the axes names of the label.

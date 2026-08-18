@@ -12,7 +12,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal, TypeVar
 
-from ngio.utils import NgioFutureWarning, stacklevel_of_first_caller
+from ngio.utils import NgioFutureWarning, NgioValueError, stacklevel_of_first_caller
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
@@ -73,6 +73,11 @@ def _map_workers(
     """
     if max_workers is None:
         _warn_default_will_change(len(items))
+    elif isinstance(max_workers, int) and max_workers < 1:
+        raise NgioValueError(
+            f"max_workers must be >= 1, got {max_workers}. Use 1 for serial "
+            'execution, or "auto" to size the pool automatically.'
+        )
     max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 1 or len(items) <= 1:
         return [func(item) for item in items]

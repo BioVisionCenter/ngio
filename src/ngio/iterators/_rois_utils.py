@@ -86,7 +86,14 @@ def grid(
     stride_t: int | None = None,
     base_name: str | None = None,
 ) -> list[Roi]:
-    """This method is a placeholder for creating a regular grid of ROIs."""
+    """Tile the ROIs with a regular grid of tiles.
+
+    Sizes default to the full axis extent (no tiling along that axis) and
+    strides default to the sizes (adjacent, non-overlapping tiles); a stride
+    smaller than the size produces overlapping tiles. The final tile along an
+    axis is clipped against the parent ROI. The grid is intersected with the
+    existing ROIs, so tiling composes with `product` and ROI tables.
+    """
     t_dim = ref_image.dimensions.get("t", default=1)
     z_dim = ref_image.dimensions.get("z", default=1)
     y_dim = ref_image.dimensions.get("y", default=1)

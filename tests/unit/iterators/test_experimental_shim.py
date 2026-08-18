@@ -14,7 +14,7 @@ def test_shim_warns_and_forwards(name: str):
         obj = getattr(experimental_iterators, name)
     assert obj is getattr(iterators, name)
     # The promised removal version is the point of the warning; pin it.
-    assert "ngio=1.1" in str(record[0].message)
+    assert "ngio=1.2" in str(record[0].message)
 
 
 def test_shim_unknown_attribute():

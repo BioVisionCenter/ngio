@@ -348,18 +348,6 @@ class OmeZarrPlate:
         """Return the wells paths in the plate."""
         return self.meta.wells_paths
 
-    @deprecated(replacement="images_paths()")
-    async def images_paths_async(self, acquisition: int | None = None) -> list[str]:
-        """Return the images paths in the plate asynchronously.
-
-        Deprecated: use `images_paths()`. Well metadata is read from the plate's
-        own attributes, so there was never any IO here to parallelise.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-        """
-        return self.images_paths(acquisition=acquisition)
-
     def images_paths(
         self, acquisition: int | None = None, max_workers: MaxWorkers = None
     ) -> list[str]:
@@ -462,26 +450,6 @@ class OmeZarrPlate:
         well_path = self._well_path(row=row, column=column)
         return self._get_well(well_path=well_path)
 
-    @deprecated(replacement="get_wells(max_workers=...)")
-    async def get_wells_async(
-        self, max_workers: MaxWorkers = None
-    ) -> dict[str, OmeZarrWell]:
-        """Get all wells in the plate asynchronously.
-
-        Deprecated: use `get_wells(max_workers=...)`.
-
-        Args:
-            max_workers: How many wells to open at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-
-        Returns:
-            A dictionary of wells, keyed by well path.
-        """
-        paths = self.wells_paths()
-        factories = [(lambda p=p: asyncio.to_thread(self._get_well, p)) for p in paths]
-        wells = await _gather_bounded(factories, max_workers=max_workers)
-        return dict(zip(paths, wells, strict=True))
-
     def get_wells(self, max_workers: MaxWorkers = None) -> dict[str, OmeZarrWell]:
         """Get all wells in the plate.
 
@@ -511,27 +479,6 @@ class OmeZarrPlate:
         image = OmeZarrContainer(img_group_handler)
         # See `_get_well` for why this is `setdefault`.
         return self._images_cache.setdefault(image_path, image)
-
-    @deprecated(replacement="get_images(max_workers=...)")
-    async def get_images_async(
-        self, acquisition: int | None = None, max_workers: MaxWorkers = None
-    ) -> dict[str, OmeZarrContainer]:
-        """Get all images in the plate asynchronously.
-
-        Deprecated: use `get_images(max_workers=...)`.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-            max_workers: How many images to open at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-
-        Returns:
-            A dictionary of images, keyed by image path.
-        """
-        paths = self.images_paths(acquisition=acquisition)
-        factories = [(lambda p=p: asyncio.to_thread(self._get_image, p)) for p in paths]
-        images = await _gather_bounded(factories, max_workers=max_workers)
-        return dict(zip(paths, images, strict=True))
 
     def get_images(
         self, acquisition: int | None = None, max_workers: MaxWorkers = None
@@ -1090,35 +1037,6 @@ class OmeZarrPlate:
             max_workers=max_workers,
         )
 
-    @deprecated(replacement="list_image_tables(max_workers=...)")
-    async def list_image_tables_async(
-        self,
-        acquisition: int | None = None,
-        filter_types: str | None = None,
-        mode: Literal["common", "all"] = "common",
-        max_workers: MaxWorkers = None,
-    ) -> list[str]:
-        """List all image tables in the plate asynchronously.
-
-        Deprecated: use `list_image_tables(max_workers=...)`.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-            filter_types: The type of tables to filter. If None, return all
-                tables.
-            mode: Whether to return only tables common to every image
-                (`"common"`) or the union across them (`"all"`).
-            max_workers: How many images to read at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-        """
-        images = tuple(self.get_images(acquisition=acquisition).values())
-        return await _list_image_tables_async(
-            images=images,
-            filter_types=filter_types,
-            mode=mode,
-            max_workers=max_workers,
-        )
-
     def concatenate_image_tables(
         self,
         name: str,
@@ -1197,95 +1115,6 @@ class OmeZarrPlate:
             mode=mode,
             max_workers=max_workers,
         )
-
-    @deprecated(replacement="concatenate_image_tables(max_workers=...)")
-    async def concatenate_image_tables_async(
-        self,
-        name: str,
-        acquisition: int | None = None,
-        index_key: str | None = None,
-        strict: bool = True,
-        mode: Literal["eager", "lazy"] = "eager",
-        max_workers: MaxWorkers = None,
-    ) -> Table:
-        """Concatenate tables from all images in the plate asynchronously.
-
-        Deprecated: use `concatenate_image_tables(max_workers=...)`.
-
-        Args:
-            name: The name of the table to concatenate.
-            index_key: The key to use for the index of the concatenated table.
-            acquisition: The acquisition id to filter the images.
-            index_key: If a string is provided, a new index column will be created
-                new_index_pattern = {row}_{column}_{path_in_well}_{label}
-            strict: If True, raise an error if the table is not found in the image.
-            mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-                if 'eager', the table will be loaded into memory.
-                if 'lazy', the table will be loaded as a lazy frame.
-            max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time; that default becomes
-                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
-                `"auto"` for a pool sized for round-trip-bound work.
-        """
-        images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(tuple(images.keys()))
-        return await _concatenate_image_tables_async(
-            images=tuple(images.values()),
-            extras=extras,
-            name=name,
-            table_cls=None,
-            index_key=index_key,
-            strict=strict,
-            mode=mode,
-            max_workers=max_workers,
-        )
-
-    @deprecated(replacement="concatenate_image_tables_as(max_workers=...)")
-    async def concatenate_image_tables_as_async(
-        self,
-        name: str,
-        table_cls: type[TableType],
-        acquisition: int | None = None,
-        index_key: str | None = None,
-        strict: bool = True,
-        mode: Literal["eager", "lazy"] = "eager",
-        max_workers: MaxWorkers = None,
-    ) -> TableType:
-        """Concatenate tables from all images in the plate as a specific type.
-
-        Deprecated: use `concatenate_image_tables_as(max_workers=...)`.
-
-        Args:
-            name: The name of the table to concatenate.
-            table_cls: The type of the table to concatenate.
-            index_key: The key to use for the index of the concatenated table.
-            acquisition: The acquisition id to filter the images.
-            index_key: If a string is provided, a new index column will be created
-                new_index_pattern = {row}_{column}_{path_in_well}_{label}
-            strict: If True, raise an error if the table is not found in the image.
-            mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-                if 'eager', the table will be loaded into memory.
-                if 'lazy', the table will be loaded as a lazy frame.
-            max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time; that default becomes
-                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
-                `"auto"` for a pool sized for round-trip-bound work.
-        """
-        images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(tuple(images.keys()))
-        table = await _concatenate_image_tables_async(
-            images=tuple(images.values()),
-            extras=extras,
-            name=name,
-            table_cls=table_cls,
-            index_key=index_key,
-            strict=strict,
-            mode=mode,
-            max_workers=max_workers,
-        )
-        if not isinstance(table, table_cls):
-            raise NgioValueError(f"Table is not of type {table_cls}. Got {type(table)}")
-        return table
 
 
 def open_ome_zarr_plate(

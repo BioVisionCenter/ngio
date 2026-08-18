@@ -126,13 +126,7 @@ def test_concatenate_image_tables_as(cardiomyocyte_small_mip_path_readonly: Path
     )
     assert isinstance(table, FeatureTable)
 
-    async_table = asyncio.run(
-        plate.concatenate_image_tables_as_async(
-            name="regionprops_DAPI", table_cls=FeatureTable
-        )
-    )
-    assert isinstance(async_table, FeatureTable)
-    assert set(table.dataframe.columns) == set(async_table.dataframe.columns)
+    assert "label" in table.dataframe.reset_index().columns
 
 
 def test_get_well_returns_cached_instance(tmp_path: Path):

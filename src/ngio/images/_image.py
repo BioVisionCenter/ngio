@@ -447,7 +447,6 @@ class Image(AbstractImage):
 class ImagesContainer:
     """A class to handle the /images group in an OME-NGFF file."""
 
-    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
@@ -687,27 +686,40 @@ class ImagesContainer:
         starts_ends = compute_image_percentile(ref_image, percentiles=percentiles)
         self.set_channel_windows(starts_ends=starts_ends)
 
+    def set_space_unit(self, unit: SpaceUnits = DefaultSpaceUnit) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+        """
+        self.get().set_space_unit(unit)
+
+    def set_time_unit(self, unit: TimeUnits = DefaultTimeUnit) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+        """
+        self.get().set_time_unit(unit)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit`.
 
         Args:
             space_unit: The space unit of the image.
             time_unit: The time unit of the image.
         """
-        self.get().set_axes_units(space_unit=space_unit, time_unit=time_unit)
-
-    @deprecated(replacement="set_axes_units()")
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Deprecated alias for `set_axes_units`."""
-        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
+        self.get().set_space_unit(space_unit)
+        self.get().set_time_unit(time_unit)
 
     def set_axes_names(
         self,

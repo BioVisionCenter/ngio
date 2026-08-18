@@ -27,7 +27,13 @@ from ngio.utils import NgioValueError
 
 
 class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
-    """Base class for iterators over ROIs."""
+    """Segment an image region by region into a label.
+
+    Reads each region from the input image and writes the function's label
+    patch to the output label. With `stitch=True` (and a halo) objects split
+    by tile boundaries are resolved into one id after the map; see
+    `StitchConfig`.
+    """
 
     # Class-level defaults so subclasses that write their own `__init__` — the
     # masked iterator does — are simply not stitching, rather than missing an
@@ -220,7 +226,16 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 
 
 class MaskedSegmentationIterator(SegmentationIterator):
-    """Base class for iterators over ROIs."""
+    """Segment each object of a masking ROI table, inside its own mask.
+
+    Regions come from the masking table's per-object bounding boxes; reads
+    are masked to the object (outside pixels filled) and writes protect
+    everything outside it (`MaskMerge`). There is no `stitch` option here:
+    stitching needs a regular tile grid, which per-object bounding boxes do
+    not form — ids across objects are the caller's to keep unique, e.g. with
+    `output_transforms=[UniqueLabelsTransform(block_size)]`, where the ROI's
+    own label supplies the block index.
+    """
 
     # Narrows the base class's `Image`: this iterator needs the masking label
     # and ROI table that only a `MaskedImage` carries.

@@ -634,7 +634,6 @@ class ImagePyramidBuilder(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
-    @deprecated_alias(levels_paths="level_paths")
     def from_scaling_factors(
         cls,
         level_paths: tuple[str, ...],
@@ -694,7 +693,6 @@ class ImagePyramidBuilder(BaseModel):
         )
 
     @classmethod
-    @deprecated_alias(levels_paths="level_paths")
     def from_shapes(
         cls,
         shapes: Sequence[tuple[int, ...]],

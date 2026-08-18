@@ -47,6 +47,7 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
+    deprecated,
     deprecated_alias,
 )
 
@@ -103,7 +104,6 @@ class OmeZarrContainer:
     _labels_container: LabelsContainer | None
     _tables_container: TablesContainer | None
 
-    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
@@ -390,26 +390,54 @@ class OmeZarrContainer:
             percentiles=percentiles
         )
 
+    def set_space_unit(
+        self, unit: SpaceUnits = DefaultSpaceUnit, *, set_labels: bool = True
+    ) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+            set_labels: Whether to set the unit for the labels as well.
+        """
+        if set_labels:
+            for label_name in self.list_labels():
+                self.get_label(label_name).set_space_unit(unit)
+        self._images_container.set_space_unit(unit)
+
+    def set_time_unit(
+        self, unit: TimeUnits = DefaultTimeUnit, *, set_labels: bool = True
+    ) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+            set_labels: Whether to set the unit for the labels as well.
+        """
+        if set_labels:
+            for label_name in self.list_labels():
+                self.get_label(label_name).set_time_unit(unit)
+        self._images_container.set_time_unit(unit)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
         set_labels: bool = True,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit`.
 
         Args:
             space_unit: The unit of space.
             time_unit: The unit of time.
             set_labels: Whether to set the units for the labels as well.
         """
-        if set_labels:
-            for label_name in self.list_labels():
-                label = self.get_label(label_name)
-                label.set_axes_units(space_unit=space_unit, time_unit=time_unit)
-        self._images_container.set_axes_units(
-            space_unit=space_unit, time_unit=time_unit
-        )
+        self.set_space_unit(space_unit, set_labels=set_labels)
+        self.set_time_unit(time_unit, set_labels=set_labels)
 
     def set_axes_names(
         self,

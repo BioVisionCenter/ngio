@@ -22,7 +22,13 @@ from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 
 class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
-    """Base class for iterators over ROIs."""
+    """Apply an image-to-image function region by region.
+
+    Reads each region from the input image, hands the patch to `map`'s
+    function, and writes the result to the output image — a filter, a
+    projection, a restoration model. Compose with `by_chunks(grid="write")`
+    for collision-free parallel writes and `with_halo` for seamless tiles.
+    """
 
     def __init__(
         self,

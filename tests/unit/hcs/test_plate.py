@@ -42,9 +42,6 @@ def test_open_real_ome_zarr_plate(cardiomyocyte_tiny_path_readonly: Path):
 
     images_plate = ome_zarr_plate.get_images()
     assert len(images_plate) == 1
-    images_plate_async = asyncio.run(ome_zarr_plate.get_images_async())
-    assert len(images_plate_async) == 1
-    assert images_plate.keys() == images_plate_async.keys()
 
     _ = ome_zarr_plate.get_image("B", "03", "0")
 
@@ -317,13 +314,8 @@ def test_plate_table_aggregations(cardiomyocyte_small_mip_path_readonly: Path):
     ]
     tables = ome_zarr_plate.list_image_tables()
     assert set(tables) == set(expected_tables)
-    async_tables = asyncio.run(ome_zarr_plate.list_image_tables_async())
-    assert set(async_tables) == set(expected_tables)
     roi_tables = ome_zarr_plate.list_image_tables(filter_types="roi_table")
     assert set(roi_tables) == {"FOV_ROI_table", "well_ROI_table"}
 
     t1 = ome_zarr_plate.concatenate_image_tables(name="regionprops_DAPI")
-    t2 = asyncio.run(
-        ome_zarr_plate.concatenate_image_tables_async(name="regionprops_DAPI")
-    )
-    pdt.assert_frame_equal(t1.dataframe, t2.dataframe)
+    assert t1.dataframe is not None

@@ -142,7 +142,12 @@ def _default_feature_coalesce(
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
-    """Base class for iterators over ROIs."""
+    """Measure image/label pairs region by region; nothing is written.
+
+    Each unit pairs the image patch with the label patch over the same
+    region. `reduce` collects per-region results; `reduce_to_table` joins
+    them into a single `FeatureTable` for the caller to store.
+    """
 
     def __init__(
         self,

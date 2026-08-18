@@ -57,7 +57,9 @@ class IoPipeContext:
         return tuple(self.axes_ops.output_axes)
 
 
-# The pre-1.1 name for the context handed to transforms; kept importable.
+#: Legacy alias for `IoPipeContext` — the pre-1.1 name for the context handed
+#: to transforms. Kept importable indefinitely; new code should spell it
+#: `IoPipeContext`.
 TransformContext = IoPipeContext
 
 

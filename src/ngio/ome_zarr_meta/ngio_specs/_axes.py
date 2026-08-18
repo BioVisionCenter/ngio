@@ -87,6 +87,17 @@ TimeUnits = Literal[
 DefaultTimeUnit = "second"
 
 
+class _UnitUnset:
+    """Sentinel type: leave the unit as it is."""
+
+    def __repr__(self) -> str:
+        return "UnitUnchanged"
+
+
+#: Passed as a unit to mean "leave the unit unchanged".
+UnitUnchanged = _UnitUnset()
+
+
 class Axis(BaseModel):
     """Axis infos model."""
 
@@ -425,27 +436,29 @@ class AxesHandler:
     def to_units(
         self,
         *,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
+        space_unit: SpaceUnits | _UnitUnset = UnitUnchanged,
+        time_unit: TimeUnits | _UnitUnset = UnitUnchanged,
     ) -> "AxesHandler":
-        """Convert the pixel size to the given units.
+        """Set the units of the space and time axes.
 
         Args:
-            space_unit(str): The space unit to convert to.
-            time_unit(str): The time unit to convert to.
+            space_unit: The space unit to set; omitted means unchanged.
+            time_unit: The time unit to set; omitted means unchanged.
         """
         new_axes = []
         for ax in self.axes:
-            if ax.axis_type == AxisType.space:
-                new_ax = Axis(
-                    name=ax.name,
-                    axis_type=ax.axis_type,
-                    unit=space_unit,
+            if ax.axis_type == AxisType.space and not isinstance(
+                space_unit, _UnitUnset
+            ):
+                new_axes.append(
+                    Axis(name=ax.name, axis_type=ax.axis_type, unit=space_unit)
                 )
-                new_axes.append(new_ax)
-            elif ax.axis_type == AxisType.time:
-                new_ax = Axis(name=ax.name, axis_type=ax.axis_type, unit=time_unit)
-                new_axes.append(new_ax)
+            elif ax.axis_type == AxisType.time and not isinstance(
+                time_unit, _UnitUnset
+            ):
+                new_axes.append(
+                    Axis(name=ax.name, axis_type=ax.axis_type, unit=time_unit)
+                )
             else:
                 new_axes.append(ax)
 

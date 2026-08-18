@@ -10,7 +10,7 @@ from ngio.utils._warnings import NgioDeprecationWarning
 
 _F = TypeVar("_F", bound=Callable[..., Any])
 
-DEFAULT_REMOVED_IN = "1.1"
+DEFAULT_REMOVED_IN = "1.2"
 
 
 def _qualname(func: Callable[..., Any]) -> str:

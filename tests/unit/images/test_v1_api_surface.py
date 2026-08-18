@@ -111,50 +111,32 @@ def test_validate_arrays_is_forwarded(tmp_path, monkeypatch):
     assert len(opened) == 3
 
 
-def test_validate_paths_alias_warns(tmp_path):
-    from ngio.images import ImagesContainer
-    from ngio.utils import ZarrGroupHandler
+def test_v1_promised_removals_are_gone():
+    """The surfaces v1.0.0 deprecated 'until 1.1' no longer exist."""
+    import inspect
 
-    store = tmp_path / "alias.zarr"
-    create_empty_ome_zarr(store=store, shape=(32, 32), pixelsize=0.5)
-    handler = ZarrGroupHandler(store=store, mode="r+")
-    with pytest.warns(NgioDeprecationWarning, match="validate_paths"):
-        ImagesContainer(handler, axes_setup=None, validate_paths=False)
-
-
-def test_set_axes_unit_alias_warns(float_container):
-    with pytest.warns(NgioDeprecationWarning, match="set_axes_units"):
-        float_container.get_image().set_axes_unit(space_unit="millimeter")
-    assert float_container.get_image().space_unit == "millimeter"
-
-
-def test_levels_paths_alias_warns():
+    import ngio.images
     from ngio.common._pyramid import ImagePyramidBuilder
+    from ngio.images import ImagesContainer
 
-    with pytest.warns(NgioDeprecationWarning, match="level_paths"):
-        builder = ImagePyramidBuilder.from_shapes(
-            shapes=[(32, 32), (16, 16)],
-            base_scale=(1.0, 1.0),
-            axes=("y", "x"),
-            levels_paths=["a", "b"],
-        )
-    assert [level.path for level in builder.levels] == ["a", "b"]
+    assert not hasattr(ngio.images, "conctatenate_tables")
+    assert not hasattr(ngio.images, "list_image_tables_async")
+    assert not hasattr(ngio.images, "concatenate_image_tables_async")
+    assert not hasattr(ngio.images, "concatenate_image_tables_as_async")
+    assert not hasattr(ImagesContainer, "set_axes_unit")
+    assert "levels_paths" not in inspect.signature(
+        ImagePyramidBuilder.from_shapes
+    ).parameters
+    assert "validate_paths" not in inspect.signature(
+        ImagesContainer.__init__
+    ).parameters
 
 
-def test_conctatenate_tables_typo_alias_warns(tmp_path):
-    import pandas as pd
-
-    from ngio.images import TableWithExtras, concatenate_tables, conctatenate_tables
-    from ngio.tables import FeatureTable
-
-    def make():
-        data = pd.DataFrame({"x": [1, 2], "label": [1, 2]})
-        return [TableWithExtras(table=FeatureTable(table_data=data), extras={"a": "b"})]
-
-    expected = concatenate_tables(make()).dataframe
-    with pytest.warns(NgioDeprecationWarning, match="concatenate_tables"):
-        got = conctatenate_tables(make()).dataframe
-    assert got.equals(expected)
+def test_set_axes_units_is_deprecated(float_container):
+    """The batch form points at the split methods; both units are still set."""
+    with pytest.warns(NgioDeprecationWarning, match="set_space_unit"):
+        float_container.get_image().set_axes_units(space_unit="millimeter")
+    assert float_container.get_image().space_unit == "millimeter"
 
 
 class TestMaskedLabelPixelSize:
@@ -220,15 +202,13 @@ class TestMaxWorkers:
         serial = plate.get_wells()
         assert list(plate.get_wells(max_workers=max_workers)) == list(serial)
 
-    def test_async_methods_are_deprecated(self, plate):
-        with pytest.warns(NgioDeprecationWarning, match="get_images"):
-            coro = plate.get_images_async()
-        assert list(asyncio.run(coro)) == list(plate.get_images())
-
-        with pytest.warns(NgioDeprecationWarning, match="get_wells"):
-            coro = plate.get_wells_async()
-        assert list(asyncio.run(coro)) == list(plate.get_wells())
-
-        with pytest.warns(NgioDeprecationWarning, match="images_paths"):
-            coro = plate.images_paths_async()
-        assert asyncio.run(coro) == plate.images_paths()
+    def test_async_methods_are_removed(self, plate):
+        for name in (
+            "get_images_async",
+            "get_wells_async",
+            "images_paths_async",
+            "list_image_tables_async",
+            "concatenate_image_tables_async",
+            "concatenate_image_tables_as_async",
+        ):
+            assert not hasattr(plate, name)

@@ -203,20 +203,21 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
             for other in active:
                 other_rect = footprints[other.index]
                 if chunk_rects_intersect(other_rect, rect):
-                    shared = tuple(
-                        (max(a_first, b_first), min(a_last, b_last))
-                        for (a_first, a_last), (b_first, b_last) in zip(
-                            other_rect, rect, strict=True
+                    axes = unit.setter.slicing_ops.on_disk_axes  # type: ignore[union-attr]
+                    shared = ", ".join(
+                        f"{axis_name}: {max(a_first, b_first)}..{min(a_last, b_last)}"
+                        for axis_name, (a_first, a_last), (b_first, b_last) in zip(
+                            axes, other_rect, rect, strict=True
                         )
                     )
                     raise NgioValueError(
-                        f"Cannot run units in parallel: ROIs "
-                        f"{other.roi.name!r} and {unit.roi.name!r} write into "
-                        f"the same write unit(s) {shared} of the output "
-                        "array. Two concurrent writers on one chunk/shard "
-                        "lose data. Re-tile the iterator with "
-                        '`by_chunks(grid="write")`, or run serially '
-                        "(drop the `mapper` argument)."
+                        f"Cannot run regions in parallel: "
+                        f"{other.roi.get_name()!r} and {unit.roi.get_name()!r} "
+                        "write into the same write unit(s) of the output "
+                        f"array — chunk/shard indices per axis: {shared}. Two "
+                        "concurrent writers on one chunk/shard lose data. "
+                        'Re-tile the iterator with `by_chunks(grid="write")`, '
+                        "or run serially (drop the `mapper` argument)."
                     )
             active.append(unit)
 
