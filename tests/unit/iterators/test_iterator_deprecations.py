@@ -21,9 +21,7 @@ def _build_iterator() -> SegmentationIterator:
     )
     label = ome_zarr.derive_label("label")
     image = ome_zarr.get_image()
-    iterator = SegmentationIterator(
-        image, label, channel_selection=0, axes_order="yx"
-    )
+    iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
     return iterator.by_chunks()
 
 

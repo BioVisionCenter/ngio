@@ -27,12 +27,9 @@ from ngio.io_pipes._ops_slices import (
 )
 from ngio.io_pipes._ops_transforms import (
     TransformProtocol,
-    get_as_dask_transform,
-    get_as_numpy_transform,
-    require_dask_transforms,
-    require_numpy_transforms,
-    set_as_dask_transform,
-    set_as_numpy_transform,
+    apply_get_transforms,
+    apply_set_transforms,
+    normalize_transforms,
 )
 
 
@@ -79,7 +76,7 @@ class DataGetter(ABC, Generic[T]):
         self._zarr_array = zarr_array
         self._slicing_ops = slicing_ops
         self._axes_ops = axes_ops
-        self._transforms = transforms
+        self._transforms = normalize_transforms(transforms)
         self._roi = roi
 
     def __repr__(self) -> str:
@@ -134,7 +131,7 @@ class DataSetter(ABC, Generic[T]):
         self._zarr_array = zarr_array
         self._slicing_ops = slicing_ops
         self._axes_ops = axes_ops
-        self._transforms = transforms
+        self._transforms = normalize_transforms(transforms)
         self._roi = roi
 
     def __repr__(self) -> str:
@@ -190,7 +187,6 @@ class NumpyGetter(DataGetter[np.ndarray]):
         roi: Roi | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
-        self._numpy_transforms = require_numpy_transforms(transforms)
         slicing_ops, axes_ops = setup_io_pipe(
             dimensions=dimensions,
             slicing_dict=slicing_dict,
@@ -209,11 +205,13 @@ class NumpyGetter(DataGetter[np.ndarray]):
         """Get a numpy array from the zarr array with ops."""
         array = get_slice_as_numpy(self._zarr_array, slicing_ops=self._slicing_ops)
         array = get_as_numpy_axes_ops(array, axes_ops=self._axes_ops)
-        array = get_as_numpy_transform(
+        array = apply_get_transforms(
             array,
             slicing_ops=self._slicing_ops,
             axes_ops=self._axes_ops,
-            transforms=self._numpy_transforms,
+            transforms=self._transforms,
+            roi=self._roi,
+            expected_type=np.ndarray,
         )
         return array
 
@@ -231,7 +229,6 @@ class DaskGetter(DataGetter[DaskArray]):
         roi: Roi | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
-        self._dask_transforms = require_dask_transforms(transforms)
         slicing_ops, axes_ops = setup_io_pipe(
             dimensions=dimensions,
             slicing_dict=slicing_dict,
@@ -257,11 +254,13 @@ class DaskGetter(DataGetter[DaskArray]):
         """
         array = get_slice_as_dask(self._zarr_array, slicing_ops=self._slicing_ops)
         array = get_as_dask_axes_ops(array, axes_ops=self._axes_ops)
-        array = get_as_dask_transform(
+        array = apply_get_transforms(
             array,
             slicing_ops=self._slicing_ops,
             axes_ops=self._axes_ops,
-            transforms=self._dask_transforms,
+            transforms=self._transforms,
+            roi=self._roi,
+            expected_type=DaskArray,
         )
         return array
 
@@ -286,7 +285,6 @@ class NumpySetter(DataSetter[np.ndarray]):
         roi: Roi | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
-        self._numpy_transforms = require_numpy_transforms(transforms)
         slicing_ops, axes_ops = setup_io_pipe(
             dimensions=dimensions,
             slicing_dict=slicing_dict,
@@ -303,11 +301,13 @@ class NumpySetter(DataSetter[np.ndarray]):
 
     def set(self, patch: np.ndarray) -> None:
         """Get a numpy array from the zarr array with ops."""
-        patch = set_as_numpy_transform(
-            array=patch,
+        patch = apply_set_transforms(
+            patch,
             slicing_ops=self._slicing_ops,
             axes_ops=self._axes_ops,
-            transforms=self._numpy_transforms,
+            transforms=self._transforms,
+            roi=self._roi,
+            expected_type=np.ndarray,
         )
         patch = set_as_numpy_axes_ops(
             array=patch,
@@ -333,7 +333,6 @@ class DaskSetter(DataSetter[DaskArray]):
         roi: Roi | None = None,
     ) -> None:
         """Build a pipe to get a numpy or dask array from a zarr array."""
-        self._dask_transforms = require_dask_transforms(transforms)
         slicing_ops, axes_ops = setup_io_pipe(
             dimensions=dimensions,
             slicing_dict=slicing_dict,
@@ -350,11 +349,13 @@ class DaskSetter(DataSetter[DaskArray]):
 
     def set(self, patch: DaskArray) -> None:
         """Get a dask array from the zarr array with ops."""
-        patch = set_as_dask_transform(
-            array=patch,
+        patch = apply_set_transforms(
+            patch,
             slicing_ops=self._slicing_ops,
             axes_ops=self._axes_ops,
-            transforms=self._dask_transforms,
+            transforms=self._transforms,
+            roi=self._roi,
+            expected_type=DaskArray,
         )
         patch = set_as_dask_axes_ops(
             array=patch,

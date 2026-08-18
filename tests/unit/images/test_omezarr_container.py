@@ -11,36 +11,23 @@ from ngio import (
     open_ome_zarr_container,
 )
 from ngio.images._image import ChannelSelectionModel
-from ngio.io_pipes._ops_axes import AxesOps
-from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.io_pipes import TransformContext
 from ngio.ome_zarr_meta import ChannelsMeta
 from ngio.tables import GenericTable
 from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
 class IdentityTransform:
-    def get_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the scaling transformation to a numpy array."""
+    def on_get(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the transformation after reading."""
         return array
 
-    def get_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the scaling transformation to a dask array."""
-        return array
-
-    def set_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the inverse scaling transformation to a numpy array."""
-        return array
-
-    def set_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the inverse scaling transformation to a dask array."""
+    def on_set(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the inverse transformation before writing."""
         return array
 
 

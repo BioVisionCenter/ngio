@@ -21,12 +21,13 @@ When reading data the order of operations is:
 
 When writing data the order of operations is the reverse.
 
-The Transforms must implement the NumpyTransformProtocol (for the numpy pipes),
-the DaskTransformProtocol (for the dask pipes), or both. The numpy protocol is
-the canonical one; the dask half is optional. `TransformProtocol` is the union
-of the two. Transforms should be stateless and only depend on the input array
-and the slicing and axes ops. This allows them to be easily reused between
-different I/O pipes.
+The Transforms must implement the TransformProtocol: `on_get(array, ctx)` runs
+after reading, `on_set(array, ctx)` (the inverse) before writing. One contract
+serves both backends — the array type expresses the backend, and a transform
+supporting both dispatches on it. The `ctx` is a `TransformContext` carrying
+the axis names, the slicing ops, and the ROI (when there is one). Transforms
+should be stateless and only depend on the input array and the context. This
+allows them to be easily reused between different I/O pipes.
 
 """
 
@@ -55,8 +56,7 @@ from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps, SlicingType
 from ngio.io_pipes._ops_slices_utils import ChunkRect
 from ngio.io_pipes._ops_transforms import (
-    DaskTransformProtocol,
-    NumpyTransformProtocol,
+    TransformContext,
     TransformProtocol,
 )
 
@@ -69,7 +69,6 @@ __all__ = [
     "DaskRoiSetter",
     "DaskSetter",
     "DaskSetterMasked",
-    "DaskTransformProtocol",
     "DataGetter",
     "DataSetter",
     "NumpyGetter",
@@ -78,10 +77,10 @@ __all__ = [
     "NumpyRoiSetter",
     "NumpySetter",
     "NumpySetterMasked",
-    "NumpyTransformProtocol",
     "SlicingInputType",
     "SlicingOps",
     "SlicingType",
+    "TransformContext",
     "TransformProtocol",
     "dask_match_shape",
     "numpy_match_shape",

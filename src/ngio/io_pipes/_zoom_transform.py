@@ -10,8 +10,8 @@ from ngio.common._zoom import (
     dask_zoom,
     numpy_zoom,
 )
-from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.io_pipes._ops_transforms import TransformContext
 from ngio.utils import NgioValueError
 
 
@@ -53,18 +53,18 @@ class BaseZoomTransform:
     def _compute_zoom_shape(
         self,
         array_shape: Sequence[int],
-        axes_ops: AxesOps,
+        axes: Sequence[str],
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        if len(array_shape) != len(axes_ops.output_axes):
+        if len(array_shape) != len(axes):
             raise NgioValueError(
                 f"Array has {len(array_shape)} dimensions but the transform "
-                f"declares {len(axes_ops.output_axes)} output axes "
-                f"({axes_ops.output_axes})."
+                f"declares {len(axes)} output axes "
+                f"({axes})."
             )
 
         target_shape = []
-        for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
+        for shape, ax_name in zip(array_shape, axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is None:
                 # Unknown axis can only be a virtual axis
@@ -89,18 +89,18 @@ class BaseZoomTransform:
     def _compute_inverse_zoom_shape(
         self,
         array_shape: Sequence[int],
-        axes_ops: AxesOps,
+        axes: Sequence[str],
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
-        if len(array_shape) != len(axes_ops.output_axes):
+        if len(array_shape) != len(axes):
             raise NgioValueError(
                 f"Array has {len(array_shape)} dimensions but the transform "
-                f"declares {len(axes_ops.output_axes)} output axes "
-                f"({axes_ops.output_axes})."
+                f"declares {len(axes)} output axes "
+                f"({axes})."
             )
 
         target_shape = []
-        for shape, ax_name in zip(array_shape, axes_ops.output_axes, strict=True):
+        for shape, ax_name in zip(array_shape, axes, strict=True):
             ax_type = self._input_dimensions.axes_handler.get_axis(ax_name)
             if ax_type is not None and ax_type.axis_type == "channel":
                 # Do not scale channel axis
@@ -116,7 +116,7 @@ class BaseZoomTransform:
         # that the input image we got is roughly the right size.
         # This is a safeguard against user errors.
         expected_shape = self._compute_zoom_shape(
-            array_shape=target_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
+            array_shape=target_shape, axes=axes, slicing_ops=slicing_ops
         )
         if any(
             abs(es - s) > 1 for es, s in zip(expected_shape, array_shape, strict=True)
@@ -148,44 +148,36 @@ class BaseZoomTransform:
             source_array=array, target_shape=target_shape, order=self._order
         )
 
-    def get_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the scaling transformation to a numpy array."""
+    def on_get(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the scaling transformation after reading."""
+        if isinstance(array, da.Array):
+            array_shape = tuple(int(s) for s in array.shape)
+            target_shape = self._compute_zoom_shape(
+                array_shape=array_shape, axes=ctx.axes, slicing_ops=ctx.slicing
+            )
+            return self._dask_zoom(
+                array=array, array_shape=array_shape, target_shape=target_shape
+            )
         target_shape = self._compute_zoom_shape(
-            array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
+            array_shape=array.shape, axes=ctx.axes, slicing_ops=ctx.slicing
         )
         return self._numpy_zoom(array=array, target_shape=target_shape)
 
-    def get_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the scaling transformation to a dask array."""
-        array_shape = tuple(int(s) for s in array.shape)
-        target_shape = self._compute_zoom_shape(
-            array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
-        )
-        return self._dask_zoom(
-            array=array, array_shape=array_shape, target_shape=target_shape
-        )
-
-    def set_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the inverse scaling transformation to a numpy array."""
+    def on_set(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the inverse scaling transformation before writing."""
+        if isinstance(array, da.Array):
+            array_shape = tuple(int(s) for s in array.shape)
+            target_shape = self._compute_inverse_zoom_shape(
+                array_shape=array_shape, axes=ctx.axes, slicing_ops=ctx.slicing
+            )
+            return self._dask_zoom(
+                array=array, array_shape=array_shape, target_shape=target_shape
+            )
         target_shape = self._compute_inverse_zoom_shape(
-            array_shape=array.shape, axes_ops=axes_ops, slicing_ops=slicing_ops
+            array_shape=array.shape, axes=ctx.axes, slicing_ops=ctx.slicing
         )
         return self._numpy_zoom(array=array, target_shape=target_shape)
-
-    def set_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the inverse scaling transformation to a dask array."""
-        array_shape = tuple(int(s) for s in array.shape)
-        target_shape = self._compute_inverse_zoom_shape(
-            array_shape=array_shape, axes_ops=axes_ops, slicing_ops=slicing_ops
-        )
-        return self._dask_zoom(
-            array=array, array_shape=array_shape, target_shape=target_shape
-        )
