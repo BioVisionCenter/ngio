@@ -17,6 +17,7 @@ from ngio.io_pipes import (
     NumpyGetter,
     NumpyRoiGetter,
     NumpyRoiSetter,
+    SlicingInputType,
 )
 
 
@@ -36,10 +37,13 @@ def test_roi_getter_equals_bare_getter_with_slices():
     roi_getter = NumpyRoiGetter(
         zarr_array=image.zarr_array, dimensions=image.dimensions, roi=roi
     )
+    roi_slices: dict[str, SlicingInputType] = {
+        **roi.to_slicing_dict(pixel_size=image.dimensions.pixel_size)
+    }
     bare_getter = NumpyGetter(
         zarr_array=image.zarr_array,
         dimensions=image.dimensions,
-        slicing_dict=roi.to_slicing_dict(pixel_size=image.dimensions.pixel_size),
+        slicing_dict=roi_slices,
     )
     assert roi_getter.slicing_ops == bare_getter.slicing_ops
     np.testing.assert_array_equal(roi_getter(), data[6:22, 8:26])
@@ -93,6 +97,19 @@ def test_roi_getter_axes_order_passthrough():
         axes_order=["x", "y"],
     )
     np.testing.assert_array_equal(roi_getter(), data[6:22, 8:26].T)
+
+
+def test_bare_getter_roi_kwarg_is_slicing_active():
+    # New in 1.1: passing roi to a bare pipe slices by it, making the Roi
+    # pipe classes redundant.
+    image, data = _make_image()
+    roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r")
+
+    getter = NumpyGetter(
+        zarr_array=image.zarr_array, dimensions=image.dimensions, roi=roi
+    )
+    np.testing.assert_array_equal(getter(), data[6:22, 8:26])
+    assert getter.roi is roi
 
 
 def test_roi_getter_exposes_roi():

@@ -121,6 +121,25 @@ def test_transform_context_contents():
     assert ctx.slicing.get("x") == slice(2, 12)
 
 
+def test_io_pipe_context_is_transform_context():
+    from ngio.io_pipes import IoPipeContext
+    from ngio.transforms import TransformContext as TransformContextAlias
+
+    assert TransformContext is IoPipeContext
+    assert TransformContextAlias is IoPipeContext
+
+
+def test_io_pipe_context_plumbing_fields():
+    calls: list[tuple[str, str]] = []
+    transform = RecordingTransform("a", calls)
+    image = _make_image()
+
+    image.get_as_numpy(transforms=[transform])
+    ctx = transform.contexts[-1]
+    assert ctx.zarr_array is image.zarr_array
+    assert ctx.axes == tuple(ctx.axes_ops.output_axes)
+
+
 def test_dual_backend_transform_roundtrip():
     calls: list[tuple[str, str]] = []
     transform = RecordingTransform("a", calls)

@@ -56,6 +56,7 @@ from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps, SlicingType
 from ngio.io_pipes._ops_slices_utils import ChunkRect
 from ngio.io_pipes._ops_transforms import (
+    IoPipeContext,
     TransformContext,
     TransformProtocol,
 )
@@ -71,6 +72,7 @@ __all__ = [
     "DaskSetterMasked",
     "DataGetter",
     "DataSetter",
+    "IoPipeContext",
     "NumpyGetter",
     "NumpyGetterMasked",
     "NumpyRoiGetter",

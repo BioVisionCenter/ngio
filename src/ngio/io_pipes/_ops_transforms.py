@@ -1,8 +1,9 @@
 import warnings
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Protocol, TypeVar, runtime_checkable
 
+import zarr
 from dask.array import Array as DaskArray
 
 from ngio.common._roi import Roi
@@ -13,22 +14,35 @@ from ngio.utils import NgioDeprecationWarning, NgioValueError
 ArrayT = TypeVar("ArrayT")
 
 
-@dataclass(frozen=True)
-class TransformContext:
-    """The context an io pipe hands to each transform.
+@dataclass(frozen=True, eq=False)
+class IoPipeContext:
+    """Everything an io pipe knows about one read/write path.
+
+    Transforms may depend on the transform-stable fields: `axes`, `slicing`
+    and `roi`. The remaining fields (`zarr_array`, `axes_ops`) are pipe
+    plumbing, exposed for the pipes and adapters; transforms should not
+    reach for them.
 
     Attributes:
-        axes: Axis names of the array as the transform sees it.
+        zarr_array: The zarr array the pipe reads from or writes to.
         slicing: Where the patch sits in the parent image.
+        axes_ops: The axes operations mapping on-disk axes to the user's.
         roi: The physical ROI when the pipe has one, `None` otherwise.
     """
 
-    axes: tuple[str, ...]
+    zarr_array: zarr.Array
     slicing: SlicingOps
+    axes_ops: AxesOps
     roi: Roi | None = None
-    # Only the legacy adapter needs the full AxesOps to forward to old-style
-    # methods; removed together with the adapter in ngio=1.2.
-    _axes_ops: AxesOps | None = field(default=None, repr=False)
+
+    @property
+    def axes(self) -> tuple[str, ...]:
+        """Axis names of the array as a transform sees it."""
+        return tuple(self.axes_ops.output_axes)
+
+
+# The pre-1.1 name for the context handed to transforms; kept importable.
+TransformContext = IoPipeContext
 
 
 @runtime_checkable
@@ -41,11 +55,11 @@ class TransformProtocol(Protocol[ArrayT]):
     `on_get`/`on_set`.
     """
 
-    def on_get(self, array: ArrayT, ctx: TransformContext) -> ArrayT:
+    def on_get(self, array: ArrayT, ctx: IoPipeContext) -> ArrayT:
         """A transformation to be applied after reading an array."""
         ...
 
-    def on_set(self, array: ArrayT, ctx: TransformContext) -> ArrayT:
+    def on_set(self, array: ArrayT, ctx: IoPipeContext) -> ArrayT:
         """The inverse transformation, applied before writing an array."""
         ...
 
@@ -72,26 +86,21 @@ class _LegacyTransformAdapter:
     def __repr__(self) -> str:
         return f"_LegacyTransformAdapter({self._wrapped!r})"
 
-    def _forward(self, method_name: str, array: ArrayT, ctx: TransformContext):
+    def _forward(self, method_name: str, array: ArrayT, ctx: IoPipeContext):
         method = getattr(self._wrapped, method_name, None)
         if method is None:
             raise NgioValueError(
                 f"Transform '{type(self._wrapped).__name__}' does not implement "
                 f"{method_name}(), which this data path requires."
             )
-        if ctx._axes_ops is None:
-            raise NgioValueError(
-                "TransformContext was built without axes ops; legacy transforms "
-                "cannot be applied outside an io pipe."
-            )
-        return method(array, slicing_ops=ctx.slicing, axes_ops=ctx._axes_ops)
+        return method(array, slicing_ops=ctx.slicing, axes_ops=ctx.axes_ops)
 
-    def on_get(self, array: ArrayT, ctx: TransformContext) -> ArrayT:
+    def on_get(self, array: ArrayT, ctx: IoPipeContext) -> ArrayT:
         if isinstance(array, DaskArray):
             return self._forward("get_as_dask_transform", array, ctx)
         return self._forward("get_as_numpy_transform", array, ctx)
 
-    def on_set(self, array: ArrayT, ctx: TransformContext) -> ArrayT:
+    def on_set(self, array: ArrayT, ctx: IoPipeContext) -> ArrayT:
         if isinstance(array, DaskArray):
             return self._forward("set_as_dask_transform", array, ctx)
         return self._forward("set_as_numpy_transform", array, ctx)
@@ -151,22 +160,14 @@ def _require_backend_type(
 def apply_get_transforms(
     array: ArrayT,
     *,
-    slicing_ops: SlicingOps,
-    axes_ops: AxesOps,
+    ctx: IoPipeContext,
     transforms: Sequence[TransformProtocol] | None,
-    roi: Roi | None,
     expected_type: type,
 ) -> ArrayT:
     """Fold an array read from disk through the transforms' `on_get`."""
     if transforms is None:
         return array
 
-    ctx = TransformContext(
-        axes=tuple(axes_ops.output_axes),
-        slicing=slicing_ops,
-        roi=roi,
-        _axes_ops=axes_ops,
-    )
     for transform in transforms:
         array = transform.on_get(array, ctx)
         _require_backend_type(array, expected_type, transform)
@@ -176,22 +177,14 @@ def apply_get_transforms(
 def apply_set_transforms(
     array: ArrayT,
     *,
-    slicing_ops: SlicingOps,
-    axes_ops: AxesOps,
+    ctx: IoPipeContext,
     transforms: Sequence[TransformProtocol] | None,
-    roi: Roi | None,
     expected_type: type,
 ) -> ArrayT:
     """Fold an array about to be written through the transforms' `on_set`."""
     if transforms is None:
         return array
 
-    ctx = TransformContext(
-        axes=tuple(axes_ops.output_axes),
-        slicing=slicing_ops,
-        roi=roi,
-        _axes_ops=axes_ops,
-    )
     # Reading applies [A, B] as B(A(x)), so writing must invert the chain
     # outermost-first: A_inv(B_inv(y)).
     for transform in reversed(transforms):

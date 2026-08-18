@@ -214,9 +214,9 @@ def test_masked_set_with_user_transform():
     calls: list[str] = []
     patch = np.full((16, 18), 60, dtype="uint16")
 
-    NumpySetterMasked(transforms=[PlusN(5, calls)], **_masked_kwargs(image, label, roi))(
-        patch
-    )
+    NumpySetterMasked(
+        transforms=[PlusN(5, calls)], **_masked_kwargs(image, label, roi)
+    )(patch)
     # The patch is merged with the transformed disk data, then the inverse
     # transform applies to the merged patch before writing: inside the mask
     # the written pixels are patch - 5, outside they are unchanged.
@@ -274,9 +274,7 @@ def test_masked_slicing_dict_overrides_roi_axis():
     assert masked_getter.slicing_ops == roi_getter.slicing_ops
 
     mask = label_img[6:22, 2:10] == 3
-    np.testing.assert_array_equal(
-        masked_getter(), np.where(mask, data[6:22, 2:10], 0)
-    )
+    np.testing.assert_array_equal(masked_getter(), np.where(mask, data[6:22, 2:10], 0))
 
 
 def test_masked_pipe_properties():
