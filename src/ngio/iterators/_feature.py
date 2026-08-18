@@ -148,6 +148,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         self,
         input_image: Image,
         input_label: Label,
+        *,
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,

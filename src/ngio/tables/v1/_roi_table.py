@@ -97,6 +97,9 @@ def _dataframe_to_rois(
     extra_columns = set(dataframe.columns).difference(
         set(required_columns + TIME_COLUMNS)
     )
+    # `label` is consumed explicitly below (it is a Roi field, not an extra);
+    # leaving it here would pass it to `Roi.from_values` twice.
+    extra_columns.discard("label")
 
     for col in extra_columns:
         _check_optional_columns(col)

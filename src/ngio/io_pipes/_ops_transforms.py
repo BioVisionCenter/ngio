@@ -69,6 +69,10 @@ class TransformProtocol(Protocol[ArrayT]):
     expressed by the array type. A numpy-only transform is complete; a
     transform supporting both backends dispatches on the array type inside
     `on_get`/`on_set`.
+
+    Compatibility policy: future ngio versions will only ever add *optional*
+    members to this protocol, probed with `getattr` — a transform satisfying
+    today's two-method contract keeps working.
     """
 
     def on_get(self, array: ArrayT, ctx: IoPipeContext) -> ArrayT:

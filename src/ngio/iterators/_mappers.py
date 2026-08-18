@@ -68,7 +68,7 @@ def compute_write_footprint(setter: DataSetterProtocol[Any]) -> ChunkRect | None
     )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class IterUnit(Generic[T]):
     """One schedulable unit of iterator work: read one ROI, optionally write back.
 
@@ -120,6 +120,10 @@ class MapperProtocol(Protocol[T, R]):
       (store metadata round-trips); generators are not thread-safe. A parallel
       mapper must materialise and consume `units` on the dispatching thread
       only, then distribute the materialised units to its workers.
+
+    Compatibility policy: future ngio versions will only ever add
+    *optional* members to this protocol, probed with `getattr` — an
+    implementation satisfying today's contract keeps working.
     """
 
     def __call__(

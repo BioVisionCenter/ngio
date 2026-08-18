@@ -49,14 +49,14 @@ from ngio.utils import NgioStore, NgioValueError, StoreOrGroup, open_group_wrapp
 _SCRATCH_GROUP = "_ngio_stitch"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class StitchConfig:
     """How to stitch a tiled segmentation.
 
     Attributes:
         block_size: Ids reserved per tile. Must exceed the largest label a
             single tile can produce, or ids spill into the next tile's block.
-        min_iou: How much two tiles' predictions must agree over the shared band
+        iou_threshold: How much two tiles' predictions must agree over the shared band
             before their ids are called the same object. Low values merge
             eagerly; the default errs towards leaving an object split, which is
             fixable downstream, rather than merging two that are not.
@@ -70,7 +70,7 @@ class StitchConfig:
     """
 
     block_size: int = 10_000
-    min_iou: float = 0.3
+    iou_threshold: float = 0.3
     compact: bool = True
     scratch_store: StoreOrGroup | None = None
 
@@ -78,9 +78,9 @@ class StitchConfig:
         """Validate the configuration."""
         if self.block_size <= 0:
             raise NgioValueError(f"block_size must be > 0, got {self.block_size}.")
-        if not 0.0 < self.min_iou <= 1.0:
+        if not 0.0 < self.iou_threshold <= 1.0:
             raise NgioValueError(
-                f"min_iou must be in (0, 1], got {self.min_iou}. Zero would "
+                f"iou_threshold must be in (0, 1], got {self.iou_threshold}. Zero would "
                 "merge any pair that shares a single pixel."
             )
 
@@ -213,7 +213,7 @@ class StitchPlan:
                 predicted = np.asarray(scratch[selection])
                 written = np.asarray(label_array[selection])
                 for (mine, theirs), score in overlap_iou(predicted, written).items():
-                    if score >= self._config.min_iou:
+                    if score >= self._config.iou_threshold:
                         union.union(mine, theirs)
 
         mapping = union.resolve()

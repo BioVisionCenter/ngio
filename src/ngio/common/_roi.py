@@ -480,7 +480,7 @@ class Roi(BaseModel):
                 new_slices.append(roi_slice)
         return self.model_copy(update={"slices": new_slices})
 
-    def compose(self, local: "Roi", pixel_size: PixelSize) -> "Roi":
+    def anchor(self, local: "Roi", *, pixel_size: PixelSize) -> "Roi":
         """Anchor a patch-local pixel ROI inside this region.
 
         The inverse of handing out a patch: a function that received the
@@ -513,20 +513,20 @@ class Roi(BaseModel):
             box = Roi.from_values(
                 slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel"
             )
-            abs_roi = tile_roi.compose(box, pixel_size=image.pixel_size)
+            abs_roi = tile_roi.anchor(box, pixel_size=image.pixel_size)
             ```
         """
         if self.space != "world":
             raise NgioValueError(
-                "compose anchors a local ROI inside a world-space region, "
+                "anchor places a local ROI inside a world-space region, "
                 f"but this ROI is in {self.space!r} space. Convert it with "
-                "to_world() first."
+                "to_world(pixel_size=...) first."
             )
         if local.space != "pixel":
             raise NgioValueError(
                 "The local ROI must be in pixel space (space='pixel'): its "
                 "starts are offsets into this region's patch. A world-space "
-                "ROI is already absolute and needs no composing."
+                "ROI is already absolute and needs no anchoring."
             )
         region = self.to_pixel(pixel_size=pixel_size)
         new_slices = []

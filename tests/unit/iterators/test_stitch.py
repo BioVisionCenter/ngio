@@ -120,7 +120,7 @@ def test_touching_objects_stay_distinct():
 
     Note this holds *regardless of the threshold*: the two tiles pair their
     objects one-to-one, so the wrong pairs score zero rather than merely low.
-    The criterion is what saves this, not `min_iou` — see
+    The criterion is what saves this, not `iou_threshold` — see
     `test_threshold_rejects_weak_agreement` for what the threshold is for.
     """
     data = _two_objects_touching_at_the_seam()
@@ -150,15 +150,15 @@ def test_threshold_rejects_weak_agreement():
     """Neighbours that only partly agree about an object are left unmerged."""
     data = _one_object_across_the_seam()
 
-    lenient = _run(data, stitch=StitchConfig(min_iou=0.3), halo=4)
-    strict = _run(data, stitch=StitchConfig(min_iou=0.99), halo=4)
+    lenient = _run(data, stitch=StitchConfig(iou_threshold=0.3), halo=4)
+    strict = _run(data, stitch=StitchConfig(iou_threshold=0.99), halo=4)
 
     # Identical predictions agree perfectly, so even the strict run merges.
     assert len(_object_ids(lenient)) == 1
     assert len(_object_ids(strict)) == 1
 
     # With neighbours that disagree near the seam, the threshold starts to bite.
-    disagreeing = _run_with(data, _eroding_components, StitchConfig(min_iou=0.99))
+    disagreeing = _run_with(data, _eroding_components, StitchConfig(iou_threshold=0.99))
     assert len(_object_ids(disagreeing)) == 2, "weak agreement should not merge"
 
 
@@ -283,8 +283,8 @@ def test_stitching_requires_a_halo():
 
 
 def test_config_rejects_a_zero_threshold():
-    with pytest.raises(NgioValueError, match="min_iou"):
-        StitchConfig(min_iou=0.0)
+    with pytest.raises(NgioValueError, match="iou_threshold"):
+        StitchConfig(iou_threshold=0.0)
     with pytest.raises(NgioValueError, match="block_size"):
         StitchConfig(block_size=0)
 

@@ -57,6 +57,7 @@ from ngio.io_pipes._io_pipes import (
     NumpyGetter,
     NumpySetter,
 )
+from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
 from ngio.io_pipes._merge_policy import MergeInput, MergePolicy, MergeRule
 from ngio.io_pipes._ops_axes import AxesOps
@@ -78,7 +79,9 @@ __all__ = [
     "DaskSetter",
     "DaskSetterMasked",
     "DataGetter",
+    "DataGetterProtocol",
     "DataSetter",
+    "DataSetterProtocol",
     "IoPipeContext",
     "MergeInput",
     "MergePolicy",

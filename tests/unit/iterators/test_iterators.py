@@ -322,3 +322,39 @@ def test_masked_segmentation_checks_dimensions():
 
     with pytest.raises(NgioValueError):
         MaskedSegmentationIterator(masked, mismatched, axes_order="yx")
+
+
+def test_feature_iterator_still_refuses_a_halo():
+    """Only iterators that reconcile the margin themselves may read grown."""
+    data = np.zeros((16, 16), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, axes_names="yx", levels=1
+    )
+    iterator = FeatureExtractorIterator(
+        input_image=ome_zarr.get_image(),
+        input_label=ome_zarr.derive_label("lbl"),
+        axes_order="yx",
+    )
+    with pytest.raises(NgioValueError, match="read-only"):
+        iterator.with_halo(x=4, y=4)
+
+
+def test_incomplete_get_init_kwargs_is_refused():
+    """Forgotten constructor state must fail loudly, not vanish on reshaping."""
+    data = np.zeros((16, 16), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, axes_names="yx", levels=1
+    )
+
+    class Forgetful(SegmentationIterator):
+        def __init__(self, input_image, output_label, *, favourite=None, **kwargs):
+            super().__init__(input_image, output_label, **kwargs)
+            self._favourite = favourite
+
+        # get_init_kwargs inherited: 'favourite' is silently missing from it.
+
+    iterator = Forgetful(
+        ome_zarr.get_image(), ome_zarr.derive_label("seg"), favourite=42
+    )
+    with pytest.raises(NgioValueError, match="favourite"):
+        iterator.by_yx()

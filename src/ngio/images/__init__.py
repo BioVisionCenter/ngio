@@ -2,7 +2,12 @@
 
 from ngio.images._abstract_image import AbstractImage
 from ngio.images._create_synt_container import create_synthetic_ome_zarr
-from ngio.images._image import ChannelSelectionModel, Image, ImagesContainer
+from ngio.images._image import (
+    ChannelSelectionModel,
+    ChannelSlicingInputType,
+    Image,
+    ImagesContainer,
+)
 from ngio.images._label import Label, LabelsContainer, derive_label
 from ngio.images._masked_image import MaskedImage, MaskedLabel
 from ngio.images._ome_zarr_container import (
@@ -28,6 +33,7 @@ from ngio.images._table_ops import (
 __all__ = [
     "AbstractImage",
     "ChannelSelectionModel",
+    "ChannelSlicingInputType",
     "Image",
     "ImagesContainer",
     "Label",

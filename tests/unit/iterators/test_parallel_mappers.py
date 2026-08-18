@@ -214,13 +214,13 @@ def test_detect_across_processes(tmp_path: Path):
         levels=1,
         consolidation_mode="dask",
     )
-    iterator = ObjectDetectionIterator(
-        ome_zarr.get_image(),
-        channel_selection=0,
-        axes_order="yx",
-        padding_x=8,
-        padding_y=8,
-    ).grid(size_x=32, size_y=32)
+    iterator = (
+        ObjectDetectionIterator(
+            ome_zarr.get_image(), channel_selection=0, axes_order="yx"
+        )
+        .grid(size_x=32, size_y=32)
+        .with_halo(x=8, y=8)
+    )
 
     serial = iterator.detect(_detect_bright)
     from_processes = iterator.detect(

@@ -1,3 +1,4 @@
+import inspect
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator, Mapping
@@ -51,6 +52,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     # The default is immutable and shared: instances assign a fresh dict, and
     # a mutable class-level `{}` would be one shared across every iterator.
     _halo: Mapping[str, int] = MappingProxyType({})
+    # A read-only subclass that opts in declares the halo a pure read margin:
+    # there is no write to crop it from, and the subclass owns reconciling the
+    # overlapping context (the detection iterator's NMS). Off by default so a
+    # read-only iterator does not silently measure grown regions.
+    _allow_readonly_halo: bool = False
 
     def __repr__(self) -> str:
         halo = f", halo={self._halo}" if self._halo else ""
@@ -84,9 +90,39 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """The image this iterator writes to, or `None` for a read-only iterator."""
         return None
 
+    @classmethod
+    def _require_complete_init_kwargs(cls, init_kwargs: dict) -> None:
+        """Refuse a `get_init_kwargs` that silently forgets constructor state.
+
+        Every reshaping call rebuilds the iterator from this dict; a
+        constructor parameter missing from it is state that vanishes on the
+        first `.grid()`/`.by_chunks()`/`.with_halo()` with no error. Checked
+        once per class, then cached.
+        """
+        checked = cls.__dict__.get("_init_kwargs_checked", False)
+        if checked:
+            return
+        parameters = inspect.signature(cls.__init__).parameters
+        missing = [
+            name
+            for name, parameter in parameters.items()
+            if name != "self"
+            and parameter.kind not in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD)
+            and name not in init_kwargs
+        ]
+        if missing:
+            raise NgioValueError(
+                f"{cls.__name__}.get_init_kwargs() omits the constructor "
+                f"parameter(s) {missing}: the iterator would silently lose "
+                "that state on the first grid()/by_chunks()/with_halo() "
+                "call. Add them to get_init_kwargs()."
+            )
+        cls._init_kwargs_checked = True
+
     def _new_from_rois(self, rois: list[Roi]) -> Self:
         """Create a new instance of the iterator with a different set of ROIs."""
         init_kwargs = self.get_init_kwargs()
+        self._require_complete_init_kwargs(init_kwargs)
         new_instance = self.__class__(**init_kwargs)
         new_instance._set_rois(rois)
         # Carried here rather than through every concrete `get_init_kwargs`:
@@ -102,6 +138,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         seamless tiles — each tile sees past its own edge, so a smoothing or a
         segmentation has the context it needs — and how you "trim" a tile,
         which is the same operation seen from the other side.
+
+        On a read-only iterator that opts in (the object-detection iterator),
+        the halo is a pure read margin: there is no write to crop it from, and
+        the iterator itself reconciles the overlapping context (NMS resolves
+        the duplicate detections the margin produces). Other read-only
+        iterators refuse, so a `reduce` never silently measures grown regions.
 
         The ROIs themselves do not move, so the write footprints are unchanged
         and a haloed iterator parallelizes exactly as far as it did without
@@ -146,7 +188,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 raise NgioValueError(
                     f"Halo along '{axis_name}' must be >= 0, got {margin}."
                 )
-        if self.output_image is None:
+        if self.output_image is None and not self._allow_readonly_halo:
             name = self.__class__.__name__
             raise NgioValueError(
                 f"{name} is read-only, so there is no written region for a "
@@ -228,6 +270,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         self,
         overlap_xy: int = 0,
         overlap_z: int = 0,
+        overlap_t: int = 0,
         grid: Literal["read", "write"] = "read",
     ) -> Self:
         """Return a new iterator that iterates over ROIs by storage tiles.
@@ -235,6 +278,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Args:
             overlap_xy (int): Overlap in XY dimensions.
             overlap_z (int): Overlap in Z dimension.
+            overlap_t (int): Overlap in the T dimension.
             grid: `"read"` (the default) sizes the tiles by the input image's
                 chunk grid, which is also what this method always did.
                 `"write"` sizes them by the output image's write granularity —
@@ -258,6 +302,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             self.ref_image,
             overlap_xy=overlap_xy,
             overlap_z=overlap_z,
+            overlap_t=overlap_t,
             grid_image=grid_image,
         )
         return self._new_from_rois(rois)
@@ -522,6 +567,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def map(
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
+        *,
         mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
     ) -> None:
         """Apply a transformation function to the ROI pixels and write it back.
@@ -545,6 +591,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def map_as_numpy(
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
+        *,
         mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
     ) -> None:
         """Alias for `map()`."""
@@ -557,6 +604,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def map_as_dask(
         self,
         func: Callable[[DaskPipeType], DaskPipeType],
+        *,
         mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
     ) -> None:
         """Apply a transformation function to the ROI pixels and write it back.
@@ -580,6 +628,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def reduce(
         self,
         func: Callable[[NumpyPipeType], R],
+        *,
         mapper: MapperProtocol[NumpyPipeType, R] | None = None,
     ) -> list[R]:
         """Apply a function to every ROI and collect the results without writing.
@@ -605,6 +654,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def reduce_as_numpy(
         self,
         func: Callable[[NumpyPipeType], R],
+        *,
         mapper: MapperProtocol[NumpyPipeType, R] | None = None,
     ) -> list[R]:
         """Alias for `reduce()`."""
@@ -617,6 +667,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def reduce_as_dask(
         self,
         func: Callable[[DaskPipeType], R],
+        *,
         mapper: MapperProtocol[DaskPipeType, R] | None = None,
     ) -> list[R]:
         """Apply a function to every ROI and collect the results without writing.

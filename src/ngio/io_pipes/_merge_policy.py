@@ -41,6 +41,10 @@ class MergePolicy(Protocol):
         because they refuse two ROIs that share a write unit, which gives each
         unit sole ownership of the pixels it reads; a policy reaching past
         `ctx.slicing` would break that silently.
+
+    Compatibility policy: future ngio versions will only ever add *optional*
+    members to this protocol, probed with `getattr` — a policy implementing
+    `reconcile` keeps working.
     """
 
     def reconcile(

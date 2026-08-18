@@ -43,17 +43,24 @@ from ngio.images import (
     open_ome_zarr_container,
 )
 from ngio.iterators import (
+    AbstractIteratorBuilder,
     BasicMapper,
+    DetectionFuncResult,
     FeatureExtractorIterator,
+    FeatureFuncResult,
+    HaloMargins,
     ImageProcessingIterator,
     IterUnit,
     MapperProtocol,
     MaskedSegmentationIterator,
+    MaxWorkers,
+    NmsConfig,
     ObjectDetectionIterator,
     ProcessMapper,
     SegmentationIterator,
     StitchConfig,
     ThreadedMapper,
+    compute_write_footprint,
 )
 from ngio.ome_zarr_meta import (
     get_ngio_image_meta,
@@ -85,6 +92,7 @@ from ngio.utils import (
 )
 
 __all__ = [
+    "AbstractIteratorBuilder",
     "AxesSetup",
     "BasicMapper",
     "Channel",
@@ -92,8 +100,11 @@ __all__ = [
     "ConsolidationConfig",
     "DaskConfig",
     "DefaultNgffVersion",
+    "DetectionFuncResult",
     "Dimensions",
     "FeatureExtractorIterator",
+    "FeatureFuncResult",
+    "HaloMargins",
     "Image",
     "ImageInWellPath",
     "ImageProcessingIterator",
@@ -103,6 +114,7 @@ __all__ = [
     "MaskedImage",
     "MaskedLabel",
     "MaskedSegmentationIterator",
+    "MaxWorkers",
     "NgffVersions",
     "NgioConfig",
     "NgioError",
@@ -113,6 +125,7 @@ __all__ = [
     "NgioTableValidationError",
     "NgioValidationError",
     "NgioValueError",
+    "NmsConfig",
     "ObjectDetectionIterator",
     "OmeZarrContainer",
     "OmeZarrPlate",
@@ -129,6 +142,7 @@ __all__ = [
     "ThreadedMapper",
     "ZarrConfig",
     "__version__",
+    "compute_write_footprint",
     "create_empty_ome_zarr",
     "create_empty_plate",
     "create_empty_well",

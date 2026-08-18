@@ -28,6 +28,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         self,
         input_image: Image,
         output_image: Image,
+        *,
         input_channel_selection: ChannelSlicingInputType = None,
         output_channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,

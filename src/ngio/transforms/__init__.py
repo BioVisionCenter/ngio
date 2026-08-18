@@ -18,7 +18,7 @@ from ngio.io_pipes import (
     TransformContext,
     TransformProtocol,
 )
-from ngio.io_pipes._merge_policy import MergePolicy, MergeRule
+from ngio.io_pipes._merge_policy import MergeInput, MergePolicy, MergeRule
 from ngio.transforms._mask import MaskMerge, MaskTransform
 from ngio.transforms._unique_labels import UniqueLabelsTransform
 from ngio.transforms._zoom import ZoomTransform
@@ -28,6 +28,7 @@ __all__ = [
     "IoPipeContext",
     "MaskMerge",
     "MaskTransform",
+    "MergeInput",
     "MergePolicy",
     "MergeRule",
     "SlicingOps",
