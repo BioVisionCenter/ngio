@@ -13,6 +13,7 @@ from ngio.iterators._segmentation import (
     MaskedSegmentationIterator,
     SegmentationIterator,
 )
+from ngio.iterators._stitch import StitchConfig
 
 __all__ = [
     "BasicMapper",
@@ -23,5 +24,6 @@ __all__ = [
     "MaskedSegmentationIterator",
     "ProcessMapper",
     "SegmentationIterator",
+    "StitchConfig",
     "ThreadedMapper",
 ]

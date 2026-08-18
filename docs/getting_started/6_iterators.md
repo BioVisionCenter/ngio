@@ -300,6 +300,54 @@ label.set_roi(
 )
 ```
 
+## Stitching a tiled segmentation
+
+Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. `stitch=True` fixes both:
+
+```python
+iterator = SegmentationIterator(
+    image, label, stitch=True
+).by_chunks(grid="write").with_halo(y=16, x=16)
+
+iterator.map(run_segmentation)
+```
+
+The halo is required, and the reason is the criterion. Stitching joins two ids when the two tiles' predictions **overlap**, not when their objects merely touch across the cut. Two distinct objects that abut at a tile boundary are adjacent but do not overlap, so an adjacency rule would merge them and an overlap rule does not. Each tile's halo is what gives it an opinion about the strip its neighbour owns, and comparing the two opinions is what the stitch does.
+
+Those opinions have to be kept somewhere, since a tile writes only its core — so the map also banks each tile's halo band into a small transient array, removed once the stitch resolves. Write footprints on the label itself are unchanged, so a stitching iterator parallelizes exactly as far as it did without one.
+
+Tune it with `StitchConfig`:
+
+```python
+from ngio.iterators import StitchConfig
+
+iterator = SegmentationIterator(
+    image, label, stitch=StitchConfig(min_iou=0.5, block_size=50_000)
+)
+```
+
+By default the halo bands are kept in a transient group inside the output label, which works under every mapper. `scratch_store` puts them elsewhere — often worth doing, since labels compress well and the bands are small:
+
+```python
+from zarr.storage import MemoryStore
+
+StitchConfig(scratch_store=MemoryStore())
+```
+
+That keeps the output store untouched and leaves nothing behind if a run dies. The one restriction is `ProcessMapper`: a `MemoryStore` pickles by value, so each worker would bank its bands into a private copy — ngio refuses that rather than losing them silently.
+
+`min_iou` is how much two tiles must agree before their ids are joined. The default errs towards leaving an object split rather than merging two that are not — an over-split label can be fixed downstream, a wrong merge cannot. `block_size` is how many ids each tile is given, and must exceed the largest count a single tile can produce.
+
+Compaction is not exclusive to stitching — `label.relabel_sequential()` renumbers any label to a dense `1..N` on its own:
+
+```python
+label.relabel_sequential()
+```
+
+Either way the numbering is assigned in first-encounter order over the chunk grid rather than by sorting the existing ids. That keeps it to a single pass over the label, and means which object ends up as `1` follows the array rather than the tile it came from.
+
+If a run is interrupted between the map and the resolve, the label holds a valid but over-split segmentation; re-running the resolve is safe, because it is idempotent.
+
 ## Next steps
 
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.

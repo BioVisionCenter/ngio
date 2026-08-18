@@ -6,6 +6,7 @@ from typing import Any, Literal
 from zarr.core.array import CompressorLike
 
 from ngio.common import compute_masking_roi
+from ngio.common._label_ops import relabel_sequential
 from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.images._image import Image
@@ -92,6 +93,34 @@ class Label(AbstractImage):
             order="nearest",
             mode=mode,
         )
+
+    def relabel_sequential(
+        self,
+        consolidation_mode: ConsolidationMode | None = None,
+    ) -> int:
+        """Renumber the objects to a dense `1..N`, in place.
+
+        Useful after any process that leaves gaps in the ids — a segmentation
+        written region by region, a filtering step that dropped objects, or a
+        stitch run with `compact=False`.
+
+        Numbers are handed out in first-encounter order over the chunk grid
+        rather than by sorting the existing ids, which is what lets this be a
+        single pass over the label instead of one pass to collect and another to
+        write. Which object ends up as `1` therefore follows the array, and
+        depends on the chunking.
+
+        Args:
+            consolidation_mode: How to rebuild the pyramid afterwards, see
+                `consolidate`. Every level derives from level 0, so they would
+                otherwise disagree with the renumbered ids.
+
+        Returns:
+            How many distinct objects the label now holds.
+        """
+        count = relabel_sequential(self.zarr_array)
+        self.consolidate(mode=consolidation_mode)
+        return count
 
 
 class LabelsContainer:

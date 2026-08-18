@@ -21,10 +21,18 @@ from ngio.io_pipes import (
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.iterators._stitch import StitchConfig, StitchingSetter, StitchPlan
 
 
 class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
     """Base class for iterators over ROIs."""
+
+    # Class-level defaults so subclasses that write their own `__init__` — the
+    # masked iterator does — are simply not stitching, rather than missing an
+    # attribute the inherited `post_consolidate` reads. Stitching needs a tile
+    # grid, which a masking ROI table does not have.
+    _stitch: StitchConfig | None = None
+    _stitch_plan: StitchPlan | None = None
 
     def __init__(
         self,
@@ -35,6 +43,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
         consolidation_mode: ConsolidationMode | None = None,
+        stitch: StitchConfig | bool = False,
     ) -> None:
         """Initialize the iterator with a ROI table and input/output images.
 
@@ -52,12 +61,18 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 transforms to apply to the output label.
             consolidation_mode: How to build the output pyramid after
                 iteration, see `Label.consolidate`. Defaults to `None`.
+            stitch: Resolve objects split across tile boundaries into one id
+                after the map. Requires a halo — see `with_halo` — because the
+                evidence is overlap between neighbouring tiles' predictions.
+                `True` uses the `StitchConfig` defaults.
         """
         self._input = input_image
         self._output = output_label
         self._ref_image = input_image
         self._rois = input_image.build_image_roi_table(name=None).rois()
         self._consolidation_mode = consolidation_mode
+        self._stitch = StitchConfig() if stitch is True else stitch or None
+        self._stitch_plan: StitchPlan | None = None
 
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -80,6 +95,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
             "consolidation_mode": self._consolidation_mode,
+            "stitch": self._stitch or False,
         }
 
     @property
@@ -97,15 +113,40 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             slicing_dict=self._input_slicing_kwargs,
         )
 
+    def _stitching_plan(self) -> StitchPlan:
+        """The stitch plan, built once the full ROI list is known."""
+        if self._stitch_plan is None:
+            assert self._stitch is not None
+            self._stitch_plan = StitchPlan(
+                config=self._stitch,
+                output=self._output,
+                rois=self.rois,
+                ref_image=self._ref_image,
+                halo=self.halo,
+                read_roi=self._read_roi,
+            )
+        return self._stitch_plan
+
+    def _wrap_for_stitch(
+        self, setter: DataSetterProtocol[np.ndarray], roi: Roi
+    ) -> DataSetterProtocol[np.ndarray]:
+        """Put the stitch wrapper outside the halo crop, so it sees the band."""
+        if self._stitch is None:
+            return setter
+        return StitchingSetter(setter, self._stitching_plan(), roi)
+
     def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
-        return self._wrap_setter(
-            NumpySetter(
-                zarr_array=self._output.zarr_array,
-                dimensions=self._output.dimensions,
-                roi=roi,
-                axes_order=self._axes_order,
-                transforms=self._output_transforms,
-                remove_channel_selection=True,
+        return self._wrap_for_stitch(
+            self._wrap_setter(
+                NumpySetter(
+                    zarr_array=self._output.zarr_array,
+                    dimensions=self._output.dimensions,
+                    roi=roi,
+                    axes_order=self._axes_order,
+                    transforms=self._output_transforms,
+                    remove_channel_selection=True,
+                ),
+                roi,
             ),
             roi,
         )
@@ -134,6 +175,11 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def post_consolidate(self):
+        # The relabel has to precede consolidation: every pyramid level is
+        # derived from level 0, so stitching after would leave them disagreeing.
+        if self._stitch is not None:
+            self._stitching_plan().resolve()
+            self._stitch_plan = None
         self._output.consolidate(mode=self._consolidation_mode)
 
 

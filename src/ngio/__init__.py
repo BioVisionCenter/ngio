@@ -51,6 +51,7 @@ from ngio.iterators import (
     MaskedSegmentationIterator,
     ProcessMapper,
     SegmentationIterator,
+    StitchConfig,
     ThreadedMapper,
 )
 from ngio.ome_zarr_meta import (
@@ -121,6 +122,7 @@ __all__ = [
     "RoiSlice",
     "S3FSConfig",
     "SegmentationIterator",
+    "StitchConfig",
     "StoreOrGroup",
     "ThreadedMapper",
     "ZarrConfig",
