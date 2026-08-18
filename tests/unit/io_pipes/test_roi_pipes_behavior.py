@@ -1,8 +1,7 @@
 """Behavior locks for the ROI io pipes.
 
-These tests pin the exact observable behavior of the ROI pipes ahead of the
-io_pipes refactor (roi becoming a slicing-active kwarg on the bare pipes).
-They must pass unchanged before and after.
+These tests pin the exact observable behavior of the ROI pipe shells, which
+must match the bare pipes' roi kwarg until their removal in ngio=1.2.
 """
 
 import dask.array as da
@@ -19,6 +18,8 @@ from ngio.io_pipes import (
     NumpyRoiSetter,
     SlicingInputType,
 )
+
+pytestmark = pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 
 
 def _make_image(pixelsize: float = 1.0, seed: int = 0):

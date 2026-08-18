@@ -1,9 +1,9 @@
 """Behavior locks for the masked io pipes.
 
-These tests pin the exact pixel-level behavior of the masked pipes ahead of
-the io_pipes refactor (masking becoming a terminal transform). They must pass
-unchanged before and after, so the expectations are built only from
-refactor-stable primitives: the bare pipes, `BaseZoomTransform`, and numpy.
+These tests pin the exact pixel-level behavior of the masked pipe shells,
+which must match a bare pipe with a terminal `MaskTransform` until their
+removal in ngio=1.2. The expectations are built only from stable primitives:
+the bare pipes, `BaseZoomTransform`, and numpy.
 """
 
 import dask.array as da
@@ -20,6 +20,8 @@ from ngio.io_pipes import (
     NumpySetterMasked,
 )
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
+
+pytestmark = pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 
 
 class PlusN:

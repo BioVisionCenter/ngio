@@ -36,6 +36,7 @@ def _make_setup(seed: int = 0):
     return image, label, data, label_img
 
 
+@pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 def test_mask_transform_get_matches_masked_pipe():
     image, label, data, label_img = _make_setup()
     roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r", label=3)
