@@ -59,7 +59,7 @@ class HaloCroppingSetter(Generic[T]):
         return f"HaloCroppingSetter({self._setter!r}, margins={self._margins})"
 
     @property
-    def zarr_array(self):  # noqa: ANN201
+    def zarr_array(self):
         """The wrapped setter's target array."""
         return self._setter.zarr_array
 
@@ -74,7 +74,7 @@ class HaloCroppingSetter(Generic[T]):
         return self._setter.axes_ops
 
     @property
-    def transforms(self):  # noqa: ANN201
+    def transforms(self):
         """The wrapped setter's transform chain."""
         return self._setter.transforms
 

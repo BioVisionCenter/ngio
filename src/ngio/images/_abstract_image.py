@@ -31,6 +31,7 @@ from ngio.images._create_utils import (
 from ngio.io_pipes import (
     DaskGetter,
     DaskSetter,
+    MergeInput,
     NumpyGetter,
     NumpySetter,
     SlicingInputType,
@@ -482,6 +483,7 @@ class AbstractImage(ABC):
         patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set a slice of the image.
@@ -490,6 +492,8 @@ class AbstractImage(ABC):
             patch: The patch to set.
             axes_order: The order of the axes to set the patch.
             transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
             **slicing_kwargs: The slices to set the patch.
 
         """
@@ -499,6 +503,7 @@ class AbstractImage(ABC):
                 dimensions=self.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             numpy_setter(patch)
@@ -509,6 +514,7 @@ class AbstractImage(ABC):
                 dimensions=self.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             dask_setter(patch)
@@ -525,6 +531,7 @@ class AbstractImage(ABC):
         patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set a slice of the image.
@@ -534,6 +541,8 @@ class AbstractImage(ABC):
             patch: The patch to set.
             axes_order: The order of the axes to set the patch.
             transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
             **slicing_kwargs: The slices to set the patch.
 
         """
@@ -544,6 +553,7 @@ class AbstractImage(ABC):
                 roi=roi,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             roi_numpy_setter(patch)
@@ -555,6 +565,7 @@ class AbstractImage(ABC):
                 roi=roi,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             roi_dask_setter(patch)

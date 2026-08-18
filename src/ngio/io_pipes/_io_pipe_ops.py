@@ -6,6 +6,7 @@ without importing the pipes.
 """
 
 from collections.abc import Sequence
+from typing import TypeVar, cast
 
 import numpy as np
 import zarr
@@ -13,6 +14,7 @@ from dask.array import Array as DaskArray
 
 from ngio.common._dimensions import Dimensions
 from ngio.common._roi import Roi
+from ngio.io_pipes._merge_policy import MergePolicy
 from ngio.io_pipes._ops_axes import (
     build_axes_ops,
     get_as_dask_axes_ops,
@@ -35,6 +37,28 @@ from ngio.io_pipes._ops_transforms import (
     apply_set_transforms,
 )
 from ngio.ome_zarr_meta.ngio_specs._pixel_size import PixelSize
+from ngio.utils import NgioValueError
+
+ArrayT = TypeVar("ArrayT", np.ndarray, DaskArray)
+
+
+def _merged(
+    merge: MergePolicy,
+    existing: ArrayT,
+    patch: ArrayT,
+    ctx: IoPipeContext,
+    expected_type: type,
+) -> ArrayT:
+    """Apply the merge policy and verify it stayed on the same backend."""
+    merged = cast("ArrayT", merge.reconcile(existing, patch, ctx))
+    if not isinstance(merged, expected_type):
+        raise NgioValueError(
+            f"Merge policy '{type(merge).__name__}' returned a "
+            f"{type(merged).__name__} instead of a {expected_type.__name__} — "
+            "it does not support this data path (e.g. a numpy-only policy used "
+            "through the dask API, or one materializing a dask array)."
+        )
+    return merged
 
 
 def roi_to_slicing_dict(
@@ -115,11 +139,20 @@ def write_from_numpy(
     ctx: IoPipeContext,
     transforms: Sequence[TransformProtocol] | None,
     patch: np.ndarray,
+    merge: MergePolicy | None = None,
 ) -> None:
-    """Run the write chain: set-transforms in reverse, axes ops, then write."""
+    """Run the write chain: set-transforms in reverse, merge, axes ops, write.
+
+    The merge runs after the transforms so both it and the destination read are
+    in the array's own space; `read_as_numpy(ctx, None)` deliberately replays no
+    chain, and covers exactly the region about to be written.
+    """
     patch = apply_set_transforms(
         patch, ctx=ctx, transforms=transforms, expected_type=np.ndarray
     )
+    if merge is not None:
+        existing = read_as_numpy(ctx, None)
+        patch = _merged(merge, existing, patch, ctx, expected_type=np.ndarray)
     patch = set_as_numpy_axes_ops(array=patch, axes_ops=ctx.axes_ops)
     set_slice_as_numpy(zarr_array=ctx.zarr_array, patch=patch, slicing_ops=ctx.slicing)
 
@@ -128,10 +161,14 @@ def write_from_dask(
     ctx: IoPipeContext,
     transforms: Sequence[TransformProtocol] | None,
     patch: DaskArray,
+    merge: MergePolicy | None = None,
 ) -> None:
-    """Run the write chain: set-transforms in reverse, axes ops, then write."""
+    """Run the write chain: set-transforms in reverse, merge, axes ops, write."""
     patch = apply_set_transforms(
         patch, ctx=ctx, transforms=transforms, expected_type=DaskArray
     )
+    if merge is not None:
+        existing = read_as_dask(ctx, None)
+        patch = _merged(merge, existing, patch, ctx, expected_type=DaskArray)
     patch = set_as_dask_axes_ops(array=patch, axes_ops=ctx.axes_ops)
     set_slice_as_dask(zarr_array=ctx.zarr_array, patch=patch, slicing_ops=ctx.slicing)

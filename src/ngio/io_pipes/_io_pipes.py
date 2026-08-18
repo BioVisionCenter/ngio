@@ -15,6 +15,7 @@ from ngio.io_pipes._io_pipe_ops import (
     write_from_dask,
     write_from_numpy,
 )
+from ngio.io_pipes._merge_policy import MergeInput, MergePolicy, resolve_merge
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps
 from ngio.io_pipes._ops_transforms import (
@@ -22,7 +23,6 @@ from ngio.io_pipes._ops_transforms import (
     TransformProtocol,
     normalize_transforms,
 )
-from ngio.io_pipes._rmw_transform import ReadModifyWriteTransform
 from ngio.utils import NgioValueError
 
 T = TypeVar("T")
@@ -31,42 +31,25 @@ T = TypeVar("T")
 def _prepare_transforms(
     transforms: Sequence[TransformProtocol] | None,
 ) -> Sequence[TransformProtocol] | None:
-    """Normalize the chain, check its read-modify-write transform, bind it.
+    """Normalize the chain, refusing anything that is not a transform.
 
-    Read-modify-write transforms (`MaskTransform`, `MergeTransform`, …) read
-    the destination back on the write path, which constrains where they may
-    sit; see `ngio.io_pipes._rmw_transform`. Binding hands the terminal one
-    the transforms placed before it, so it replays them on that read.
+    A transform is a function of the patch alone, so the chain composes and
+    inverts freely and needs no ordering rules. Anything that also depends on
+    the destination's contents is a merge and belongs in the pipe's `merge=`
+    slot; that is the one thing worth catching here, because a merge policy
+    would otherwise fail with a confusing "not a transform" message.
     """
-    normalized = normalize_transforms(transforms)
-    if not normalized:
-        return normalized
-
-    rmw = [t for t in normalized if isinstance(t, ReadModifyWriteTransform)]
-    if len(rmw) > 1:
-        names = ", ".join(type(t).__name__ for t in rmw)
-        raise NgioValueError(
-            f"A transform chain may hold at most one read-modify-write "
-            f"transform, but this one holds {len(rmw)}: {names}. Writing "
-            "folds the chain outermost-first, so the outer one would read "
-            "the destination again and merge an already-merged array. Apply "
-            "them in separate writes, or express the combination as a single "
-            "transform."
-        )
-    if rmw and rmw[0] is not normalized[-1]:
-        raise NgioValueError(
-            f"{type(rmw[0]).__name__} must be the last transform in the "
-            "chain: on the write path it merges the patch with on-disk data "
-            "read through the transforms placed before it, so any transform "
-            "placed after it would be silently skipped during that read. "
-            "Move it to the end of the transforms list."
-        )
-
-    preceding = normalized[:-1]
-    last = normalized[-1]
-    if isinstance(last, ReadModifyWriteTransform):
-        return [*preceding, last.bind_preceding(preceding)]
-    return normalized
+    if transforms:
+        policies = [t for t in transforms if isinstance(t, MergePolicy)]
+        if policies:
+            names = ", ".join(type(t).__name__ for t in policies)
+            raise NgioValueError(
+                f"{names} is a merge policy, not a transform: it combines the "
+                "patch with what is already on disk, which the transform chain "
+                "has no place for. Pass it as `merge=` on the write instead of "
+                "in `transforms=`."
+            )
+    return normalize_transforms(transforms)
 
 
 class _IoPipe:
@@ -79,19 +62,22 @@ class _IoPipe:
         axes_ops: AxesOps,
         transforms: Sequence[TransformProtocol] | None = None,
         roi: Roi | None = None,
+        merge: MergeInput | None = None,
     ) -> None:
         self._ctx = IoPipeContext(
             zarr_array=zarr_array, slicing=slicing_ops, axes_ops=axes_ops, roi=roi
         )
         self._transforms = _prepare_transforms(transforms)
+        self._merge = resolve_merge(merge)
 
     def __repr__(self) -> str:
         name = self.__class__.__name__
+        merge = f", merge={self._merge!r}" if self._merge is not None else ""
         return (
             f"{name}(zarr_array={self._ctx.zarr_array}, "
             f"slicing_ops={self._ctx.slicing}, "
             f"axes_ops={self._ctx.axes_ops}, "
-            f"transforms={self._transforms})"
+            f"transforms={self._transforms}{merge})"
         )
 
     @property
@@ -109,6 +95,11 @@ class _IoPipe:
     @property
     def transforms(self) -> Sequence[TransformProtocol] | None:
         return self._transforms
+
+    @property
+    def merge(self) -> MergePolicy | None:
+        """How writes combine with the destination, or `None` to overwrite."""
+        return self._merge
 
     @property
     def roi(self) -> Roi:
@@ -149,12 +140,14 @@ class _FromDimensionsInit(_IoPipe):
         slicing_dict: dict[str, SlicingInputType] | None = None,
         remove_channel_selection: bool = False,
         roi: Roi | None = None,
+        merge: MergeInput | None = None,
     ) -> None:
         """Build a pipe to read or write a slice of a zarr array.
 
         When a `roi` is given, it defines the slicing (converted at this
         image's pixel size); explicit `slicing_dict` entries override the
-        ROI-derived ones per axis.
+        ROI-derived ones per axis. `merge` applies to setters only and decides
+        how the patch combines with what is already there.
         """
         ctx = setup_io_pipe(
             zarr_array=zarr_array,
@@ -170,6 +163,7 @@ class _FromDimensionsInit(_IoPipe):
             axes_ops=ctx.axes_ops,
             transforms=transforms,
             roi=roi,
+            merge=merge,
         )
 
 
@@ -188,10 +182,10 @@ class DaskGetter(_FromDimensionsInit, DataGetter[DaskArray]):
 class NumpySetter(_FromDimensionsInit, DataSetter[np.ndarray]):
     def set(self, patch: np.ndarray) -> None:
         """Write a numpy array to the zarr array with ops."""
-        write_from_numpy(self._ctx, self._transforms, patch)
+        write_from_numpy(self._ctx, self._transforms, patch, self._merge)
 
 
 class DaskSetter(_FromDimensionsInit, DataSetter[DaskArray]):
     def set(self, patch: DaskArray) -> None:
         """Write a dask array to the zarr array with ops."""
-        write_from_dask(self._ctx, self._transforms, patch)
+        write_from_dask(self._ctx, self._transforms, patch, self._merge)

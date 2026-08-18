@@ -256,17 +256,49 @@ Read the same trick backwards and it is a "trim": if you want each tile's outer 
 
 ## Merging instead of overwriting
 
-Writes replace what is on disk. `MergeTransform` combines with it instead — reading the destination back, folding it with your patch, and writing the result:
+By default a write replaces what is on disk. `merge=` combines with it instead:
 
 ```python
-from ngio.transforms import MergeTransform
-
-image.set_roi(roi, patch, transforms=[MergeTransform("max")])
+image.set_roi(roi, patch, merge="max")
 ```
 
-`"max"`, `"min"` and `"sum"` are order-independent, so overlapping regions give the same answer whatever order they are written in. `"keep_nonzero"` ("the last nonzero write wins") and a custom `(existing, patch, ctx) -> array` rule do depend on the order.
+`"max"`, `"min"` and `"sum"` are commutative and associative, so overlapping regions give the same answer whatever order they are written in. `"keep_nonzero"` ("the last nonzero write wins") and a custom `(existing, patch, ctx) -> array` rule do depend on the order.
 
-Such a transform must be the last in the chain, and there can be only one — the pipes raise otherwise. Both rules come from the same fact: it reads the destination through the transforms placed *before* it, so anything after would be skipped during that read, and a second one would merge an already-merged array. `MaskTransform` is the other transform of this kind, which is why it cannot be combined with a merge.
+The merge is a separate argument rather than an entry in `transforms=`, and the distinction matters. A transform is a function of the patch alone, which is why the chain composes and inverts with no rules about order or position. A merge also depends on what is already there, so it runs once, after the chain — by which point the patch is in the array's own space and the destination is read raw. Both sides are in the same space, which is what makes the comparison meaningful and keeps untouched pixels byte-identical instead of round-tripping them through a transform and back.
+
+Masking follows the same split. On a read it fills outside the mask, which is a transform; on a write it protects outside the mask, which is a merge:
+
+```python
+from ngio.transforms import MaskMerge, MaskTransform
+
+patch = image.get_roi(roi, transforms=[MaskTransform(label=nuclei, target_image=image)])
+image.set_roi(roi, patch, merge=MaskMerge(label=nuclei, target_image=image))
+```
+
+`get_roi_masked` and `set_roi_masked` do this for you; reach for the objects directly when you want to combine masking with other transforms.
+
+## Keeping label ids unique across regions
+
+Segmenting region by region gives each region its own `1, 2, 3, …`, so writing them into one array collides. `UniqueLabelsTransform` gives each region a disjoint slice of the id space:
+
+```python
+from ngio.transforms import UniqueLabelsTransform
+
+# Region 4's labels 1, 2, 3 are written as 4001, 4002, 4003.
+label.set_roi(roi, patch, transforms=[UniqueLabelsTransform(1000, block_index=4)])
+```
+
+`block_size` has to exceed the largest label any one region can produce, or ids spill into the next region's block. Inside a masked iterator you can leave `block_index` out — the ROI's own label supplies it.
+
+The offset is derived from the block index rather than counted up as regions are processed. That is what makes it work in parallel: there is no shared counter to synchronize, it survives `ProcessMapper`, and it is idempotent — re-running a region after a failure reproduces exactly the ids it wrote before, where a counter would hand out a fresh set and strand the old one.
+
+Being an ordinary transform, it composes with a merge:
+
+```python
+label.set_roi(
+    roi, patch, transforms=[UniqueLabelsTransform(1000, block_index=4)], merge="max"
+)
+```
 
 ## Next steps
 

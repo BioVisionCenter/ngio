@@ -20,7 +20,7 @@ from ngio.io_pipes._io_pipes import (
     NumpySetter,
     _FromDimensionsInit,
 )
-from ngio.io_pipes._mask_transform import BaseMaskTransform
+from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.io_pipes._ops_slices import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol
 from ngio.utils import NgioDeprecationWarning
@@ -114,12 +114,12 @@ class _DeprecatedMaskedInit(_FromDimensionsInit):
     ):
         _warn_deprecated_pipe(type(self).__name__, self._replacement)
         mask_transform = BaseMaskTransform(
+            fill_value=fill_value,
             label_zarr_array=label_zarr_array,
             label_dimensions=label_dimensions,
             label_transforms=label_transforms,
             label_slicing_dict=label_slicing_dict,
             axes_order=axes_order,
-            fill_value=fill_value,
             allow_rescaling=allow_rescaling,
             target_dimensions=dimensions,
         )
@@ -157,19 +157,28 @@ class _DeprecatedMaskedSetterInit(_DeprecatedMaskedInit):
         allow_rescaling: bool = True,
         remove_channel_selection: bool = False,
     ):
-        super().__init__(
-            zarr_array=zarr_array,
-            dimensions=dimensions,
+        _warn_deprecated_pipe(type(self).__name__, self._replacement)
+        mask_merge = BaseMaskMerge(
             label_zarr_array=label_zarr_array,
             label_dimensions=label_dimensions,
-            roi=roi,
+            label_transforms=label_transforms,
+            label_slicing_dict=label_slicing_dict,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+            target_dimensions=dimensions,
+        )
+        # Skips `_DeprecatedMaskedInit`: on a write the mask is a merge, not a
+        # transform, so there is no mask to put in the chain.
+        _FromDimensionsInit.__init__(
+            self,
+            zarr_array=zarr_array,
+            dimensions=dimensions,
             axes_order=axes_order,
             transforms=transforms,
-            label_transforms=label_transforms,
+            merge=mask_merge,
             slicing_dict=slicing_dict,
-            label_slicing_dict=label_slicing_dict,
-            allow_rescaling=allow_rescaling,
             remove_channel_selection=remove_channel_selection,
+            roi=roi,
         )
 
 
@@ -186,12 +195,8 @@ class DaskGetterMasked(_DeprecatedMaskedInit, DaskGetter):
 
 
 class NumpySetterMasked(_DeprecatedMaskedSetterInit, NumpySetter):
-    _replacement = (
-        "NumpySetter(..., roi=..., transforms=[..., ngio.transforms.MaskTransform])"
-    )
+    _replacement = "NumpySetter(..., roi=..., merge=ngio.transforms.MaskMerge(...))"
 
 
 class DaskSetterMasked(_DeprecatedMaskedSetterInit, DaskSetter):
-    _replacement = (
-        "DaskSetter(..., roi=..., transforms=[..., ngio.transforms.MaskTransform])"
-    )
+    _replacement = "DaskSetter(..., roi=..., merge=ngio.transforms.MaskMerge(...))"

@@ -6,7 +6,7 @@ import pytest
 from ngio import Roi, create_ome_zarr_from_array
 from ngio.io_pipes import NumpyGetterMasked
 from ngio.io_pipes._mask_transform import BaseMaskTransform
-from ngio.transforms import MaskTransform
+from ngio.transforms import MaskMerge, MaskTransform
 from ngio.utils import NgioValueError
 
 
@@ -85,13 +85,13 @@ def test_mask_transform_instance_reusable_across_rois():
     )
 
 
-def test_mask_transform_set_merges_with_disk_data():
+def test_mask_merge_protects_outside_pixels():
     image, label, data, label_img = _make_setup()
     roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r", label=3)
-    mask = MaskTransform(label=label, target_image=image)
+    merge = MaskMerge(label=label, target_image=image)
     patch = np.full((16, 18), 250, dtype="uint16")
 
-    image.set_roi(roi=roi, patch=patch, transforms=[mask])
+    image.set_roi(roi=roi, patch=patch, merge=merge)
 
     bool_mask = label_img[6:22, 8:26] == 3
     expected = data.copy()
@@ -99,14 +99,13 @@ def test_mask_transform_set_merges_with_disk_data():
     np.testing.assert_array_equal(image.get_as_numpy(), expected)
 
 
-def test_mask_transform_set_with_prefix_transforms():
+def test_mask_merge_with_a_transform_in_the_chain():
     image, label, data, label_img = _make_setup()
     roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r", label=3)
-    plus = PlusN(5)
-    mask = MaskTransform(label=label, target_image=image, set_transforms=[plus])
+    merge = MaskMerge(label=label, target_image=image)
     patch = np.full((16, 18), 60, dtype="uint16")
 
-    image.set_roi(roi=roi, patch=patch, transforms=[plus, mask])
+    image.set_roi(roi=roi, patch=patch, transforms=[PlusN(5)], merge=merge)
 
     # Inside the mask the patch lands minus the inverse transform; outside
     # the disk data is untouched.
@@ -124,15 +123,23 @@ def test_mask_transform_requires_roi():
         image.get_as_numpy(transforms=[mask])
 
 
-def test_mask_transform_must_be_terminal():
-    image, label, _, _ = _make_setup()
+def test_mask_transform_has_no_position_rule():
+    """A read-side transform composes either way round; only the result differs."""
+    image, label, data, label_img = _make_setup()
     roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r", label=3)
     mask = MaskTransform(label=label, target_image=image)
+    bool_mask = label_img[6:22, 8:26] == 3
 
-    with pytest.raises(NgioValueError, match="last transform"):
-        image.get_roi_as_numpy(roi=roi, transforms=[mask, PlusN(5)])
-    # Terminal position is fine
-    image.get_roi_as_numpy(roi=roi, transforms=[PlusN(5), mask])
+    # Mask first, then add: the fill value is shifted too.
+    np.testing.assert_array_equal(
+        image.get_roi_as_numpy(roi=roi, transforms=[mask, PlusN(5)]),
+        np.where(bool_mask, data[6:22, 8:26], 0) + 5,
+    )
+    # Add first, then mask: the fill value is not.
+    np.testing.assert_array_equal(
+        image.get_roi_as_numpy(roi=roi, transforms=[PlusN(5), mask]),
+        np.where(bool_mask, data[6:22, 8:26] + 5, 0),
+    )
 
 
 def test_mask_transform_rescaling_requires_target_dimensions():

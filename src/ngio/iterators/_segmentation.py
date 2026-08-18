@@ -19,7 +19,7 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
-from ngio.io_pipes._mask_transform import BaseMaskTransform
+from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 
@@ -216,15 +216,14 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
         return [*(self._input_transforms or []), mask_transform]
 
-    def _output_transforms_with_mask(self) -> Sequence[TransformProtocol]:
-        """The output transforms plus a terminal mask over the output label."""
-        mask_transform = BaseMaskTransform(
+    def _output_mask_merge(self) -> BaseMaskMerge:
+        """The mask protecting everything outside the ROI's own label."""
+        return BaseMaskMerge(
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
             target_dimensions=self._output.dimensions,
         )
-        return [*(self._output_transforms or []), mask_transform]
 
     def build_numpy_getter(self, roi: Roi):
         return NumpyGetter(
@@ -243,7 +242,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
                 zarr_array=self._output.zarr_array,
                 dimensions=self._output.dimensions,
                 axes_order=self._axes_order,
-                transforms=self._output_transforms_with_mask(),
+                transforms=self._output_transforms,
+                merge=self._output_mask_merge(),
                 remove_channel_selection=True,
             ),
             roi,
@@ -266,7 +266,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
                 zarr_array=self._output.zarr_array,
                 dimensions=self._output.dimensions,
                 axes_order=self._axes_order,
-                transforms=self._output_transforms_with_mask(),
+                transforms=self._output_transforms,
+                merge=self._output_mask_merge(),
                 remove_channel_selection=True,
             ),
             roi,

@@ -16,11 +16,12 @@ from ngio.images._label import Label
 from ngio.io_pipes import (
     DaskGetter,
     DaskSetter,
+    MergeInput,
     NumpyGetter,
     NumpySetter,
     TransformProtocol,
 )
-from ngio.io_pipes._mask_transform import BaseMaskTransform
+from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
@@ -28,22 +29,39 @@ from ngio.utils import (
 )
 
 
+def _mask_kwargs(
+    masked_image: "MaskedImage | MaskedLabel",
+    axes_order: Sequence[str] | None,
+    allow_rescaling: bool,
+) -> dict:
+    return {
+        "label_zarr_array": masked_image._label.zarr_array,
+        "label_dimensions": masked_image._label.dimensions,
+        "axes_order": axes_order,
+        "allow_rescaling": allow_rescaling,
+        "target_dimensions": masked_image.dimensions,
+    }
+
+
 def _build_mask_transform(
     *,
     masked_image: "MaskedImage | MaskedLabel",
     axes_order: Sequence[str] | None,
-    transforms: Sequence[TransformProtocol] | None,
+    transforms: Sequence[TransformProtocol] | None = None,
     allow_rescaling: bool,
 ) -> BaseMaskTransform:
-    """Build the terminal mask transform for a masked read or write."""
-    return BaseMaskTransform(
-        label_zarr_array=masked_image._label.zarr_array,
-        label_dimensions=masked_image._label.dimensions,
-        axes_order=axes_order,
-        allow_rescaling=allow_rescaling,
-        target_dimensions=masked_image.dimensions,
-        set_transforms=transforms,
-    )
+    """The read-side mask: outside-mask pixels come back as the fill value."""
+    return BaseMaskTransform(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
+
+
+def _build_mask_merge(
+    *,
+    masked_image: "MaskedImage | MaskedLabel",
+    axes_order: Sequence[str] | None,
+    allow_rescaling: bool,
+) -> BaseMaskMerge:
+    """The write-side mask: keep the on-disk pixels outside the mask."""
+    return BaseMaskMerge(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
 
 
 class MaskedImage(Image):
@@ -150,6 +168,7 @@ class MaskedImage(Image):
         channel_selection: ChannelSlicingInputType | None = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
@@ -161,6 +180,7 @@ class MaskedImage(Image):
             channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **slicing_kwargs,
         )
 
@@ -284,20 +304,19 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        mask_transform = _build_mask_transform(
+        mask_merge = _build_mask_merge(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
-        masked_transforms = [*(transforms or []), mask_transform]
         if isinstance(patch, da.Array):
             path_setter = DaskSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
-                transforms=masked_transforms,
+                transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
@@ -307,7 +326,8 @@ class MaskedImage(Image):
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
-                transforms=masked_transforms,
+                transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
@@ -415,6 +435,7 @@ class MaskedLabel(Label):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
@@ -425,6 +446,7 @@ class MaskedLabel(Label):
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **slicing_kwargs,
         )
 
@@ -530,20 +552,19 @@ class MaskedLabel(Label):
         """Set the masked array for a given label."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        mask_transform = _build_mask_transform(
+        mask_merge = _build_mask_merge(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
-        masked_transforms = [*(transforms or []), mask_transform]
         if isinstance(patch, da.Array):
             path_setter = DaskSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
-                transforms=masked_transforms,
+                transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
@@ -553,7 +574,8 @@ class MaskedLabel(Label):
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 axes_order=axes_order,
-                transforms=masked_transforms,
+                transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)

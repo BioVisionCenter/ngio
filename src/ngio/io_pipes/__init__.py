@@ -27,9 +27,12 @@ contract serves both backends — the array type expresses the backend, and a
 transform supporting both dispatches on it. The `ctx` is the pipe's
 `IoPipeContext`; transforms may depend on its stable fields — `axes`,
 `slicing`, and `roi` (when there is one) — while `zarr_array` and `axes_ops`
-are pipe plumbing. `MaskTransform` must be the last transform of its chain
-(the pipes raise otherwise): on the write path it merges the patch with
-on-disk data read through the transforms placed before it.
+are pipe plumbing.
+
+A transform is a function of the patch alone, which is why the chain composes
+and inverts with no ordering rules. Combining a patch with what is *already*
+on disk is a different operation and gets its own slot: `merge=` on a setter,
+applied once after the chain, against the array's own contents.
 
 The ROI pipe classes (`*RoiGetter`, `*RoiSetter`) and the masked pipe
 classes (`*GetterMasked`, `*SetterMasked`) are deprecated shells over the
@@ -55,6 +58,7 @@ from ngio.io_pipes._io_pipes import (
     NumpySetter,
 )
 from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
+from ngio.io_pipes._merge_policy import MergeInput, MergePolicy, MergeRule
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps, SlicingType
 from ngio.io_pipes._ops_slices_utils import ChunkRect
@@ -76,6 +80,9 @@ __all__ = [
     "DataGetter",
     "DataSetter",
     "IoPipeContext",
+    "MergeInput",
+    "MergePolicy",
+    "MergeRule",
     "NumpyGetter",
     "NumpyGetterMasked",
     "NumpyRoiGetter",

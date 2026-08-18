@@ -218,9 +218,7 @@ def test_mask_transform_composes_with_a_halo():
     non-identity — that zoom rescales the label it reads, never the data
     array, which is why it does not disturb the halo arithmetic.
     """
-    ome_zarr, array = _container(
-        shape=(64, 64), chunks=(16, 16), axes_names="yx", levels=2
-    )
+    ome_zarr, _ = _container(shape=(64, 64), chunks=(16, 16), axes_names="yx", levels=2)
     label = ome_zarr.derive_label("m")
     mask_img = np.zeros((64, 64), dtype=label.zarr_array.dtype)
     mask_img[8:56, 8:56] = 1

@@ -17,6 +17,7 @@ from ngio.common import (
 from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._abstract_image import AbstractImage, abstract_derive
 from ngio.io_pipes import (
+    MergeInput,
     SlicingInputType,
     TransformProtocol,
 )
@@ -374,6 +375,7 @@ class Image(AbstractImage):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array.
@@ -384,13 +386,19 @@ class Image(AbstractImage):
                 If None, all channels are set.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
+            merge: How to combine the patch with what is already there —
+                a rule name, a callable, or a policy. `None` overwrites.
             **slicing_kwargs: The slices to set the array.
         """
         _slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         self._set_array(
-            patch=patch, axes_order=axes_order, transforms=transforms, **_slicing_kwargs
+            patch=patch,
+            axes_order=axes_order,
+            transforms=transforms,
+            merge=merge,
+            **_slicing_kwargs,
         )
 
     def set_roi(
@@ -400,6 +408,7 @@ class Image(AbstractImage):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array for a region of interest.
@@ -410,6 +419,8 @@ class Image(AbstractImage):
             channel_selection: Select a what subset of channels to return.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
+            merge: How to combine the patch with what is already there —
+                a rule name, a callable, or a policy. `None` overwrites.
             **slicing_kwargs: The slices to set the array.
         """
         _slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -420,6 +431,7 @@ class Image(AbstractImage):
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **_slicing_kwargs,
         )
 

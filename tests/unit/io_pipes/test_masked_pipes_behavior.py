@@ -219,14 +219,17 @@ def test_masked_set_with_user_transform():
     NumpySetterMasked(
         transforms=[PlusN(5, calls)], **_masked_kwargs(image, label, roi)
     )(patch)
-    # The patch is merged with the transformed disk data, then the inverse
-    # transform applies to the merged patch before writing: inside the mask
-    # the written pixels are patch - 5, outside they are unchanged.
+    # The inverse transform applies to the patch, then the mask merge picks
+    # between it and the raw on-disk data: inside the mask the written pixels
+    # are patch - 5, outside they are unchanged.
     mask = label_img[6:22, 8:26] == 3
     expected = data.copy()
     expected[6:22, 8:26] = np.where(mask, patch - 5, data[6:22, 8:26])
     np.testing.assert_array_equal(_read_raw(image), expected)
-    assert calls == ["get", "set"]
+    # `on_get` is *not* called on the write path. The merge runs after the
+    # chain against raw disk values, so the protected pixels are never sent
+    # through the transform and back — which is what keeps them exact.
+    assert calls == ["set"]
 
 
 @pytest.mark.parametrize("mode", ["numpy", "dask"])

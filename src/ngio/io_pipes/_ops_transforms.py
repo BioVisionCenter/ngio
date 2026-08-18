@@ -1,8 +1,9 @@
 import warnings
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Protocol, TypeVar, runtime_checkable
+from typing import Any, Protocol, TypeAlias, TypeVar, cast, runtime_checkable
 
+import numpy as np
 import zarr
 from dask.array import Array as DaskArray
 
@@ -12,6 +13,21 @@ from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.utils import NgioDeprecationWarning, NgioValueError
 
 ArrayT = TypeVar("ArrayT")
+
+# The union rather than a constrained TypeVar for implementations that dispatch
+# on the backend at runtime: the two arms genuinely differ, so a TypeVar would
+# promise a link the bodies do not keep.
+ArrayLike: TypeAlias = np.ndarray | DaskArray
+
+
+def elementwise(op: Any, *args: Any) -> ArrayLike:
+    """Apply a numpy ufunc or array-function across either backend.
+
+    Dask implements numpy's dispatch protocols, so one call serves both; the
+    call is opaque here on purpose, because numpy's stubs describe only the
+    numpy side and would reject a dask argument at every call site.
+    """
+    return cast("ArrayLike", op(*args))
 
 
 @dataclass(frozen=True, eq=False)
