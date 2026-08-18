@@ -122,7 +122,6 @@ class _DeprecatedMaskedInit(_FromDimensionsInit):
             fill_value=fill_value,
             allow_rescaling=allow_rescaling,
             target_dimensions=dimensions,
-            set_transforms=transforms,
         )
         super().__init__(
             zarr_array=zarr_array,

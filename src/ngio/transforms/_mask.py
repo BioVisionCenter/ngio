@@ -14,8 +14,8 @@ class MaskTransform(BaseMaskTransform):
     `label != 0` for an unlabelled ROI, so a single instance can be reused
     across ROIs.
 
-    Must be the last transform in the transforms list — the pipes raise
-    otherwise.
+    Must be the last transform in the transforms list, and the only
+    read-modify-write one — the pipes raise otherwise.
 
     Example:
         ```python
@@ -50,9 +50,8 @@ class MaskTransform(BaseMaskTransform):
                 it and keep the on-disk data instead.
             allow_rescaling: Zoom the label to the data grid (nearest) when
                 the two live at different pyramid levels.
-            set_transforms: The transforms placed before this one in the
-                transforms list, replayed when reading back the on-disk
-                data on the write path.
+            set_transforms: Override for the chain replayed on the write
+                path's read-back; the pipe binds it for you.
         """
         super().__init__(
             label_zarr_array=label.zarr_array,

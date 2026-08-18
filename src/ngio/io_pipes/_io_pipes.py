@@ -15,7 +15,6 @@ from ngio.io_pipes._io_pipe_ops import (
     write_from_dask,
     write_from_numpy,
 )
-from ngio.io_pipes._mask_transform import BaseMaskTransform
 from ngio.io_pipes._ops_axes import AxesOps
 from ngio.io_pipes._ops_slices import SlicingInputType, SlicingOps
 from ngio.io_pipes._ops_transforms import (
@@ -23,25 +22,51 @@ from ngio.io_pipes._ops_transforms import (
     TransformProtocol,
     normalize_transforms,
 )
+from ngio.io_pipes._rmw_transform import ReadModifyWriteTransform
 from ngio.utils import NgioValueError
 
 T = TypeVar("T")
 
 
-def _check_mask_transforms_are_terminal(
+def _prepare_transforms(
     transforms: Sequence[TransformProtocol] | None,
-) -> None:
-    if not transforms:
-        return
-    for transform in transforms[:-1]:
-        if isinstance(transform, BaseMaskTransform):
-            raise NgioValueError(
-                "MaskTransform must be the last transform in the chain: on "
-                "the write path it merges the patch with on-disk data read "
-                "through the transforms placed before it, so any transform "
-                "placed after it would be silently skipped during that read. "
-                "Move it to the end of the transforms list."
-            )
+) -> Sequence[TransformProtocol] | None:
+    """Normalize the chain, check its read-modify-write transform, bind it.
+
+    Read-modify-write transforms (`MaskTransform`, `MergeTransform`, …) read
+    the destination back on the write path, which constrains where they may
+    sit; see `ngio.io_pipes._rmw_transform`. Binding hands the terminal one
+    the transforms placed before it, so it replays them on that read.
+    """
+    normalized = normalize_transforms(transforms)
+    if not normalized:
+        return normalized
+
+    rmw = [t for t in normalized if isinstance(t, ReadModifyWriteTransform)]
+    if len(rmw) > 1:
+        names = ", ".join(type(t).__name__ for t in rmw)
+        raise NgioValueError(
+            f"A transform chain may hold at most one read-modify-write "
+            f"transform, but this one holds {len(rmw)}: {names}. Writing "
+            "folds the chain outermost-first, so the outer one would read "
+            "the destination again and merge an already-merged array. Apply "
+            "them in separate writes, or express the combination as a single "
+            "transform."
+        )
+    if rmw and rmw[0] is not normalized[-1]:
+        raise NgioValueError(
+            f"{type(rmw[0]).__name__} must be the last transform in the "
+            "chain: on the write path it merges the patch with on-disk data "
+            "read through the transforms placed before it, so any transform "
+            "placed after it would be silently skipped during that read. "
+            "Move it to the end of the transforms list."
+        )
+
+    preceding = normalized[:-1]
+    last = normalized[-1]
+    if isinstance(last, ReadModifyWriteTransform):
+        return [*preceding, last.bind_preceding(preceding)]
+    return normalized
 
 
 class _IoPipe:
@@ -58,8 +83,7 @@ class _IoPipe:
         self._ctx = IoPipeContext(
             zarr_array=zarr_array, slicing=slicing_ops, axes_ops=axes_ops, roi=roi
         )
-        self._transforms = normalize_transforms(transforms)
-        _check_mask_transforms_are_terminal(self._transforms)
+        self._transforms = _prepare_transforms(transforms)
 
     def __repr__(self) -> str:
         name = self.__class__.__name__

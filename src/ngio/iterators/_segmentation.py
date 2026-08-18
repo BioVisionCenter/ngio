@@ -207,7 +207,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
             label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
             target_dimensions=self._input.dimensions,
-            set_transforms=self._input_transforms,
         )
         return [*(self._input_transforms or []), mask_transform]
 
@@ -218,7 +217,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
             label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
             target_dimensions=self._output.dimensions,
-            set_transforms=self._output_transforms,
         )
         return [*(self._output_transforms or []), mask_transform]
 

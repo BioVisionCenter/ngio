@@ -16,6 +16,7 @@ from ngio.io_pipes._io_pipe_ops import (
 from ngio.io_pipes._match_shape import dask_match_shape, numpy_match_shape
 from ngio.io_pipes._ops_slices import SlicingInputType
 from ngio.io_pipes._ops_transforms import TransformProtocol, normalize_transforms
+from ngio.io_pipes._rmw_transform import ReadModifyWriteTransform
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
 from ngio.utils import NgioValueError
 
@@ -52,7 +53,7 @@ def _label_to_bool_mask(
     return cast("ArrayT", matched)
 
 
-class BaseMaskTransform:
+class BaseMaskTransform(ReadModifyWriteTransform):
     """Mask the data flowing through an io pipe with a label image.
 
     On read, pixels outside the mask are replaced with `fill_value`; on
@@ -60,10 +61,9 @@ class BaseMaskTransform:
     The mask is selected by the pipe's ROI: `label_data == roi.label`, or
     `label_data != 0` for an unlabelled ROI.
 
-    Must be the last transform of its pipe: on the write path it merges the
-    patch with on-disk data read through the transforms placed before it, so
-    any transform placed after it would be silently skipped during that read.
-    The pipes enforce this at construction.
+    Must be the last transform of its pipe, and the only read-modify-write
+    one — see `ngio.io_pipes._rmw_transform`. The pipes enforce both at
+    construction.
     """
 
     def __init__(
@@ -94,10 +94,10 @@ class BaseMaskTransform:
             allow_rescaling: Zoom the label to the data grid (nearest) when
                 the two live at different pyramid levels.
             target_dimensions: The data's dimensions, required to rescale.
-            set_transforms: The transforms placed before this one in the
-                pipe's chain, replayed when reading back the on-disk data
-                on the write path.
+            set_transforms: Override for the chain replayed on the write
+                path's read-back; the pipe binds it for you.
         """
+        super().__init__(set_transforms=set_transforms)
         if allow_rescaling:
             if target_dimensions is None:
                 raise NgioValueError(
@@ -120,7 +120,6 @@ class BaseMaskTransform:
         self._label_slicing_dict = label_slicing_dict
         self._axes_order = axes_order
         self._fill_value = fill_value
-        self._set_transforms = normalize_transforms(set_transforms)
 
     def _label_ctx(self, ctx: IoPipeContext) -> IoPipeContext:
         if ctx.roi is None:
@@ -172,23 +171,25 @@ class BaseMaskTransform:
             bool_mask = np.broadcast_to(bool_mask, array.shape)
         return np.where(bool_mask, array, self._fill_value)
 
-    def on_set(
-        self, array: np.ndarray | DaskArray, ctx: IoPipeContext
+    def reconcile(
+        self,
+        existing: np.ndarray | DaskArray,
+        patch: np.ndarray | DaskArray,
+        ctx: IoPipeContext,
     ) -> np.ndarray | DaskArray:
-        """Merge the patch with the on-disk data outside the mask."""
+        """Take the patch inside the mask, the on-disk data outside it."""
         label_ctx = self._label_ctx(ctx)
-        if isinstance(array, DaskArray):
-            data = read_as_dask(ctx, self._set_transforms)
+        if isinstance(patch, DaskArray):
             label_data = read_as_dask(label_ctx, self._label_transforms)
-            data_shape = tuple(int(dim) for dim in data.shape)
+            data_shape = tuple(int(dim) for dim in existing.shape)
             bool_mask = self._bool_mask(ctx, label_ctx, label_data, data_shape)
-            if bool_mask.shape != data.shape:
-                bool_mask = da.broadcast_to(bool_mask, data.shape)
-            return da.where(bool_mask, array, data)
+            if bool_mask.shape != existing.shape:
+                bool_mask = da.broadcast_to(bool_mask, existing.shape)
+            return da.where(bool_mask, patch, existing)
 
-        data = read_as_numpy(ctx, self._set_transforms)
+        existing_np = cast("np.ndarray", existing)
         label_data = read_as_numpy(label_ctx, self._label_transforms)
-        bool_mask = self._bool_mask(ctx, label_ctx, label_data, data.shape)
-        if bool_mask.shape != data.shape:
-            bool_mask = np.broadcast_to(bool_mask, data.shape)
-        return np.where(bool_mask, array, data)
+        bool_mask = self._bool_mask(ctx, label_ctx, label_data, existing_np.shape)
+        if bool_mask.shape != existing_np.shape:
+            bool_mask = np.broadcast_to(bool_mask, existing_np.shape)
+        return np.where(bool_mask, cast("np.ndarray", patch), existing_np)
