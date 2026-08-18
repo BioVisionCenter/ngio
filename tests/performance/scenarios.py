@@ -28,6 +28,7 @@ from ngio import (
     open_ome_zarr_container,
     open_ome_zarr_plate,
 )
+from ngio.iterators import ThreadedMapper
 
 #: The well grid of the `create_plate` scenario. Stated here rather than shared
 #: with the plate fixture: a scenario owns the shape of what it measures, the
@@ -430,7 +431,8 @@ SCENARIOS: dict[str, Scenario] = {
     "iterator_map_parallel": Scenario(
         _iterator_target,
         lambda it: it.map_as_numpy(
-            lambda patch: (patch > 0).astype("uint32"), max_workers=4
+            lambda patch: (patch > 0).astype("uint32"),
+            mapper=ThreadedMapper(4),
         ),
     ),
 }

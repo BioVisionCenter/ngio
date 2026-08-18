@@ -209,17 +209,18 @@ More complete examples can be found in the [Fractal tasks template](https://gith
 
 ## Parallel mapping
 
-`map` runs one ROI at a time by default, and that stays the default — parallel writing is explicit opt-in. To fan out:
+`map` runs one ROI at a time by default, and that stays the default — parallel writing is explicit opt-in. Concurrency belongs to the *mapper*: pass one, and it sizes its own pool.
 
 ```python
+from ngio import ProcessMapper, ThreadedMapper
+
 # Threads: the fit for IO-bound work and for funcs that release the GIL
-# (most numpy/scipy do).
-iterator.map(run_segmentation, max_workers="auto")
+# (most numpy/scipy do). "auto" sizes the pool for round-trip-bound work.
+iterator.map(run_segmentation, mapper=ThreadedMapper("auto"))
 
 # Processes: the fit for pure-Python, GIL-holding funcs. The func must be
 # picklable (a module-level function, not a lambda), and the store must not
 # be in-memory.
-from ngio import ProcessMapper
 iterator.map(run_segmentation, mapper=ProcessMapper(max_workers=8))
 ```
 
@@ -227,12 +228,12 @@ Before fanning out, both parallel mappers check every ROI's *write footprint* �
 
 ```python
 iterator = iterator.by_chunks(grid="write")
-iterator.map(run_segmentation, max_workers="auto")   # cannot collide
+iterator.map(run_segmentation, mapper=ThreadedMapper("auto"))   # cannot collide
 ```
 
 Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. The dask iterator surface (`iter_as_dask`, `map_as_dask`, `reduce_as_dask`) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use `Image.get_as_dask` instead.
 
-For per-ROI measurement without writing anything, use `reduce` — it returns one result per ROI, in ROI order, and accepts the same `max_workers`/`mapper` arguments:
+For per-ROI measurement without writing anything, use `reduce` — it returns one result per ROI, in ROI order, and takes the same `mapper` argument:
 
 ```python
 means = iterator.reduce(lambda patch: float(patch.mean()))

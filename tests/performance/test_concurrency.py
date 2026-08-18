@@ -137,13 +137,13 @@ def iterator_target():
 
 
 def test_threaded_map_overlaps_all_units(iterator_target):
-    """`max_workers` on `map_as_numpy` must put one op in flight per ROI.
+    """A `ThreadedMapper` on `map_as_numpy` must put one op in flight per ROI.
 
     The op-count gate holds the parallel map to the *same tally* as the
     serial one; this holds the half that tally cannot see.
     """
     from ngio import open_ome_zarr_container
-    from ngio.iterators import SegmentationIterator
+    from ngio.iterators import SegmentationIterator, ThreadedMapper
 
     container = open_ome_zarr_container(rendezvous_store(iterator_target), mode="r+")
     iterator = SegmentationIterator(
@@ -154,7 +154,7 @@ def test_threaded_map_overlaps_all_units(iterator_target):
     assert len(iterator.rois) == 4
 
     with concurrency_probe(rendezvous=4, kind="chunk") as probe:
-        iterator.map_as_numpy(lambda x: x, max_workers=4)
+        iterator.map_as_numpy(lambda x: x, mapper=ThreadedMapper(4))
     assert probe.arrivals > 0
     assert probe.max_in_flight == 4
 

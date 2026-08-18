@@ -54,7 +54,7 @@ def test_threaded_map_is_bit_identical_to_serial():
     serial_it.map_as_numpy(_threshold)
 
     threaded_zarr, threaded_it = _segmentation_iterator(MemoryStore())
-    threaded_it.map_as_numpy(_threshold, max_workers="auto")
+    threaded_it.map_as_numpy(_threshold, mapper=ThreadedMapper("auto"))
 
     np.testing.assert_array_equal(
         serial_zarr.get_label("out").get_as_numpy(),
@@ -112,10 +112,10 @@ def test_parallel_map_refuses_colliding_write_units():
     read_tiled = base.by_chunks(grid="read")
     assert read_tiled.check_if_chunks_overlap()
     with pytest.raises(NgioValueError, match="same write unit"):
-        read_tiled.map_as_numpy(_threshold, max_workers=4)
+        read_tiled.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
 
     # The named fix works: write-unit tiling passes.
-    base.by_chunks(grid="write").map_as_numpy(_threshold, max_workers=4)
+    base.by_chunks(grid="write").map_as_numpy(_threshold, mapper=ThreadedMapper(4))
 
 
 def test_process_mapper_refuses_memory_stores():
@@ -124,12 +124,13 @@ def test_process_mapper_refuses_memory_stores():
         iterator.map_as_numpy(_threshold, mapper=ProcessMapper(max_workers=2))
 
 
-def test_mapper_and_max_workers_are_mutually_exclusive():
+def test_max_workers_is_not_an_iterator_argument():
+    """Concurrency is the mapper's to own; there is no second spelling for it."""
     _, iterator = _segmentation_iterator(MemoryStore())
-    with pytest.raises(NgioValueError, match="not both"):
-        iterator.map_as_numpy(_threshold, mapper=ThreadedMapper(), max_workers="auto")
-    # `None` and `1` say "serial", which a custom mapper overrides untroubled.
-    iterator.map_as_numpy(_threshold, mapper=ThreadedMapper(), max_workers=1)
+    with pytest.raises(TypeError, match="max_workers"):
+        iterator.map_as_numpy(_threshold, max_workers="auto")  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="max_workers"):
+        iterator.reduce_as_numpy(_threshold, max_workers="auto")  # type: ignore[call-arg]
 
 
 def test_threaded_mapper_with_one_unit_degrades_to_serial():
@@ -138,5 +139,5 @@ def test_threaded_mapper_with_one_unit_degrades_to_serial():
     image = ome_zarr.get_image()
     iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
     assert len(iterator.rois) == 1
-    iterator.map_as_numpy(_threshold, max_workers="auto")
+    iterator.map_as_numpy(_threshold, mapper=ThreadedMapper("auto"))
     assert ome_zarr.get_label("out").get_as_numpy().max() <= 1

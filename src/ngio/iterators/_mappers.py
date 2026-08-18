@@ -1,13 +1,15 @@
 """Mappers for iterators.
 
 Mappers execute a function over the units produced by an iterator and collect
-the results. They can be passed to the `map_as_*`/`reduce_as_*` methods of
-iterators to customize how the units are scheduled.
+the results. A mapper is the *only* way to schedule iterator work: `map` and
+`reduce` take a `mapper` argument and nothing else, so the pool size lives on
+the mapper that owns it rather than being spelled a second time at the call.
 
-Three ship with ngio. `BasicMapper` is serial. `ThreadedMapper` fans units out
-on a thread pool — the fit for round-trip-bound IO and for `func`s that
-release the GIL. `ProcessMapper` fans out on a spawn-based process pool — the
-fit for pure-Python, GIL-holding `func`s. Both parallel mappers refuse to
+Three ship with ngio. `BasicMapper` is serial and is what `mapper=None` means.
+`ThreadedMapper` fans units out on a thread pool — the fit for round-trip-bound
+IO and for `func`s that release the GIL. `ProcessMapper` fans out on a
+spawn-based process pool — the fit for pure-Python, GIL-holding `func`s. Both
+parallel mappers take their pool size at construction, and both refuse to
 schedule two units whose write footprints share a write unit
 (`require_no_write_conflicts`): disjointness is what makes the parallel
 writes safe *without any lock, in any topology* — a chunk or shard object
@@ -133,30 +135,6 @@ class BasicMapper(Generic[T, R]):
         return [result for _, result in results]
 
 
-def _select_mapper(
-    mapper: "MapperProtocol[T, R] | None",
-    max_workers: MaxWorkers,
-) -> "MapperProtocol[T, R]":
-    """Pick the mapper for a `map_as_*`/`reduce_as_*` call.
-
-    `max_workers` is the convenience spelling for the common case;
-    `mapper` is the escape hatch (`ProcessMapper`, a custom implementation).
-    Passing both is refused rather than resolved by precedence — silent
-    precedence would hide which code actually ran.
-    """
-    if mapper is not None:
-        if max_workers not in (None, 1):
-            raise NgioValueError(
-                "Pass either `mapper` or `max_workers`, not both: the mapper "
-                "owns the scheduling, so a `max_workers` alongside it would "
-                "be silently ignored."
-            )
-        return mapper
-    if max_workers in (None, 1):
-        return BasicMapper()
-    return ThreadedMapper(max_workers)
-
-
 def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
     """Refuse to schedule two units that write into the same write unit.
 
@@ -213,7 +191,7 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
                         "array. Two concurrent writers on one chunk/shard "
                         "lose data. Re-tile the iterator with "
                         '`by_chunks(grid="write")`, or run serially '
-                        "(`max_workers=1` / `BasicMapper`)."
+                        "(drop the `mapper` argument)."
                     )
             active.append(unit)
 

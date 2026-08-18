@@ -4,7 +4,7 @@ import pytest
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
-from ngio.iterators import SegmentationIterator
+from ngio.iterators import SegmentationIterator, ThreadedMapper
 from ngio.utils import NgioDeprecationWarning, NgioFutureWarning
 
 
@@ -81,11 +81,11 @@ def test_reduce_is_equivalent_to_alias():
     )
 
 
-def test_map_with_max_workers():
+def test_map_with_threaded_mapper():
     iterator = _build_iterator()
     label = iterator.output_image
 
-    iterator.map(lambda x: np.full_like(x, 5), max_workers=2)
+    iterator.map(lambda x: np.full_like(x, 5), mapper=ThreadedMapper(2))
     np.testing.assert_array_equal(
         label.zarr_array[...],
         np.full(label.shape, 5, dtype=label.zarr_array.dtype),
