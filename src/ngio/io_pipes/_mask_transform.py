@@ -19,7 +19,6 @@ from ngio.io_pipes._ops_transforms import TransformProtocol, normalize_transform
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
 from ngio.utils import NgioValueError
 
-
 ArrayT = TypeVar("ArrayT", np.ndarray, DaskArray)
 
 
@@ -50,7 +49,7 @@ def _label_to_bool_mask(
             array_axes=label_axes,
             reference_axes=data_axes,
         )
-    return cast(ArrayT, matched)
+    return cast("ArrayT", matched)
 
 
 class BaseMaskTransform:

@@ -12,17 +12,14 @@ from ngio.images._image import (
 )
 from ngio.images._masked_image import MaskedImage
 from ngio.io_pipes import (
-    DaskGetterMasked,
-    DaskRoiGetter,
-    DaskRoiSetter,
-    DaskSetterMasked,
-    NumpyGetterMasked,
-    NumpyRoiGetter,
-    NumpyRoiSetter,
-    NumpySetterMasked,
+    DaskGetter,
+    DaskSetter,
+    NumpyGetter,
+    NumpySetter,
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.io_pipes._mask_transform import BaseMaskTransform
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 
@@ -91,7 +88,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         return self._output
 
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
-        return NumpyRoiGetter(
+        return NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             roi=roi,
@@ -101,7 +98,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
-        return NumpyRoiSetter(
+        return NumpySetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             roi=roi,
@@ -111,7 +108,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[da.Array]:
-        return DaskRoiGetter(
+        return DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             roi=roi,
@@ -121,7 +118,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
-        return DaskRoiSetter(
+        return DaskSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             roi=roi,
@@ -203,50 +200,64 @@ class MaskedSegmentationIterator(SegmentationIterator):
             "consolidation_mode": self._consolidation_mode,
         }
 
-    def build_numpy_getter(self, roi: Roi):
-        return NumpyGetterMasked(
-            zarr_array=self._input.zarr_array,
-            dimensions=self._input.dimensions,
-            roi=roi,
+    def _input_transforms_with_mask(self) -> Sequence[TransformProtocol]:
+        """The input transforms plus a terminal mask over the input image."""
+        mask_transform = BaseMaskTransform(
             label_zarr_array=self._input._label.zarr_array,
             label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
-            transforms=self._input_transforms,
+            target_dimensions=self._input.dimensions,
+            set_transforms=self._input_transforms,
+        )
+        return [*(self._input_transforms or []), mask_transform]
+
+    def _output_transforms_with_mask(self) -> Sequence[TransformProtocol]:
+        """The output transforms plus a terminal mask over the output label."""
+        mask_transform = BaseMaskTransform(
+            label_zarr_array=self._input._label.zarr_array,
+            label_dimensions=self._input._label.dimensions,
+            axes_order=self._axes_order,
+            target_dimensions=self._output.dimensions,
+            set_transforms=self._output_transforms,
+        )
+        return [*(self._output_transforms or []), mask_transform]
+
+    def build_numpy_getter(self, roi: Roi):
+        return NumpyGetter(
+            zarr_array=self._input.zarr_array,
+            dimensions=self._input.dimensions,
+            roi=roi,
+            axes_order=self._axes_order,
+            transforms=self._input_transforms_with_mask(),
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_numpy_setter(self, roi: Roi):
-        return NumpySetterMasked(
+        return NumpySetter(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
-            label_zarr_array=self._input._label.zarr_array,
-            label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
-            transforms=self._output_transforms,
+            transforms=self._output_transforms_with_mask(),
             remove_channel_selection=True,
         )
 
     def build_dask_getter(self, roi: Roi):
-        return DaskGetterMasked(
+        return DaskGetter(
             roi=roi,
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
-            label_zarr_array=self._input._label.zarr_array,
-            label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
-            transforms=self._input_transforms,
+            transforms=self._input_transforms_with_mask(),
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_dask_setter(self, roi: Roi):
-        return DaskSetterMasked(
+        return DaskSetter(
             roi=roi,
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
-            label_zarr_array=self._input._label.zarr_array,
-            label_dimensions=self._input._label.dimensions,
             axes_order=self._axes_order,
-            transforms=self._output_transforms,
+            transforms=self._output_transforms_with_mask(),
             remove_channel_selection=True,
         )

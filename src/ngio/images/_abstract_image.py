@@ -30,12 +30,8 @@ from ngio.images._create_utils import (
 )
 from ngio.io_pipes import (
     DaskGetter,
-    DaskRoiGetter,
-    DaskRoiSetter,
     DaskSetter,
     NumpyGetter,
-    NumpyRoiGetter,
-    NumpyRoiSetter,
     NumpySetter,
     SlicingInputType,
     TransformProtocol,
@@ -358,7 +354,7 @@ class AbstractImage(ABC):
         Returns:
             The array of the region of interest.
         """
-        numpy_roi_getter = NumpyRoiGetter(
+        numpy_roi_getter = NumpyGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -405,7 +401,7 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        roi_dask_getter = DaskRoiGetter(
+        roi_dask_getter = DaskGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -542,7 +538,7 @@ class AbstractImage(ABC):
 
         """
         if isinstance(patch, np.ndarray):
-            roi_numpy_setter = NumpyRoiSetter(
+            roi_numpy_setter = NumpySetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
@@ -553,7 +549,7 @@ class AbstractImage(ABC):
             roi_numpy_setter(patch)
 
         elif isinstance(patch, da.Array):
-            roi_dask_setter = DaskRoiSetter(
+            roi_dask_setter = DaskSetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,

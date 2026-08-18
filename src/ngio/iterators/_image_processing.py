@@ -11,10 +11,10 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.io_pipes import (
-    DaskRoiGetter,
-    DaskRoiSetter,
-    NumpyRoiGetter,
-    NumpyRoiSetter,
+    DaskGetter,
+    DaskSetter,
+    NumpyGetter,
+    NumpySetter,
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
@@ -98,7 +98,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         return self._output
 
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
-        return NumpyRoiGetter(
+        return NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             roi=roi,
@@ -108,7 +108,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
-        return NumpyRoiSetter(
+        return NumpySetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             roi=roi,
@@ -118,7 +118,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[da.Array]:
-        return DaskRoiGetter(
+        return DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             roi=roi,
@@ -128,7 +128,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
-        return DaskRoiSetter(
+        return DaskSetter(
             zarr_array=self._output.zarr_array,
             dimensions=self._output.dimensions,
             roi=roi,

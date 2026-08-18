@@ -135,7 +135,7 @@ def test_mask_transform_must_be_terminal():
 
 
 def test_mask_transform_rescaling_requires_target_dimensions():
-    image, label, _, _ = _make_setup()
+    _, label, _, _ = _make_setup()
 
     with pytest.raises(NgioValueError, match="target_dimensions"):
         BaseMaskTransform(

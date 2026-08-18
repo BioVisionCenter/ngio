@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TypeAlias
+from typing import Generic, TypeAlias, TypeVar
 
 import dask.array as da
 import numpy as np
@@ -11,9 +11,9 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.io_pipes import (
-    DaskRoiGetter,
+    DaskGetter,
     DataGetter,
-    NumpyRoiGetter,
+    NumpyGetter,
     TransformProtocol,
 )
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
@@ -22,12 +22,16 @@ from ngio.utils import deprecated
 NumpyPipeType: TypeAlias = tuple[np.ndarray, np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, da.Array, Roi]
 
+T = TypeVar("T", np.ndarray, da.Array)
 
-class NumpyFeatureGetter(DataGetter[NumpyPipeType]):
+
+class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
+    """Pairs an image getter with a label getter over the same ROI."""
+
     def __init__(
         self,
-        image_getter: NumpyRoiGetter,
-        label_getter: NumpyRoiGetter,
+        image_getter: DataGetter[T],
+        label_getter: DataGetter[T],
     ) -> None:
         self._image_getter = image_getter
         self._label_getter = label_getter
@@ -39,44 +43,20 @@ class NumpyFeatureGetter(DataGetter[NumpyPipeType]):
             roi=self._image_getter.roi,
         )
 
-    def get(self) -> NumpyPipeType:
+    def get(self) -> tuple[T, T, Roi]:
         return self._image_getter(), self._label_getter(), self.roi
 
     @property
-    def image(self) -> np.ndarray:
+    def image(self) -> T:
         return self._image_getter()
 
     @property
-    def label(self) -> np.ndarray:
+    def label(self) -> T:
         return self._label_getter()
 
 
-class DaskFeatureGetter(DataGetter[DaskPipeType]):
-    def __init__(
-        self,
-        image_getter: DaskRoiGetter,
-        label_getter: DaskRoiGetter,
-    ) -> None:
-        self._image_getter = image_getter
-        self._label_getter = label_getter
-        super().__init__(
-            zarr_array=self._image_getter.zarr_array,
-            slicing_ops=self._image_getter.slicing_ops,
-            axes_ops=self._image_getter.axes_ops,
-            transforms=self._image_getter.transforms,
-            roi=self._image_getter.roi,
-        )
-
-    def get(self) -> DaskPipeType:
-        return self._image_getter(), self._label_getter(), self.roi
-
-    @property
-    def image(self) -> da.Array:
-        return self._image_getter()
-
-    @property
-    def label(self) -> da.Array:
-        return self._label_getter()
+NumpyFeatureGetter = FeatureGetter
+DaskFeatureGetter = FeatureGetter
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
@@ -134,8 +114,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             "label_transforms": self._label_transforms,
         }
 
-    def build_numpy_getter(self, roi: Roi) -> NumpyFeatureGetter:
-        data_getter = NumpyRoiGetter(
+    def build_numpy_getter(self, roi: Roi) -> FeatureGetter[np.ndarray]:
+        data_getter = NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -143,7 +123,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = NumpyRoiGetter(
+        label_getter = NumpyGetter(
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
@@ -151,10 +131,10 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             roi=roi,
             remove_channel_selection=True,
         )
-        return NumpyFeatureGetter(data_getter, label_getter)
+        return FeatureGetter(data_getter, label_getter)
 
-    def build_dask_getter(self, roi: Roi) -> DaskFeatureGetter:
-        data_getter = DaskRoiGetter(
+    def build_dask_getter(self, roi: Roi) -> FeatureGetter[da.Array]:
+        data_getter = DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
@@ -162,7 +142,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             roi=roi,
             slicing_dict=self._input_slicing_kwargs,
         )
-        label_getter = DaskRoiGetter(
+        label_getter = DaskGetter(
             zarr_array=self._input_label.zarr_array,
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
@@ -170,7 +150,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             roi=roi,
             remove_channel_selection=True,
         )
-        return DaskFeatureGetter(data_getter, label_getter)
+        return FeatureGetter(data_getter, label_getter)
 
     def build_numpy_setter(self, roi: Roi) -> None:
         return None
