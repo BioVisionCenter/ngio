@@ -89,8 +89,13 @@ def test_zoom_normalize_shape_branches():
     assert zoom._normalize_shape(slice_=3, scale=2.0, max_dim=10) == 1
     # Open-ended slice: the stop defaults to the axis size
     assert zoom._normalize_shape(slice_=slice(2, None), scale=1.0, max_dim=10) == 8
-    # List slicing scales with the number of selected elements
-    assert zoom._normalize_shape(slice_=[0, 1, 2], scale=2.0, max_dim=10) == 6
+    # A slice entirely past the edge is an empty read, never a negative extent
+    assert zoom._normalize_shape(slice_=slice(12, 20), scale=1.0, max_dim=10) == 0
+    # An unscaled list passes through by element count...
+    assert zoom._normalize_shape(slice_=[0, 1, 2], scale=1.0, max_dim=10) == 3
+    # ...but a scaled one has no geometry a zoom factor applies to
+    with pytest.raises(ValueError, match="non-contiguous"):
+        zoom._normalize_shape(slice_=[0, 1, 2], scale=2.0, max_dim=10)
     with pytest.raises(ValueError, match="Unsupported slice type"):
         zoom._normalize_shape(slice_="bad", scale=1.0, max_dim=10)  # ty: ignore[invalid-argument-type]
 

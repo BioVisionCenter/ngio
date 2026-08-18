@@ -141,3 +141,12 @@ def test_threaded_mapper_with_one_unit_degrades_to_serial():
     assert len(iterator.rois) == 1
     iterator.map_as_numpy(_threshold, mapper=ThreadedMapper("auto"))
     assert ome_zarr.get_label("out").get_as_numpy().max() <= 1
+
+
+def test_zero_or_negative_max_workers_is_refused():
+    from ngio.utils import NgioValueError
+
+    with pytest.raises(NgioValueError, match="max_workers must be >= 1"):
+        ThreadedMapper(0)
+    with pytest.raises(NgioValueError, match="max_workers must be >= 1"):
+        ProcessMapper(-2)

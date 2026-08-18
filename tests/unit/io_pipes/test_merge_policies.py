@@ -215,3 +215,45 @@ def test_mask_merge_leaves_outside_pixels_byte_identical():
     np.testing.assert_array_equal(
         written[outside], data[4:12, 4:12][outside], "protected pixels were resampled"
     )
+
+
+def test_merge_refuses_a_broadcastable_patch():
+    """Without the check, numpy would broadcast a (1, 8) patch over the region."""
+    image, _ = _image(fill=100)
+    patch = np.full((1, 8), 50, dtype="uint16")
+
+    with pytest.raises(NgioValueError, match="broadcast"):
+        image.set_roi(roi=ROI, patch=patch, merge="max")
+
+
+def test_merge_refuses_a_dtype_change():
+    """A float patch promotes the merge to float64; zarr would wrap-cast it back."""
+    image, _ = _image(fill=100)
+    patch = np.full((8, 8), 50.0, dtype="float64")
+
+    with pytest.raises(NgioValueError, match="dtype"):
+        image.set_roi(roi=ROI, patch=patch, merge="max")
+
+
+def test_merge_refuses_a_shape_changing_policy():
+    image, _ = _image(fill=100)
+    patch = np.full((8, 8), 50, dtype="uint16")
+
+    def truncating(existing, incoming, ctx):
+        return incoming[:4]
+
+    with pytest.raises(NgioValueError, match="must preserve the region"):
+        image.set_roi(roi=ROI, patch=patch, merge=truncating)
+
+
+def test_merge_on_a_getter_is_refused():
+    """A merge on a read would be silently ignored; say so at construction."""
+    from ngio.io_pipes import NumpyGetter
+
+    image, _ = _image()
+    with pytest.raises(NgioValueError, match="getter"):
+        NumpyGetter(
+            zarr_array=image.zarr_array,
+            dimensions=image.dimensions,
+            merge="max",
+        )

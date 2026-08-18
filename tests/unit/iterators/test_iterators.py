@@ -291,3 +291,34 @@ def test_chunk_gate_readonly_returns_false():
 
     assert iterator.check_if_chunks_overlap() is False
     iterator.require_no_chunks_overlap()
+
+
+def test_by_zyx_strict_raises_ngio_error():
+    data = np.zeros((16, 16), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, axes_names="yx", levels=1
+    )
+    image = ome_zarr.get_image()
+    label = ome_zarr.derive_label("seg")
+    iterator = SegmentationIterator(image, label, axes_order="yx")
+
+    with pytest.raises(NgioValueError, match="must be 3D"):
+        iterator.by_zyx(strict=True)
+
+
+def test_masked_segmentation_checks_dimensions():
+    """A label on a different spatial grid is a misconfiguration, not a target."""
+    data = np.zeros((2, 32, 32), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, axes_names="cyx", levels=1
+    )
+    masking = ome_zarr.derive_label("masking")
+    masking.set_array(np.ones(masking.shape, dtype="uint8"))
+    masking.consolidate()
+    ome_zarr.add_table("masking_ROI_table", masking.build_masking_roi_table())
+    masked = ome_zarr.get_masked_image(masking_label_name="masking")
+
+    mismatched = ome_zarr.derive_label("half_res", shape=(16, 16))
+
+    with pytest.raises(NgioValueError):
+        MaskedSegmentationIterator(masked, mismatched, axes_order="yx")

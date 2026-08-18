@@ -3,6 +3,7 @@ import zarr
 
 from ngio.common import Dimensions
 from ngio.io_pipes._ops_slices import (
+    SlicingInputType,
     build_slicing_ops,
     get_slice_as_dask,
     get_slice_as_numpy,
@@ -46,7 +47,7 @@ def test_slicing_ops_base(
 
     slicing_ops = build_slicing_ops(
         dimensions=dims,
-        slicing_dict=slicing_dict,  # type: ignore[arg-type]
+        slicing_dict=slicing_dict,
         remove_channel_selection=False,
     )
     assert slicing_ops.slice_axes == tuple(output_axes)
@@ -83,7 +84,7 @@ def test_chunk_slice():
     slicing_dict = {"t": 0, "c": (0, 2)}
     slicing_ops1 = build_slicing_ops(
         dimensions=dims,
-        slicing_dict=slicing_dict,  # type: ignore[arg-type]
+        slicing_dict=slicing_dict,
         remove_channel_selection=False,
     )
     assert slicing_ops1.slice_chunks() == {(0, 0, 0, 0, 0), (0, 2, 0, 0, 0)}
@@ -91,7 +92,7 @@ def test_chunk_slice():
     slicing_dict = {"t": 1, "c": (0, 2)}
     slicing_ops2 = build_slicing_ops(
         dimensions=dims,
-        slicing_dict=slicing_dict,  # type: ignore[arg-type]
+        slicing_dict=slicing_dict,
         remove_channel_selection=False,
     )
     assert slicing_ops2.slice_chunks() == {(1, 0, 0, 0, 0), (1, 2, 0, 0, 0)}
@@ -105,7 +106,7 @@ def test_chunk_slice():
     slicing_dict = {"t": 0, "c": (0, 2)}
     slicing_ops2 = build_slicing_ops(
         dimensions=dims,
-        slicing_dict=slicing_dict,  # type: ignore[arg-type]
+        slicing_dict=slicing_dict,
         remove_channel_selection=False,
     )
 
@@ -156,3 +157,39 @@ def test_check_elem_intersection_step_not_implemented():
         check_elem_intersection(slice(0, 5, 2), slice(1, 3))
     with pytest.raises(NotImplementedError):
         check_elem_intersection(slice(1, 3), slice(0, 5, 2))
+
+
+def test_remove_channel_selection_wins_over_virtual_axis_validation():
+    """A dropped channel selection must not be validated as a virtual axis first."""
+    from ngio.utils import NgioValueError
+
+    axes = [Axis(name=name) for name in "zyx"]
+    ds = Dataset(
+        path="0",
+        axes_handler=AxesHandler(axes=axes),
+        scale=[1.0] * 3,
+        translation=[0.0] * 3,
+    )
+    dims = Dimensions(shape=(4, 8, 8), chunks=(4, 8, 8), dataset=ds)
+    # Annotated rather than ignored: `dict` is invariant in its value type, so
+    # a bare literal infers `dict[str, slice[int, int, Any]]` and will not pass
+    # as the wider `SlicingInputType` the builder accepts.
+    slicing_dict: dict[str, SlicingInputType] = {
+        "c": slice(1, 3),
+        "y": slice(0, 4),
+    }
+
+    ops = build_slicing_ops(
+        dimensions=dims,
+        slicing_dict=slicing_dict,
+        remove_channel_selection=True,
+    )
+    assert "c" not in ops.on_disk_axes
+
+    # Without the flag the entry is a real (invalid) virtual-axis selection.
+    with pytest.raises(NgioValueError, match="Invalid axis selection"):
+        build_slicing_ops(
+            dimensions=dims,
+            slicing_dict=slicing_dict,
+            remove_channel_selection=False,
+        )

@@ -208,7 +208,7 @@ def test_stitching_is_parallel_safe():
 
 
 def test_scratch_arrays_are_removed():
-    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
         SegmentationIterator(
             image, label, axes_order="yx", consolidation_mode="dask", stitch=True
@@ -233,7 +233,7 @@ def test_scratch_can_live_in_a_separate_store():
 
 def test_a_supplied_scratch_store_keeps_the_label_clean():
     """Nothing is written inside the OME-Zarr label group."""
-    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
         SegmentationIterator(
             image,
@@ -254,7 +254,7 @@ def test_memory_scratch_refuses_to_cross_a_process_boundary():
     """A MemoryStore pickles by value, so the bands would be lost silently."""
     import pickle
 
-    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
         SegmentationIterator(
             image,
@@ -273,7 +273,7 @@ def test_memory_scratch_refuses_to_cross_a_process_boundary():
 
 
 def test_stitching_requires_a_halo():
-    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    _, image, label = _setup(_one_object_across_the_seam())
     iterator = SegmentationIterator(
         image, label, axes_order="yx", consolidation_mode="dask", stitch=True
     ).grid(size_y=32, size_x=32)
@@ -307,3 +307,83 @@ def test_relabel_sequential_without_a_stitch():
 
     assert label.relabel_sequential(consolidation_mode="dask") == 2
     assert _object_ids(ome_zarr.get_label("seg").get_as_numpy()) == {1, 2}
+
+
+def test_stitch_refuses_the_dask_path():
+    """The dask setters do not offset ids or bank bands; raising beats corrupting."""
+    _, image, label = _setup(_one_object_across_the_seam())
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+
+    with pytest.raises(NgioValueError, match="numpy path"):
+        iterator.build_dask_setter(iterator.rois[0])
+
+
+def test_stitch_refuses_tiles_split_on_an_unhaloed_axis():
+    """z-tiled tiles with a yx-only halo collapse onto one grid cell: refuse."""
+    data = np.zeros((2, 64, 64), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=data,
+        pixelsize=1.0,
+        axes_names="zyx",
+        levels=1,
+        chunks=(1, 32, 32),
+        consolidation_mode="dask",
+    )
+    image = ome_zarr.get_image()
+    label = ome_zarr.derive_label("seg")
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="zyx", consolidation_mode="dask", stitch=True
+        )
+        .grid(size_z=1, size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+
+    with pytest.raises(NgioValueError, match="same stitch grid cell"):
+        iterator.map(lambda patch: np.zeros_like(patch, dtype="uint32"))
+
+
+def test_stitch_refuses_duplicate_tile_names():
+    from ngio import Roi
+
+    _, image, label = _setup(_one_object_across_the_seam())
+    iterator = SegmentationIterator(
+        image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+    )
+    iterator._set_rois(
+        [
+            Roi.from_values(name="dup", slices={"y": (0, 64), "x": (0, 32)}),
+            Roi.from_values(name="dup", slices={"y": (0, 64), "x": (32, 32)}),
+        ]
+    )
+    iterator = iterator.with_halo(y=4, x=4)
+
+    with pytest.raises(NgioValueError, match="share the name"):
+        iterator.map(_connected_components)
+
+
+def test_failed_map_removes_the_scratch():
+    """A failed run cannot be resolved; the scratch must not linger."""
+    _, image, label = _setup(_one_object_across_the_seam())
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+
+    def exploding(patch: np.ndarray) -> np.ndarray:
+        raise RuntimeError("segmenter died")
+
+    with pytest.raises(RuntimeError, match="segmenter died"):
+        iterator.map(exploding)
+
+    assert "_ngio_stitch" not in list(label._group_handler.group.keys())

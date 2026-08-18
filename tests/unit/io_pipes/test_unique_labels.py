@@ -184,3 +184,37 @@ def test_composes_with_a_mask_merge():
     written = label.get_as_numpy()
     assert written[0, 0] == 4003, "inside the mask the offset patch should land"
     assert written[1, 1] == 500, "outside the mask the on-disk id must survive"
+
+
+def test_block_spill_is_refused():
+    """An id at or above block_size belongs to the next region's block."""
+    _, label = _label()
+    patch = np.zeros((2, 2), dtype="uint32")
+    patch[0, 0] = 1000  # == block_size
+
+    with pytest.raises(NgioValueError, match="spill"):
+        label.set_roi(
+            roi=_roi(0, size=2),
+            patch=patch,
+            transforms=[UniqueLabelsTransform(1000, block_index=0)],
+        )
+
+
+def test_dask_overflow_is_refused_at_compute():
+    """The dask path checks each block as it materializes instead of wrapping.
+
+    The offset (60 000) fits in uint16, so nothing errors at graph-build time;
+    only the *shifted ids* (60 000 + 9 999) overflow — exactly the case that
+    wrapped silently without the per-block check.
+    """
+    import dask.array as da
+
+    _, label = _label(dtype="uint16")
+    patch = da.full((2, 2), 9_999, dtype="uint16")
+
+    with pytest.raises(NgioValueError, match="past what uint16 can hold"):
+        label.set_roi(
+            roi=_roi(0, size=2),
+            patch=patch,
+            transforms=[UniqueLabelsTransform(10_000, block_index=6)],
+        )

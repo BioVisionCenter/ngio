@@ -187,3 +187,18 @@ def test_custom_shuffled_mapper_pins_roi_order():
 
     assert shuffled == basic
     assert [name for name, _ in shuffled] == [roi.name for roi in iterator.rois]
+
+
+def test_written_units_collect_none_not_the_patch():
+    """Holding every written patch would put the whole output in memory."""
+    from ngio.iterators import BasicMapper
+
+    iterator, label = _build_segmentation_iterator(_build_ome_zarr())
+    units = list(iterator._numpy_units_generator())
+
+    results = BasicMapper()(lambda patch: np.full_like(patch, 3), units)
+
+    assert results == [None] * len(units)
+    np.testing.assert_array_equal(
+        label.zarr_array[...], np.full(label.shape, 3, dtype=label.zarr_array.dtype)
+    )

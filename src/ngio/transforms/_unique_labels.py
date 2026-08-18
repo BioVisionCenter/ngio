@@ -1,3 +1,6 @@
+from typing import cast
+
+import dask.array as da
 import numpy as np
 
 from ngio.io_pipes import IoPipeContext
@@ -126,7 +129,9 @@ class UniqueLabelsTransform:
                 self._check_fits(block, offset)
                 return block
 
-            array = array.map_blocks(_checked, dtype=array.dtype)
+            # Cast because dask's `map_blocks` stubs are a union the checker
+            # cannot resolve at this call site; the result is a dask array.
+            array = cast("ArrayLike", da.map_blocks(_checked, array, dtype=array.dtype))
         if offset == 0:
             return array
         return elementwise(np.where, array > 0, array + offset, 0)

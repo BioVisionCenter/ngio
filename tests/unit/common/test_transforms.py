@@ -5,6 +5,7 @@ import pytest
 
 from ngio import Roi, create_empty_ome_zarr
 from ngio.transforms import ZoomTransform
+from ngio.utils import NgioValueError
 
 
 def _make_pair(
@@ -611,3 +612,89 @@ def test_zoom_inverse_shape_validation(tmp_path):
     wrong_data = np.zeros((30, 30), dtype="uint16")
     with pytest.raises(ValueError, match="not compatible"):
         input_img.set_roi(patch=wrong_data, roi=roi, transforms=[zoom])
+
+
+def test_zoom_clamps_a_negative_slice_start(tmp_path: Path):
+    """The read clamps a negative start to 0; the zoomed shape must match it."""
+    full_res_img = create_empty_ome_zarr(
+        store=tmp_path / "full.zarr",
+        shape=(101, 101),
+        axes_names="yx",
+        pixelsize=1.0,
+    ).get_image()
+    img = create_empty_ome_zarr(
+        store=tmp_path / "coarse.zarr",
+        shape=(25, 25),
+        axes_names="yx",
+        pixelsize=4.0,
+    ).get_image()
+    zoom = ZoomTransform(input_image=img, target_image=full_res_img, order="nearest")
+
+    data = img.get_as_numpy(transforms=[zoom], y=slice(-5, 20))
+
+    # The read delivered y=0:20 of the coarse grid, i.e. 80 full-res pixels —
+    # deriving the target from the unclamped -5 would stretch it to 100.
+    assert data.shape == (80, 101)
+
+    # Both backends agree, and the patch writes back through the inverse.
+    as_dask = img.get_as_dask(transforms=[zoom], y=slice(-5, 20)).compute()
+    np.testing.assert_array_equal(data, as_dask)
+    img.set_array(patch=data, transforms=[zoom], y=slice(-5, 20))
+
+
+def _delicate_pair(tmp_path: Path):
+    """A 4x pair whose extents (101 vs 25) do not divide evenly on purpose."""
+    full = create_empty_ome_zarr(
+        store=tmp_path / "full.zarr", shape=(101, 101), axes_names="yx", pixelsize=1.0
+    ).get_image()
+    coarse = create_empty_ome_zarr(
+        store=tmp_path / "coarse.zarr", shape=(25, 25), axes_names="yx", pixelsize=4.0
+    ).get_image()
+    zoom = ZoomTransform(input_image=coarse, target_image=full, order="nearest")
+    return full, coarse, zoom
+
+
+def test_zoom_subpixel_origin_matches_target_grid(tmp_path: Path):
+    """A ROI whose origin is not divisible by the scale still lands exactly.
+
+    On the 4x-coarser grid this ROI is `slice(5.25, 10.5)` — the sub-pixel
+    bounds only the *raw* slice carries. Deriving the shape from a normalized
+    (integer-rounded) slice breaks exactly this case, which is why the forward
+    path must never normalize.
+    """
+    full, coarse, zoom = _delicate_pair(tmp_path)
+    roi = Roi.from_values(name=None, slices={"y": (21, 21), "x": (21, 21)})
+
+    on_target_grid = full.get_roi_as_numpy(roi=roi)
+    rescaled = coarse.get_roi_as_numpy(roi=roi, transforms=[zoom])
+
+    assert rescaled.shape == on_target_grid.shape == (21, 21)
+    coarse.set_roi(patch=rescaled, roi=roi, transforms=[zoom])
+
+
+def test_zoom_of_an_empty_selection_is_empty(tmp_path: Path):
+    """Zero pixels in, zero pixels out — not a crash in the zoom kernel.
+
+    Both the zero-length slice and the slice entirely past the array's end
+    used to reach `numpy_zoom` with a zero (or negative) extent and die in a
+    divide-by-zero reshape.
+    """
+    _, coarse, zoom = _delicate_pair(tmp_path)
+
+    for empty in (slice(10, 10), slice(30, 40)):
+        data = coarse.get_as_numpy(transforms=[zoom], y=empty)
+        assert data.shape[0] == 0 and data.shape[1] == 101
+        as_dask = coarse.get_as_dask(transforms=[zoom], y=empty).compute()
+        assert as_dask.shape == data.shape
+
+
+def test_zoom_refuses_a_noncontiguous_selection(tmp_path: Path):
+    """A list selection has no geometry a zoom factor applies to.
+
+    Silently stretching three non-contiguous rows as if adjacent resamples
+    across pixels that were never neighbours.
+    """
+    _, coarse, zoom = _delicate_pair(tmp_path)
+
+    with pytest.raises(NgioValueError, match="non-contiguous"):
+        coarse.get_as_numpy(transforms=[zoom], y=[0, 2, 7])

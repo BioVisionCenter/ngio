@@ -2,7 +2,6 @@
 
 import numpy as np
 import pytest
-
 import zarr
 
 from ngio.common._label_ops import (
@@ -18,9 +17,7 @@ from ngio.utils import NgioValueError
 
 def test_offset_leaves_background_alone():
     array = np.array([[0, 1], [2, 0]], dtype="uint32")
-    np.testing.assert_array_equal(
-        offset_labels(array, 1000), [[0, 1001], [1002, 0]]
-    )
+    np.testing.assert_array_equal(offset_labels(array, 1000), [[0, 1001], [1002, 0]])
 
 
 def test_offset_preserves_dtype():
@@ -155,3 +152,16 @@ def test_chunk_selections_cover_the_array_exactly():
     for selection in chunk_selections(array):
         seen[selection] += 1
     assert (seen == 1).all(), "every pixel visited exactly once"
+
+
+def test_offset_refuses_id_spill_into_the_next_block():
+    """An id at or above block_size would collide with the neighbour's labels."""
+    from ngio.common._label_ops import check_offset_fits
+    from ngio.utils import NgioValueError
+
+    patch = np.array([[0, 150]], dtype="uint32")
+    with pytest.raises(NgioValueError, match="spill"):
+        check_offset_fits(patch, offset=100, block_size=100)
+
+    # The largest id that still fits is fine.
+    check_offset_fits(np.array([[99]], dtype="uint32"), offset=100, block_size=100)

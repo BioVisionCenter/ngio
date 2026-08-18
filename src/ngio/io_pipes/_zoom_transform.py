@@ -1,3 +1,31 @@
+"""Rescaling between two pixel grids, as a transform on the io pipes.
+
+**The shape arithmetic here is delicate — read this before touching it.**
+It has a history of edge-case regressions, and the invariants interlock:
+
+- The forward path (`_compute_zoom_shape`) derives the target shape from the
+  **raw, un-normalized** slice. The raw slice carries the ROI's sub-pixel
+  world bounds (`slice(5.25, 10.5)` on a 4x-coarser grid), and that is what
+  makes the zoomed patch land exactly on the target grid. Normalizing first
+  rounds to *this* array's integer pixels and derives a wrong factor —
+  pinned by `test_zoom_from_dimensions` and
+  `test_zoom_subpixel_origin_matches_target_grid`.
+- The inverse path (`_compute_inverse_zoom_shape`) does the opposite on
+  purpose: it normalizes, because a write must match the integer on-disk
+  region the setter will actually cover.
+- Raw does not mean unclamped. The read clamps at the array's edges, so the
+  target arithmetic clamps the same way: a negative start is cut at 0
+  (`test_zoom_clamps_a_negative_slice_start`) and the stop at the target
+  extent; a slice entirely past the edge yields an empty patch, never a
+  negative extent (`test_zoom_of_an_empty_selection_is_empty`).
+- The forward path has **no** shape validation — the patch is whatever the
+  read produced. Only the inverse carries the ±1 guard, because sub-pixel
+  bounds legitimately round the two paths one pixel apart.
+- Only contiguous selections can be rescaled: a list selection has no
+  geometry a zoom factor applies to, so it is refused on any scaled axis
+  (`test_zoom_refuses_a_noncontiguous_selection`).
+"""
+
 import math
 from collections.abc import Sequence
 
@@ -34,7 +62,8 @@ class BaseZoomTransform:
         if isinstance(slice_, slice):
             # Clamped like the read: a slice reaching past either edge is cut
             # there by the boundary check, so deriving the target from the
-            # overhang would zoom at a silently wrong factor.
+            # overhang would zoom at a silently wrong factor. A slice entirely
+            # past the edge is an empty read, never a negative extent.
             _start = max(0.0, slice_.start or 0)
             _start_int = math.floor(_start * scale)
             if slice_.stop is not None:
@@ -43,14 +72,24 @@ class BaseZoomTransform:
             else:
                 _stop = max_dim
             _stop_int = math.ceil(_stop)
-            target_shape = _stop_int - _start_int
+            target_shape = max(0, _stop_int - _start_int)
 
         elif isinstance(slice_, int):
             target_shape = 1
         elif isinstance(slice_, list):
-            target_shape = len(slice_) * scale
+            if scale != 1:
+                # Three non-contiguous rows are not a region: stretching them
+                # as if adjacent resamples across pixels that were never
+                # neighbours, silently.
+                raise NgioValueError(
+                    "Cannot zoom a non-contiguous list selection "
+                    f"({slice_!r}): the selected elements are not adjacent, "
+                    "so no zoom factor applies to them. Select a contiguous "
+                    "slice, or zoom before selecting."
+                )
+            target_shape = len(slice_)
         else:
-            raise ValueError(f"Unsupported slice type: {type(slice_)}")
+            raise NgioValueError(f"Unsupported slice type: {type(slice_)}")
         return math.ceil(target_shape)
 
     def _compute_zoom_shape(
@@ -128,7 +167,7 @@ class BaseZoomTransform:
         if any(
             abs(es - s) > 1 for es, s in zip(expected_shape, array_shape, strict=True)
         ):
-            raise ValueError(
+            raise NgioValueError(
                 f"Input array shape {array_shape} is not compatible with the expected "
                 f"shape {expected_shape} based on the zoom transform.\n"
             )
@@ -139,6 +178,10 @@ class BaseZoomTransform:
     ) -> np.ndarray:
         if array.shape == target_shape:
             return array
+        if array.size == 0 or 0 in target_shape:
+            # Nothing to resample either way; the zoom kernels divide by the
+            # source shape and would blow up on the zero.
+            return np.empty(target_shape, dtype=array.dtype)
         return numpy_zoom(
             source_array=array, target_shape=target_shape, order=self._order
         )
@@ -151,6 +194,8 @@ class BaseZoomTransform:
     ) -> da.Array:
         if array_shape == target_shape:
             return array
+        if 0 in array_shape or 0 in target_shape:
+            return da.empty(target_shape, dtype=array.dtype)
         return dask_zoom(
             source_array=array, target_shape=target_shape, order=self._order
         )

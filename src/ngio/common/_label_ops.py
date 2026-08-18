@@ -77,7 +77,9 @@ def overlap_iou(left: np.ndarray, right: np.ndarray) -> dict[tuple[int, int], fl
     # Areas are measured over the whole band, not just the intersecting pixels,
     # so a pair that agrees on a sliver of two large objects scores low.
     left_area = dict(zip(*np.unique(left[left > 0], return_counts=True), strict=True))
-    right_area = dict(zip(*np.unique(right[right > 0], return_counts=True), strict=True))
+    right_area = dict(
+        zip(*np.unique(right[right > 0], return_counts=True), strict=True)
+    )
 
     scores: dict[tuple[int, int], float] = {}
     for column, intersection in enumerate(intersections):
@@ -120,7 +122,9 @@ def chunk_selections(array: zarr.Array) -> Iterator[tuple[slice, ...]]:
     for corner in itertools.product(*ranges):
         yield tuple(
             slice(start, min(start + chunk, size))
-            for start, chunk, size in zip(corner, array.chunks, array.shape, strict=True)
+            for start, chunk, size in zip(
+                corner, array.chunks, array.shape, strict=True
+            )
         )
 
 

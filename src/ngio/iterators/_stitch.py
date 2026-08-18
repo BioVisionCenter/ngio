@@ -24,8 +24,8 @@ import numpy as np
 import zarr
 
 from ngio.common._label_ops import (
-    chunk_selections,
     check_offset_fits,
+    chunk_selections,
     offset_labels,
     overlap_iou,
     relabel,
@@ -280,9 +280,7 @@ def _open_scratch(
     }
 
 
-def _delete_scratch(
-    output: AbstractImage, scratch_store: StoreOrGroup | None
-) -> None:
+def _delete_scratch(output: AbstractImage, scratch_store: StoreOrGroup | None) -> None:
     """Remove the scratch arrays, if they are still there.
 
     Only the group ngio created inside the label is deleted. A store the caller
@@ -337,7 +335,7 @@ class StitchingSetter:
         return self._setter.axes_ops
 
     @property
-    def transforms(self):  # noqa: ANN201
+    def transforms(self):
         """The wrapped setter's transform chain."""
         return self._setter.transforms
 

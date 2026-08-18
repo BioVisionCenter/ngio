@@ -1,7 +1,6 @@
 """Tests for the tile geometry behind stitching, and for union-find."""
 
 import numpy as np
-import pytest
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
@@ -12,7 +11,6 @@ from ngio.iterators._stitch_geometry import (
     shared_band,
     tile_placements,
 )
-from ngio.utils import NgioValueError
 
 
 def _image(shape=(100, 100)):
@@ -111,11 +109,7 @@ def test_forward_bands_never_collide():
 
     seen: set[tuple[int, int]] = set()
     for band in bands.values():
-        pixels = {
-            (y, x)
-            for y in range(*band["y"])
-            for x in range(*band["x"])
-        }
+        pixels = {(y, x) for y in range(*band["y"]) for x in range(*band["x"])}
         assert not (pixels & seen), "two tiles wrote the same scratch pixel"
         seen |= pixels
 
