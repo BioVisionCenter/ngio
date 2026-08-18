@@ -1,8 +1,9 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import Generic, TypeAlias, TypeVar
 
 import dask.array as da
 import numpy as np
+import pandas as pd
 
 from ngio.common import Roi
 from ngio.images import Image, Label
@@ -17,12 +18,19 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
-from ngio.utils import deprecated
+from ngio.iterators._mappers import MapperProtocol
+from ngio.tables import FeatureTable, Table
+from ngio.utils import NgioValueError, deprecated
 
 NumpyPipeType: TypeAlias = tuple[np.ndarray, np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, da.Array, Roi]
 
 T = TypeVar("T", np.ndarray, da.Array)
+
+#: What a per-ROI feature function may return: a DataFrame, or the cheaper
+#: dict-of-columns (`{"label": [...], "area": [...]}`) that concatenates
+#: without building one frame per ROI.
+FeatureFuncResult: TypeAlias = pd.DataFrame | dict[str, list]
 
 
 class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
@@ -35,6 +43,11 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
     ) -> None:
         self._image_getter = image_getter
         self._label_getter = label_getter
+        # Read at most once per getter: `get()` and the two properties used to
+        # each re-run the underlying read, so the documented lazy pattern
+        # (`.image` then `.label`) paid double IO.
+        self._image_data: T | None = None
+        self._label_data: T | None = None
         super().__init__(
             zarr_array=self._image_getter.zarr_array,
             slicing_ops=self._image_getter.slicing_ops,
@@ -44,19 +57,88 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
         )
 
     def get(self) -> tuple[T, T, Roi]:
-        return self._image_getter(), self._label_getter(), self.roi
+        return self.image, self.label, self.roi
 
     @property
     def image(self) -> T:
-        return self._image_getter()
+        if self._image_data is None:
+            self._image_data = self._image_getter()
+        return self._image_data
 
     @property
     def label(self) -> T:
-        return self._label_getter()
+        if self._label_data is None:
+            self._label_data = self._label_getter()
+        return self._label_data
 
 
 NumpyFeatureGetter = FeatureGetter
 DaskFeatureGetter = FeatureGetter
+
+
+class _UnpackedFeatureFunc:
+    """Adapt `func(image, label, roi)` to the unit payload tuple.
+
+    A class rather than a closure so it pickles by reference and the wrapped
+    `func` can cross a `ProcessMapper` boundary.
+    """
+
+    def __init__(
+        self, func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult]
+    ) -> None:
+        self._func = func
+
+    def __call__(self, data: NumpyPipeType) -> FeatureFuncResult:
+        image, label, roi = data
+        return self._func(image, label, roi)
+
+
+def _default_feature_coalesce(
+    results: list[FeatureFuncResult], reference_label: str | None
+) -> FeatureTable:
+    """Join per-ROI results into one `FeatureTable` indexed by `label`.
+
+    Dicts of columns are concatenated as cheaply as they were produced;
+    DataFrames are concatenated as they are. Either way the rows must carry
+    the object id in a `label` column (or already sit on a `label` index).
+    """
+    if not results:
+        raise NgioValueError(
+            "No per-ROI results to build a table from: the iterator has no "
+            "ROIs. Check the ROI table or the tiling that produced it."
+        )
+    frames = []
+    for result in results:
+        if isinstance(result, pd.DataFrame):
+            frames.append(result)
+        elif isinstance(result, dict):
+            frames.append(pd.DataFrame(result))
+        else:
+            raise NgioValueError(
+                f"A feature function must return a DataFrame or a dict of "
+                f"columns, got {type(result).__name__}. Pass a custom "
+                "`coalesce` to handle other shapes."
+            )
+    # ROIs with no objects contribute empty frames; concatenating those would
+    # silently upcast the surviving columns (an empty `label` is float64, and
+    # a float index fails the table's integer-index validation).
+    frames = [frame for frame in frames if len(frame)]
+    if not frames:
+        raise NgioValueError(
+            "Every ROI returned zero rows: there is nothing to build a table "
+            "from. Check that the label actually contains objects inside the "
+            "iterated ROIs."
+        )
+    joined = pd.concat(frames)
+    if "label" in joined.columns:
+        joined = joined.set_index("label")
+    elif joined.index.name != "label":
+        raise NgioValueError(
+            "The per-ROI results carry no 'label' column or index, so the "
+            "rows cannot be tied to the objects they measure. Add a 'label' "
+            "column, or pass a custom `coalesce`."
+        )
+    return FeatureTable(table_data=joined, reference_label=reference_label)
 
 
 class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
@@ -160,6 +242,40 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
 
     def post_consolidate(self):
         pass
+
+    def reduce_to_table(
+        self,
+        func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
+        *,
+        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
+        mapper: MapperProtocol | None = None,
+    ) -> Table:
+        """Measure every ROI and join the results into one table.
+
+        The per-ROI measurement fans out exactly like `reduce` — pass a
+        `mapper` to parallelize it — and the join happens once, at the end,
+        on the calling thread. Nothing is written: the returned table is
+        yours to store, e.g. `container.add_table(name, table)`.
+
+        Args:
+            func: `(image, label, roi) -> DataFrame | dict[str, list]` — the
+                measurements for one ROI. Rows must carry the object id in a
+                `label` column (or index). Under a parallel mapper it runs on
+                worker threads or processes and must be safe there.
+            coalesce: Joins the per-ROI results into an ngio table. The
+                default concatenates them into a `FeatureTable` indexed by
+                `label`, referencing the input label.
+            mapper: How the per-ROI work is scheduled; `None` is serial.
+
+        Returns:
+            The joined table — a `FeatureTable` under the default `coalesce`.
+        """
+        results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
+        if coalesce is None:
+            return _default_feature_coalesce(
+                results, reference_label=self._input_label.meta.name
+            )
+        return coalesce(results)
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Create an iterator over the pixels of the ROIs."""

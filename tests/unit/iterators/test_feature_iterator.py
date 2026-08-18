@@ -81,3 +81,119 @@ def test_feature_iterator_is_readonly():
     assert iterator.build_numpy_setter(roi) is None
     assert iterator.build_dask_setter(roi) is None
     assert iterator.post_consolidate() is None
+
+
+def _build_container_and_iterator():
+    rng = np.random.default_rng(0)
+    array = rng.integers(0, 255, size=(2, 16, 16)).astype("uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=array,
+        pixelsize=1.0,
+        axes_names="cyx",
+        levels=1,
+    )
+    label = ome_zarr.derive_label(name="nuclei")
+    label_data = np.zeros((16, 16), dtype="uint32")
+    label_data[2:6, 2:6] = 1
+    label_data[10:14, 10:14] = 2
+    label.set_array(label_data)
+    label.consolidate()
+    iterator = FeatureExtractorIterator(
+        input_image=ome_zarr.get_image(),
+        input_label=ome_zarr.get_label("nuclei"),
+        channel_selection=0,
+        axes_order="yx",
+    ).grid(size_x=8, size_y=8)
+    return ome_zarr, iterator
+
+
+def _measure_as_dict(image, label, roi):
+    ids = [int(value) for value in np.unique(label) if value]
+    return {
+        "label": ids,
+        "mean": [float(image[label == i].mean()) for i in ids],
+    }
+
+
+def _measure_as_frame(image, label, roi):
+    import pandas as pd
+
+    return pd.DataFrame(_measure_as_dict(image, label, roi))
+
+
+def test_reduce_to_table_returns_a_feature_table():
+    """Both result shapes coalesce into the same table; the write is the caller's."""
+    ome_zarr, iterator = _build_container_and_iterator()
+
+    from_dicts = iterator.reduce_to_table(_measure_as_dict)
+    assert sorted(from_dicts.dataframe.index.tolist()) == [1, 2]
+    assert from_dicts.dataframe.index.name == "label"
+    assert "feats" not in ome_zarr.list_tables(), "nothing is written implicitly"
+
+    from_frames = iterator.reduce_to_table(_measure_as_frame)
+    assert from_frames.dataframe.equals(from_dicts.dataframe)
+
+    # The caller stores the table; a round-trip through the container works.
+    ome_zarr.add_table("feats", from_dicts)
+    read_back = ome_zarr.get_table("feats")
+    assert read_back.dataframe.equals(from_dicts.dataframe)
+
+
+def test_reduce_to_table_parallel_matches_serial():
+    from ngio.iterators import ThreadedMapper
+
+    _, iterator = _build_container_and_iterator()
+
+    serial = iterator.reduce_to_table(_measure_as_dict)
+    threaded = iterator.reduce_to_table(_measure_as_dict, mapper=ThreadedMapper(4))
+    assert threaded.dataframe.equals(serial.dataframe)
+
+
+def test_reduce_to_table_custom_coalesce():
+    import pandas as pd
+
+    from ngio.tables import GenericTable
+
+    _, iterator = _build_container_and_iterator()
+
+    def totals(results):
+        joined = pd.concat([pd.DataFrame(r) for r in results if r["label"]])
+        return GenericTable(pd.DataFrame({"total_objects": [len(joined)]}))
+
+    table = iterator.reduce_to_table(_measure_as_dict, coalesce=totals)
+    assert table.dataframe["total_objects"].tolist() == [2]
+
+
+def test_reduce_to_table_all_empty_raises():
+    from ngio.utils import NgioValueError
+
+    _, iterator = _build_container_and_iterator()
+
+    def nothing(image, label, roi):
+        return {"label": [], "mean": []}
+
+    with pytest.raises(NgioValueError, match="zero rows"):
+        iterator.reduce_to_table(nothing)
+
+
+def test_reduce_to_table_requires_a_label_key():
+    from ngio.utils import NgioValueError
+
+    _, iterator = _build_container_and_iterator()
+
+    def unlabelled(image, label, roi):
+        return {"mean": [1.0]}
+
+    with pytest.raises(NgioValueError, match="no 'label' column"):
+        iterator.reduce_to_table(unlabelled)
+
+
+def test_feature_getter_reads_once():
+    """`get()` and the properties share one read per underlying getter."""
+    _, iterator = _build_container_and_iterator()
+
+    getter = iterator.build_numpy_getter(iterator.rois[0])
+    image, label, _ = getter.get()
+    assert getter.image is image
+    assert getter.label is label

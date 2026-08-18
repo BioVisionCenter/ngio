@@ -25,8 +25,10 @@ import numpy as np
 import pandas as pd
 from skimage import measure
 
+from ngio import Roi
 
-def extract_features(image: np.ndarray, label: np.ndarray) -> pd.DataFrame:
+
+def extract_features(image: np.ndarray, label: np.ndarray, roi: Roi) -> pd.DataFrame:
     """Basic feature extraction using skimage.measure.regionprops_table."""
     label = label.squeeze(-1)  # Remove the channel axis if present
     roi_feat_table = measure.regionprops_table(
@@ -83,7 +85,6 @@ zoom_transform = ZoomTransform(
 
 # --8<-- [start:extract]
 from ngio.iterators import FeatureExtractorIterator
-from ngio.tables import FeatureTable
 
 iterator = FeatureExtractorIterator(
     input_image=image,
@@ -92,17 +93,27 @@ iterator = FeatureExtractorIterator(
     axes_order=["y", "x", "c"],
 )
 
-feat_table = []
-for image_data, label_data, roi in iterator.iter_as_numpy():
-    print(f"Processing ROI: {roi}")
-    roi_feat_table = extract_features(image=image_data, label=label_data)
-    feat_table.append(roi_feat_table)
+# Measure every region and join the per-region results into ONE FeatureTable.
+# Pass `mapper=ThreadedMapper("auto")` to fan the measurements out in parallel;
+# the join always happens once, at the end. Nothing is written yet.
+feat_table = iterator.reduce_to_table(extract_features)
 
-# Concatenate the per-region frames into one table
-feat_table = pd.concat(feat_table)
-feat_table = FeatureTable(table_data=feat_table, reference_label="nuclei")
+# Storing the table is a separate, explicit step.
 ome_zarr.add_table("nuclei_regionprops", feat_table, overwrite=True)
 # --8<-- [end:extract]
+
+# --8<-- [start:manual_extract]
+from ngio.tables import FeatureTable
+
+feat_frames = []
+for image_data, label_data, roi in iterator.iter_as_numpy():
+    print(f"Processing ROI: {roi}")
+    feat_frames.append(extract_features(image_data, label_data, roi))
+
+# Concatenate the per-region frames into one table
+manual_table = FeatureTable(table_data=pd.concat(feat_frames), reference_label="nuclei")
+ome_zarr.add_table("nuclei_regionprops_manual", manual_table, overwrite=True)
+# --8<-- [end:manual_extract]
 
 # --8<-- [start:read_table_back]
 print(table_html(ome_zarr.get_table("nuclei_regionprops").dataframe.head()))

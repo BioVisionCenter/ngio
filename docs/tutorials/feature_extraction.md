@@ -13,7 +13,9 @@ table with one row per label, ready to be read back or aggregated across a plate
 ## Step 1: write the measurement function
 
 Start with the function that does the measuring — here a thin wrapper around
-`skimage.measure.regionprops_table`, taking one image patch and one label patch.
+`skimage.measure.regionprops_table`, taking one image patch, one label patch, and
+the region's `Roi`. It can return a `DataFrame` or a plain dict of columns; either
+way the rows must carry the object id in a `label` column.
 
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:extract_features"
@@ -33,8 +35,23 @@ Start with the function that does the measuring — here a thin wrapper around
 
 ## Step 4: use the FeatureExtractorIterator to create a feature table
 
+`reduce_to_table` runs the measurement over every region and joins the results
+into a `FeatureTable` referencing the input label — one call, one table. The
+per-region measurements schedule exactly like `reduce`, so a
+`mapper=ThreadedMapper("auto")` parallelizes them; the join still happens once,
+at the end. The iterator writes nothing: storing the table is your explicit
+`add_table` call, where the name, backend and overwrite policy belong.
+
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:extract"
+```
+
+For flows the default join does not fit — a different table type, filtering, or
+aggregation — either pass a custom `coalesce`, or drop down to the loop that
+`reduce_to_table` replaces:
+
+```python exec="true" source="material-block" session="feature_extraction"
+--8<-- "docs/snippets/tutorials/feature_extraction.py:manual_extract"
 ```
 
 ### Sanity check: read the table back

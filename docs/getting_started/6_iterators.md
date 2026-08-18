@@ -172,7 +172,7 @@ the top-level `ngio` namespace):
 * The `SegmentationIterator` is designed to build segmentation pipelines, where an input image is processed to produce a segmentation mask. For a worked example, see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * The `MaskedSegmentationIterator` is similar to the `SegmentationIterator`, but it uses a masking ROI table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. For a worked example, see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * The `ImageProcessingIterator` is designed to build image processing pipelines, where an input image is processed to produce a new image. For a worked example, see the [image processing tutorial](../tutorials/image_processing.md).
-* The `FeatureExtractorIterator` is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. For a worked example, see the [feature extraction tutorial](../tutorials/feature_extraction.md).
+* The `FeatureExtractorIterator` is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. Its `reduce_to_table` runs a measurement over every region and returns the joined results as a single feature table — parallel per region via `mapper=`, stored by your own `add_table` call. For a worked example, see the [feature extraction tutorial](../tutorials/feature_extraction.md).
 
 ## Building one
 

@@ -150,3 +150,37 @@ def test_zero_or_negative_max_workers_is_refused():
         ThreadedMapper(0)
     with pytest.raises(NgioValueError, match="max_workers must be >= 1"):
         ProcessMapper(-2)
+
+
+def _measure_labels(image, label, roi):
+    ids = [int(value) for value in np.unique(label) if value]
+    return {
+        "label": ids,
+        "mean": [float(image[label == i].mean()) for i in ids],
+    }
+
+
+def test_reduce_to_table_across_processes(tmp_path: Path):
+    """Per-ROI dicts pickle back from the workers; the joined table matches serial."""
+    from ngio.iterators import FeatureExtractorIterator
+
+    ome_zarr = _build_ome_zarr(tmp_path / "features.zarr")
+    label = ome_zarr.derive_label("nuclei")
+    label_data = np.zeros((64, 64), dtype="uint32")
+    label_data[4:12, 4:12] = 1
+    label_data[40:48, 40:48] = 2
+    label.set_array(label_data)
+    label.consolidate()
+
+    iterator = FeatureExtractorIterator(
+        input_image=ome_zarr.get_image(),
+        input_label=ome_zarr.get_label("nuclei"),
+        channel_selection=0,
+        axes_order="yx",
+    ).grid(size_x=16, size_y=16)
+
+    serial = iterator.reduce_to_table(_measure_labels)
+    from_processes = iterator.reduce_to_table(
+        _measure_labels, mapper=ProcessMapper(max_workers=2)
+    )
+    assert from_processes.dataframe.equals(serial.dataframe)
