@@ -1,3 +1,4 @@
+import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator
 from typing import Generic, Literal, Self, TypeVar, overload
@@ -26,7 +27,12 @@ from ngio.iterators._rois_utils import (
     rois_product,
 )
 from ngio.tables import GenericRoiTable
-from ngio.utils import NgioValueError
+from ngio.utils import (
+    NgioDeprecationWarning,
+    NgioFutureWarning,
+    NgioValueError,
+    deprecated,
+)
 
 NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
@@ -257,6 +263,33 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             yield getter, setter
         self.post_consolidate()
 
+    def _iter(
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] = "dask",
+        iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
+    ) -> Generator:
+        """Create an iterator over the pixels of the ROIs (no deprecation warnings)."""
+        if data_mode == "numpy":
+            getters = self._numpy_getters_generator()
+            setters = self._numpy_setters_generator()
+        elif data_mode == "dask":
+            getters = self._dask_getters_generator()
+            setters = self._dask_setters_generator()
+        else:
+            raise NgioValueError(f"Invalid mode: {data_mode}")
+
+        if iterator_mode == "readonly":
+            if lazy:
+                return getters
+            else:
+                return (getter() for getter in getters)
+        if lazy:
+            return self._read_and_write_generator(getters, setters)
+        else:
+            gen = self._read_and_write_generator(getters, setters)
+            return ((getter(), setter) for getter, setter in gen)
+
     @overload
     def iter(
         self,
@@ -328,41 +361,55 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def iter(
         self,
         lazy: bool = False,
-        data_mode: Literal["numpy", "dask"] = "dask",
+        data_mode: Literal["numpy", "dask"] | None = None,
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
     ) -> Generator:
-        """Create an iterator over the pixels of the ROIs."""
-        if data_mode == "numpy":
-            getters = self._numpy_getters_generator()
-            setters = self._numpy_setters_generator()
-        elif data_mode == "dask":
-            getters = self._dask_getters_generator()
-            setters = self._dask_setters_generator()
-        else:
-            raise NgioValueError(f"Invalid mode: {data_mode}")
+        """Create an iterator over the pixels of the ROIs.
 
-        if iterator_mode == "readonly":
-            if lazy:
-                return getters
-            else:
-                return (getter() for getter in getters)
-        if lazy:
-            return self._read_and_write_generator(getters, setters)
-        else:
-            gen = self._read_and_write_generator(getters, setters)
-            return ((getter(), setter) for getter, setter in gen)
+        Note:
+            The dask data mode is deprecated and will be removed in ngio=1.2;
+            from then on `iter()` yields numpy arrays.
+        """
+        if data_mode is None:
+            warnings.warn(
+                "iter() currently defaults to data_mode='dask'; in ngio=1.2 it "
+                "will yield numpy arrays and the dask mode will be removed. "
+                "Pass data_mode='numpy' (or use iter_as_numpy()) to adopt the "
+                "future behaviour now, or data_mode='dask' to keep the current "
+                "behaviour and silence this warning.",
+                NgioFutureWarning,
+                stacklevel=2,
+            )
+            data_mode = "dask"
+        elif data_mode == "dask":
+            warnings.warn(
+                "data_mode='dask' on iter() is deprecated and will be removed "
+                "in ngio=1.2; the numpy path is the only iterator backend going "
+                "forward. Use data_mode='numpy', or Image.get_as_dask() for "
+                "lazy whole-region access.",
+                NgioDeprecationWarning,
+                stacklevel=2,
+            )
+        return self._iter(lazy=lazy, data_mode=data_mode, iterator_mode=iterator_mode)
 
     def iter_as_numpy(
         self,
     ):
         """Create an iterator over the pixels of the ROIs."""
-        return self.iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
+        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
 
+    @deprecated(
+        replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
+        removed_in="1.2",
+    )
     def iter_as_dask(
         self,
     ):
-        """Create an iterator over the pixels of the ROIs."""
-        return self.iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
+        """Create an iterator over the pixels of the ROIs.
+
+        Deprecated: removed in ngio=1.2.
+        """
+        return self._iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
 
     def _require_writable_units(
         self, units: list[IterUnit[NumpyPipeType]] | list[IterUnit[DaskPipeType]]
@@ -375,7 +422,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 "Use reduce (or iter) to compute without writing."
             )
 
-    def map_as_numpy(
+    def map(
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
         mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
@@ -401,12 +448,27 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         _mapper(func, units)
         self.post_consolidate()
 
+    def map_as_numpy(
+        self,
+        func: Callable[[NumpyPipeType], NumpyPipeType],
+        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
+        max_workers: MaxWorkers = None,
+    ) -> None:
+        """Alias for `map()`."""
+        return self.map(func, mapper=mapper, max_workers=max_workers)
+
+    @deprecated(
+        replacement="map() / map_as_numpy(max_workers=...)",
+        removed_in="1.2",
+    )
     def map_as_dask(
         self,
         func: Callable[[DaskPipeType], DaskPipeType],
         mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
     ) -> None:
         """Apply a transformation function to the ROI pixels and write it back.
+
+        Deprecated: removed in ngio=1.2.
 
         No `max_workers` here on purpose: the dask pipes are already executed
         by dask's own scheduler, and stacking a thread pool on top of it
@@ -422,7 +484,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         _mapper(func, units)
         self.post_consolidate()
 
-    def reduce_as_numpy(
+    def reduce(
         self,
         func: Callable[[NumpyPipeType], R],
         mapper: MapperProtocol[NumpyPipeType, R] | None = None,
@@ -447,12 +509,27 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         _mapper = _select_mapper(mapper, max_workers)
         return _mapper(func, list(self._numpy_units_generator(with_setters=False)))
 
+    def reduce_as_numpy(
+        self,
+        func: Callable[[NumpyPipeType], R],
+        mapper: MapperProtocol[NumpyPipeType, R] | None = None,
+        max_workers: MaxWorkers = None,
+    ) -> list[R]:
+        """Alias for `reduce()`."""
+        return self.reduce(func, mapper=mapper, max_workers=max_workers)
+
+    @deprecated(
+        replacement="reduce() / reduce_as_numpy(max_workers=...)",
+        removed_in="1.2",
+    )
     def reduce_as_dask(
         self,
         func: Callable[[DaskPipeType], R],
         mapper: MapperProtocol[DaskPipeType, R] | None = None,
     ) -> list[R]:
         """Apply a function to every ROI and collect the results without writing.
+
+        Deprecated: removed in ngio=1.2.
 
         Units are built read-only even on writable iterators: nothing is
         written and `post_consolidate` does not run. No `max_workers` here:

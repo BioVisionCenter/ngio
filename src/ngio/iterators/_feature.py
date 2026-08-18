@@ -17,6 +17,7 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.utils import deprecated
 
 NumpyPipeType: TypeAlias = tuple[np.ndarray, np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, da.Array, Roi]
@@ -182,8 +183,15 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Create an iterator over the pixels of the ROIs."""
-        return self.iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
+        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
+    @deprecated(
+        replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
+        removed_in="1.2",
+    )
     def iter_as_dask(self):  # type: ignore[override]
-        """Create an iterator over the pixels of the ROIs."""
-        return self.iter(lazy=False, data_mode="dask", iterator_mode="readonly")
+        """Create an iterator over the pixels of the ROIs.
+
+        Deprecated: removed in ngio=1.2.
+        """
+        return self._iter(lazy=False, data_mode="dask", iterator_mode="readonly")

@@ -12,7 +12,7 @@ from ngio.iterators import (
     MaskedSegmentationIterator,
     SegmentationIterator,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioDeprecationWarning, NgioValueError
 
 # The iterators run through the version-agnostic container API, so the
 # expensive write tests cover the full axes matrix on v05 only, plus a v04
@@ -55,13 +55,17 @@ def test_segmentation_iterator(single_image_copy: Path):
         label_patch = np.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
         writer(label_patch)
 
-    iterator.map_as_numpy(lambda x: np.zeros_like(x, dtype=np.uint8))
+    iterator.map(lambda x: np.zeros_like(x, dtype=np.uint8))
 
-    for i, (img_chunk, writer) in enumerate(iterator.iter_as_dask()):
-        label_patch = da.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
-        writer(label_patch)
+    with pytest.warns(NgioDeprecationWarning):
+        for i, (img_chunk, writer) in enumerate(iterator.iter_as_dask()):
+            label_patch = da.full(
+                shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8
+            )
+            writer(label_patch)
 
-    iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
+    with pytest.warns(NgioDeprecationWarning):
+        iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
 @pytest.mark.parametrize("zarr_name", WRITER_ZARR_NAMES)
@@ -90,13 +94,17 @@ def test_masked_segmentation_iterator(single_image_copy: Path):
         label_patch = np.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
         writer(label_patch)
 
-    iterator.map_as_numpy(lambda x: np.zeros_like(x, dtype=np.uint8))
+    iterator.map(lambda x: np.zeros_like(x, dtype=np.uint8))
 
-    for i, (img_chunk, writer) in enumerate(iterator.iter_as_dask()):
-        label_patch = da.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
-        writer(label_patch)
+    with pytest.warns(NgioDeprecationWarning):
+        for i, (img_chunk, writer) in enumerate(iterator.iter_as_dask()):
+            label_patch = da.full(
+                shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8
+            )
+            writer(label_patch)
 
-    iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
+    with pytest.warns(NgioDeprecationWarning):
+        iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
 def test_img_processing_iterator(
@@ -124,13 +132,15 @@ def test_img_processing_iterator(
         label_patch = np.zeros_like(img_chunk, dtype=np.uint8)
         writer(label_patch)
 
-    iterator.map_as_numpy(lambda x: np.zeros_like(x, dtype=np.uint8))
+    iterator.map(lambda x: np.zeros_like(x, dtype=np.uint8))
 
-    for img_chunk, writer in iterator.iter_as_dask():
-        label_patch = da.zeros_like(img_chunk, dtype=np.uint8)
-        writer(label_patch)
+    with pytest.warns(NgioDeprecationWarning):
+        for img_chunk, writer in iterator.iter_as_dask():
+            label_patch = da.zeros_like(img_chunk, dtype=np.uint8)
+            writer(label_patch)
 
-    iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
+    with pytest.warns(NgioDeprecationWarning):
+        iterator.map_as_dask(lambda x: da.zeros_like(x, dtype=np.uint8))
 
 
 def test_features_iterator(

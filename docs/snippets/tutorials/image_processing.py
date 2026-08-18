@@ -148,7 +148,7 @@ iterator.require_no_regions_overlap()
 iterator.require_no_chunks_overlap()
 
 # Map the blur across every region
-iterator.map_as_numpy(lambda x: gaussian_blur(x, sigma=sigma))
+iterator.map(lambda x: gaussian_blur(x, sigma=sigma))
 
 # No need to consolidate: the iterator does it once every region is processed
 # --8<-- [end:iterators]

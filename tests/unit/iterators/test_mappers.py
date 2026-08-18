@@ -12,7 +12,7 @@ from ngio.iterators import (
     IterUnit,
     SegmentationIterator,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioDeprecationWarning, NgioValueError
 
 
 def _build_ome_zarr(chunks="auto", ngff_version="0.4"):
@@ -81,9 +81,10 @@ def test_reduce_returns_dataframe():
 
 def test_reduce_as_dask():
     iterator = _build_feature_iterator(_build_ome_zarr())
-    results = iterator.reduce_as_dask(
-        lambda data: (data[2].name, float(data[0].mean().compute()))
-    )
+    with pytest.warns(NgioDeprecationWarning):
+        results = iterator.reduce_as_dask(
+            lambda data: (data[2].name, float(data[0].mean().compute()))
+        )
     assert [name for name, _ in results] == [roi.name for roi in iterator.rois]
 
 
@@ -118,7 +119,10 @@ def test_map_readonly_raises_before_func_runs():
 
     with pytest.raises(NgioValueError, match="read-only"):
         iterator.map_as_numpy(recording_func)
-    with pytest.raises(NgioValueError, match="read-only"):
+    with (
+        pytest.warns(NgioDeprecationWarning),
+        pytest.raises(NgioValueError, match="read-only"),
+    ):
         iterator.map_as_dask(recording_func)
     assert calls == []
 

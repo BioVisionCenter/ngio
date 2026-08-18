@@ -1,9 +1,11 @@
 import dask.array as da
 import numpy as np
+import pytest
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
 from ngio.iterators import FeatureExtractorIterator
+from ngio.utils import NgioDeprecationWarning
 
 
 def _build_iterator() -> FeatureExtractorIterator:
@@ -50,7 +52,9 @@ def test_feature_iterator_dask():
     iterator = _build_iterator()
 
     n_items = 0
-    for data, seg, roi in iterator.iter_as_dask():
+    with pytest.warns(NgioDeprecationWarning):
+        dask_iter = iterator.iter_as_dask()
+    for data, seg, roi in dask_iter:
         assert isinstance(data, da.Array)
         assert isinstance(seg, da.Array)
         assert data.shape == seg.shape
@@ -59,7 +63,11 @@ def test_feature_iterator_dask():
     assert n_items == len(iterator.rois)
 
     # Lazy iteration yields the getter objects with image/label properties
-    for getter in iterator.iter(lazy=True, data_mode="dask", iterator_mode="readonly"):
+    with pytest.warns(NgioDeprecationWarning):
+        lazy_dask_iter = iterator.iter(
+            lazy=True, data_mode="dask", iterator_mode="readonly"
+        )
+    for getter in lazy_dask_iter:
         assert isinstance(getter.image, da.Array)  # ty: ignore[unresolved-attribute]
         assert isinstance(getter.label, da.Array)  # ty: ignore[unresolved-attribute]
         assert getter.image.shape == getter.label.shape  # ty: ignore[unresolved-attribute]
