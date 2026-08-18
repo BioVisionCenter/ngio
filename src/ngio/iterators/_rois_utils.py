@@ -1,6 +1,65 @@
+from collections.abc import Mapping
+
 from ngio.common import Roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.utils import NgioValueError
+
+# Per-axis pixels added on each side of a ROI when reading, keyed by axis name.
+HaloMargins = dict[str, tuple[int, int]]
+
+
+def halo_roi(
+    roi: Roi, ref_image: AbstractImage, halo: Mapping[str, int]
+) -> tuple[Roi, HaloMargins]:
+    """Grow a ROI by a per-axis pixel margin, clipped to the image.
+
+    The margin actually applied is returned alongside, per axis and per side,
+    because clipping at an image border makes it asymmetric — a tile at `y=0`
+    grows downwards only, and whatever crops the result back has to know that
+    rather than assume the requested margin.
+
+    Args:
+        roi: The core ROI: the region that will be written.
+        ref_image: The image the ROI is read from; supplies the pixel size and
+            the bounds to clip against.
+        halo: Pixels to add on each side, per axis name. Axes absent from the
+            ROI, or absent here, are left alone.
+
+    Returns:
+        The grown ROI, and the applied `(before, after)` margin per axis. Axes
+        that did not grow are omitted from the margins.
+    """
+    if not halo:
+        return roi, {}
+
+    pixel_size = ref_image.pixel_size
+    roi_px = roi.to_pixel(pixel_size=pixel_size)
+    margins: HaloMargins = {}
+    for axis_name, margin in halo.items():
+        if margin == 0:
+            continue
+        if margin < 0:
+            raise NgioValueError(
+                f"Halo along '{axis_name}' must be >= 0, got {margin}."
+            )
+        roi_slice = roi_px.get(axis_name)
+        if roi_slice is None or roi_slice.start is None or roi_slice.length is None:
+            # An axis the ROI does not pin has nothing to grow around.
+            continue
+        start = int(roi_slice.start)
+        end = start + int(roi_slice.length)
+        dim = ref_image.dimensions.get(axis_name, default=1)
+        new_start = max(0, start - margin)
+        new_end = min(dim, end + margin)
+        before, after = start - new_start, new_end - end
+        if before == 0 and after == 0:
+            continue
+        margins[axis_name] = (before, after)
+        roi_px = roi_px.update_slice(axis_name, (new_start, new_end - new_start))
+
+    if not margins:
+        return roi, {}
+    return roi_px.to_world(pixel_size=pixel_size), margins
 
 
 def rois_product(rois_a: list[Roi], rois_b: list[Roi]) -> list[Roi]:

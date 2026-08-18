@@ -1,6 +1,7 @@
 import warnings
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Mapping
+from types import MappingProxyType
 from typing import Generic, Literal, Self, TypeVar, overload
 
 from ngio.common import Roi
@@ -11,6 +12,7 @@ from ngio.io_pipes._ops_slices_utils import (
     check_if_regions_overlap,
     chunk_rects_intersect,
 )
+from ngio.iterators._halo import HaloCroppingSetter
 from ngio.iterators._mappers import (
     BasicMapper,
     IterUnit,
@@ -22,6 +24,7 @@ from ngio.iterators._rois_utils import (
     by_yx,
     by_zyx,
     grid,
+    halo_roi,
     rois_product,
 )
 from ngio.tables import GenericRoiTable
@@ -35,6 +38,7 @@ from ngio.utils import (
 NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
 R = TypeVar("R")
+T = TypeVar("T")
 
 
 class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
@@ -42,9 +46,15 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
     _rois: list[Roi]
     _ref_image: AbstractImage
+    # Extra pixels read around each ROI and dropped before writing; see
+    # `with_halo`. Empty means the read and the write cover the same region.
+    # The default is immutable and shared: instances assign a fresh dict, and
+    # a mutable class-level `{}` would be one shared across every iterator.
+    _halo: Mapping[str, int] = MappingProxyType({})
 
     def __repr__(self) -> str:
-        return f"{self.__class__.__name__}(regions={len(self._rois)})"
+        halo = f", halo={self._halo}" if self._halo else ""
+        return f"{self.__class__.__name__}(regions={len(self._rois)}{halo})"
 
     @abstractmethod
     def get_init_kwargs(self) -> dict:
@@ -79,7 +89,96 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         init_kwargs = self.get_init_kwargs()
         new_instance = self.__class__(**init_kwargs)
         new_instance._set_rois(rois)
+        # Carried here rather than through every concrete `get_init_kwargs`:
+        # the halo is orthogonal to how an iterator was built.
+        new_instance._halo = self._halo
         return new_instance
+
+    def with_halo(self, x: int = 0, y: int = 0, z: int = 0, t: int = 0) -> Self:
+        """Read a margin of context around each ROI, but write only the ROI.
+
+        The function is handed the grown region and must return it grown too;
+        the extra border is cropped off before the write. This is how you get
+        seamless tiles — each tile sees past its own edge, so a smoothing or a
+        segmentation has the context it needs — and how you "trim" a tile,
+        which is the same operation seen from the other side.
+
+        The ROIs themselves do not move, so the write footprints are unchanged
+        and a haloed iterator parallelizes exactly as far as it did without
+        one. That is the point of doing this on the read side: overlapping
+        *writes* would have to be serialized, overlapping reads cost nothing.
+
+        Margins are in pixels of the reference image and are clipped at its
+        borders, so an edge tile simply grows on the sides where there is room.
+
+        Note:
+            Because the margins are counted in reference-image pixels, they do
+            not survive a rescale: a shape-changing transform on the data path
+            (a `ZoomTransform`, say) leaves the patch on a different grid from
+            the margins, and the crop refuses rather than guessing. To work at
+            a lower resolution, iterate on a coarser pyramid level instead. A
+            `MaskTransform` is unaffected — its zoom rescales the *label* it
+            reads, never the data array — and composes with a halo normally.
+
+        Args:
+            x: Pixels added on each side along x.
+            y: Pixels added on each side along y.
+            z: Pixels added on each side along z.
+            t: Frames added on each side along t.
+
+        Returns:
+            A new iterator reading with the halo.
+
+        Raises:
+            NgioValueError: On a read-only iterator, which has no write region
+                for the halo to be defined against, or for a negative margin.
+
+        Example:
+            ```python
+            # 8 px of context per side, disjoint writes, still parallel.
+            it = iterator.by_chunks(grid="write").with_halo(x=8, y=8)
+            it.map(smooth, mapper=ThreadedMapper("auto"))
+            ```
+        """
+        halo = {"x": x, "y": y, "z": z, "t": t}
+        for axis_name, margin in halo.items():
+            if margin < 0:
+                raise NgioValueError(
+                    f"Halo along '{axis_name}' must be >= 0, got {margin}."
+                )
+        if self.output_image is None:
+            name = self.__class__.__name__
+            raise NgioValueError(
+                f"{name} is read-only, so there is no written region for a "
+                "halo to surround. Widen the ROIs themselves instead (e.g. "
+                "`grid(...)` with a stride smaller than the size)."
+            )
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._halo = {ax: m for ax, m in halo.items() if m > 0}
+        return new_instance
+
+    @property
+    def halo(self) -> dict[str, int]:
+        """The per-axis read margin, empty when there is none."""
+        return dict(self._halo)
+
+    def _read_roi(self, roi: Roi) -> Roi:
+        """The region a getter reads for `roi`: grown by the halo, if any."""
+        if not self._halo:
+            return roi
+        read_roi, _ = halo_roi(roi, self._ref_image, self._halo)
+        return read_roi
+
+    def _wrap_setter(
+        self, setter: DataSetterProtocol[T], roi: Roi
+    ) -> DataSetterProtocol[T]:
+        """Crop the halo off patches heading into `setter`, if there is one."""
+        if not self._halo:
+            return setter
+        _, margins = halo_roi(roi, self._ref_image, self._halo)
+        if not margins:
+            return setter
+        return HaloCroppingSetter(setter, margins)
 
     def grid(
         self,

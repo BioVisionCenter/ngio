@@ -78,9 +78,11 @@ class MergeTransform(ReadModifyWriteTransform):
         # Overlapping tiles keep the brighter value.
         image.set_roi(roi, patch, transforms=[MergeTransform("max")])
 
+
         # Or supply your own rule.
         def half(existing, patch, ctx):
             return (existing + patch) // 2
+
 
         image.set_roi(roi, patch, transforms=[MergeTransform(half)])
         ```

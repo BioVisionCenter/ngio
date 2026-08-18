@@ -239,6 +239,35 @@ For per-ROI measurement without writing anything, use `reduce` — it returns on
 means = iterator.reduce(lambda patch: float(patch.mean()))
 ```
 
+## Halos: context without seams
+
+Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. `with_halo` fixes that by reading a margin around each ROI and writing only the ROI back:
+
+```python
+iterator = iterator.by_chunks(grid="write").with_halo(x=8, y=8)
+iterator.map(smooth, mapper=ThreadedMapper("auto"))
+```
+
+`smooth` receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.
+
+The ROIs themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping *writes* would have to be serialized; overlapping reads cost nothing.
+
+Read the same trick backwards and it is a "trim": if you want each tile's outer margin discarded rather than written, that is exactly a halo of that width.
+
+## Merging instead of overwriting
+
+Writes replace what is on disk. `MergeTransform` combines with it instead — reading the destination back, folding it with your patch, and writing the result:
+
+```python
+from ngio.transforms import MergeTransform
+
+image.set_roi(roi, patch, transforms=[MergeTransform("max")])
+```
+
+`"max"`, `"min"` and `"sum"` are order-independent, so overlapping regions give the same answer whatever order they are written in. `"keep_nonzero"` ("the last nonzero write wins") and a custom `(existing, patch, ctx) -> array` rule do depend on the order.
+
+Such a transform must be the last in the chain, and there can be only one — the pipes raise otherwise. Both rules come from the same fact: it reads the destination through the transforms placed *before* it, so anything after would be skipped during that read, and a second one would merge an already-merged array. `MaskTransform` is the other transform of this kind, which is why it cannot be combined with a merge.
+
 ## Next steps
 
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.

@@ -101,40 +101,46 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         return NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
-            roi=roi,
+            roi=self._read_roi(roi),
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
-        return NumpySetter(
-            zarr_array=self._output.zarr_array,
-            dimensions=self._output.dimensions,
-            roi=roi,
-            axes_order=self._axes_order,
-            transforms=self._output_transforms,
-            slicing_dict=self._output_slicing_kwargs,
+        return self._wrap_setter(
+            NumpySetter(
+                zarr_array=self._output.zarr_array,
+                dimensions=self._output.dimensions,
+                roi=roi,
+                axes_order=self._axes_order,
+                transforms=self._output_transforms,
+                slicing_dict=self._output_slicing_kwargs,
+            ),
+            roi,
         )
 
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[da.Array]:
         return DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
-            roi=roi,
+            roi=self._read_roi(roi),
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
-        return DaskSetter(
-            zarr_array=self._output.zarr_array,
-            dimensions=self._output.dimensions,
-            roi=roi,
-            axes_order=self._axes_order,
-            transforms=self._output_transforms,
-            slicing_dict=self._output_slicing_kwargs,
+        return self._wrap_setter(
+            DaskSetter(
+                zarr_array=self._output.zarr_array,
+                dimensions=self._output.dimensions,
+                roi=roi,
+                axes_order=self._axes_order,
+                transforms=self._output_transforms,
+                slicing_dict=self._output_slicing_kwargs,
+            ),
+            roi,
         )
 
     def post_consolidate(self):
