@@ -1,9 +1,10 @@
+import hashlib
 import inspect
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator, Mapping
 from types import MappingProxyType
-from typing import Generic, Literal, Self, TypeVar, overload
+from typing import Generic, Literal, Self, TypedDict, TypeVar, overload
 
 from ngio.common import Roi
 from ngio.common._pyramid import RegionsLike
@@ -45,6 +46,18 @@ NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
 R = TypeVar("R")
 T = TypeVar("T")
+
+
+class JobArgs(TypedDict):
+    """One entry of `prepare_jobs`'s parallelization list.
+
+    A plain dict at runtime — JSON-serializable for schedulers that ship
+    task arguments as JSON (Fractal's parallelization list), and it splats
+    straight into the selector: `iterator.for_job(**args)`.
+    """
+
+    job_index: int
+    n_jobs: int
 
 
 class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
@@ -792,10 +805,14 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         (reshaping a slice would invalidate its selection and refuses), and
         in-memory stores cannot work across separate processes. Jobs beyond
         the number of independent unit groups come back empty and their
-        `map` is a no-op. Read-only iterators and stitch-enabled
-        segmentations refuse — their gather steps are global joins that
-        independent jobs cannot reproduce. `write_conflict_components`
-        exposes the grouping this partition is built from.
+        `map` is a no-op. A *stitched* segmentation additionally requires
+        `prepare_jobs(n_jobs)` to have created the scratch band arrays; its
+        band writes join the conflict graph, so tiles whose bands share a
+        scratch chunk travel together (a tile grid aligned with the label's
+        chunk grid still splits fully). Read-only iterators refuse —
+        their gathers are global joins that independent jobs cannot
+        reproduce. `write_conflict_components` exposes the grouping this
+        partition is built from.
         """
         if self._partition is not None:
             _, current_index, current_n = self._partition
@@ -811,6 +828,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 f"job_index must be in [0, {n_jobs}), got {job_index}."
             )
         self._require_splittable()
+        self._validate_job_context(n_jobs)
         units = list(self._numpy_units_generator())
         partition = partition_components(write_conflict_components(units), n_jobs)
         restricted = self._new_from_rois(self.rois)
@@ -820,6 +838,96 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             n_jobs,
         )
         return restricted
+
+    def prepare_jobs(self, n_jobs: int) -> list[JobArgs]:
+        """Set up a distributed run and return its parallelization list.
+
+        The init step of the three-phase distributed recipe (init → parallel
+        jobs → consolidate, the shape schedulers like Fractal run natively):
+        it computes the partition, performs whatever setup the iterator needs
+        — always **clearing any stale scratch state from earlier runs first**,
+        so a crashed or superseded run can never leak into this one — and
+        returns one `JobArgs` per non-empty partition, ready to become the
+        scheduler's parallelization list:
+
+        ```python
+        # init task
+        args_list = iterator.prepare_jobs(n_jobs=4)
+        # -> [{"job_index": 0, "n_jobs": 4}, ...]
+
+        # parallel task, per entry
+        iterator.for_job(**args).map(func)
+
+        # consolidate task, after all jobs
+        iterator.finalize()
+        ```
+
+        Empty partitions are dropped from the list — no task is submitted
+        for a share with nothing to do. For plain writing iterators this
+        call is optional (there is nothing to set up; `for_job` alone
+        works); a *stitching* segmentation requires it, because the scratch
+        band arrays must exist — race-free — before any job banks into them.
+        """
+        if self._partition is not None:
+            raise NgioValueError(
+                "prepare_jobs belongs to the unrestricted iterator; this one "
+                "is already restricted to a partition."
+            )
+        if n_jobs < 1:
+            raise NgioValueError(f"n_jobs must be >= 1, got {n_jobs}.")
+        self._require_splittable()
+        units = list(self._numpy_units_generator())
+        partition = partition_components(write_conflict_components(units), n_jobs)
+        self._prepare_distributed(n_jobs)
+        return [
+            JobArgs(job_index=job_index, n_jobs=n_jobs)
+            for job_index, indices in enumerate(partition)
+            if indices
+        ]
+
+    def _prepare_distributed(self, n_jobs: int) -> None:
+        """Per-class setup for a distributed run; the base has none.
+
+        Implementations must clear their scratch state before recreating it:
+        `prepare_jobs` is the one moment a distributed run may destroy
+        leftovers, and a clean slate here is what makes stale or corrupted
+        state from a failed run unreachable.
+        """
+
+    def _validate_job_context(self, n_jobs: int) -> None:
+        """Hook for `for_job`-time requirements; the base has none.
+
+        Subclasses whose jobs depend on prepared shared state (the stitch
+        scratch) verify it here, so a missing `prepare_jobs` fails at
+        `for_job` with a clear message instead of mid-map.
+        """
+
+    def _plan_fingerprint(self, n_jobs: int) -> str:
+        """Deterministic identity of a distributed plan.
+
+        Built from geometry — the write regions, the output array's shape
+        and chunks, the halo, `n_jobs` — never from ROI *names*, which are
+        not stable across processes (duplicate names are de-duplicated with
+        per-process suffixes). Every process that builds the same iterator
+        computes the same fingerprint, so a job or a consolidate step can
+        prove it is talking about the same plan the init step prepared.
+        """
+        payload: list[str] = [
+            self.__class__.__name__,
+            f"n_jobs={n_jobs}",
+            f"halo={sorted(self._halo.items())}",
+        ]
+        output = self.output_image
+        if output is not None:
+            payload.append(f"shape={output.zarr_array.shape}")
+            payload.append(f"chunks={output.zarr_array.chunks}")
+        payload.append(f"regions={self._touched_write_regions()}")
+        payload.extend(self._fingerprint_extras())
+        return hashlib.sha256("|".join(payload).encode()).hexdigest()
+
+    def _fingerprint_extras(self) -> tuple[str, ...]:
+        """Extra class-specific terms for `_plan_fingerprint`; base: none."""
+        return ()
 
     def _require_unrestricted_finalize(self) -> None:
         """Refuse `finalize` on a partition slice: the gather is global.

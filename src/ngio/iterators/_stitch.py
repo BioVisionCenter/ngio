@@ -16,7 +16,8 @@ The map phase stays disjoint and parallel throughout; all the reconciling
 happens afterwards, in `resolve`.
 """
 
-from collections.abc import Sequence
+import threading
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -37,6 +38,7 @@ from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataSetterProtocol
 from ngio.io_pipes._ops_axes import AxesOps, set_as_numpy_axes_ops
 from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.io_pipes._ops_slices_utils import ChunkRect, compute_chunk_rect
 from ngio.iterators._stitch_geometry import (
     TilePlacement,
     forward_bands,
@@ -111,8 +113,19 @@ class StitchPlan:
         ref_image: AbstractImage,
         halo: dict[str, int],
         read_roi: Any,
+        scratch_factory: Callable[[tuple[str, ...]], dict[str, zarr.Array]]
+        | None = None,
     ) -> None:
-        """Place every tile, reserve its id block, and open the scratch arrays."""
+        """Place every tile and reserve its id block; scratch resolves lazily.
+
+        The scratch arrays are opened (or created) on first access rather
+        than here: the plan's *geometry* — placements, bands, id blocks — is
+        needed for footprint planning before any storage should be touched,
+        and in a distributed run which arrays to use (create fresh vs open
+        the prepared ones) is the iterator's decision, injected via
+        `scratch_factory`. With no factory, first access creates a fresh
+        scratch — the standalone `map` behaviour.
+        """
         if not halo:
             raise NgioValueError(
                 "Stitching needs a halo: without one each tile only sees its "
@@ -175,7 +188,41 @@ class StitchPlan:
             ).items():
                 self._work[rois[index].get_name()].bands[axis_name] = band
 
-        self._scratch = _open_scratch(output, self._axes, config.scratch_store)
+        self._scratch_factory = scratch_factory
+        self._scratch_arrays: dict[str, zarr.Array] | None = None
+        self._scratch_lock: threading.Lock | None = threading.Lock()
+
+    @property
+    def _scratch(self) -> dict[str, zarr.Array]:
+        """The scratch arrays, resolved on first access (thread-safe)."""
+        if self._scratch_arrays is None:
+            lock = self._scratch_lock or threading.Lock()
+            with lock:
+                if self._scratch_arrays is None:
+                    if self._scratch_factory is None:
+                        self._scratch_arrays = create_scratch(
+                            self._output, self._axes, self._config.scratch_store
+                        )
+                    else:
+                        self._scratch_arrays = self._scratch_factory(self._axes)
+        return self._scratch_arrays
+
+    def __getstate__(self) -> dict:
+        """Resolve the scratch before crossing a process boundary.
+
+        The factory is a closure (unpicklable) and the lock is
+        process-local; the resolved arrays pickle by store reference, which
+        is exactly what the workers need.
+        """
+        _ = self._scratch
+        state = self.__dict__.copy()
+        state["_scratch_factory"] = None
+        state["_scratch_lock"] = None
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._scratch_lock = threading.Lock()
 
     @property
     def axes(self) -> tuple[str, ...]:
@@ -251,22 +298,49 @@ def _apply_relabel(label_array: zarr.Array, mapping: dict[int, int]) -> None:
             label_array[selection] = remapped
 
 
-def _open_scratch(
+def _scratch_group(
+    output: AbstractImage, scratch_store: StoreOrGroup | None
+) -> zarr.Group:
+    """The scratch group, created inside the label or opened from the store."""
+    if scratch_store is None:
+        return output._group_handler.get_group(_SCRATCH_GROUP, create_mode=True)
+    return open_group_wrapper(scratch_store, mode="a")
+
+
+def read_scratch_attrs(
+    output: AbstractImage, scratch_store: StoreOrGroup | None
+) -> dict[str, Any] | None:
+    """The scratch group's attributes, or `None` when no scratch exists."""
+    try:
+        if scratch_store is None:
+            group = output._group_handler.get_group(_SCRATCH_GROUP)
+        else:
+            group = open_group_wrapper(scratch_store, mode="r")
+    except Exception:
+        return None
+    return dict(group.attrs)
+
+
+def create_scratch(
     output: AbstractImage,
     axes: Sequence[str],
     scratch_store: StoreOrGroup | None,
+    attrs: dict[str, Any] | None = None,
 ) -> dict[str, zarr.Array]:
-    """Create one scratch array per haloed axis, shaped like the output.
+    """Create the scratch arrays fresh, wiping any leftovers first.
 
-    With no `scratch_store` the arrays live in a transient group inside the
-    output label — same store, so it works under every mapper, at the cost of a
+    Creation is the one moment a run may destroy scratch state: stale or
+    corrupted bands from a crashed, interrupted, or superseded run are wiped
+    here, so nothing older than this call can ever reach a resolve. With no
+    `scratch_store` the arrays live in a transient group inside the output
+    label — same store, so it works under every mapper, at the cost of a
     non-standard group sitting beside the resolution levels until the stitch
     resolves.
     """
-    if scratch_store is None:
-        group = output._group_handler.create_group(_SCRATCH_GROUP, overwrite=True)
-    else:
-        group = open_group_wrapper(scratch_store, mode="a")
+    _delete_scratch(output, scratch_store)
+    group = _scratch_group(output, scratch_store)
+    if attrs:
+        group.attrs.update(attrs)
     array = output.zarr_array
     return {
         axis_name: group.create_array(
@@ -278,6 +352,41 @@ def _open_scratch(
         )
         for axis_name in axes
     }
+
+
+def open_scratch(
+    output: AbstractImage,
+    axes: Sequence[str],
+    scratch_store: StoreOrGroup | None,
+) -> dict[str, zarr.Array]:
+    """Open existing scratch arrays without touching their content.
+
+    The job and gather steps of a distributed run come through here: the
+    bands other jobs banked must survive, so nothing is created or reset.
+    Raises when the scratch is missing — the init step was skipped.
+    """
+    if read_scratch_attrs(output, scratch_store) is None:
+        raise NgioValueError(
+            "The stitch scratch does not exist: a distributed stitched run "
+            "needs `prepare_jobs(n_jobs)` to create it before any job runs."
+        )
+    group = _scratch_group(output, scratch_store)
+    arrays: dict[str, zarr.Array] = {}
+    for axis_name in axes:
+        try:
+            member = group[axis_name]
+        except KeyError as e:
+            raise NgioValueError(
+                f"The stitch scratch is missing the '{axis_name}' band array; "
+                "re-run `prepare_jobs(n_jobs)` to recreate it."
+            ) from e
+        if not isinstance(member, zarr.Array):
+            raise NgioValueError(
+                f"The stitch scratch member '{axis_name}' is not an array; "
+                "re-run `prepare_jobs(n_jobs)` to recreate the scratch."
+            )
+        arrays[axis_name] = member
+    return arrays
 
 
 def _delete_scratch(output: AbstractImage, scratch_store: StoreOrGroup | None) -> None:
@@ -374,18 +483,56 @@ class StitchingSetter:
         self._bank_bands(offset)
         self._setter.set(offset)
 
+    def _band_destinations(self) -> dict[str, tuple]:
+        """Per haloed axis, the on-disk selection this tile's band writes."""
+        core_selection = list(self._setter.slicing_ops.normalized_slicing_tuple)
+        on_disk_axes = self._setter.slicing_ops.on_disk_axes
+        destinations = {}
+        for axis_name, band in self._work.bands.items():
+            destination = list(core_selection)
+            for band_axis, (start, stop) in band.items():
+                destination[on_disk_axes.index(band_axis)] = slice(start, stop)
+            destinations[axis_name] = tuple(destination)
+        return destinations
+
+    @property
+    def extra_write_footprints(self) -> list[tuple[Any, ChunkRect]]:
+        """The scratch chunks this tile's forward bands will write.
+
+        Declared so the wave scheduler and the job splitter treat band
+        banking like any other write: bands are pixel-disjoint by the
+        forward-band argument, but two tiles' bands can still share a
+        scratch *chunk* — a read-modify-write race if they ran concurrently.
+        Scratch arrays are chunked like the label and never sharded, so the
+        claim granularity is the label's chunk grid; the geometry is pure
+        metadata, computable before any scratch array exists.
+        """
+        claims: list[tuple[Any, ChunkRect]] = []
+        slicing_ops = self._setter.slicing_ops
+        for axis_name, destination in self._band_destinations().items():
+            rect = compute_chunk_rect(
+                shape=slicing_ops.on_disk_shape,
+                chunks=self._setter.zarr_array.chunks,
+                slicing_tuple=destination,
+            )
+            if rect is not None:
+                claims.append(
+                    ((id(self._setter.zarr_array), "stitch-band", axis_name), rect)
+                )
+        return claims
+
     def _bank_bands(self, patch: np.ndarray) -> None:
         """Copy this tile's forward bands into the scratch arrays.
 
-        Safe to do concurrently with every other tile: a tile's forward band
-        lies inside the *next* tile's core and is clipped to it, so no two tiles
-        ever write the same scratch pixel. The mappers' write-conflict check
-        only inspects the setter's own array, so this disjointness is an
-        argument rather than something they verify.
+        Pixel-safe concurrently with every other tile: a tile's forward band
+        lies inside the *next* tile's core and is clipped to it, so no two
+        tiles ever write the same scratch pixel. Chunk-level safety is the
+        schedulers' job: the bands are declared via `extra_write_footprints`,
+        so two tiles sharing a scratch chunk never run in the same wave — or
+        land in different jobs of a distributed run.
         """
         output_axes = self._setter.axes_ops.output_axes
-        core_selection = list(self._setter.slicing_ops.normalized_slicing_tuple)
-        on_disk_axes = self._setter.slicing_ops.on_disk_axes
+        destinations = self._band_destinations()
 
         for axis_name, band in self._work.bands.items():
             patch_selection = []
@@ -398,13 +545,9 @@ class StitchingSetter:
                     patch_selection.append(slice(None))
             band_patch = patch[tuple(patch_selection)]
 
-            destination = list(core_selection)
-            for band_axis, (start, stop) in band.items():
-                destination[on_disk_axes.index(band_axis)] = slice(start, stop)
-
             # Indexed through `Any`: the selection mixes slices with the ints
             # and index lists the core slicing may carry, which zarr's stubs
             # only describe one shape at a time.
-            self._plan.scratch_for(axis_name)[cast("Any", tuple(destination))] = (
+            self._plan.scratch_for(axis_name)[cast("Any", destinations[axis_name])] = (
                 set_as_numpy_axes_ops(array=band_patch, axes_ops=self._setter.axes_ops)
             )

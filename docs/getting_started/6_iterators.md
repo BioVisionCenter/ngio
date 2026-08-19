@@ -283,7 +283,38 @@ Each job builds the identical iterator — construction is metadata-only and det
 
 Effective parallelism therefore equals the number of independent groups, which follows the **output's** chunking. Inspect it before submitting — `[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]` — one fat list plus empties means the output chunking (or a tiling like `by_zyx`, which splits along t only), not the cluster, is the constraint; a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and [`write_conflict_components`][ngio.iterators.write_conflict_components] makes the grouping auditable.
 
-The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). A stitching segmentation refuses to partition — stitching banks seam bands in shared scratch and resolves them in one global pass — as do read-only iterators, whose gathers (feature coalescing, detection NMS) are global joins.
+The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). Read-only iterators refuse to partition — their gathers (feature coalescing, detection NMS) are global joins.
+
+### The three-phase recipe: `prepare_jobs`
+
+Schedulers like Fractal run distributed work as **init → parallel tasks → consolidate**, where the init task builds a *parallelization list* (one JSON of arguments per parallel task). `prepare_jobs` is that init step: it performs any setup the iterator needs — always wiping stale scratch state from earlier runs first — and returns the list, with empty partitions already dropped:
+
+```python
+# init task
+iterator = SegmentationIterator(image, label, ...).by_chunks()
+args_list = iterator.prepare_jobs(n_jobs=4)
+# -> [{"job_index": 0, "n_jobs": 4}, {"job_index": 1, "n_jobs": 4}, ...]
+
+# parallel task, once per entry
+iterator = SegmentationIterator(image, label, ...).by_chunks()
+iterator.for_job(**args).map(func)
+
+# consolidate task, after all parallel tasks
+iterator = SegmentationIterator(image, label, ...).by_chunks()
+iterator.finalize()
+```
+
+For a plain writing iterator `prepare_jobs` is optional — the two-step recipe above works on its own. A **stitching** segmentation requires it: the scratch band arrays must exist, race-free, before any job banks into them, and the init step is the one safe moment to create them.
+
+### Distributed stitching
+
+With `prepare_jobs` in the recipe, `stitch=True` distributes too. Each job's `map` banks its tiles' seam bands into the shared scratch exactly as a local run would; the consolidate task's `finalize()` runs the one global resolve — seam scan, id union, renumbering to a dense `1..N` — then rebuilds the pyramid and removes the scratch. Three properties are worth knowing:
+
+- **Band writes join the conflict graph.** Tiles whose bands would land in the same scratch chunk travel in the same job (and never share a wave locally), so band banking needs no locks anywhere. A tile grid aligned with the label's chunk grid still splits fully.
+- **A failed job never destroys the others' bands.** Re-run just that job — banding is idempotent, the id offsets are derived from the global tile index — and gather as planned. A fresh `prepare_jobs` always starts from a clean slate.
+- **Every step validates a plan fingerprint** stamped at init: change the tiling, halo, stitch config, or `n_jobs` between phases and the run fails loudly instead of resolving against the wrong bands.
+
+The consolidate task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.
 
 ## Halos: context without seams
 

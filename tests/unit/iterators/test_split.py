@@ -60,10 +60,7 @@ def _fresh_iterator(ome_zarr, name="out"):
 
 
 def _partition_layout(iterator, n_jobs):
-    return [
-        iterator.for_job(i, n_jobs=n_jobs).partition_indices
-        for i in range(n_jobs)
-    ]
+    return [iterator.for_job(i, n_jobs=n_jobs).partition_indices for i in range(n_jobs)]
 
 
 def _label_levels(ome_zarr, name="out"):
@@ -126,9 +123,7 @@ def test_partitions_keep_conflicting_tiles_together(tmp_path: Path):
 
     for n_jobs in (2, 3, 5):
         layout = _partition_layout(iterator, n_jobs)
-        job_of = {
-            index: job for job, indices in enumerate(layout) for index in indices
-        }
+        job_of = {index: job for job, indices in enumerate(layout) for index in indices}
         # Components stay whole ...
         for component in components:
             assert len({job_of[index] for index in component}) == 1
@@ -172,15 +167,206 @@ def test_partition_is_deterministic(tmp_path: Path):
     assert _fresh_iterator(ome_zarr).partition_indices is None
 
 
-def test_for_job_refuses_stitch(tmp_path: Path):
-    ome_zarr = _build_ome_zarr(tmp_path / "stitch.zarr", chunks=(1, 32, 32))
-    image = ome_zarr.get_image()
-    label = ome_zarr.derive_label("out")
-    iterator = SegmentationIterator(
-        image, label, channel_selection=0, axes_order="yx", stitch=True
-    ).by_grid(size_y=32, size_x=32)
-    with pytest.raises(NgioValueError, match="stitch"):
-        iterator.for_job(0, n_jobs=2)
+def test_prepare_jobs_drops_empty_partitions(tmp_path: Path):
+    """The parallelization list never contains a job with nothing to do."""
+    ome_zarr = _build_ome_zarr(tmp_path / "prepare.zarr")
+    ome_zarr.derive_label("out")
+    iterator = _fresh_iterator(ome_zarr)
+    n_units = len(iterator.rois)
+
+    args_list = iterator.prepare_jobs(n_jobs=n_units + 5)
+    assert len(args_list) == n_units
+    assert all(args["n_jobs"] == n_units + 5 for args in args_list)
+    # The listed jobs are exactly the non-empty ones.
+    for args in args_list:
+        slice_ = _fresh_iterator(ome_zarr).for_job(**args)
+        assert slice_.partition_indices
+
+
+def test_prepare_jobs_refuses_on_a_slice(tmp_path: Path):
+    ome_zarr = _build_ome_zarr(tmp_path / "prepare_slice.zarr")
+    ome_zarr.derive_label("out")
+    restricted = _fresh_iterator(ome_zarr).for_job(0, n_jobs=2)
+    with pytest.raises(NgioValueError, match="unrestricted"):
+        restricted.prepare_jobs(n_jobs=2)
+
+
+# --- stitched distributed runs (prepare -> jobs -> gather) ------------------
+
+
+def _stitched_setup(store, chunks=(32, 32), levels=2):
+    """An image with one object crossing the x=32 tile boundary."""
+    data = np.zeros((64, 64), dtype="uint8")
+    data[8:16, 24:40] = 255  # crosses x=32
+    data[40:48, 8:16] = 255
+    return create_ome_zarr_from_array(
+        store=store,
+        array=data,
+        pixelsize=1.0,
+        axes_names="yx",
+        levels=levels,
+        chunks=chunks,
+        consolidation_mode="dask",
+    )
+
+
+def _label_components(patch):
+    from scipy import ndimage
+
+    labeled, _ = ndimage.label(patch > 128)
+    return labeled.astype("uint32")
+
+
+def _stitched_iterator(ome_zarr, size=32):
+    return (
+        SegmentationIterator(
+            ome_zarr.get_image(),
+            ome_zarr.get_label("seg"),
+            axes_order="yx",
+            consolidation_mode="dask",
+            stitch=True,
+        )
+        .by_grid(size_y=size, size_x=size)
+        .with_halo(y=4, x=4)
+    )
+
+
+def _stitched_serial_reference(tmp_path):
+    ome_zarr = _stitched_setup(tmp_path / "stitch_serial.zarr")
+    ome_zarr.derive_label("seg")
+    _stitched_iterator(ome_zarr).map(_label_components)
+    return ome_zarr.get_label("seg").get_as_numpy()
+
+
+def test_stitched_jobs_match_serial_stitched(tmp_path: Path):
+    """prepare -> shuffled jobs -> gather, bit-identical to a serial stitch."""
+    reference = _stitched_serial_reference(tmp_path)
+
+    ome_zarr = _stitched_setup(tmp_path / "stitch_jobs.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    assert all(set(args) == {"job_index", "n_jobs"} for args in args_list)
+
+    for args in reversed(args_list):
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+    _stitched_iterator(ome_zarr).finalize()
+
+    np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
+    # The gather resolved and cleaned up: the scratch group is gone.
+    label = ome_zarr.get_label("seg")
+    assert "_ngio_stitch" not in list(label._group_handler.group.keys())
+
+
+def test_stitched_for_job_requires_prepare(tmp_path: Path):
+    ome_zarr = _stitched_setup(tmp_path / "stitch_noprep.zarr")
+    ome_zarr.derive_label("seg")
+    with pytest.raises(NgioValueError, match="prepare_jobs"):
+        _stitched_iterator(ome_zarr).for_job(0, n_jobs=2)
+
+
+def test_stitched_fingerprint_mismatch_refuses(tmp_path: Path):
+    """A job built with a different tiling than the prepared one fails loud."""
+    ome_zarr = _stitched_setup(tmp_path / "stitch_drift.zarr")
+    ome_zarr.derive_label("seg")
+    _stitched_iterator(ome_zarr, size=32).prepare_jobs(n_jobs=2)
+
+    retiled = _stitched_iterator(ome_zarr, size=16)
+    with pytest.raises(NgioValueError, match="different plan"):
+        retiled.for_job(0, n_jobs=2)
+    # Wrong n_jobs against a matching tiling fails the same way.
+    with pytest.raises(NgioValueError, match="different plan"):
+        _stitched_iterator(ome_zarr, size=32).for_job(0, n_jobs=3)
+
+
+def test_failed_job_leaves_scratch_and_reprepare_resets(tmp_path: Path):
+    ome_zarr = _stitched_setup(tmp_path / "stitch_fail.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+
+    _stitched_iterator(ome_zarr).for_job(**args_list[0]).map(_label_components)
+
+    def boom(patch):
+        raise RuntimeError("job crashed")
+
+    with pytest.raises(RuntimeError):
+        _stitched_iterator(ome_zarr).for_job(**args_list[1]).map(boom)
+
+    # The crash must not have destroyed the other job's banked bands.
+    label = ome_zarr.get_label("seg")
+    assert "_ngio_stitch" in list(label._group_handler.group.keys())
+
+    # Re-running the failed job and gathering still matches serial.
+    _stitched_iterator(ome_zarr).for_job(**args_list[1]).map(_label_components)
+    _stitched_iterator(ome_zarr).finalize()
+    np.testing.assert_array_equal(
+        label.get_as_numpy(), _stitched_serial_reference(tmp_path)
+    )
+
+
+def test_standalone_stitched_map_still_works(tmp_path: Path):
+    """The classic single-call stitched map needs no prepare and cleans up."""
+    ome_zarr = _stitched_setup(tmp_path / "stitch_solo.zarr")
+    ome_zarr.derive_label("seg")
+    _stitched_iterator(ome_zarr).map(_label_components)
+    label = ome_zarr.get_label("seg")
+    assert "_ngio_stitch" not in list(label._group_handler.group.keys())
+    np.testing.assert_array_equal(
+        label.get_as_numpy(), _stitched_serial_reference(tmp_path)
+    )
+
+
+def test_misaligned_stitched_bands_couple_components(tmp_path: Path):
+    """Tiles finer than the label chunks: band claims coarsen the partition.
+
+    Without the band claims, tiles in different label chunks would look
+    independent while banking into the same scratch chunk — the read-modify-
+    write race the claims exist to prevent.
+    """
+    ome_zarr = _stitched_setup(tmp_path / "stitch_misaligned.zarr")
+    ome_zarr.derive_label("seg")
+
+    plain = SegmentationIterator(
+        ome_zarr.get_image(),
+        ome_zarr.get_label("seg"),
+        axes_order="yx",
+        consolidation_mode="dask",
+    ).by_grid(size_y=16, size_x=16)
+    stitched = _stitched_iterator(ome_zarr, size=16)
+
+    plain_components = write_conflict_components(list(plain._numpy_units_generator()))
+    stitched_components = write_conflict_components(
+        list(stitched._numpy_units_generator())
+    )
+    assert len(stitched_components) < len(plain_components)
+
+
+def _run_stitched_job(store: str, job_index: int, n_jobs: int) -> None:
+    """One array task of a distributed stitched run."""
+    ome_zarr = open_ome_zarr_container(store)
+    _stitched_iterator(ome_zarr).for_job(job_index=job_index, n_jobs=n_jobs).map(
+        _label_components
+    )
+
+
+def test_stitched_jobs_across_processes_match_serial(tmp_path: Path):
+    reference = _stitched_serial_reference(tmp_path)
+
+    store = tmp_path / "stitch_procs.zarr"
+    ome_zarr = _stitched_setup(store)
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+
+    with ProcessPoolExecutor(
+        max_workers=len(args_list), mp_context=get_context("spawn")
+    ) as pool:
+        futures = [
+            pool.submit(_run_stitched_job, str(store), **args) for args in args_list
+        ]
+        for future in futures:
+            future.result()
+
+    _stitched_iterator(ome_zarr).finalize()
+    np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
 
 
 def test_for_job_refuses_readonly(tmp_path: Path):
@@ -231,9 +417,7 @@ def test_empty_partition_is_a_noop(tmp_path: Path):
 
     before = _label_levels(ome_zarr)
     empty_job = layout.index([])
-    _fresh_iterator(ome_zarr).for_job(empty_job, n_jobs=n_jobs).map(
-        _threshold
-    )
+    _fresh_iterator(ome_zarr).for_job(empty_job, n_jobs=n_jobs).map(_threshold)
     for path, level in _label_levels(ome_zarr).items():
         np.testing.assert_array_equal(level, before[path])
 
@@ -242,9 +426,7 @@ def test_slice_map_does_not_finalize_and_slice_finalize_raises(tmp_path: Path):
     ome_zarr = _build_ome_zarr(tmp_path / "nofinalize.zarr")
     ome_zarr.derive_label("out")
     for job_index in range(2):
-        _fresh_iterator(ome_zarr).for_job(job_index, n_jobs=2).map(
-            _threshold
-        )
+        _fresh_iterator(ome_zarr).for_job(job_index, n_jobs=2).map(_threshold)
 
     levels = _label_levels(ome_zarr)
     paths = sorted(levels, key=lambda p: int(p))
@@ -265,9 +447,7 @@ def test_slice_map_does_not_finalize_and_slice_finalize_raises(tmp_path: Path):
 def _run_one_job(store: str, job_index: int, n_jobs: int) -> None:
     """One SLURM array task: reopen, rebuild identically, run its share."""
     ome_zarr = open_ome_zarr_container(store)
-    _fresh_iterator(ome_zarr).for_job(job_index, n_jobs=n_jobs).map(
-        _threshold
-    )
+    _fresh_iterator(ome_zarr).for_job(job_index, n_jobs=n_jobs).map(_threshold)
 
 
 def test_jobs_across_processes_match_serial(tmp_path: Path):

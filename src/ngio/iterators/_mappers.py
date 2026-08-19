@@ -186,45 +186,85 @@ def _collect_write_footprints(
     return footprints
 
 
+def _collect_extra_claims(
+    units: Sequence[IterUnit[Any]],
+) -> dict[Any, list[tuple[int, ChunkRect]]]:
+    """Side-channel write claims by claim key, as `(unit.index, rect)` pairs.
+
+    A setter that writes anywhere besides its own target array — the
+    stitching setter banking halo bands into scratch arrays — declares those
+    writes through the optional `extra_write_footprints` member (probed with
+    `getattr`, per the mapper compatibility policy): `(key, rect)` pairs,
+    where the key identifies the side array and the rect is the claim on its
+    chunk grid. Claims under the same key conflict like footprints on one
+    array; claims under different keys never do.
+    """
+    claims: dict[Any, list[tuple[int, ChunkRect]]] = {}
+    for unit in units:
+        if unit.setter is None:
+            continue
+        extra = getattr(unit.setter, "extra_write_footprints", None)
+        if not extra:
+            continue
+        for key, rect in extra:
+            claims.setdefault(key, []).append((unit.index, rect))
+    return claims
+
+
+def _sweep_adjacency(
+    pairs: list[tuple[int, ChunkRect]],
+    adjacency: dict[int, set[int]],
+) -> None:
+    """Add edges between intersecting rects of one array into `adjacency`.
+
+    Sweeps the axis with the most distinct starts (the same idea as
+    `check_if_regions_overlap`): sorted by first chunk index there, a rect is
+    compared only against those whose range is still open.
+    """
+    if len(pairs) < 2:
+        return
+    rank = len(pairs[0][1])
+    axis = max(
+        range(rank),
+        key=lambda ax: len({rect[ax][0] for _, rect in pairs}),
+    )
+    ordered = sorted(pairs, key=lambda pair: pair[1][axis][0])
+    active: list[tuple[int, ChunkRect]] = []
+    for index, rect in ordered:
+        first = rect[axis][0]
+        active = [pair for pair in active if pair[1][axis][1] >= first]
+        for other_index, other_rect in active:
+            if other_index != index and chunk_rects_intersect(other_rect, rect):
+                adjacency.setdefault(index, set()).add(other_index)
+                adjacency.setdefault(other_index, set()).add(index)
+        active.append((index, rect))
+
+
 def _write_conflict_edges(
     units: Sequence[IterUnit[Any]],
     footprints: dict[int, ChunkRect],
 ) -> dict[int, set[int]]:
-    """The adjacency of units whose write footprints share a write unit.
+    """The adjacency of units whose writes share a write unit anywhere.
 
-    Keyed and valued by `unit.index`; only units present in `footprints` (a
-    setter with a non-empty selection) appear. Units targeting different
-    output arrays never conflict.
+    Keyed and valued by `unit.index`. Units targeting different output
+    arrays never conflict through their footprints — but a setter's
+    side-channel claims (`extra_write_footprints`, e.g. stitch bands) join
+    the graph too, so two units banking into the same scratch chunk are
+    edges exactly like two units writing the same label chunk.
     """
     adjacency: dict[int, set[int]] = {index: set() for index in footprints}
-    by_array: dict[int, list[IterUnit[Any]]] = {}
+    by_array: dict[int, list[tuple[int, ChunkRect]]] = {}
     for unit in units:
         if unit.setter is None or unit.index not in footprints:
             continue
-        by_array.setdefault(id(unit.setter.zarr_array), []).append(unit)
+        by_array.setdefault(id(unit.setter.zarr_array), []).append(
+            (unit.index, footprints[unit.index])
+        )
 
     for group in by_array.values():
-        if len(group) < 2:
-            continue
-        # Sweep the axis with the most distinct starts (the same idea as
-        # `check_if_regions_overlap`): sorted by first chunk index there, a
-        # unit is compared only against those whose range is still open.
-        rank = len(footprints[group[0].index])
-        axis = max(
-            range(rank),
-            key=lambda ax: len({footprints[u.index][ax][0] for u in group}),
-        )
-        ordered = sorted(group, key=lambda u: footprints[u.index][axis][0])
-        active: list[IterUnit[Any]] = []
-        for unit in ordered:
-            rect = footprints[unit.index]
-            first = rect[axis][0]
-            active = [u for u in active if footprints[u.index][axis][1] >= first]
-            for other in active:
-                if chunk_rects_intersect(footprints[other.index], rect):
-                    adjacency[unit.index].add(other.index)
-                    adjacency[other.index].add(unit.index)
-            active.append(unit)
+        _sweep_adjacency(group, adjacency)
+    for group in _collect_extra_claims(units).values():
+        _sweep_adjacency(group, adjacency)
     return adjacency
 
 

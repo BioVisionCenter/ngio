@@ -9,9 +9,7 @@ footprints conflict travel together, and a component is never divided.
 """
 
 
-def partition_components(
-    components: list[list[int]], n_jobs: int
-) -> list[list[int]]:
+def partition_components(components: list[list[int]], n_jobs: int) -> list[list[int]]:
     """Assign conflict components to `n_jobs` jobs, balanced and deterministic.
 
     Greedy multiway partitioning: components sorted by (size descending,

@@ -22,7 +22,14 @@ from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol
-from ngio.iterators._stitch import StitchConfig, StitchingSetter, StitchPlan
+from ngio.iterators._stitch import (
+    StitchConfig,
+    StitchingSetter,
+    StitchPlan,
+    create_scratch,
+    open_scratch,
+    read_scratch_attrs,
+)
 from ngio.utils import NgioValueError
 
 
@@ -133,8 +140,89 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 ref_image=self._ref_image,
                 halo=self.halo,
                 read_roi=self._read_roi,
+                scratch_factory=self._scratch_factory,
             )
         return self._stitch_plan
+
+    def _scratch_matches(self, attrs: dict) -> bool:
+        """Whether existing scratch attrs describe this iterator's plan."""
+        n_jobs = attrs.get("n_jobs")
+        return isinstance(n_jobs, int) and attrs.get(
+            "fingerprint"
+        ) == self._plan_fingerprint(n_jobs)
+
+    def _require_scratch_match(self, attrs: dict, n_jobs: int) -> None:
+        if attrs.get("n_jobs") != n_jobs or attrs.get(
+            "fingerprint"
+        ) != self._plan_fingerprint(n_jobs):
+            raise NgioValueError(
+                "The stitch scratch was prepared for a different plan: the "
+                "tiling, halo, stitch config, or n_jobs changed since "
+                "`prepare_jobs`. Re-run `prepare_jobs(n_jobs)` with the "
+                "current iterator, then resubmit the jobs."
+            )
+
+    def _scratch_factory(self, axes: tuple[str, ...]):
+        """Resolve the scratch arrays for the current role.
+
+        A partition slice must find the prepared scratch (and it must match
+        this plan) — jobs never create shared state. The unrestricted
+        iterator opens a matching prepared scratch when one exists (the
+        gather step, or a resumed run) and otherwise creates a fresh one,
+        which is the standalone `map` behaviour.
+        """
+        assert self._stitch is not None
+        store = self._stitch.scratch_store
+        attrs = read_scratch_attrs(self._output, store)
+        if self._partition is not None:
+            _, _, n_jobs = self._partition
+            if attrs is None:
+                raise NgioValueError(
+                    "This job's stitch scratch does not exist: run "
+                    "`prepare_jobs(n_jobs)` once before submitting the jobs."
+                )
+            self._require_scratch_match(attrs, n_jobs=n_jobs)
+            return open_scratch(self._output, axes, store)
+        if attrs is not None and self._scratch_matches(attrs):
+            return open_scratch(self._output, axes, store)
+        return create_scratch(self._output, axes, store)
+
+    def _prepare_distributed(self, n_jobs: int) -> None:
+        """Create the scratch band arrays, wiping any stale ones first."""
+        if self._stitch is None:
+            return
+        plan = self._stitching_plan()  # validates the halo, fixes the axes
+        create_scratch(
+            self._output,
+            plan.axes,
+            self._stitch.scratch_store,
+            attrs={
+                "fingerprint": self._plan_fingerprint(n_jobs),
+                "n_jobs": n_jobs,
+            },
+        )
+
+    def _validate_job_context(self, n_jobs: int) -> None:
+        """`for_job` on a stitched iterator needs the prepared scratch."""
+        if self._stitch is None:
+            return
+        attrs = read_scratch_attrs(self._output, self._stitch.scratch_store)
+        if attrs is None:
+            raise NgioValueError(
+                "A distributed stitched run needs `prepare_jobs(n_jobs)` "
+                "before `for_job`: the scratch band arrays must exist, "
+                "race-free, before any job banks into them."
+            )
+        self._require_scratch_match(attrs, n_jobs=n_jobs)
+
+    def _fingerprint_extras(self) -> tuple[str, ...]:
+        if self._stitch is None:
+            return ()
+        return (
+            f"stitch.block_size={self._stitch.block_size}",
+            f"stitch.iou_threshold={self._stitch.iou_threshold}",
+            f"stitch.compact={self._stitch.compact}",
+        )
 
     def _wrap_for_stitch(
         self, setter: DataSetterProtocol[np.ndarray], roi: Roi
@@ -200,13 +288,15 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
     ) -> None:
         """See `AbstractIteratorBuilder.map`; also cleans up on failure.
 
-        A failed run cannot be resolved, so the stitch scratch arrays are
-        deleted rather than left as a stray `_ngio_stitch` group beside the
-        resolution levels. The already-written tiles stay: re-running the map
-        recreates the scratch and produces the same ids (the offsets are
-        derived, not counted).
+        A failed standalone run cannot be resolved, so the stitch scratch
+        arrays are deleted rather than left as a stray `_ngio_stitch` group
+        beside the resolution levels. A *partition slice* never cleans up:
+        the scratch holds the bands every other job banked, and one failed
+        job must not destroy them — re-running that job is idempotent (the
+        bands rewrite, the id offsets are derived, not counted). The
+        already-written tiles stay in both cases.
         """
-        if self._stitch is None:
+        if self._stitch is None or self._partition is not None:
             return super().map(func, mapper=mapper)
         try:
             return super().map(func, mapper=mapper)
@@ -215,16 +305,6 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 self._stitch_plan.cleanup()
                 self._stitch_plan = None
             raise
-
-    def _require_splittable(self) -> None:
-        super()._require_splittable()
-        if self._stitch is not None:
-            raise NgioValueError(
-                "Job splitting is not supported with stitch=True: stitching "
-                "banks seam bands in a shared scratch group and resolves them "
-                "in one global pass, which independent jobs cannot "
-                "coordinate. Run a single map() call, or use stitch=False."
-            )
 
     def finalize(self):
         self._require_unrestricted_finalize()

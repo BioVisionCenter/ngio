@@ -1,7 +1,7 @@
 """Iterators to build scalable image processing pipelines."""
 
 from ngio.common._concurrency import MaxWorkers
-from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.iterators._abstract_iterator import AbstractIteratorBuilder, JobArgs
 from ngio.iterators._feature import FeatureExtractorIterator, FeatureFuncResult
 from ngio.iterators._image_processing import ImageProcessingIterator
 from ngio.iterators._mappers import (
@@ -34,6 +34,7 @@ __all__ = [
     "HaloMargins",
     "ImageProcessingIterator",
     "IterUnit",
+    "JobArgs",
     "MapperProtocol",
     "MaskedSegmentationIterator",
     "MaxWorkers",

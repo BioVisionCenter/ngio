@@ -64,6 +64,7 @@ description: API reference for the ngio processing iterators.
 
 The shared method surface of every iterator — the reshaping calls
 (`by_grid`, `by_blocks`, `by_chunks`, `by_write_units`, `product`, `with_halo`,
-`for_job`) and the execution calls (`iter`, `map`, `reduce`).
+`for_job`), the execution calls (`iter`, `map`, `reduce`), and the
+distributed-run init step (`prepare_jobs`).
 
 ::: ngio.iterators.AbstractIteratorBuilder
