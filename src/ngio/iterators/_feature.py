@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from typing import Generic, TypeAlias, TypeVar
+from typing import Any, Generic, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -19,6 +19,14 @@ from ngio.io_pipes import (
 )
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol
+from ngio.iterators._partials import (
+    INDEX_COLUMN,
+    delete_partials_root,
+    merge_partial_frames,
+    prepare_partials,
+    validate_partials_context,
+    write_partial,
+)
 from ngio.tables import FeatureTable, Table
 from ngio.utils import NgioValueError, deprecated
 
@@ -93,6 +101,19 @@ class _UnpackedFeatureFunc:
         return self._func(image, label, roi)
 
 
+def _as_feature_frame(result: FeatureFuncResult) -> pd.DataFrame:
+    """One ROI's result as a DataFrame, validating the contract."""
+    if isinstance(result, pd.DataFrame):
+        return result
+    if isinstance(result, dict):
+        return pd.DataFrame(result)
+    raise NgioValueError(
+        f"A feature function must return a DataFrame or a dict of "
+        f"columns, got {type(result).__name__}. Pass a custom "
+        "`coalesce` to handle other shapes."
+    )
+
+
 def _default_feature_coalesce(
     results: list[FeatureFuncResult], reference_label: str | None
 ) -> FeatureTable:
@@ -107,18 +128,7 @@ def _default_feature_coalesce(
             "No per-ROI results to build a table from: the iterator has no "
             "ROIs. Check the ROI table or the tiling that produced it."
         )
-    frames = []
-    for result in results:
-        if isinstance(result, pd.DataFrame):
-            frames.append(result)
-        elif isinstance(result, dict):
-            frames.append(pd.DataFrame(result))
-        else:
-            raise NgioValueError(
-                f"A feature function must return a DataFrame or a dict of "
-                f"columns, got {type(result).__name__}. Pass a custom "
-                "`coalesce` to handle other shapes."
-            )
+    frames = [_as_feature_frame(result) for result in results]
     # ROIs with no objects contribute empty frames; concatenating those would
     # silently upcast the surviving columns (an empty `label` is float64, and
     # a float index fails the table's integer-index validation).
@@ -249,6 +259,16 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def finalize(self):
         pass
 
+    def _partials_handler(self):
+        """Partials live beside the input label's levels, like a stitch scratch."""
+        return self._input_label._group_handler
+
+    def _prepare_distributed(self, n_jobs: int) -> None:
+        prepare_partials(self, self._partials_handler(), n_jobs)
+
+    def _validate_job_context(self, n_jobs: int) -> None:
+        validate_partials_context(self, self._partials_handler(), n_jobs)
+
     def reduce_to_table(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
@@ -276,12 +296,120 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         Returns:
             The joined table — a `FeatureTable` under the default `coalesce`.
         """
+        if self._partition is not None:
+            raise NgioValueError(
+                "reduce_to_table on a partition slice would coalesce only "
+                "this job's share. Use `reduce_to_partial(func)` per job and "
+                "`merge_partials()` once, after all jobs."
+            )
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
         if coalesce is None:
             return _default_feature_coalesce(
                 results, reference_label=self._input_label.meta.name
             )
         return coalesce(results)
+
+    def reduce_to_partial(
+        self,
+        func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
+        *,
+        mapper: MapperProtocol | None = None,
+    ) -> None:
+        """Measure this job's share and store the raw records as a partial.
+
+        The per-job step of a distributed run (see `prepare_jobs`): the
+        measurements are stored **before** any join, tagged with their global
+        ROI index, so `merge_partials` can rebuild the full per-ROI result
+        list and run the ONE global coalesce — bit-identical to a serial
+        `reduce_to_table`, custom `coalesce` included. Only callable on a
+        `for_job` slice; re-running a job overwrites its own partial.
+
+        Frames returned as dicts are normalized to DataFrames and a `label`
+        index to a `label` column — a custom `coalesce` at merge time sees
+        that normalized form.
+        """
+        if self._partition is None:
+            raise NgioValueError(
+                "reduce_to_partial is the per-job step of a distributed run: "
+                "restrict the iterator first (`for_job(**args)`), or use "
+                "reduce_to_table() for a local run."
+            )
+        _, job_index, n_jobs = self._partition
+        handler = self._partials_handler()
+        validate_partials_context(self, handler, n_jobs)
+
+        indices = self.partition_indices or []
+        results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
+        frames = []
+        for index, result in zip(indices, results, strict=True):
+            frame = _as_feature_frame(result)
+            if INDEX_COLUMN in frame.columns:
+                raise NgioValueError(
+                    f"The feature function returned a reserved column "
+                    f"{INDEX_COLUMN!r}; rename it."
+                )
+            if not len(frame):
+                continue
+            if frame.index.name == "label":
+                frame = frame.reset_index()
+            else:
+                frame = frame.reset_index(drop=True)
+            frame = frame.copy()
+            frame[INDEX_COLUMN] = index
+            frames.append(frame)
+        payload = pd.concat(frames, ignore_index=True) if frames else None
+        write_partial(
+            handler,
+            job_index,
+            payload,
+            attrs={
+                "job_index": job_index,
+                "n_jobs": n_jobs,
+                "fingerprint": self._plan_fingerprint(n_jobs),
+            },
+        )
+
+    def merge_partials(
+        self,
+        *,
+        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
+    ) -> Table:
+        """Merge a distributed run's partials into the one final table.
+
+        The consolidate step (see `prepare_jobs`): validates that every job
+        of the prepared plan produced a matching partial — a half-finished
+        run errors instead of returning a silently incomplete table —
+        rebuilds the per-ROI result list in global ROI order, and runs the
+        single (default or custom) `coalesce`, exactly as a serial
+        `reduce_to_table` would. On success the partials group is removed.
+        Nothing is registered: the returned table is yours to store with
+        `add_table`.
+        """
+        if self._partition is not None:
+            raise NgioValueError(
+                "merge_partials belongs to the unrestricted iterator: rebuild "
+                "it without `for_job` for the consolidate step."
+            )
+        handler = self._partials_handler()
+        merged = merge_partial_frames(self, handler)
+
+        groups: dict[int, pd.DataFrame] = {}
+        if merged is not None:
+            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+                groups[int(cast("Any", index))] = group.drop(
+                    columns=[INDEX_COLUMN]
+                ).reset_index(drop=True)
+        results: list[FeatureFuncResult] = [
+            groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
+        ]
+        if coalesce is None:
+            table: Table = _default_feature_coalesce(
+                results, reference_label=self._input_label.meta.name
+            )
+        else:
+            table = coalesce(results)
+        delete_partials_root(handler)
+        return table
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Create an iterator over the pixels of the ROIs."""

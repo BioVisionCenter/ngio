@@ -25,6 +25,7 @@ from ngio import create_ome_zarr_from_array, open_ome_zarr_container
 from ngio.io_pipes._ops_slices_utils import chunk_rects_intersect
 from ngio.iterators import (
     FeatureExtractorIterator,
+    ObjectDetectionIterator,
     SegmentationIterator,
     ThreadedMapper,
     write_conflict_components,
@@ -369,12 +370,12 @@ def test_stitched_jobs_across_processes_match_serial(tmp_path: Path):
     np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
 
 
-def test_for_job_refuses_readonly(tmp_path: Path):
+def test_readonly_for_job_requires_prepare(tmp_path: Path):
     ome_zarr = _build_ome_zarr(tmp_path / "readonly.zarr")
     image = ome_zarr.get_image()
     label = ome_zarr.derive_label("out")
     iterator = FeatureExtractorIterator(image, label, axes_order="yx")
-    with pytest.raises(NgioValueError, match="read-only"):
+    with pytest.raises(NgioValueError, match="prepare_jobs"):
         iterator.for_job(0, n_jobs=2)
 
 
@@ -475,3 +476,218 @@ def test_jobs_across_processes_match_serial(tmp_path: Path):
         np.testing.assert_array_equal(
             level, reference[path], err_msg=f"level {path} differs"
         )
+
+
+# --- read-only distributed runs (prepare -> partials -> merge) --------------
+
+
+def _feature_setup(store):
+    rng = np.random.default_rng(0)
+    ome_zarr = create_ome_zarr_from_array(
+        store=store,
+        array=rng.integers(0, 255, size=(64, 64)).astype("uint8"),
+        pixelsize=1.0,
+        axes_names="yx",
+        levels=1,
+        chunks=(16, 16),
+        consolidation_mode="dask",
+    )
+    label = ome_zarr.derive_label("objs")
+    label_image = np.zeros((64, 64), dtype="uint32")
+    label_image[4:12, 4:12] = 1
+    label_image[20:28, 40:48] = 2
+    label_image[50:60, 10:20] = 3
+    label.set_array(label_image)
+    label.consolidate(mode="dask")
+    return ome_zarr
+
+
+def _measure(image, label_patch, roi):
+    rows = {"label": [], "mean_intensity": []}
+    for obj in np.unique(label_patch):
+        if obj == 0:
+            continue
+        rows["label"].append(int(obj))
+        rows["mean_intensity"].append(float(image[label_patch == obj].mean()))
+    return rows
+
+
+def _feature_iterator(ome_zarr):
+    return FeatureExtractorIterator(
+        ome_zarr.get_image(), ome_zarr.get_label("objs"), axes_order="yx"
+    ).by_grid(size_y=32, size_x=32)
+
+
+def _global_norm_coalesce(results):
+    """Non-decomposable on purpose: normalizes by the global mean."""
+    import pandas as pd
+
+    from ngio.tables import FeatureTable
+
+    frames = [pd.DataFrame(r) if isinstance(r, dict) else r for r in results]
+    frames = [frame for frame in frames if len(frame)]
+    joined = pd.concat(frames).set_index("label")
+    joined["norm"] = joined["mean_intensity"] / joined["mean_intensity"].mean()
+    return FeatureTable(table_data=joined, reference_label="objs")
+
+
+@pytest.mark.parametrize("custom_coalesce", [False, True])
+def test_feature_merge_matches_serial(tmp_path: Path, custom_coalesce: bool):
+    import pandas as pd
+
+    coalesce = _global_norm_coalesce if custom_coalesce else None
+    serial_oz = _feature_setup(tmp_path / "feat_serial.zarr")
+    serial = _feature_iterator(serial_oz).reduce_to_table(_measure, coalesce=coalesce)
+
+    ome_zarr = _feature_setup(tmp_path / "feat_jobs.zarr")
+    args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in reversed(args_list):
+        _feature_iterator(ome_zarr).for_job(**args).reduce_to_partial(_measure)
+    merged = _feature_iterator(ome_zarr).merge_partials(coalesce=coalesce)
+
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+    # The merge cleaned the partials group up.
+    label = ome_zarr.get_label("objs")
+    assert "_ngio_partials" not in list(label._group_handler.group.keys())
+
+
+def test_feature_finished_verbs_refuse_on_slices(tmp_path: Path):
+    ome_zarr = _feature_setup(tmp_path / "feat_guard.zarr")
+    iterator = _feature_iterator(ome_zarr)
+    args_list = iterator.prepare_jobs(n_jobs=2)
+    restricted = _feature_iterator(ome_zarr).for_job(**args_list[0])
+
+    with pytest.raises(NgioValueError, match="reduce_to_partial"):
+        restricted.reduce_to_table(_measure)
+    with pytest.raises(NgioValueError, match="for_job"):
+        _feature_iterator(ome_zarr).reduce_to_partial(_measure)
+    with pytest.raises(NgioValueError, match="unrestricted"):
+        restricted.merge_partials()
+
+
+def test_feature_merge_refuses_incomplete_run(tmp_path: Path):
+    ome_zarr = _feature_setup(tmp_path / "feat_incomplete.zarr")
+    args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    # Only one of two jobs runs.
+    _feature_iterator(ome_zarr).for_job(**args_list[0]).reduce_to_partial(_measure)
+    with pytest.raises(NgioValueError, match="incomplete"):
+        _feature_iterator(ome_zarr).merge_partials()
+
+
+def test_feature_merge_refuses_without_prepare(tmp_path: Path):
+    ome_zarr = _feature_setup(tmp_path / "feat_noprep.zarr")
+    with pytest.raises(NgioValueError, match="No partials"):
+        _feature_iterator(ome_zarr).merge_partials()
+
+
+def test_feature_fingerprint_drift_refuses(tmp_path: Path):
+    ome_zarr = _feature_setup(tmp_path / "feat_drift.zarr")
+    _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    retiled = FeatureExtractorIterator(
+        ome_zarr.get_image(), ome_zarr.get_label("objs"), axes_order="yx"
+    ).by_grid(size_y=16, size_x=16)
+    with pytest.raises(NgioValueError, match="different plan"):
+        retiled.for_job(0, n_jobs=2)
+    with pytest.raises(NgioValueError, match="different plan"):
+        retiled.merge_partials()
+
+
+def _detection_setup(store):
+    rng = np.random.default_rng(1)
+    return create_ome_zarr_from_array(
+        store=store,
+        array=rng.integers(0, 255, size=(64, 64)).astype("uint8"),
+        pixelsize=1.0,
+        axes_names="yx",
+        levels=1,
+        chunks=(16, 16),
+        consolidation_mode="dask",
+    )
+
+
+def _detector(patch, roi):
+    from scipy import ndimage
+
+    labeled, count = ndimage.label(patch > 200)
+    rows = {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
+    for obj in range(1, count + 1):
+        ys, xs = np.where(labeled == obj)
+        rows["y_min"].append(float(ys.min()))
+        rows["y_max"].append(float(ys.max() + 1))
+        rows["x_min"].append(float(xs.min()))
+        rows["x_max"].append(float(xs.max() + 1))
+        rows["confidence"].append(float(patch[labeled == obj].mean()))
+    return rows
+
+
+def _detection_iterator(ome_zarr):
+    return (
+        ObjectDetectionIterator(ome_zarr.get_image(), axes_order="yx")
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=8, x=8)
+    )
+
+
+def test_detection_merge_matches_serial(tmp_path: Path):
+    """Global NMS at merge: bit-identical to serial `detect`.
+
+    The noisy image produces hundreds of overlapping boxes across the haloed
+    tile borders — dense suppression chains that a per-job NMS followed by a
+    merge NMS (hierarchical) would resolve differently.
+    """
+    import pandas as pd
+
+    serial_oz = _detection_setup(tmp_path / "det_serial.zarr")
+    serial = _detection_iterator(serial_oz).detect(_detector)
+    assert len(serial.dataframe) > 50
+
+    ome_zarr = _detection_setup(tmp_path / "det_jobs.zarr")
+    args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    for args in reversed(args_list):
+        _detection_iterator(ome_zarr).for_job(**args).detect_to_partial(_detector)
+    merged = _detection_iterator(ome_zarr).merge_partials()
+
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+    image = ome_zarr.get_image()
+    assert "_ngio_partials" not in list(image._group_handler.group.keys())
+
+
+def test_detection_finished_verbs_refuse_on_slices(tmp_path: Path):
+    ome_zarr = _detection_setup(tmp_path / "det_guard.zarr")
+    args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    restricted = _detection_iterator(ome_zarr).for_job(**args_list[0])
+    with pytest.raises(NgioValueError, match="detect_to_partial"):
+        restricted.detect(_detector)
+    with pytest.raises(NgioValueError, match="for_job"):
+        _detection_iterator(ome_zarr).detect_to_partial(_detector)
+
+
+def _run_feature_job(store: str, job_index: int, n_jobs: int) -> None:
+    """One array task of a distributed feature run."""
+    ome_zarr = open_ome_zarr_container(store)
+    _feature_iterator(ome_zarr).for_job(
+        job_index=job_index, n_jobs=n_jobs
+    ).reduce_to_partial(_measure)
+
+
+def test_feature_jobs_across_processes_match_serial(tmp_path: Path):
+    import pandas as pd
+
+    serial_oz = _feature_setup(tmp_path / "feat_proc_serial.zarr")
+    serial = _feature_iterator(serial_oz).reduce_to_table(_measure)
+
+    store = tmp_path / "feat_procs.zarr"
+    ome_zarr = _feature_setup(store)
+    args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+
+    with ProcessPoolExecutor(
+        max_workers=len(args_list), mp_context=get_context("spawn")
+    ) as pool:
+        futures = [
+            pool.submit(_run_feature_job, str(store), **args) for args in args_list
+        ]
+        for future in futures:
+            future.result()
+
+    merged = _feature_iterator(ome_zarr).merge_partials()
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)

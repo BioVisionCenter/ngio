@@ -742,15 +742,13 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             )
 
     def _require_splittable(self) -> None:
-        """Refuse job splitting where the gather step could not be correct."""
-        if self.output_image is None:
-            name = self.__class__.__name__
-            raise NgioValueError(
-                f"{name} is read-only: job splitting exists to distribute "
-                "writes, and the read-side gathers (feature coalescing, "
-                "detection NMS) are global joins that independent per-job "
-                "runs cannot reproduce. Use reduce() in a single job instead."
-            )
+        """Hook refusing job splitting where it could not be correct.
+
+        The base allows it everywhere: writers distribute their writes, and
+        the read-only iterators distribute via their partial verbs
+        (`reduce_to_partial` / `detect_to_partial`) plus a `merge_partials`
+        gather. Subclasses with an unsupported configuration raise here.
+        """
 
     @property
     def partition_indices(self) -> list[int] | None:
@@ -809,10 +807,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         `prepare_jobs(n_jobs)` to have created the scratch band arrays; its
         band writes join the conflict graph, so tiles whose bands share a
         scratch chunk travel together (a tile grid aligned with the label's
-        chunk grid still splits fully). Read-only iterators refuse —
-        their gathers are global joins that independent jobs cannot
-        reproduce. `write_conflict_components` exposes the grouping this
-        partition is built from.
+        chunk grid still splits fully). Read-only iterators require
+        `prepare_jobs` too, and distribute through their partial verbs —
+        `reduce_to_partial` / `detect_to_partial` per job, `merge_partials`
+        as the gather — because their joins (coalesce, NMS) are global.
+        `write_conflict_components` exposes the grouping this partition is
+        built from.
         """
         if self._partition is not None:
             _, current_index, current_n = self._partition
@@ -921,7 +921,15 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         if output is not None:
             payload.append(f"shape={output.zarr_array.shape}")
             payload.append(f"chunks={output.zarr_array.chunks}")
-        payload.append(f"regions={self._touched_write_regions()}")
+        regions = self._touched_write_regions()
+        if regions is None:
+            # Read-only iterators: the read regions are the plan's geometry
+            # (halo included, via the grown read ROI each getter covers).
+            regions = [
+                self.build_numpy_getter(roi).slicing_ops.normalized_slicing_tuple
+                for roi in self.rois
+            ]
+        payload.append(f"regions={regions}")
         payload.extend(self._fingerprint_extras())
         return hashlib.sha256("|".join(payload).encode()).hexdigest()
 

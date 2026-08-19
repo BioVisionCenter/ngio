@@ -316,6 +316,26 @@ With `prepare_jobs` in the recipe, `stitch=True` distributes too. Each job's `ma
 
 The consolidate task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.
 
+### Distributed measurement and detection
+
+The read-only iterators end in a *global join* — one feature coalesce, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their distributed form therefore stores each job's **raw pre-join records** as a *partial*, and the consolidate step runs the single global join:
+
+```python
+# init task
+iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
+args_list = iterator.prepare_jobs(n_jobs=4)
+
+# parallel task, once per entry
+iterator.for_job(**args).reduce_to_partial(measure)      # features
+# iterator.for_job(**args).detect_to_partial(detector)   # detection
+
+# consolidate task, after all parallel tasks
+table = iterator.merge_partials()
+container.add_table("measurements", table)               # storing stays yours
+```
+
+The result is bit-identical to a serial `reduce_to_table` / `detect` — including a **custom `coalesce`**, which runs once at merge time over the reconstructed per-ROI results (dicts normalized to DataFrames, a `label` index to a `label` column). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call. The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (`reduce_to_table`, `detect`) refuse on a `for_job` slice, pointing at their partial counterparts.
+
 ## Halos: context without seams
 
 Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. `with_halo` fixes that by reading a margin around each ROI and writing only the ROI back:

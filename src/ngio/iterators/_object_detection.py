@@ -20,7 +20,7 @@ ones.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Generic, TypeAlias, TypeVar
+from typing import Any, Generic, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -35,6 +35,14 @@ from ngio.images._image import (
 from ngio.io_pipes import DaskGetter, DataGetter, NumpyGetter, TransformProtocol
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol
+from ngio.iterators._partials import (
+    INDEX_COLUMN,
+    delete_partials_root,
+    merge_partial_frames,
+    prepare_partials,
+    validate_partials_context,
+    write_partial,
+)
 from ngio.tables import RoiTable
 from ngio.utils import NgioValueError
 
@@ -344,20 +352,139 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
             (tile, row) order, in the reference image's world coordinates.
             An image with nothing to detect gives an empty table.
         """
+        if self._partition is not None:
+            raise NgioValueError(
+                "detect on a partition slice would run NMS over only this "
+                "job's tiles — and greedy NMS is not hierarchical, so the "
+                "result could differ from a serial run. Use "
+                "`detect_to_partial(func)` per job and `merge_partials()` "
+                "once, after all jobs."
+            )
         results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
         detections = self._collect(results)
         kept = self._suppress(detections)
         return RoiTable(rois=self._renumbered(kept))
 
-    def _collect(self, results: list[DetectionFuncResult]) -> list[_Detection]:
-        """Validate and anchor every tile's boxes into reference coordinates."""
+    def _partials_handler(self):
+        """Partials live beside the input image's levels."""
+        return self._input._group_handler
+
+    def _prepare_distributed(self, n_jobs: int) -> None:
+        prepare_partials(self, self._partials_handler(), n_jobs)
+
+    def _validate_job_context(self, n_jobs: int) -> None:
+        validate_partials_context(self, self._partials_handler(), n_jobs)
+
+    def detect_to_partial(
+        self,
+        func: Callable[[np.ndarray, Roi], DetectionFuncResult],
+        *,
+        mapper: MapperProtocol | None = None,
+    ) -> None:
+        """Detect over this job's tiles and store the raw boxes as a partial.
+
+        The per-job step of a distributed run (see `prepare_jobs`): the
+        detector's raw, **pre-NMS** output is stored tagged with its global
+        tile index, so `merge_partials` can run the ONE global NMS and
+        renumbering — bit-identical to a serial `detect` (per-job NMS
+        followed by a merge NMS would not be: greedy NMS is not
+        hierarchical). The tiles' boxes are validated here, so a malformed
+        detector fails in the job rather than at the merge. Only callable on
+        a `for_job` slice; re-running a job overwrites its own partial.
+        """
+        if self._partition is None:
+            raise NgioValueError(
+                "detect_to_partial is the per-job step of a distributed run: "
+                "restrict the iterator first (`for_job(**args)`), or use "
+                "detect() for a local run."
+            )
+        _, job_index, n_jobs = self._partition
+        handler = self._partials_handler()
+        validate_partials_context(self, handler, n_jobs)
+
+        indices = self.partition_indices or []
+        results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
+        # Early, loud validation with the correct global tile indices; the
+        # anchored output is discarded — the merge re-derives everything from
+        # the raw records so the whole pipeline runs once, globally.
+        self._collect(results, tile_indices=indices)
+
+        frames = []
+        for index, result in zip(indices, results, strict=True):
+            frame = _as_dataframe(result, self.rois[index].get_name())
+            if INDEX_COLUMN in frame.columns:
+                raise NgioValueError(
+                    f"The detection function returned a reserved column "
+                    f"{INDEX_COLUMN!r}; rename it."
+                )
+            if not len(frame):
+                continue
+            frame = frame.reset_index(drop=True).copy()
+            frame[INDEX_COLUMN] = index
+            frames.append(frame)
+        payload = pd.concat(frames, ignore_index=True) if frames else None
+        write_partial(
+            handler,
+            job_index,
+            payload,
+            attrs={
+                "job_index": job_index,
+                "n_jobs": n_jobs,
+                "fingerprint": self._plan_fingerprint(n_jobs),
+            },
+        )
+
+    def merge_partials(self) -> RoiTable:
+        """Merge a distributed run's partials into the one final ROI table.
+
+        The consolidate step (see `prepare_jobs`): validates that every job
+        of the prepared plan produced a matching partial — a half-finished
+        run errors instead of returning a silently incomplete table — then
+        rebuilds every tile's raw boxes and runs the full serial pipeline
+        once, globally: anchoring, the cross-tile invariant checks, NMS, and
+        the dense `1..N` renumbering. Bit-identical to a serial `detect` by
+        construction. On success the partials group is removed. Nothing is
+        registered: the returned table is yours to store with `add_table`.
+        """
+        if self._partition is not None:
+            raise NgioValueError(
+                "merge_partials belongs to the unrestricted iterator: rebuild "
+                "it without `for_job` for the consolidate step."
+            )
+        handler = self._partials_handler()
+        merged = merge_partial_frames(self, handler)
+
+        results: list[DetectionFuncResult] = [pd.DataFrame() for _ in self.rois]
+        if merged is not None:
+            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+                results[int(cast("Any", index))] = group.drop(
+                    columns=[INDEX_COLUMN]
+                ).reset_index(drop=True)
+        detections = self._collect(results)
+        kept = self._suppress(detections)
+        table = RoiTable(rois=self._renumbered(kept))
+        delete_partials_root(handler)
+        return table
+
+    def _collect(
+        self,
+        results: list[DetectionFuncResult],
+        tile_indices: Sequence[int] | None = None,
+    ) -> list[_Detection]:
+        """Validate and anchor every tile's boxes into reference coordinates.
+
+        `tile_indices` maps each result to its global position in `rois`;
+        `None` means the results cover every ROI in order (the serial case).
+        """
         pixel_size = self._ref_image.pixel_size
         detections: list[_Detection] = []
         bbox_axes: tuple[str, ...] | None = None
         frames: list[tuple[int, pd.DataFrame]] = []
         scored = 0
 
-        for tile_index, result in enumerate(results):
+        if tile_indices is None:
+            tile_indices = range(len(results))
+        for tile_index, result in zip(tile_indices, results, strict=True):
             tile_name = self.rois[tile_index].get_name()
             frame = _as_dataframe(result, tile_name)
             if not len(frame):
