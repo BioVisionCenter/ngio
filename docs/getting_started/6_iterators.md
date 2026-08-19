@@ -208,6 +208,20 @@ processing anything:
 --8<-- "docs/snippets/getting_started/iterators.py:inspect"
 ```
 
+Beyond a ROI table, four tiling calls reshape the regions, and each name says what it
+tiles by. `by_grid(size_x=..., size_y=..., ...)` lays a regular grid of the sizes you
+ask for; where the grid does not divide the axis, its `tail=` policy decides what
+happens to the leftover — `"clip"` (the default) shrinks the last tile to the border,
+`"balance"` re-splits the last two tiles so a thin overhang never yields a thin tile
+(100 px at 32 gives `32, 32, 18, 18` rather than `32, 32, 32, 4`), `"shift"` slides
+the last tile back to stay full-size (it then overlaps its neighbour — fine for
+detection or a merge, not for a plain parallel write), and `"drop"` discards it.
+`by_blocks(num_x=..., num_y=...)` is the complement — you say how many tiles, not how
+big, and the partition is balanced by construction. `by_chunks()` tiles by the *input*
+image's chunk grid, the natural unit of reading; `by_write_units()` tiles by the
+*output*'s write granularity — the shard shape when the output is sharded, the chunk
+shape otherwise — which is what makes parallel writes collision-free by construction.
+
 From here you would call `map` or iterate with `iter_as_numpy` to do the work;
 the [image processing tutorial](../tutorials/image_processing.md) carries this through to
 a written result.
@@ -320,7 +334,7 @@ Tune it with `StitchConfig`:
 from ngio.iterators import StitchConfig
 
 iterator = SegmentationIterator(
-    image, label, stitch=StitchConfig(min_iou=0.5, block_size=50_000)
+    image, label, stitch=StitchConfig(iou_threshold=0.5, block_size=50_000)
 )
 ```
 
@@ -334,7 +348,7 @@ StitchConfig(scratch_store=MemoryStore())
 
 That keeps the output store untouched and leaves nothing behind if a run dies. The one restriction is `ProcessMapper`: a `MemoryStore` pickles by value, so each worker would bank its bands into a private copy — ngio refuses that rather than losing them silently.
 
-`min_iou` is how much two tiles must agree before their ids are joined. The default errs towards leaving an object split rather than merging two that are not — an over-split label can be fixed downstream, a wrong merge cannot. `block_size` is how many ids each tile is given, and must exceed the largest count a single tile can produce.
+`iou_threshold` is how much two tiles must agree before their ids are joined. The default errs towards leaving an object split rather than merging two that are not — an over-split label can be fixed downstream, a wrong merge cannot. `block_size` is how many ids each tile is given, and must exceed the largest count a single tile can produce.
 
 Compaction is not exclusive to stitching — `label.relabel_sequential()` renumbers any label to a dense `1..N` on its own:
 
