@@ -169,6 +169,23 @@ class BasicMapper(Generic[T, R]):
         return [result for _, result in results]
 
 
+def _collect_write_footprints(
+    units: Sequence[IterUnit[Any]],
+) -> dict[int, ChunkRect]:
+    """Write footprints by `unit.index`, skipping read-only / empty writes.
+
+    The single source of footprints for both `plan_waves` and
+    `write_conflict_components` — sharing it is what guarantees the wave
+    scheduler and the job splitter can never disagree about who conflicts.
+    """
+    footprints: dict[int, ChunkRect] = {}
+    for unit in units:
+        footprint = unit.write_footprint
+        if footprint is not None:
+            footprints[unit.index] = footprint
+    return footprints
+
+
 def _write_conflict_edges(
     units: Sequence[IterUnit[Any]],
     footprints: dict[int, ChunkRect],
@@ -231,12 +248,7 @@ def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
     """
     if not units:
         return []
-    footprints: dict[int, ChunkRect] = {}
-    for unit in units:
-        footprint = unit.write_footprint
-        if footprint is not None:
-            footprints[unit.index] = footprint
-    adjacency = _write_conflict_edges(units, footprints)
+    adjacency = _write_conflict_edges(units, _collect_write_footprints(units))
 
     wave_of: dict[int, int] = {}
     waves: list[list[IterUnit[T]]] = [[]]
@@ -269,6 +281,44 @@ def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
             "`by_write_units()` would yield a single wave."
         )
     return waves
+
+
+def write_conflict_components(units: Sequence[IterUnit[Any]]) -> list[list[int]]:
+    """Connected components of the write-conflict graph, as unit-index lists.
+
+    Two units are connected when their write footprints share a write unit (a
+    chunk, or a shard when the output is sharded) of the same output array —
+    the same adjacency `plan_waves` schedules by, computed by the same code,
+    so the scheduler and the splitter can never disagree about who conflicts.
+    Read-only units and units with an empty write selection conflict with
+    nothing and are singletons.
+
+    A component is the unit of independence: units in different components
+    never share a write unit, so they need no coordination in any topology.
+    That is the property `split(n_jobs)` builds on — a component never spans
+    two jobs. Each component is a sorted list of `unit.index`; components are
+    ordered by their smallest index, and the whole result is a pure function
+    of the unit sequence.
+    """
+    adjacency = _write_conflict_edges(units, _collect_write_footprints(units))
+
+    components: list[list[int]] = []
+    visited: set[int] = set()
+    for index in sorted(unit.index for unit in units):
+        if index in visited:
+            continue
+        visited.add(index)
+        component = []
+        stack = [index]
+        while stack:
+            current = stack.pop()
+            component.append(current)
+            for neighbor in adjacency.get(current, ()):
+                if neighbor not in visited:
+                    visited.add(neighbor)
+                    stack.append(neighbor)
+        components.append(sorted(component))
+    return components
 
 
 class ThreadedMapper(Generic[T, R]):

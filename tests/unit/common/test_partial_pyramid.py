@@ -115,7 +115,9 @@ def test_region_consolidate_is_byte_identical_to_full(
         regions=_regions_for(shapes[0]),
     )
 
-    for level, (reference, rebuilt) in enumerate(zip(full[1:], partial[1:])):
+    for level, (reference, rebuilt) in enumerate(
+        zip(full[1:], partial[1:], strict=True)
+    ):
         np.testing.assert_array_equal(
             reference[...], rebuilt[...], err_msg=f"level {level + 1} differs"
         )
@@ -177,7 +179,7 @@ class TestPlanPartialFallbacks:
         assert _plan_partial(levels[0], plan, merged, "cubic") is None
 
     def test_mid_level_source_upsamples(self, tmp_path: Path):
-        levels, plan_unused = self._plan(
+        levels, _ = self._plan(
             tmp_path, [(1, 4, 256, 256), (1, 4, 128, 128), (1, 4, 64, 64)]
         )
         # Consolidating from level 1 asks for level 0 too — an upsample edge.
@@ -204,9 +206,7 @@ class TestPlanPartialFallbacks:
 
         consolidate_pyramid(levels[0], levels[1:], order="linear", regions=[])
         degenerate = (slice(None), slice(None), slice(10, 10), slice(0, 64))
-        consolidate_pyramid(
-            levels[0], levels[1:], order="linear", regions=[degenerate]
-        )
+        consolidate_pyramid(levels[0], levels[1:], order="linear", regions=[degenerate])
 
         # A full rebuild (or any consolidation at all) would repair the poison.
         np.testing.assert_array_equal(levels[1][...], poison)
@@ -227,7 +227,7 @@ class TestPlanPartialFallbacks:
         consolidate_pyramid(
             partial[0], partial[1:], order="linear", mode="dask", regions=[region]
         )
-        for reference, rebuilt in zip(full[1:], partial[1:]):
+        for reference, rebuilt in zip(full[1:], partial[1:], strict=True):
             np.testing.assert_array_equal(reference[...], rebuilt[...])
 
 

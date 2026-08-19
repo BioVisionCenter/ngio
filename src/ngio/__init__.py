@@ -61,6 +61,7 @@ from ngio.iterators import (
     StitchConfig,
     ThreadedMapper,
     compute_write_footprint,
+    write_conflict_components,
 )
 from ngio.ome_zarr_meta import (
     get_ngio_image_meta,
@@ -162,4 +163,5 @@ __all__ = [
     "open_ome_zarr_container",
     "open_ome_zarr_plate",
     "open_ome_zarr_well",
+    "write_conflict_components",
 ]

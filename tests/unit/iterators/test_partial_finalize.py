@@ -39,7 +39,8 @@ def _quadrant_roi(image):
 def _level_arrays(label):
     handler = label._group_handler
     return {
-        path: handler.get_array(path)[...] for path in label.meta_handler.get_meta().paths
+        path: handler.get_array(path)[...]
+        for path in label.meta_handler.get_meta().paths
     }
 
 
@@ -97,14 +98,18 @@ def test_stitching_finalize_forces_a_full_rebuild(tmp_path, monkeypatch):
     image = ome_zarr.get_image()
     label = ome_zarr.derive_label("out")
 
-    iterator = SegmentationIterator(
-        image,
-        label,
-        channel_selection=0,
-        axes_order="yx",
-        consolidation_mode="dask",
-        stitch=True,
-    ).by_grid(size_y=32, size_x=32).with_halo(y=4, x=4)
+    iterator = (
+        SegmentationIterator(
+            image,
+            label,
+            channel_selection=0,
+            axes_order="yx",
+            consolidation_mode="dask",
+            stitch=True,
+        )
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
 
     calls = []
     original = type(label).consolidate

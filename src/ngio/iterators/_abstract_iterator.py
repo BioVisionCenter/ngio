@@ -20,6 +20,7 @@ from ngio.iterators._mappers import (
     IterUnit,
     MapperProtocol,
     compute_write_footprint,
+    write_conflict_components,
 )
 from ngio.iterators._rois_utils import (
     TailPolicy,
@@ -31,6 +32,7 @@ from ngio.iterators._rois_utils import (
     halo_roi,
     rois_product,
 )
+from ngio.iterators._split import partition_components
 from ngio.tables import GenericRoiTable
 from ngio.utils import (
     NgioDeprecationWarning,
@@ -67,10 +69,20 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     # overlapping context (the detection iterator's NMS). Off by default so a
     # read-only iterator does not silently measure grown regions.
     _allow_readonly_halo: bool = False
+    # Set by `for_job`: (selected unit indices, job_index, n_jobs).
+    # `None` means unrestricted. Deliberately not carried through
+    # `_new_from_rois`: the indices are positions in the current ROI list, so
+    # a partition slice refuses further reshaping instead of silently
+    # invalidating them.
+    _partition: tuple[frozenset[int], int, int] | None = None
 
     def __repr__(self) -> str:
         halo = f", halo={self._halo}" if self._halo else ""
-        return f"{self.__class__.__name__}(regions={len(self._rois)}{halo})"
+        partition = ""
+        if self._partition is not None:
+            _, job_index, n_jobs = self._partition
+            partition = f", partition={job_index}/{n_jobs}"
+        return f"{self.__class__.__name__}(regions={len(self._rois)}{halo}{partition})"
 
     @abstractmethod
     def get_init_kwargs(self) -> dict:
@@ -131,6 +143,14 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
     def _new_from_rois(self, rois: list[Roi]) -> Self:
         """Create a new instance of the iterator with a different set of ROIs."""
+        if self._partition is not None:
+            raise NgioValueError(
+                "This iterator is restricted to one partition "
+                "(`for_job`), and its selection is a set of positions "
+                "in the current ROI list — reshaping it (`by_*`, `product`, "
+                "`with_halo`) would silently invalidate the selection. Apply "
+                "`for_job` last, after every reshaping call."
+            )
         init_kwargs = self.get_init_kwargs()
         self._require_complete_init_kwargs(init_kwargs)
         new_instance = self.__class__(**init_kwargs)
@@ -471,30 +491,42 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         return regions or None
 
     def _numpy_getters_generator(self) -> Generator[DataGetterProtocol[NumpyPipeType]]:
-        """Return a list of numpy getter functions for all ROIs."""
-        yield from (self.build_numpy_getter(roi) for roi in self.rois)
+        """Return a list of numpy getter functions for all (selected) ROIs."""
+        yield from (self.build_numpy_getter(roi) for _, roi in self._selected_rois())
 
     def _dask_getters_generator(self) -> Generator[DataGetterProtocol[DaskPipeType]]:
-        """Return a list of dask getter functions for all ROIs."""
-        yield from (self.build_dask_getter(roi) for roi in self.rois)
+        """Return a list of dask getter functions for all (selected) ROIs."""
+        yield from (self.build_dask_getter(roi) for _, roi in self._selected_rois())
 
     def _numpy_setters_generator(
         self,
     ) -> Generator[DataSetterProtocol[NumpyPipeType] | None]:
-        """Return a list of numpy setter functions for all ROIs."""
-        yield from (self.build_numpy_setter(roi) for roi in self.rois)
+        """Return a list of numpy setter functions for all (selected) ROIs."""
+        yield from (self.build_numpy_setter(roi) for _, roi in self._selected_rois())
 
     def _dask_setters_generator(
         self,
     ) -> Generator[DataSetterProtocol[DaskPipeType] | None]:
-        """Return a list of dask setter functions for all ROIs."""
-        yield from (self.build_dask_setter(roi) for roi in self.rois)
+        """Return a list of dask setter functions for all (selected) ROIs."""
+        yield from (self.build_dask_setter(roi) for _, roi in self._selected_rois())
+
+    def _selected_rois(self) -> Generator[tuple[int, Roi]]:
+        """`(index, roi)` pairs, filtered to the selected partition if any.
+
+        The index is always the position in the *full* ROI list, whether or
+        not a partition restricts which ROIs come out — `IterUnit.index`
+        stays globally consistent across every job of a split run.
+        """
+        selection = None if self._partition is None else self._partition[0]
+        for index, roi in enumerate(self.rois):
+            if selection is None or index in selection:
+                yield index, roi
 
     def _numpy_units_generator(
         self, with_setters: bool = True
     ) -> Generator[IterUnit[NumpyPipeType]]:
-        """Yield one numpy `IterUnit` per ROI, in ROI order."""
-        for index, roi in enumerate(self.rois):
+        """Yield one numpy `IterUnit` per (selected) ROI, in ROI order."""
+        for index, roi in self._selected_rois():
             yield IterUnit(
                 index=index,
                 roi=roi,
@@ -505,8 +537,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def _dask_units_generator(
         self, with_setters: bool = True
     ) -> Generator[IterUnit[DaskPipeType]]:
-        """Yield one dask `IterUnit` per ROI, in ROI order."""
-        for index, roi in enumerate(self.rois):
+        """Yield one dask `IterUnit` per (selected) ROI, in ROI order."""
+        for index, roi in self._selected_rois():
             yield IterUnit(
                 index=index,
                 roi=roi,
@@ -534,7 +566,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 name = self.__class__.__name__
                 raise NgioValueError(f"Iterator is read-only: {name}")
             yield getter, setter
-        self.finalize()
+        if self._partition is None:
+            self.finalize()
 
     def _iter(
         self,
@@ -695,6 +728,116 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 "Use reduce (or iter) to compute without writing."
             )
 
+    def _require_splittable(self) -> None:
+        """Refuse job splitting where the gather step could not be correct."""
+        if self.output_image is None:
+            name = self.__class__.__name__
+            raise NgioValueError(
+                f"{name} is read-only: job splitting exists to distribute "
+                "writes, and the read-side gathers (feature coalescing, "
+                "detection NMS) are global joins that independent per-job "
+                "runs cannot reproduce. Use reduce() in a single job instead."
+            )
+
+    @property
+    def partition_indices(self) -> list[int] | None:
+        """The unit indices this iterator is restricted to, or `None`.
+
+        `None` on an unrestricted iterator; on a `for_job` slice,
+        the sorted positions (in the full ROI list) of the units it runs.
+        The whole layout of a split is
+        `[it.for_job(i, n).partition_indices for i in range(n)]` —
+        the pre-flight check before submitting a distributed run: one fat
+        list plus empties means the output chunking, not the cluster, is
+        the constraint.
+        """
+        if self._partition is None:
+            return None
+        return sorted(self._partition[0])
+
+    def for_job(self, job_index: int, n_jobs: int) -> Self:
+        """Restrict the iterator to one of `n_jobs` independent partitions.
+
+        The distributed counterpart of a parallel mapper: partition the
+        units into `n_jobs` embarrassingly independent jobs and keep job
+        `job_index`'s share. No write unit (a chunk, or a shard when the
+        output is sharded) is ever shared between two partitions — units
+        whose write footprints conflict travel together — so the jobs need
+        no locks, no barriers, and no channel to one another: safe to run
+        as separate SLURM array tasks on a shared filesystem, in any order
+        and any overlap in time. The partition is a pure function of the
+        iterator's ROIs and the output geometry, so every process that
+        builds the same iterator derives the same partition on its own.
+
+        The returned iterator executes as usual (`map(func, mapper=...)`),
+        with one difference: it does **not** finalize — the pyramid resolve
+        is the one global step and belongs to the unrestricted iterator,
+        once after all jobs (a SLURM job dependency is the barrier). The
+        typical array task, and its dependent gather task:
+
+        ```python
+        n_jobs = 4
+        job_index = 0  # e.g. int($SLURM_ARRAY_TASK_ID)
+
+        iterator = SegmentationIterator(image, label, ...).by_chunks()
+        iterator.for_job(job_index, n_jobs=n_jobs).map(func)
+
+        # gather task, after all jobs:
+        SegmentationIterator(image, label, ...).by_chunks().finalize()
+        ```
+
+        Every job must build an identical iterator — same construction,
+        same tiling calls, same `n_jobs`; construction is metadata-only, so
+        this is cheap. `for_job` comes *last* in the builder chain
+        (reshaping a slice would invalidate its selection and refuses), and
+        in-memory stores cannot work across separate processes. Jobs beyond
+        the number of independent unit groups come back empty and their
+        `map` is a no-op. Read-only iterators and stitch-enabled
+        segmentations refuse — their gather steps are global joins that
+        independent jobs cannot reproduce. `write_conflict_components`
+        exposes the grouping this partition is built from.
+        """
+        if self._partition is not None:
+            _, current_index, current_n = self._partition
+            raise NgioValueError(
+                f"This iterator is already restricted to partition "
+                f"{current_index}/{current_n}; partitions do not nest. "
+                "Apply `for_job` once, to the full iterator."
+            )
+        if n_jobs < 1:
+            raise NgioValueError(f"n_jobs must be >= 1, got {n_jobs}.")
+        if not 0 <= job_index < n_jobs:
+            raise NgioValueError(
+                f"job_index must be in [0, {n_jobs}), got {job_index}."
+            )
+        self._require_splittable()
+        units = list(self._numpy_units_generator())
+        partition = partition_components(write_conflict_components(units), n_jobs)
+        restricted = self._new_from_rois(self.rois)
+        restricted._partition = (
+            frozenset(partition[job_index]),
+            job_index,
+            n_jobs,
+        )
+        return restricted
+
+    def _require_unrestricted_finalize(self) -> None:
+        """Refuse `finalize` on a partition slice: the gather is global.
+
+        Called by the writing iterators' `finalize` implementations. A slice
+        holds one job's share; finalizing from it would resolve the pyramid
+        against a partially-written level 0. Rebuild the iterator without
+        `for_job` and finalize once, after every job completes.
+        """
+        if self._partition is not None:
+            _, job_index, n_jobs = self._partition
+            raise NgioValueError(
+                f"finalize() on partition {job_index}/{n_jobs}: the gather "
+                "step is global and belongs to the unrestricted iterator. "
+                "Rebuild it without `for_job` and call `finalize()` "
+                "once, after every job has completed."
+            )
+
     def map(
         self,
         func: Callable[[NumpyPipeType], NumpyPipeType],
@@ -710,14 +853,17 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 serial — parallel writes stay explicit opt-in. Pass
                 `ThreadedMapper()` or `ProcessMapper()` to fan out; each
                 sizes its own pool from its `max_workers` argument, and both
-                first refuse ROIs whose write footprints share a write unit.
+                schedule the units into conflict-free waves (`plan_waves`).
         """
         if mapper is None:
             mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
         units = list(self._numpy_units_generator())
         self._require_writable_units(units)
         mapper(func, units)
-        self.finalize()
+        # A partition slice runs only its share; the finalize (the one global
+        # step) belongs to the unrestricted iterator, once every job is done.
+        if self._partition is None:
+            self.finalize()
 
     def map_as_numpy(
         self,
@@ -754,7 +900,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         units = list(self._dask_units_generator())
         self._require_writable_units(units)
         _mapper(func, units)
-        self.finalize()
+        if self._partition is None:
+            self.finalize()
 
     def reduce(
         self,

@@ -258,6 +258,33 @@ For per-ROI measurement without writing anything, use `reduce` — it returns on
 --8<-- "docs/snippets/getting_started/iterators.py:reduce_demo"
 ```
 
+## Distributed runs: selecting a partition
+
+A mapper parallelizes within one machine. On a cluster — SLURM array tasks over a shared filesystem, where processes cannot coordinate — restrict each task to one partition of the work instead:
+
+```python
+n_jobs = 4
+job_index = 0  # e.g. int($SLURM_ARRAY_TASK_ID)
+
+iterator = SegmentationIterator(image, label, ...).by_chunks()
+iterator.for_job(job_index, n_jobs=n_jobs).map(func)
+```
+
+and, in a dependent job once every array task has finished, the gather step:
+
+```python
+iterator = SegmentationIterator(image, label, ...).by_chunks()  # same construction
+iterator.finalize()
+```
+
+`for_job` is a builder call like `by_grid` or `with_halo` — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, `map(func, mapper=...)` included. It comes *last* in the chain (reshaping a restricted iterator refuses), and its `map` deliberately does **not** finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date.
+
+Each job builds the identical iterator — construction is metadata-only and deterministic, so this is cheap — and derives the same partition on its own; there is nothing to hand from one job to another. The guarantee behind it is *embarrassing independence*: the units are grouped by their write-conflict components (the same adjacency the wave scheduler uses), and no write unit is ever shared between two partitions — so the jobs need no locks, no barriers, and no channel to one another, in any order and any overlap in time. Regions whose footprints conflict simply travel in the same partition, where the ordinary wave planning handles them.
+
+Effective parallelism therefore equals the number of independent groups, which follows the **output's** chunking. Inspect it before submitting — `[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]` — one fat list plus empties means the output chunking (or a tiling like `by_zyx`, which splits along t only), not the cluster, is the constraint; a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and [`write_conflict_components`][ngio.iterators.write_conflict_components] makes the grouping auditable.
+
+The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). A stitching segmentation refuses to partition — stitching banks seam bands in shared scratch and resolves them in one global pass — as do read-only iterators, whose gathers (feature coalescing, detection NMS) are global joins.
+
 ## Halos: context without seams
 
 Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. `with_halo` fixes that by reading a margin around each ROI and writing only the ROI back:

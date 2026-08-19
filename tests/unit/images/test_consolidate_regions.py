@@ -189,7 +189,9 @@ def test_rois_and_tuples_mix(tmp_path):
     region = (slice(None), slice(32, 48), slice(32, 48))
 
     image.set_roi(roi, np.full((1, 16, 16), 7, dtype="uint8"))
-    image.set_array(np.full((1, 16, 16), 9, dtype="uint8"), y=slice(32, 48), x=slice(32, 48))
+    image.set_array(
+        np.full((1, 16, 16), 9, dtype="uint8"), y=slice(32, 48), x=slice(32, 48)
+    )
     image.consolidate(mode="dask", regions=[roi, region])
 
     after_partial = _levels(image)

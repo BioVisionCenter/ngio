@@ -216,7 +216,18 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 self._stitch_plan = None
             raise
 
+    def _require_splittable(self) -> None:
+        super()._require_splittable()
+        if self._stitch is not None:
+            raise NgioValueError(
+                "Job splitting is not supported with stitch=True: stitching "
+                "banks seam bands in a shared scratch group and resolves them "
+                "in one global pass, which independent jobs cannot "
+                "coordinate. Run a single map() call, or use stitch=False."
+            )
+
     def finalize(self):
+        self._require_unrestricted_finalize()
         # The relabel has to precede consolidation: every pyramid level is
         # derived from level 0, so stitching after would leave them disagreeing.
         if self._stitch is not None:

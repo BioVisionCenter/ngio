@@ -11,6 +11,7 @@ from ngio.iterators._mappers import (
     ProcessMapper,
     ThreadedMapper,
     compute_write_footprint,
+    write_conflict_components,
 )
 from ngio.iterators._object_detection import (
     DetectionFuncResult,
@@ -43,4 +44,5 @@ __all__ = [
     "StitchConfig",
     "ThreadedMapper",
     "compute_write_footprint",
+    "write_conflict_components",
 ]

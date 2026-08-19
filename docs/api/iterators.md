@@ -56,11 +56,14 @@ description: API reference for the ngio processing iterators.
 
 ::: ngio.iterators.IterUnit
 
+### write_conflict_components
+
+::: ngio.iterators.write_conflict_components
+
 ## AbstractIteratorBuilder
 
 The shared method surface of every iterator — the reshaping calls
-(`by_grid`, `by_blocks`, `by_chunks`, `by_write_units`, `product`, `with_halo`)
-and the execution calls
-(`iter`, `map`, `reduce`).
+(`by_grid`, `by_blocks`, `by_chunks`, `by_write_units`, `product`, `with_halo`,
+`for_job`) and the execution calls (`iter`, `map`, `reduce`).
 
 ::: ngio.iterators.AbstractIteratorBuilder
