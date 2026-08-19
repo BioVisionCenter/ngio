@@ -135,17 +135,22 @@ print(f"objects: {sorted(int(v) for v in set(stitched.get_as_numpy().ravel()) - 
 from ngio import ObjectDetectionIterator, Roi
 
 
-def find_bright_boxes(patch: np.ndarray, roi: Roi) -> dict[str, list]:
+def find_bright_boxes(patch: np.ndarray) -> list[Roi]:
     ys, xs = np.nonzero(patch > 100)
     if not len(ys):
-        return {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
-    return {
-        "x_min": [int(xs.min())],
-        "x_max": [int(xs.max()) + 1],
-        "y_min": [int(ys.min())],
-        "y_max": [int(ys.max()) + 1],
-        "confidence": [float((patch > 100).mean())],
-    }
+        return []
+    x_min, y_min = int(xs.min()), int(ys.min())
+    return [
+        Roi.from_values(
+            slices={
+                "x": (x_min, int(xs.max()) + 1 - x_min),
+                "y": (y_min, int(ys.max()) + 1 - y_min),
+            },
+            name=None,
+            space="pixel",
+            confidence=float((patch > 100).mean()),
+        )
+    ]
 
 
 detect_iterator = (

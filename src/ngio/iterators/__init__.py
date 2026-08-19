@@ -14,11 +14,7 @@ from ngio.iterators._mappers import (
     compute_write_footprint,
     write_conflict_components,
 )
-from ngio.iterators._object_detection import (
-    DetectionFuncResult,
-    NmsConfig,
-    ObjectDetectionIterator,
-)
+from ngio.iterators._object_detection import NmsConfig, ObjectDetectionIterator
 from ngio.iterators._rois_utils import HaloMargins
 from ngio.iterators._segmentation import (
     MaskedSegmentationIterator,
@@ -30,7 +26,6 @@ __all__ = [
     "AbstractIteratorBuilder",
     "BasicMapper",
     "BatchedMapper",
-    "DetectionFuncResult",
     "FeatureExtractorIterator",
     "FeatureFuncResult",
     "HaloMargins",

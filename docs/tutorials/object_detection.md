@@ -15,10 +15,10 @@ one table at the end. Here the "model" is a Laplacian-of-Gaussian spot finder fr
 
 ## Step 1: write the detector function
 
-The detector sees one tile's pixels and the ROI that identifies the tile globally, and
-answers in the tile's own pixel coordinates: `x_min`/`x_max`/`y_min`/`y_max` columns
-bounding each box as `[min, max)`. Any extra column — here the peak intensity as a
-confidence — rides along into the final table.
+The detector sees one tile's pixels and answers with a list of `Roi` boxes in the
+tile's own pixel coordinates (`space="pixel"`); the iterator anchors them into world
+coordinates. Any extra field — here the peak intensity as a confidence — rides along
+into the final table.
 
 ```python exec="true" source="material-block" session="object_detection"
 --8<-- "docs/snippets/tutorials/object_detection.py:detector"

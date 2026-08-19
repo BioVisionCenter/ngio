@@ -1,13 +1,13 @@
 """Object detection over tiles: bounding boxes in, one deduplicated ROI table out.
 
 A detector (a YOLO model, a maxima finder) runs on one tile at a time and
-numbers its detections from zero, in the tile's own pixel coordinates. This
-iterator owns everything around that: it tiles the image (with an optional
-`with_halo` read margin, so objects on a tile's edge are seen whole by at
-least one tile), anchors each tile's boxes into the reference image's world
-coordinates (`Roi.anchor` — the tile's ROI plus a patch-local box), resolves
-the duplicates that haloed reads produce by non-maximum suppression, and
-returns the survivors as a single `RoiTable`, renumbered `1..N`.
+reports its detections as `Roi` objects in the tile's own pixel coordinates.
+This iterator owns everything around that: it tiles the image (with an
+optional `with_halo` read margin, so objects on a tile's edge are seen whole
+by at least one tile), anchors each tile's boxes into the reference image's
+world coordinates (`Roi.anchor` — the tile's ROI plus a patch-local box),
+resolves the duplicates that haloed reads produce by non-maximum suppression,
+and returns the survivors as a single `RoiTable`, renumbered `1..N`.
 Nothing is written: storing the table is the caller's `add_table` call.
 
 The duplicates are the price of the halo, and NMS is the standard cure: two
@@ -46,24 +46,12 @@ from ngio.iterators._partials import (
 from ngio.tables import RoiTable
 from ngio.utils import NgioValueError
 
-#: What a per-tile detection function may return: a DataFrame or a dict of
-#: columns. Boxes are `[min, max)` in the tile patch's own pixel coordinates:
-#: `x_min`/`x_max` and `y_min`/`y_max` are required, `z_min`/`z_max` optional
-#: (both or neither). Every other column rides along into the table — except
-#: `name`, `label`, `slices` and `space`, which collide with the ROI fields
-#: the iterator assigns and must be renamed (e.g. `label` -> `class_id`).
-DetectionFuncResult: TypeAlias = pd.DataFrame | dict[str, list]
-
 NumpyPipeType: TypeAlias = tuple[np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, Roi]
 
 T = TypeVar("T", np.ndarray, da.Array)
 
 _BBOX_AXES = ("x", "y", "z")
-
-#: Detection columns that would collide with the `Roi` fields the iterator
-#: itself assigns; a detector reporting these must rename them.
-_RESERVED_COLUMNS = frozenset({"name", "label", "slices", "space"})
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -76,8 +64,9 @@ class NmsConfig:
             one is suppressed. Values near 1 keep almost everything, values
             near 0 merge aggressively; 0 itself would merge any pair that
             merely touches and is refused.
-        score_column: Column ranking the detections, `"confidence"` by
-            default. When the detector provides no such column the box
+        score_column: Extra field on the returned Rois ranking the
+            detections (and the resulting table's column), `"confidence"`
+            by default. When the detector provides no such field the box
             volume ranks instead — bigger wins.
         max_detections_per_tile: A tile producing more detections than this
             is a runaway detector; it fails loudly instead of flooding the
@@ -124,18 +113,20 @@ class DetectionGetter(DataGetter[tuple[T, Roi]], Generic[T]):
 
 
 class _UnpackedDetectionFunc:
-    """Adapt `func(patch, roi)` to the unit payload tuple.
+    """Adapt `func(patch)` to the unit payload tuple.
 
-    A class rather than a closure so it pickles by reference and the wrapped
-    `func` can cross a `ProcessMapper` boundary.
+    The payload carries the tile's ROI for `iter_as_numpy`; the detection
+    function itself sees only the patch. A class rather than a closure so it
+    pickles by reference and the wrapped `func` can cross a `ProcessMapper`
+    boundary.
     """
 
-    def __init__(self, func: Callable[[np.ndarray, Roi], DetectionFuncResult]) -> None:
+    def __init__(self, func: Callable[[np.ndarray], list[Roi]]) -> None:
         self._func = func
 
-    def __call__(self, data: NumpyPipeType) -> DetectionFuncResult:
-        patch, roi = data
-        return self._func(patch, roi)
+    def __call__(self, data: NumpyPipeType) -> list[Roi]:
+        patch, _ = data
+        return self._func(patch)
 
 
 class _Detection:
@@ -183,44 +174,111 @@ def _bbox_iou(
     return intersection / union if union > 0 else 0.0
 
 
-def _as_dataframe(result: DetectionFuncResult, tile_name: str) -> pd.DataFrame:
-    if isinstance(result, pd.DataFrame):
-        return result
-    if isinstance(result, dict):
-        return pd.DataFrame(result)
-    raise NgioValueError(
-        f"A detection function must return a DataFrame or a dict of columns, "
-        f"got {type(result).__name__} for tile {tile_name!r}."
-    )
+def _validated_tile_rois(result: Any, tile_name: str) -> tuple[str, ...] | None:
+    """Validate one tile's returned Rois; their pinned axes, `None` when empty.
 
-
-def _bbox_axes_of(frame: pd.DataFrame, tile_name: str) -> tuple[str, ...]:
-    """The axes the frame's columns pin, validating the column contract."""
-    axes = []
-    for axis_name in _BBOX_AXES:
-        has_min = f"{axis_name}_min" in frame.columns
-        has_max = f"{axis_name}_max" in frame.columns
-        if has_min != has_max:
-            raise NgioValueError(
-                f"Tile {tile_name!r} carries '{axis_name}_min' or "
-                f"'{axis_name}_max' but not both; a box needs both bounds."
-            )
-        if has_min:
-            axes.append(axis_name)
-    for required in ("x", "y"):
-        if required not in axes:
-            raise NgioValueError(
-                f"Tile {tile_name!r} has no '{required}_min'/'{required}_max' "
-                "columns: detection boxes must pin x and y (z is optional)."
-            )
-    reserved = _RESERVED_COLUMNS.intersection(frame.columns)
-    if reserved:
+    Everything a single tile can get wrong is refused here, with the tile's
+    name in the message: a non-list result, a non-Roi item, a world-space Roi
+    (the patch-local numbers would land the box in the wrong place silently),
+    a `name` or `label` the iterator itself assigns, an unbounded or
+    non-box axis, and boxes of mixed dimensionality within the tile.
+    """
+    if not isinstance(result, list):
         raise NgioValueError(
-            f"Tile {tile_name!r} carries column(s) {sorted(reserved)}, which "
-            "collide with the ROI fields the iterator assigns (the table's "
-            "own ids among them). Rename them, e.g. 'label' -> 'class_id'."
+            f"A detection function must return a list of Roi objects, got "
+            f"{type(result).__name__} for tile {tile_name!r}."
         )
-    return tuple(axes)
+    axes: tuple[str, ...] | None = None
+    for row, roi in enumerate(result):
+        if not isinstance(roi, Roi):
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: expected a Roi, got "
+                f"{type(roi).__name__}."
+            )
+        if roi.space != "pixel":
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: the Roi is in "
+                f"{roi.space!r} space. Detection boxes are patch-local: "
+                "build them with `Roi.from_values(..., space='pixel')`; the "
+                "iterator anchors them into world coordinates."
+            )
+        if roi.name is not None or roi.label is not None:
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: the Roi carries a `name` "
+                "or `label`, which the iterator itself assigns (survivors "
+                "are renumbered 1..N). Move e.g. a class label to an extra "
+                "field: `Roi.from_values(..., class_id=3)`."
+            )
+        pinned = {roi_slice.axis_name for roi_slice in roi.slices}
+        beyond_box = pinned.difference(_BBOX_AXES)
+        if beyond_box:
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: the Roi pins axes "
+                f"{sorted(beyond_box)}. A detection box may pin only x, y "
+                "and optionally z; the tile's other axes are inherited from "
+                "the tile itself."
+            )
+        if "x" not in pinned or "y" not in pinned:
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: detection boxes must pin "
+                "x and y (z is optional)."
+            )
+        for roi_slice in roi.slices:
+            if roi_slice.start is None or roi_slice.length is None:
+                raise NgioValueError(
+                    f"Tile {tile_name!r}, item {row}: axis "
+                    f"{roi_slice.axis_name!r} is not fully bounded; a box "
+                    "needs both a start and a length on every axis it pins."
+                )
+        roi_axes = tuple(axis for axis in _BBOX_AXES if axis in pinned)
+        if axes is None:
+            axes = roi_axes
+        elif roi_axes != axes:
+            raise NgioValueError(
+                f"Tile {tile_name!r}, item {row}: the box pins axes "
+                f"{roi_axes} but earlier boxes pinned {axes}; every "
+                "detection must report the same box dimensionality."
+            )
+    return axes
+
+
+def _rois_to_frame(rois: Sequence[Roi], tile_name: str) -> pd.DataFrame:
+    """One tile's (validated) boxes as flat records, for the partial table."""
+    records = []
+    for roi in rois:
+        record: dict[str, Any] = {}
+        for roi_slice in roi.slices:
+            record[f"{roi_slice.axis_name}_start"] = roi_slice.start
+            record[f"{roi_slice.axis_name}_length"] = roi_slice.length
+        extras = roi.model_extra or {}
+        collisions = sorted(
+            key for key in extras if key in record or key == INDEX_COLUMN
+        )
+        if collisions:
+            raise NgioValueError(
+                f"Tile {tile_name!r}: extra field(s) {collisions} on a "
+                "returned Roi collide with the partial table's own columns; "
+                "rename them."
+            )
+        record.update(extras)
+        records.append(record)
+    return pd.DataFrame(records)
+
+
+def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
+    """Rebuild one tile's patch-local boxes from its partial records."""
+    axes = [axis for axis in _BBOX_AXES if f"{axis}_start" in frame.columns]
+    rois = []
+    for record in frame.to_dict("records"):
+        slices = {
+            axis: (
+                float(record.pop(f"{axis}_start")),
+                float(record.pop(f"{axis}_length")),
+            )
+            for axis in axes
+        }
+        rois.append(Roi.from_values(slices=slices, name=None, space="pixel", **record))
+    return rois
 
 
 class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
@@ -319,7 +377,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
 
     def detect(
         self,
-        func: Callable[[np.ndarray, Roi], DetectionFuncResult],
+        func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
     ) -> RoiTable:
@@ -332,19 +390,20 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         `container.add_table(name, table)`.
 
         Args:
-            func: `(patch, roi) -> DataFrame | dict[str, list]` with the
-                boxes the detector found. `roi` is the (haloed) region the
-                patch covers — the same argument every iterator func gets to
-                identify its region globally; a custom flow can anchor its
-                own boxes with `roi.anchor(...)`. The boxes are `[min, max)`
-                in the *patch's own* pixel coordinates: `x_min`/`x_max` and
-                `y_min`/`y_max` required, `z_min`/`z_max` optional (both or
-                neither, and the same choice on every tile). Every other
-                column — class, confidence, whatever the detector reports —
-                rides along into the table, except the reserved names
-                `name`/`label`/`slices`/`space` (rename a class `label` to
-                e.g. `class_id`). Under a parallel mapper the function runs
-                on worker threads or processes and must be safe there.
+            func: `(patch) -> list[Roi]` with the boxes the detector found,
+                built in the *patch's own* pixel coordinates:
+                `Roi.from_values(slices={"x": (x0, width), "y": (y0,
+                height)}, name=None, space="pixel", confidence=0.9)`.
+                `x` and `y` are required, `z` optional (the same choice on
+                every box); the tile's other axes are inherited from the
+                tile, and the iterator anchors each box into the reference
+                image's world coordinates. `space="pixel"` is required — a
+                world-space Roi is refused, and so are `name` and `label`,
+                which the iterator itself assigns (move a class label to an
+                extra field, e.g. `class_id=3`). Every extra field — class,
+                confidence, whatever the detector reports — rides along into
+                the table. Under a parallel mapper the function runs on
+                worker threads or processes and must be safe there.
             mapper: How the per-tile work is scheduled; `None` is serial.
 
         Returns:
@@ -377,7 +436,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
 
     def detect_to_partial(
         self,
-        func: Callable[[np.ndarray, Roi], DetectionFuncResult],
+        func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
     ) -> None:
@@ -406,20 +465,14 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
         # Early, loud validation with the correct global tile indices; the
         # anchored output is discarded — the merge re-derives everything from
-        # the raw records so the whole pipeline runs once, globally.
+        # the raw boxes so the whole pipeline runs once, globally.
         self._collect(results, tile_indices=indices)
 
         frames = []
         for index, result in zip(indices, results, strict=True):
-            frame = _as_dataframe(result, self.rois[index].get_name())
-            if INDEX_COLUMN in frame.columns:
-                raise NgioValueError(
-                    f"The detection function returned a reserved column "
-                    f"{INDEX_COLUMN!r}; rename it."
-                )
-            if not len(frame):
+            if not result:
                 continue
-            frame = frame.reset_index(drop=True).copy()
+            frame = _rois_to_frame(result, self.rois[index].get_name())
             frame[INDEX_COLUMN] = index
             frames.append(frame)
         payload = pd.concat(frames, ignore_index=True) if frames else None
@@ -454,12 +507,12 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         handler = self._partials_handler()
         merged = merge_partial_frames(self, handler)
 
-        results: list[DetectionFuncResult] = [pd.DataFrame() for _ in self.rois]
+        results: list[list[Roi]] = [[] for _ in self.rois]
         if merged is not None:
             for index, group in merged.groupby(INDEX_COLUMN, sort=True):
-                results[int(cast("Any", index))] = group.drop(
-                    columns=[INDEX_COLUMN]
-                ).reset_index(drop=True)
+                results[int(cast("Any", index))] = _frame_to_rois(
+                    group.drop(columns=[INDEX_COLUMN])
+                )
         detections = self._collect(results)
         kept = self._suppress(detections)
         table = RoiTable(rois=self._renumbered(kept))
@@ -468,7 +521,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
 
     def _collect(
         self,
-        results: list[DetectionFuncResult],
+        results: list[list[Roi]],
         tile_indices: Sequence[int] | None = None,
     ) -> list[_Detection]:
         """Validate and anchor every tile's boxes into reference coordinates.
@@ -479,17 +532,17 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         pixel_size = self._ref_image.pixel_size
         detections: list[_Detection] = []
         bbox_axes: tuple[str, ...] | None = None
-        frames: list[tuple[int, pd.DataFrame]] = []
+        tiles: list[tuple[int, list[Roi]]] = []
         scored = 0
+        total = 0
 
         if tile_indices is None:
             tile_indices = range(len(results))
         for tile_index, result in zip(tile_indices, results, strict=True):
             tile_name = self.rois[tile_index].get_name()
-            frame = _as_dataframe(result, tile_name)
-            if not len(frame):
+            axes = _validated_tile_rois(result, tile_name)
+            if axes is None:
                 continue
-            axes = _bbox_axes_of(frame, tile_name)
             if bbox_axes is None:
                 bbox_axes = axes
             elif axes != bbox_axes:
@@ -498,47 +551,34 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                     f"pinned {bbox_axes}; every tile must report the same "
                     "box dimensionality."
                 )
-            if len(frame) > self._nms.max_detections_per_tile:
+            if len(result) > self._nms.max_detections_per_tile:
                 raise NgioValueError(
-                    f"Tile {tile_name!r} produced {len(frame)} detections, "
+                    f"Tile {tile_name!r} produced {len(result)} detections, "
                     "more than NmsConfig.max_detections_per_tile "
                     f"({self._nms.max_detections_per_tile}) allows. Raise the "
                     "cap if the count is genuine; a runaway detector should "
                     "fail here rather than flood the table."
                 )
-            if self._nms.score_column in frame.columns:
-                scored += 1
-            frames.append((tile_index, frame))
+            scored += sum(
+                1 for roi in result if self._nms.score_column in (roi.model_extra or {})
+            )
+            total += len(result)
+            tiles.append((tile_index, result))
 
-        if scored and scored != len(frames):
+        if scored and scored != total:
             raise NgioValueError(
-                f"Some tiles carry a {self._nms.score_column!r} column and "
-                "some do not; NMS needs one consistent ranking. Report the "
-                "score from every tile, or from none (box volume ranks "
+                f"Some detections carry a {self._nms.score_column!r} extra "
+                "field and some do not; NMS needs one consistent ranking. "
+                "Report the score on every box, or on none (box volume ranks "
                 "instead)."
             )
 
-        for tile_index, frame in frames:
+        for tile_index, rois in tiles:
             assert bbox_axes is not None
             tile_roi = self.rois[tile_index]
-            tile_name = tile_roi.get_name()
             read_region = self._read_roi(tile_roi)
 
-            for row, record in enumerate(frame.to_dict("records")):
-                slices: dict[str, tuple[float, float]] = {}
-                for axis_name in bbox_axes:
-                    low = float(record.pop(f"{axis_name}_min"))
-                    high = float(record.pop(f"{axis_name}_max"))
-                    if high < low:
-                        raise NgioValueError(
-                            f"Tile {tile_name!r}, row {row}: "
-                            f"{axis_name}_max ({high}) is below "
-                            f"{axis_name}_min ({low})."
-                        )
-                    slices[axis_name] = (low, high - low)
-                local = Roi.from_values(
-                    slices=slices, name=None, space="pixel", **record
-                )
+            for row, local in enumerate(rois):
                 absolute = read_region.anchor(local, pixel_size=pixel_size)
 
                 absolute_px = absolute.to_pixel(pixel_size=pixel_size)
@@ -551,13 +591,15 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                         box_slice.start,
                         box_slice.start + box_slice.length,
                     )
-                if self._nms.score_column in frame.columns:
-                    score = float(record[self._nms.score_column])
+                extras = local.model_extra or {}
+                if scored:
+                    score = float(extras[self._nms.score_column])
                 else:
                     # No confidence to rank by: the bigger box wins.
                     score = 1.0
-                    for _, length in slices.values():
-                        score *= length
+                    for roi_slice in local.slices:
+                        assert roi_slice.length is not None
+                        score *= roi_slice.length
                 detections.append(
                     _Detection(
                         tile_index=tile_index,

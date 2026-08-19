@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import NmsConfig, ObjectDetectionIterator, create_ome_zarr_from_array
+from ngio import NmsConfig, ObjectDetectionIterator, Roi, create_ome_zarr_from_array
+from ngio.common._roi import RoiSlice
 from ngio.iterators import ThreadedMapper
 from ngio.utils import NgioValueError
 
@@ -20,7 +21,17 @@ def _image(data: np.ndarray, axes_names: str = "yx", pixelsize: float = 1.0):
     return ome_zarr, ome_zarr.get_image()
 
 
-def _bright_box_detector(patch: np.ndarray, roi):
+def _box(x: float, y: float, width: float, height: float, **extras) -> Roi:
+    """A patch-local pixel-space box, the shape a detector returns."""
+    return Roi.from_values(
+        slices={"x": (x, width), "y": (y, height)},
+        name=None,
+        space="pixel",
+        **extras,
+    )
+
+
+def _bright_box_detector(patch: np.ndarray) -> list[Roi]:
     """One box around everything bright in the patch, confidence = coverage.
 
     Content-driven, so every tile reports what it actually saw — which is how
@@ -28,14 +39,17 @@ def _bright_box_detector(patch: np.ndarray, roi):
     """
     ys, xs = np.nonzero(patch > 128)
     if not len(ys):
-        return {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
-    return {
-        "x_min": [int(xs.min())],
-        "x_max": [int(xs.max()) + 1],
-        "y_min": [int(ys.min())],
-        "y_max": [int(ys.max()) + 1],
-        "confidence": [float((patch > 128).mean())],
-    }
+        return []
+    x_min, y_min = int(xs.min()), int(ys.min())
+    return [
+        _box(
+            x_min,
+            y_min,
+            int(xs.max()) + 1 - x_min,
+            int(ys.max()) + 1 - y_min,
+            confidence=float((patch > 128).mean()),
+        )
+    ]
 
 
 def _two_blobs():
@@ -129,7 +143,7 @@ def test_halo_is_clipped_at_the_borders():
 def _fixed_boxes_factory(boxes):
     """A detector ignoring the pixels; used to drive NMS deterministically."""
 
-    def detector(patch: np.ndarray, roi):
+    def detector(patch: np.ndarray):
         return boxes
 
     return detector
@@ -138,13 +152,10 @@ def _fixed_boxes_factory(boxes):
 def test_iou_threshold_separates_duplicates_from_neighbours():
     """IoU ≈ 0.47: suppressed at threshold 0.4, kept apart at 0.6."""
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
-    boxes = {
-        "x_min": [0, 2],
-        "x_max": [10, 12],
-        "y_min": [0, 2],
-        "y_max": [10, 12],
-        "confidence": [0.9, 0.5],
-    }
+    boxes = [
+        _box(0, 0, 10, 10, confidence=0.9),
+        _box(2, 2, 10, 10, confidence=0.5),
+    ]
 
     merged = ObjectDetectionIterator(
         image, axes_order="yx", nms=NmsConfig(iou_threshold=0.4)
@@ -161,14 +172,9 @@ def test_iou_threshold_separates_duplicates_from_neighbours():
     assert len(kept.rois()) == 2
 
 
-def test_without_a_score_column_the_bigger_box_wins():
+def test_without_a_score_the_bigger_box_wins():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
-    boxes = {
-        "x_min": [0, 0],
-        "x_max": [10, 12],
-        "y_min": [0, 0],
-        "y_max": [10, 12],
-    }
+    boxes = [_box(0, 0, 10, 10), _box(0, 0, 12, 12)]
 
     table = ObjectDetectionIterator(
         image, axes_order="yx", nms=NmsConfig(iou_threshold=0.5)
@@ -177,16 +183,9 @@ def test_without_a_score_column_the_bigger_box_wins():
     assert table.rois()[0]["x"].length == 12.0
 
 
-def test_extra_columns_ride_into_the_table():
+def test_extra_fields_ride_into_the_table():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
-    boxes = {
-        "x_min": [0],
-        "x_max": [10],
-        "y_min": [0],
-        "y_max": [10],
-        "confidence": [0.7],
-        "class_name": ["nucleus"],
-    }
+    boxes = [_box(0, 0, 10, 10, confidence=0.7, class_name="nucleus")]
 
     table = ObjectDetectionIterator(image, axes_order="yx").detect(
         _fixed_boxes_factory(boxes)
@@ -233,25 +232,54 @@ def test_detection_table_round_trips_through_the_container():
     assert len(read_back.rois()) == len(table.rois())  # type: ignore[attr-defined]
 
 
-def test_column_contract_is_enforced():
+def test_roi_contract_is_enforced():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     iterator = ObjectDetectionIterator(image, axes_order="yx")
 
-    with pytest.raises(NgioValueError, match="must pin x and y"):
+    with pytest.raises(NgioValueError, match="must return a list of Roi"):
         iterator.detect(_fixed_boxes_factory({"x_min": [0], "x_max": [1]}))
 
-    with pytest.raises(NgioValueError, match="but not both"):
-        iterator.detect(
-            _fixed_boxes_factory(
-                {"x_min": [0], "x_max": [1], "y_min": [0], "y_max": [1], "z_min": [0]}
-            )
-        )
+    with pytest.raises(NgioValueError, match="expected a Roi"):
+        iterator.detect(_fixed_boxes_factory([{"x_min": 0}]))
 
-    with pytest.raises(NgioValueError, match="is below"):
-        iterator.detect(
-            _fixed_boxes_factory(
-                {"x_min": [5], "x_max": [1], "y_min": [0], "y_max": [1]}
-            )
+    world_box = Roi.from_values(slices={"x": (0, 10), "y": (0, 10)}, name=None)
+    with pytest.raises(NgioValueError, match="'world' space"):
+        iterator.detect(_fixed_boxes_factory([world_box]))
+
+    no_y = Roi.from_values(
+        slices={"x": (0, 10), "z": (0, 10)}, name=None, space="pixel"
+    )
+    with pytest.raises(NgioValueError, match="must pin x and y"):
+        iterator.detect(_fixed_boxes_factory([no_y]))
+
+    pins_t = Roi.from_values(
+        slices={"t": (0, 1), "x": (0, 10), "y": (0, 10)}, name=None, space="pixel"
+    )
+    with pytest.raises(NgioValueError, match="may pin only x, y"):
+        iterator.detect(_fixed_boxes_factory([pins_t]))
+
+    unbounded = Roi(
+        name=None,
+        slices=[RoiSlice(axis_name="x"), RoiSlice(axis_name="y", start=0, length=10)],
+        space="pixel",
+    )
+    with pytest.raises(NgioValueError, match="not fully bounded"):
+        iterator.detect(_fixed_boxes_factory([unbounded]))
+
+    with_z = Roi.from_values(
+        slices={"x": (0, 10), "y": (0, 10), "z": (0, 2)}, name=None, space="pixel"
+    )
+    with pytest.raises(NgioValueError, match="same box dimensionality"):
+        iterator.detect(_fixed_boxes_factory([_box(0, 0, 10, 10), with_z]))
+
+
+def test_score_must_be_on_every_box_or_none():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+    boxes = [_box(0, 0, 10, 10, confidence=0.9), _box(20, 20, 10, 10)]
+
+    with pytest.raises(NgioValueError, match="consistent ranking"):
+        ObjectDetectionIterator(image, axes_order="yx").detect(
+            _fixed_boxes_factory(boxes)
         )
 
 
@@ -260,12 +288,7 @@ def test_detection_cap_is_enforced():
     iterator = ObjectDetectionIterator(
         image, axes_order="yx", nms=NmsConfig(max_detections_per_tile=2)
     )
-    many = {
-        "x_min": [0, 20, 40],
-        "x_max": [1, 21, 41],
-        "y_min": [0, 0, 0],
-        "y_max": [1, 1, 1],
-    }
+    many = [_box(0, 0, 1, 1), _box(20, 0, 1, 1), _box(40, 0, 1, 1)]
 
     with pytest.raises(NgioValueError, match="max_detections_per_tile"):
         iterator.detect(_fixed_boxes_factory(many))
@@ -293,8 +316,8 @@ def test_read_only_surface():
     assert haloed.halo == {"x": 4, "y": 4}
 
 
-def test_func_receives_the_haloed_roi():
-    """The roi argument covers exactly the patch the detector was handed."""
+def test_iter_as_numpy_yields_the_patch_and_its_haloed_roi():
+    """The custom-flow escape hatch: each pair's roi covers exactly the patch."""
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
@@ -302,13 +325,10 @@ def test_func_receives_the_haloed_roi():
         .with_halo(x=8, y=8)
     )
 
-    seen: list[tuple[float, float, int, int]] = []
-
-    def recording(patch, roi):
-        seen.append((roi["x"].start, roi["x"].length, *patch.shape[-2:]))
-        return {"x_min": [], "x_max": [], "y_min": [], "y_max": []}
-
-    iterator.detect(recording)
+    seen = [
+        (roi["x"].start, roi["x"].length, *patch.shape[-2:])
+        for patch, roi in iterator.iter_as_numpy()
+    ]
 
     # Tile (0, 0): halo clipped at the left border, 32 + 8 wide.
     assert (0.0, 40.0, 40, 40) in seen
@@ -316,17 +336,18 @@ def test_func_receives_the_haloed_roi():
     assert (24.0, 40.0, 40, 40) in seen
 
 
-def test_reserved_columns_are_refused():
+def test_name_and_label_are_refused():
+    """The iterator renumbers survivors itself; a preset id must not vanish."""
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
-    boxes = {
-        "x_min": [0],
-        "x_max": [10],
-        "y_min": [0],
-        "y_max": [10],
-        "label": [7],
-    }
+    labeled = Roi.from_values(
+        slices={"x": (0, 10), "y": (0, 10)}, name=None, label=7, space="pixel"
+    )
+    named = Roi.from_values(
+        slices={"x": (0, 10), "y": (0, 10)}, name="cell", space="pixel"
+    )
 
-    with pytest.raises(NgioValueError, match="collide with the ROI fields"):
-        ObjectDetectionIterator(image, axes_order="yx").detect(
-            _fixed_boxes_factory(boxes)
-        )
+    for box in (labeled, named):
+        with pytest.raises(NgioValueError, match="iterator itself assigns"):
+            ObjectDetectionIterator(image, axes_order="yx").detect(
+                _fixed_boxes_factory([box])
+            )

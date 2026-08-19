@@ -605,19 +605,27 @@ def _detection_setup(store):
     )
 
 
-def _detector(patch, roi):
+def _detector(patch):
     from scipy import ndimage
 
+    from ngio import Roi
+
     labeled, count = ndimage.label(patch > 200)
-    rows = {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
+    boxes = []
     for obj in range(1, count + 1):
         ys, xs = np.where(labeled == obj)
-        rows["y_min"].append(float(ys.min()))
-        rows["y_max"].append(float(ys.max() + 1))
-        rows["x_min"].append(float(xs.min()))
-        rows["x_max"].append(float(xs.max() + 1))
-        rows["confidence"].append(float(patch[labeled == obj].mean()))
-    return rows
+        boxes.append(
+            Roi.from_values(
+                slices={
+                    "x": (float(xs.min()), float(xs.max() + 1 - xs.min())),
+                    "y": (float(ys.min()), float(ys.max() + 1 - ys.min())),
+                },
+                name=None,
+                space="pixel",
+                confidence=float(patch[labeled == obj].mean()),
+            )
+        )
+    return boxes
 
 
 def _detection_iterator(ome_zarr):
@@ -660,6 +668,28 @@ def test_detection_finished_verbs_refuse_on_slices(tmp_path: Path):
         restricted.detect(_detector)
     with pytest.raises(NgioValueError, match="for_job"):
         _detection_iterator(ome_zarr).detect_to_partial(_detector)
+
+
+def test_detection_partial_refuses_colliding_extras(tmp_path: Path):
+    """An extra field shadowing the partial table's own columns fails in the job."""
+    from ngio import Roi
+
+    ome_zarr = _detection_setup(tmp_path / "det_reserved.zarr")
+    args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    restricted = _detection_iterator(ome_zarr).for_job(**args_list[0])
+
+    def shadowing(patch):
+        return [
+            Roi.from_values(
+                slices={"x": (0, 1), "y": (0, 1)},
+                name=None,
+                space="pixel",
+                x_start=5.0,
+            )
+        ]
+
+    with pytest.raises(NgioValueError, match="collide with the partial table"):
+        restricted.detect_to_partial(shadowing)
 
 
 def _run_feature_job(store: str, job_index: int, n_jobs: int) -> None:

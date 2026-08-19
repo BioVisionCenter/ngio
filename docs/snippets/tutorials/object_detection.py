@@ -31,28 +31,30 @@ from skimage.feature import blob_log
 from ngio import Roi
 
 
-def find_nuclei(patch: np.ndarray, roi: Roi) -> dict[str, list]:
+def find_nuclei(patch: np.ndarray) -> list[Roi]:
     """A spot detector: Laplacian-of-Gaussian blobs, as bounding boxes.
 
-    The boxes are in the patch's own pixel coordinates; the iterator turns
-    them into world coordinates. Everything beyond the box bounds — here the
-    peak intensity as a confidence — rides along into the table.
+    The boxes are `Roi` objects in the patch's own pixel coordinates
+    (`space="pixel"`); the iterator anchors them into world coordinates.
+    Every extra field — here the peak intensity as a confidence — rides
+    along into the table.
     """
     blobs = blob_log(patch, min_sigma=2, max_sigma=6, threshold=0.05)
-    boxes: dict[str, list] = {
-        "x_min": [],
-        "x_max": [],
-        "y_min": [],
-        "y_max": [],
-        "confidence": [],
-    }
+    boxes = []
     for y, x, sigma in blobs:
         radius = sigma * math.sqrt(2)
-        boxes["x_min"].append(max(0.0, x - radius))
-        boxes["x_max"].append(x + radius)
-        boxes["y_min"].append(max(0.0, y - radius))
-        boxes["y_max"].append(y + radius)
-        boxes["confidence"].append(float(patch[int(y), int(x)]))
+        x_min, y_min = max(0.0, x - radius), max(0.0, y - radius)
+        boxes.append(
+            Roi.from_values(
+                slices={
+                    "x": (x_min, x + radius - x_min),
+                    "y": (y_min, y + radius - y_min),
+                },
+                name=None,
+                space="pixel",
+                confidence=float(patch[int(y), int(x)]),
+            )
+        )
     return boxes
 
 

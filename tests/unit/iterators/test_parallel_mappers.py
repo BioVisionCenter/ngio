@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import create_ome_zarr_from_array
+from ngio import Roi, create_ome_zarr_from_array
 from ngio.io_pipes._ops_slices_utils import chunk_rects_intersect
 from ngio.iterators import (
     MaskedSegmentationIterator,
@@ -310,17 +310,22 @@ def test_reduce_to_table_across_processes(tmp_path: Path):
     assert from_processes.dataframe.equals(serial.dataframe)
 
 
-def _detect_bright(patch, roi):
+def _detect_bright(patch):
     ys, xs = np.nonzero(patch > 128)
     if not len(ys):
-        return {"x_min": [], "x_max": [], "y_min": [], "y_max": [], "confidence": []}
-    return {
-        "x_min": [int(xs.min())],
-        "x_max": [int(xs.max()) + 1],
-        "y_min": [int(ys.min())],
-        "y_max": [int(ys.max()) + 1],
-        "confidence": [float((patch > 128).mean())],
-    }
+        return []
+    x_min, y_min = int(xs.min()), int(ys.min())
+    return [
+        Roi.from_values(
+            slices={
+                "x": (x_min, int(xs.max()) + 1 - x_min),
+                "y": (y_min, int(ys.max()) + 1 - y_min),
+            },
+            name=None,
+            space="pixel",
+            confidence=float((patch > 128).mean()),
+        )
+    ]
 
 
 def test_detect_across_processes(tmp_path: Path):
