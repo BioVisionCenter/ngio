@@ -9,14 +9,21 @@ Three ship with ngio. `BasicMapper` is serial and is what `mapper=None` means.
 `ThreadedMapper` fans units out on a thread pool — the fit for round-trip-bound
 IO and for `func`s that release the GIL. `ProcessMapper` fans out on a
 spawn-based process pool — the fit for pure-Python, GIL-holding `func`s. Both
-parallel mappers take their pool size at construction, and both refuse to
-schedule two units whose write footprints share a write unit
-(`require_no_write_conflicts`): disjointness is what makes the parallel
-writes safe *without any lock, in any topology* — a chunk or shard object
-with a single writer cannot lose an update, whether the writers are threads
-or processes, where a lock could only ever protect one process.
+parallel mappers take their pool size at construction, and both plan their
+units into conflict-free *waves* (`plan_waves`): two units whose write
+footprints share a write unit never run in the same wave, and the waves run
+back to back, each at full pool width. Within a wave, disjointness is what
+makes the parallel writes safe *without any lock, in any topology* — a chunk
+or shard object with a single writer cannot lose an update, whether the
+writers are threads or processes, where a lock could only ever protect one
+process. Tiling with `by_write_units()` yields a single wave. One caveat:
+writes overlapping at the *pixel* level always land in different waves, and
+the wave order may differ from a serial run's unit order — mask-merged and
+pixel-disjoint writes are order-independent, so only genuinely overlapping
+plain writes can differ from serial.
 """
 
+import logging
 import multiprocessing
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
@@ -33,6 +40,8 @@ from ngio.io_pipes._ops_slices_utils import (
     compute_chunk_rect,
 )
 from ngio.utils import NgioStore, NgioValueError
+
+logger = logging.getLogger(f"ngio:{__name__}")
 
 T = TypeVar("T")
 R = TypeVar("R")
@@ -160,27 +169,21 @@ class BasicMapper(Generic[T, R]):
         return [result for _, result in results]
 
 
-def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
-    """Refuse to schedule two units that write into the same write unit.
+def _write_conflict_edges(
+    units: Sequence[IterUnit[Any]],
+    footprints: dict[int, ChunkRect],
+) -> dict[int, set[int]]:
+    """The adjacency of units whose write footprints share a write unit.
 
-    Disjoint write footprints are the whole safety argument for parallel
-    mapping: a chunk (or shard) object with exactly one writer cannot lose an
-    update, in any topology. Raising rather than silently falling back to
-    serial: a fallback would hide a large performance cliff behind a flag the
-    caller explicitly set, and the fix — `by_write_units()` — is one
-    call away.
-
-    Raises:
-        NgioValueError: Naming the two colliding ROIs and the shared write
-            units, with the fixes.
+    Keyed and valued by `unit.index`; only units present in `footprints` (a
+    setter with a non-empty selection) appear. Units targeting different
+    output arrays never conflict.
     """
-    footprints: dict[int, ChunkRect] = {}
+    adjacency: dict[int, set[int]] = {index: set() for index in footprints}
     by_array: dict[int, list[IterUnit[Any]]] = {}
     for unit in units:
-        footprint = unit.write_footprint
-        if footprint is None or unit.setter is None:
+        if unit.setter is None or unit.index not in footprints:
             continue
-        footprints[unit.index] = footprint
         by_array.setdefault(id(unit.setter.zarr_array), []).append(unit)
 
     for group in by_array.values():
@@ -201,27 +204,71 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
             first = rect[axis][0]
             active = [u for u in active if footprints[u.index][axis][1] >= first]
             for other in active:
-                other_rect = footprints[other.index]
-                if chunk_rects_intersect(other_rect, rect):
-                    # Only units with a setter enter `by_array`.
-                    assert unit.setter is not None
-                    axes = unit.setter.slicing_ops.on_disk_axes
-                    shared = ", ".join(
-                        f"{axis_name}: {max(a_first, b_first)}..{min(a_last, b_last)}"
-                        for axis_name, (a_first, a_last), (b_first, b_last) in zip(
-                            axes, other_rect, rect, strict=True
-                        )
-                    )
-                    raise NgioValueError(
-                        f"Cannot run regions in parallel: "
-                        f"{other.roi.get_name()!r} and {unit.roi.get_name()!r} "
-                        "write into the same write unit(s) of the output "
-                        f"array — chunk/shard indices per axis: {shared}. Two "
-                        "concurrent writers on one chunk/shard lose data. "
-                        "Re-tile the iterator with `by_write_units()`, "
-                        "or run serially (drop the `mapper` argument)."
-                    )
+                if chunk_rects_intersect(footprints[other.index], rect):
+                    adjacency[unit.index].add(other.index)
+                    adjacency[other.index].add(unit.index)
             active.append(unit)
+    return adjacency
+
+
+def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
+    """Partition units into conflict-free waves by first-fit greedy coloring.
+
+    Two units whose write footprints share a write unit (a chunk, or a shard
+    when the output is sharded) of the same output array never share a wave:
+    a wave's writes are pairwise disjoint at write granularity, so running
+    one wave at a time preserves the single-writer-per-write-unit invariant
+    that makes parallel writes lock-free in any topology. Read-only units and
+    units with an empty write selection conflict with nothing and land in the
+    first wave. Coloring runs in ascending `unit.index`, so the schedule is a
+    pure function of the unit sequence. A conflict-free set — a
+    `by_write_units()` tiling, say — yields a single wave.
+
+    Note that units whose writes overlap at the *pixel* level always land in
+    different waves, but the wave order may differ from a serial run's unit
+    order; mask-merged and pixel-disjoint writes are order-independent either
+    way.
+    """
+    if not units:
+        return []
+    footprints: dict[int, ChunkRect] = {}
+    for unit in units:
+        footprint = unit.write_footprint
+        if footprint is not None:
+            footprints[unit.index] = footprint
+    adjacency = _write_conflict_edges(units, footprints)
+
+    wave_of: dict[int, int] = {}
+    waves: list[list[IterUnit[T]]] = [[]]
+    for unit in sorted(units, key=lambda u: u.index):
+        taken = {
+            wave_of[other]
+            for other in adjacency.get(unit.index, ())
+            if other in wave_of
+        }
+        color = 0
+        while color in taken:
+            color += 1
+        wave_of[unit.index] = color
+        if color == len(waves):
+            waves.append([])
+        waves[color].append(unit)
+
+    if len(waves) == len(units) and len(units) > 1:
+        logger.warning(
+            "Parallel map degraded to a serial schedule: every one of the "
+            f"{len(units)} units writes into the same write unit(s) as another, "
+            "so no two can run concurrently. Re-tile with `by_write_units()` "
+            "for a single fully-parallel wave."
+        )
+    elif len(waves) > 1:
+        largest = max(len(wave) for wave in waves)
+        logger.info(
+            f"Parallel map scheduled {len(units)} units into {len(waves)} "
+            f"conflict-free waves (largest wave: {largest} units). Tiling with "
+            "`by_write_units()` would yield a single wave."
+        )
+    return waves
 
 
 class ThreadedMapper(Generic[T, R]):
@@ -232,10 +279,10 @@ class ThreadedMapper(Generic[T, R]):
     sync API); `func` must be thread-safe too — that part of the contract is
     the caller's.
 
-    Before any fan-out the units are checked for write conflicts
-    (`require_no_write_conflicts`); disjointness is what makes the parallel
-    writes lock-free. With one unit, or a resolved pool of one, this is
-    exactly `BasicMapper`.
+    Before any fan-out the units are planned into conflict-free waves
+    (`plan_waves`), run back to back on one pool; within a wave disjointness
+    is what makes the parallel writes lock-free. With one unit, or a resolved
+    pool of one, this is exactly `BasicMapper`.
 
     Args:
         max_workers: `"auto"` (the default) sizes the pool for
@@ -265,7 +312,7 @@ class ThreadedMapper(Generic[T, R]):
         workers = self._resolve(len(units))
         if workers <= 1:
             return BasicMapper[T, R]()(func, units)
-        require_no_write_conflicts(units)
+        waves = plan_waves(units)
 
         def run(unit: IterUnit[T]) -> tuple[int, R]:
             result = func(unit.getter())
@@ -277,8 +324,12 @@ class ThreadedMapper(Generic[T, R]):
                 return unit.index, cast("R", None)
             return unit.index, result
 
+        indexed: list[tuple[int, R]] = []
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            indexed = list(pool.map(run, units))
+            for wave in waves:
+                # Draining `pool.map` is the inter-wave barrier: the next
+                # wave's writes are only submitted once this wave's are done.
+                indexed.extend(pool.map(run, wave))
         indexed.sort(key=lambda item: item[0])
         return [result for _, result in indexed]
 
@@ -327,9 +378,10 @@ class ProcessMapper(Generic[T, R]):
     `None` (which `map_as_*` discards anyway); only `reduce_as_*` results are
     pickled back to the parent.
 
-    The same write-conflict gate as `ThreadedMapper` applies, and it is the
-    entire cross-process safety argument: disjoint write units need no lock,
-    and no lock ngio could take would work across processes anyway.
+    The same wave planning as `ThreadedMapper` applies, and it is the entire
+    cross-process safety argument: within a wave the write units are
+    disjoint, so they need no lock — and no lock ngio could take would work
+    across processes anyway.
 
     Constraints:
     - `func` (and any transforms the units carry) must be picklable — a
@@ -366,10 +418,14 @@ class ProcessMapper(Generic[T, R]):
         if workers <= 1:
             return BasicMapper[T, R]()(func, units)
         _require_process_safe_stores(units)
-        require_no_write_conflicts(units)
+        waves = plan_waves(units)
 
         context = multiprocessing.get_context("spawn")
+        indexed: list[tuple[int, Any]] = []
+        # One pool for every wave: each worker pays its interpreter start and
+        # `import ngio` exactly once, however many waves the plan has.
         with ProcessPoolExecutor(max_workers=workers, mp_context=context) as pool:
-            indexed = list(pool.map(partial(_run_unit_in_process, func), units))
+            for wave in waves:
+                indexed.extend(pool.map(partial(_run_unit_in_process, func), wave))
         indexed.sort(key=lambda item: item[0])
         return [result for _, result in indexed]

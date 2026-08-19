@@ -386,8 +386,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         The write unit is the shard shape when the output is sharded (writes
         are atomic per shard object), the chunk shape otherwise. With no
         overlap the resulting ROIs pass `check_if_write_units_overlap` by
-        construction — exactly what a parallel `map` needs. Falls back to the
-        input chunk grid when the iterator is read-only.
+        construction, so a parallel `map` runs as a single fully-parallel
+        wave — a throughput optimization; conflicting tilings are still safe,
+        just scheduled in more waves. Falls back to the input chunk grid when
+        the iterator is read-only.
 
         Args:
             overlap_x: Overlap between adjacent tiles along x, in pixels.
@@ -827,7 +829,9 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         the grid is the output array's write granularity — the shard shape when
         the output is sharded (writes are atomic per shard object), the chunk
         shape otherwise. Two ROIs sharing a write unit make concurrent writes
-        unsafe: the read-modify-write of that unit can lose data. A read-only
+        unsafe: the read-modify-write of that unit can lose data. The parallel
+        mappers schedule such ROIs into separate waves, so this check answers
+        "will my map run as a single fully-parallel wave?". A read-only
         iterator has no write hazard and always returns `False`.
 
         This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a
@@ -849,6 +853,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         return any(chunk_rects_intersect(fi, fj) for fi, fj in _pairs_stream(non_empty))
 
     def require_no_write_units_overlap(self) -> None:
-        """Ensure that the ROIs do not share write units on the output."""
+        """Ensure that the ROIs do not share write units on the output.
+
+        The strict opt-in gate: the parallel mappers no longer refuse shared
+        write units on their own (they wave-schedule around them), so call
+        this to insist on a single-wave tiling instead.
+        """
         if self.check_if_write_units_overlap():
             raise NgioValueError("Some ROIs share write units on the output.")

@@ -1,9 +1,10 @@
-"""The parallel mappers: bit-identity, the collision gate, and process safety.
+"""The parallel mappers: bit-identity, wave scheduling, and process safety.
 
 `func`s used with `ProcessMapper` are module-level on purpose — that is the
 picklability contract the mapper documents.
 """
 
+import logging
 import os
 from pathlib import Path
 
@@ -12,7 +13,14 @@ import pytest
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
-from ngio.iterators import ProcessMapper, SegmentationIterator, ThreadedMapper
+from ngio.io_pipes._ops_slices_utils import chunk_rects_intersect
+from ngio.iterators import (
+    MaskedSegmentationIterator,
+    ProcessMapper,
+    SegmentationIterator,
+    ThreadedMapper,
+)
+from ngio.iterators._mappers import plan_waves
 from ngio.utils import NgioValueError
 
 
@@ -102,20 +110,136 @@ def test_map_returns_placeholders_from_processes(tmp_path: Path):
     assert results == [None] * len(iterator.rois)
 
 
-def test_parallel_map_refuses_colliding_write_units():
-    """ROIs sharing an output write unit must refuse to parallelize, loudly."""
-    ome_zarr = _build_ome_zarr(MemoryStore(), chunks=(1, 16, 16))
+def _colliding_iterator(store):
+    """A segmentation iterator whose read tiling collides on the output.
+
+    Input chunks are 16x16 and the output label's are 32x32, so `by_chunks()`
+    produces four read tiles per output write unit.
+    """
+    ome_zarr = _build_ome_zarr(store, chunks=(1, 16, 16))
     coarse = ome_zarr.derive_label("coarse", chunks=(1, 32, 32))
     image = ome_zarr.get_image()
     base = SegmentationIterator(image, coarse, channel_selection=0, axes_order="yx")
+    return ome_zarr, base
 
-    read_tiled = base.by_chunks()
+
+def test_parallel_map_schedules_colliding_write_units_in_waves():
+    """ROIs sharing an output write unit run in separate waves, not refused."""
+    serial_zarr, serial_base = _colliding_iterator(MemoryStore())
+    serial_base.by_chunks().map_as_numpy(_threshold)
+
+    threaded_zarr, threaded_base = _colliding_iterator(MemoryStore())
+    read_tiled = threaded_base.by_chunks()
     assert read_tiled.check_if_write_units_overlap()
-    with pytest.raises(NgioValueError, match="same write unit"):
-        read_tiled.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+    read_tiled.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
 
-    # The named fix works: write-unit tiling passes.
-    base.by_write_units().map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+    np.testing.assert_array_equal(
+        serial_zarr.get_label("coarse").get_as_numpy(),
+        threaded_zarr.get_label("coarse").get_as_numpy(),
+    )
+
+    # Write-unit tiling is conflict-free by construction: a single wave.
+    single = plan_waves(list(threaded_base.by_write_units()._numpy_units_generator()))
+    assert len(single) == 1
+
+
+def test_plan_waves_partition_is_conflict_free_and_deterministic():
+    _, base = _colliding_iterator(MemoryStore())
+    units = list(base.by_chunks()._numpy_units_generator())
+
+    waves = plan_waves(units)
+    assert len(waves) > 1
+    assert sorted(u.index for wave in waves for u in wave) == [u.index for u in units]
+    for wave in waves:
+        footprints = [u.write_footprint for u in wave]
+        for i, rect in enumerate(footprints):
+            for other in footprints[i + 1 :]:
+                assert not chunk_rects_intersect(rect, other)
+
+    again = plan_waves(units)
+    assert [[u.index for u in wave] for wave in again] == [
+        [u.index for u in wave] for wave in waves
+    ]
+
+    # Read-only units conflict with nothing: always a single wave.
+    readonly = plan_waves(
+        list(base.by_chunks()._numpy_units_generator(with_setters=False))
+    )
+    assert len(readonly) == 1
+
+
+def test_process_mapper_runs_waves_across_one_pool(tmp_path: Path):
+    serial_zarr, serial_base = _colliding_iterator(tmp_path / "serial.zarr")
+    serial_base.by_chunks().map_as_numpy(_threshold)
+
+    process_zarr, process_base = _colliding_iterator(tmp_path / "process.zarr")
+    process_base.by_chunks().map_as_numpy(
+        _threshold, mapper=ProcessMapper(max_workers=2)
+    )
+
+    np.testing.assert_array_equal(
+        serial_zarr.get_label("coarse").get_as_numpy(),
+        process_zarr.get_label("coarse").get_as_numpy(),
+    )
+
+
+def _single_chunk_output_iterator(store):
+    ome_zarr = _build_ome_zarr(store, chunks=(1, 16, 16))
+    out = ome_zarr.derive_label("out", chunks=(1, 64, 64))
+    image = ome_zarr.get_image()
+    base = SegmentationIterator(image, out, channel_selection=0, axes_order="yx")
+    return ome_zarr, base.by_chunks()
+
+
+def test_fully_conflicting_units_run_serially_and_warn(caplog):
+    """Every unit in one output chunk: a serial schedule, correct and logged."""
+    serial_zarr, serial_it = _single_chunk_output_iterator(MemoryStore())
+    serial_it.map_as_numpy(_threshold)
+
+    threaded_zarr, threaded_it = _single_chunk_output_iterator(MemoryStore())
+    with caplog.at_level(logging.WARNING, logger="ngio:ngio.iterators._mappers"):
+        threaded_it.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+    assert any("serial schedule" in record.message for record in caplog.records)
+
+    np.testing.assert_array_equal(
+        serial_zarr.get_label("out").get_as_numpy(),
+        threaded_zarr.get_label("out").get_as_numpy(),
+    )
+
+
+def _masked_iterator(store):
+    """A masked segmentation iterator whose objects share output chunks."""
+    ome_zarr = _build_ome_zarr(store, chunks=(1, 16, 16))
+    masking = ome_zarr.derive_label("masking")
+    mask = np.zeros(masking.shape, dtype="uint32")
+    mask[..., 2:10, 2:10] = 1  # chunk (0, 0)
+    mask[..., 12:20, 4:12] = 2  # spans chunk rows 0-1, shares (0, 0) with 1
+    mask[..., 40:56, 40:56] = 3  # four chunks of its own
+    masking.set_array(mask)
+    masking.consolidate()
+    ome_zarr.add_table("masking_ROI_table", masking.build_masking_roi_table())
+
+    image = ome_zarr.get_masked_image(masking_label_name="masking")
+    out = ome_zarr.derive_label("out")
+    iterator = MaskedSegmentationIterator(
+        image, out, channel_selection=0, axes_order="yx"
+    )
+    return ome_zarr, iterator
+
+
+def test_masked_segmentation_parallel_matches_serial():
+    """Chunk-sharing objects parallelize in waves, bit-identical to serial."""
+    serial_zarr, serial_it = _masked_iterator(MemoryStore())
+    assert serial_it.check_if_write_units_overlap()
+    serial_it.map_as_numpy(_threshold)
+
+    threaded_zarr, threaded_it = _masked_iterator(MemoryStore())
+    threaded_it.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+
+    np.testing.assert_array_equal(
+        serial_zarr.get_label("out").get_as_numpy(),
+        threaded_zarr.get_label("out").get_as_numpy(),
+    )
 
 
 def test_process_mapper_refuses_memory_stores():

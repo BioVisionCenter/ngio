@@ -215,12 +215,14 @@ happens to the leftover — `"clip"` (the default) shrinks the last tile to the 
 `"balance"` re-splits the last two tiles so a thin overhang never yields a thin tile
 (100 px at 32 gives `32, 32, 18, 18` rather than `32, 32, 32, 4`), `"shift"` slides
 the last tile back to stay full-size (it then overlaps its neighbour — fine for
-detection or a merge, not for a plain parallel write), and `"drop"` discards it.
+detection or a merge; a plain parallel write schedules the overlap into a separate
+wave, see below), and `"drop"` discards it.
 `by_blocks(num_x=..., num_y=...)` is the complement — you say how many tiles, not how
 big, and the partition is balanced by construction. `by_chunks()` tiles by the *input*
 image's chunk grid, the natural unit of reading; `by_write_units()` tiles by the
 *output*'s write granularity — the shard shape when the output is sharded, the chunk
-shape otherwise — which is what makes parallel writes collision-free by construction.
+shape otherwise — which makes parallel writes collision-free by construction, so a
+parallel `map` runs as a single fully-parallel wave.
 
 From here you would call `map` or iterate with `iter_as_numpy` to do the work;
 the [image processing tutorial](../tutorials/image_processing.md) carries this through to
@@ -244,9 +246,9 @@ The examples from here on run on a small synthetic image — two bright blobs, o
 
 `ThreadedMapper` is the fit for IO-bound work and for funcs that release the GIL (most numpy/scipy do); `"auto"` sizes the pool for round-trip-bound work. For pure-Python, GIL-holding funcs use `ProcessMapper(max_workers=...)` instead — the func must be picklable (a module-level function, not a lambda), and the store must not be in-memory.
 
-Before fanning out, both parallel mappers check every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image. Disjoint footprints are what make the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer. If two ROIs share a write unit the mapper refuses with an error naming them; the fix it suggests, `by_write_units()`, re-tiles the iterator on the output's write grid so collisions are impossible by construction:
+Before fanning out, both parallel mappers plan every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image — into conflict-free **waves**: ROIs sharing a write unit land in different waves, and the waves run back to back, each at full pool width. Within a wave the footprints are disjoint, which is what makes the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer at a time. A tiling with no shared write units — `by_write_units()`, as in the demo above — runs as a single fully-parallel wave; more sharing means more waves, down to an effectively serial schedule when every ROI collides (ngio logs a warning there rather than refusing). This is what lets a masked iterator parallelize out of the box: per-object bounding boxes routinely share chunks even when the boxes themselves do not overlap, and the wave count stays around the worst chunk's object multiplicity.
 
-The demo above already did this: `by_write_units()` before the parallel `map`.
+One caveat for ROIs whose *pixels* genuinely overlap (a `by_grid` with a stride below the size, or a `"shift"` tail, on a writing iterator): such writes always land in different waves, but the wave order may differ from a serial run's ROI order, so which write wins the shared pixels can differ from serial. Mask-protected and pixel-disjoint writes are order-independent, and an order-independent `merge=` (`"max"`, `"min"`, `"sum"`) never notices.
 
 Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. The dask iterator surface (`iter_as_dask`, `map_as_dask`, `reduce_as_dask`) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use `Image.get_as_dask` instead.
 

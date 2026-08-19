@@ -70,7 +70,7 @@ def segment(patch: np.ndarray) -> np.ndarray:
 seg = demo.derive_label("seg")
 seg_iterator = SegmentationIterator(demo_image, seg, axes_order="yx")
 
-# Tiles on the OUTPUT's write grid, so parallel writes cannot collide.
+# Tiles on the OUTPUT's write grid, so the parallel map runs as one wave.
 seg_iterator = seg_iterator.by_write_units()
 seg_iterator.map(segment, mapper=ThreadedMapper("auto"))
 print(f"labelled pixels: {int((seg.get_as_numpy() > 0).sum())}")
