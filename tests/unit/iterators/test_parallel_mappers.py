@@ -46,7 +46,7 @@ def _segmentation_iterator(store):
     iterator = SegmentationIterator(
         image, label, channel_selection=0, axes_order="yx", consolidation_mode="dask"
     )
-    return ome_zarr, iterator.by_chunks(grid="write")
+    return ome_zarr, iterator.by_write_units()
 
 
 def test_threaded_map_is_bit_identical_to_serial():
@@ -109,13 +109,13 @@ def test_parallel_map_refuses_colliding_write_units():
     image = ome_zarr.get_image()
     base = SegmentationIterator(image, coarse, channel_selection=0, axes_order="yx")
 
-    read_tiled = base.by_chunks(grid="read")
-    assert read_tiled.check_if_chunks_overlap()
+    read_tiled = base.by_chunks()
+    assert read_tiled.check_if_write_units_overlap()
     with pytest.raises(NgioValueError, match="same write unit"):
         read_tiled.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
 
     # The named fix works: write-unit tiling passes.
-    base.by_chunks(grid="write").map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+    base.by_write_units().map_as_numpy(_threshold, mapper=ThreadedMapper(4))
 
 
 def test_process_mapper_refuses_memory_stores():
@@ -177,7 +177,7 @@ def test_reduce_to_table_across_processes(tmp_path: Path):
         input_label=ome_zarr.get_label("nuclei"),
         channel_selection=0,
         axes_order="yx",
-    ).grid(size_x=16, size_y=16)
+    ).by_grid(size_x=16, size_y=16)
 
     serial = iterator.reduce_to_table(_measure_labels)
     from_processes = iterator.reduce_to_table(
@@ -218,7 +218,7 @@ def test_detect_across_processes(tmp_path: Path):
         ObjectDetectionIterator(
             ome_zarr.get_image(), channel_selection=0, axes_order="yx"
         )
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=8, y=8)
     )
 

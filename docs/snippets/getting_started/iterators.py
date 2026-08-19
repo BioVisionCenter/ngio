@@ -71,7 +71,7 @@ seg = demo.derive_label("seg")
 seg_iterator = SegmentationIterator(demo_image, seg, axes_order="yx")
 
 # Tiles on the OUTPUT's write grid, so parallel writes cannot collide.
-seg_iterator = seg_iterator.by_chunks(grid="write")
+seg_iterator = seg_iterator.by_write_units()
 seg_iterator.map(segment, mapper=ThreadedMapper("auto"))
 print(f"labelled pixels: {int((seg.get_as_numpy() > 0).sum())}")
 # --8<-- [end:mapper_demo]
@@ -94,7 +94,7 @@ blur_iterator = ImageProcessingIterator(demo_image, blurred.get_image())
 
 # 8 px of context per side; the function returns the grown region and the
 # border is cropped off before the write - no seams, same write footprints.
-blur_iterator = blur_iterator.by_chunks(grid="write").with_halo(x=8, y=8)
+blur_iterator = blur_iterator.by_write_units().with_halo(x=8, y=8)
 blur_iterator.map(smooth, mapper=ThreadedMapper("auto"))
 print(blurred.get_image().get_as_numpy().mean().round(2))
 # --8<-- [end:halo_demo]
@@ -103,7 +103,7 @@ print(blurred.get_image().get_as_numpy().mean().round(2))
 stitched = demo.derive_label("stitched")
 stitch_iterator = (
     SegmentationIterator(demo_image, stitched, axes_order="yx", stitch=True)
-    .grid(size_x=32, size_y=32)
+    .by_grid(size_x=32, size_y=32)
     .with_halo(x=8, y=8)
 )
 stitch_iterator.map(segment)
@@ -131,7 +131,7 @@ def find_bright_boxes(patch: np.ndarray, roi: Roi) -> dict[str, list]:
 
 detect_iterator = (
     ObjectDetectionIterator(demo_image, axes_order="yx")
-    .grid(size_x=32, size_y=32)
+    .by_grid(size_x=32, size_y=32)
     .with_halo(x=8, y=8)
 )
 detections = detect_iterator.detect(find_bright_boxes)

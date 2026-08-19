@@ -246,7 +246,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def post_consolidate(self):
+    def finalize(self):
         pass
 
     def reduce_to_table(

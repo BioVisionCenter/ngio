@@ -36,7 +36,7 @@ def _build_feature_iterator(ome_zarr) -> FeatureExtractorIterator:
         channel_selection=0,
         axes_order="yx",
     )
-    return iterator.grid(size_x=8, size_y=8)
+    return iterator.by_grid(size_x=8, size_y=8)
 
 
 def _build_segmentation_iterator(ome_zarr, label_name="seg_label", **derive_kwargs):
@@ -44,7 +44,7 @@ def _build_segmentation_iterator(ome_zarr, label_name="seg_label", **derive_kwar
     iterator = SegmentationIterator(
         ome_zarr.get_image(), label, channel_selection=0, axes_order="yx"
     )
-    return iterator.grid(size_x=8, size_y=8), label
+    return iterator.by_grid(size_x=8, size_y=8), label
 
 
 def test_reduce_as_numpy_roi_order_and_equivalence():

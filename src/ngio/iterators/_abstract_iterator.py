@@ -21,10 +21,12 @@ from ngio.iterators._mappers import (
     compute_write_footprint,
 )
 from ngio.iterators._rois_utils import (
-    by_chunks,
+    TailPolicy,
+    by_blocks,
+    by_grid,
+    by_storage_units,
     by_yx,
     by_zyx,
-    grid,
     halo_roi,
     rois_product,
 )
@@ -43,7 +45,14 @@ T = TypeVar("T")
 
 
 class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
-    """Base class for building iterators over ROIs."""
+    """Base class for building iterators over ROIs.
+
+    Constructor naming convention across the concrete iterators: a bare
+    parameter (`channel_selection`, `input_transforms`) refers to the *input*
+    image; output-side parameters are always prefixed
+    (`output_channel_selection`, `output_transforms`), and parameters
+    targeting another object name it (`label_transforms`).
+    """
 
     _rois: list[Roi]
     _ref_image: AbstractImage
@@ -178,7 +187,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Example:
             ```python
             # 8 px of context per side, disjoint writes, still parallel.
-            it = iterator.by_chunks(grid="write").with_halo(x=8, y=8)
+            it = iterator.by_write_units().with_halo(x=8, y=8)
             it.map(smooth, mapper=ThreadedMapper("auto"))
             ```
         """
@@ -222,8 +231,9 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             return setter
         return HaloCroppingSetter(setter, margins)
 
-    def grid(
+    def by_grid(
         self,
+        *,
         size_x: int | None = None,
         size_y: int | None = None,
         size_z: int | None = None,
@@ -232,6 +242,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         stride_y: int | None = None,
         stride_z: int | None = None,
         stride_t: int | None = None,
+        tail: TailPolicy = "clip",
         base_name: str = "",
     ) -> Self:
         """Tile the current ROIs with a regular grid.
@@ -246,13 +257,21 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             stride_y: As `stride_x`, along y.
             stride_z: As `stride_x`, along z.
             stride_t: As `stride_x`, along t.
+            tail: What happens where the grid does not divide the axis.
+                `"clip"` (default) shrinks the last tile to the border;
+                `"balance"` re-splits the last full tile and the tail into two
+                near-equal tiles, so a thin overhang never yields a thin tile
+                (needs adjacent tiles, `stride == size`); `"shift"` moves the
+                last tile back to stay full-size — it then overlaps its
+                neighbour, so a writing iterator needs a merge or serial
+                execution; `"drop"` discards the tail and leaves that border
+                uncovered.
             base_name: Prefix for the generated tile names.
 
         Returns:
-            A new iterator over the tiled ROIs (the final tile along each
-            axis is clipped against the parent ROI).
+            A new iterator over the tiled ROIs.
         """
-        rois = grid(
+        rois = by_grid(
             rois=self.rois,
             ref_image=self.ref_image,
             size_x=size_x,
@@ -263,6 +282,43 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             stride_y=stride_y,
             stride_z=stride_z,
             stride_t=stride_t,
+            tail=tail,
+            base_name=base_name,
+        )
+        return self._new_from_rois(rois)
+
+    def by_blocks(
+        self,
+        *,
+        num_x: int = 1,
+        num_y: int = 1,
+        num_z: int = 1,
+        num_t: int = 1,
+        base_name: str = "",
+    ) -> Self:
+        """Divide each axis into a fixed number of near-equal blocks.
+
+        The complement of `by_grid`: you say how many tiles, not how big.
+        Block lengths along an axis differ by at most one pixel, so there is
+        no tail to police — the partition is balanced by construction.
+
+        Args:
+            num_x: Number of blocks along x (default 1: no split).
+            num_y: Number of blocks along y.
+            num_z: Number of blocks along z.
+            num_t: Number of blocks along t.
+            base_name: Prefix for the generated tile names.
+
+        Returns:
+            A new iterator over the blocks.
+        """
+        rois = by_blocks(
+            rois=self.rois,
+            ref_image=self.ref_image,
+            num_x=num_x,
+            num_y=num_y,
+            num_z=num_z,
+            num_t=num_t,
             base_name=base_name,
         )
         return self._new_from_rois(rois)
@@ -285,42 +341,71 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
     def by_chunks(
         self,
-        overlap_xy: int = 0,
+        *,
+        overlap_x: int = 0,
+        overlap_y: int = 0,
         overlap_z: int = 0,
         overlap_t: int = 0,
-        grid: Literal["read", "write"] = "read",
     ) -> Self:
-        """Return a new iterator that iterates over ROIs by storage tiles.
+        """Tile the ROIs by the input image's chunk grid.
+
+        Reads are chunk-granular, so this is the natural tiling for
+        read-heavy work. For collision-free parallel *writes* use
+        `by_write_units`, which tiles by the output's write granularity.
 
         Args:
-            overlap_xy (int): Overlap in XY dimensions.
-            overlap_z (int): Overlap in Z dimension.
-            overlap_t (int): Overlap in the T dimension.
-            grid: `"read"` (the default) sizes the tiles by the input image's
-                chunk grid, which is also what this method always did.
-                `"write"` sizes them by the output image's write granularity —
-                the shard shape when the output is sharded, the chunk shape
-                otherwise — so the resulting ROIs pass
-                `check_if_chunks_overlap` by construction, which is what a
-                parallel `map` needs. Falls back to the input chunk grid when
-                the iterator is read-only.
+            overlap_x: Overlap between adjacent tiles along x, in pixels.
+            overlap_y: Overlap along y.
+            overlap_z: Overlap along z.
+            overlap_t: Overlap along t.
 
         Returns:
             A new iterator with tiled ROIs.
         """
-        if grid == "write":
-            grid_image = self.output_image
-        elif grid == "read":
-            grid_image = None
-        else:
-            raise NgioValueError(f"Invalid grid {grid!r}; expected 'write' or 'read'.")
-        rois = by_chunks(
+        rois = by_storage_units(
             self.rois,
             self.ref_image,
-            overlap_xy=overlap_xy,
+            overlap_x=overlap_x,
+            overlap_y=overlap_y,
             overlap_z=overlap_z,
             overlap_t=overlap_t,
-            grid_image=grid_image,
+            grid_image=None,
+        )
+        return self._new_from_rois(rois)
+
+    def by_write_units(
+        self,
+        *,
+        overlap_x: int = 0,
+        overlap_y: int = 0,
+        overlap_z: int = 0,
+        overlap_t: int = 0,
+    ) -> Self:
+        """Tile the ROIs by the output image's write granularity.
+
+        The write unit is the shard shape when the output is sharded (writes
+        are atomic per shard object), the chunk shape otherwise. With no
+        overlap the resulting ROIs pass `check_if_write_units_overlap` by
+        construction — exactly what a parallel `map` needs. Falls back to the
+        input chunk grid when the iterator is read-only.
+
+        Args:
+            overlap_x: Overlap between adjacent tiles along x, in pixels.
+            overlap_y: Overlap along y.
+            overlap_z: Overlap along z.
+            overlap_t: Overlap along t.
+
+        Returns:
+            A new iterator with tiled ROIs.
+        """
+        rois = by_storage_units(
+            self.rois,
+            self.ref_image,
+            overlap_x=overlap_x,
+            overlap_y=overlap_y,
+            overlap_z=overlap_z,
+            overlap_t=overlap_t,
+            grid_image=self.output_image,
         )
         return self._new_from_rois(rois)
 
@@ -352,8 +437,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         raise NotImplementedError
 
     @abstractmethod
-    def post_consolidate(self) -> None:
-        """Post-process the consolidated data."""
+    def finalize(self) -> None:
+        """Run once after every unit completes.
+
+        Writing iterators resolve any pending reconciliation (the stitch) and
+        consolidate the output pyramid here; read-only iterators do nothing.
+        """
         raise NotImplementedError
 
     def _numpy_getters_generator(self) -> Generator[DataGetterProtocol[NumpyPipeType]]:
@@ -420,7 +509,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 name = self.__class__.__name__
                 raise NgioValueError(f"Iterator is read-only: {name}")
             yield getter, setter
-        self.post_consolidate()
+        self.finalize()
 
     def _iter(
         self,
@@ -603,7 +692,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         units = list(self._numpy_units_generator())
         self._require_writable_units(units)
         mapper(func, units)
-        self.post_consolidate()
+        self.finalize()
 
     def map_as_numpy(
         self,
@@ -640,7 +729,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         units = list(self._dask_units_generator())
         self._require_writable_units(units)
         _mapper(func, units)
-        self.post_consolidate()
+        self.finalize()
 
     def reduce(
         self,
@@ -651,7 +740,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Apply a function to every ROI and collect the results without writing.
 
         Units are built read-only even on writable iterators: nothing is
-        written and `post_consolidate` does not run.
+        written and `finalize` does not run.
 
         Args:
             func: The function to apply; under a parallel mapper it must be
@@ -692,7 +781,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Deprecated: removed in ngio=1.2.
 
         Units are built read-only even on writable iterators: nothing is
-        written and `post_consolidate` does not run. A parallel `mapper` is
+        written and `finalize` does not run. A parallel `mapper` is
         pointless here: the units hand `func` *lazy* dask arrays, so the
         per-unit work is graph construction, not IO — see `map_as_dask`.
 
@@ -731,8 +820,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         if self.check_if_regions_overlap():
             raise NgioValueError("Some rois overlap.")
 
-    def check_if_chunks_overlap(self) -> bool:
-        """Check if any two ROIs write into the same chunk (or shard) of the output.
+    def check_if_write_units_overlap(self) -> bool:
+        """Check if any two ROIs write into the same write unit of the output.
 
         Measured on the write target: slicing tuples come from the setters and
         the grid is the output array's write granularity — the shard shape when
@@ -759,7 +848,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         non_empty = (footprint for footprint in footprints if footprint is not None)
         return any(chunk_rects_intersect(fi, fj) for fi, fj in _pairs_stream(non_empty))
 
-    def require_no_chunks_overlap(self) -> None:
-        """Ensure that the ROIs do not overlap in terms of chunks."""
-        if self.check_if_chunks_overlap():
-            raise NgioValueError("Some rois overlap in chunks.")
+    def require_no_write_units_overlap(self) -> None:
+        """Ensure that the ROIs do not share write units on the output."""
+        if self.check_if_write_units_overlap():
+            raise NgioValueError("Some ROIs share write units on the output.")

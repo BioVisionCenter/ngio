@@ -3,7 +3,7 @@ import pytest
 from zarr.storage import MemoryStore
 
 from ngio import Roi, create_ome_zarr_from_array
-from ngio.iterators._rois_utils import by_chunks, grid
+from ngio.iterators._rois_utils import by_grid, by_storage_units
 from ngio.utils import NgioValueError
 
 
@@ -26,7 +26,7 @@ def full_image_roi() -> Roi:
 
 
 def test_grid_rois_have_unique_names(sample_image):
-    tiles = grid(
+    tiles = by_grid(
         rois=[full_image_roi()],
         ref_image=sample_image,
         size_x=32,
@@ -40,8 +40,8 @@ def test_grid_rois_have_unique_names(sample_image):
 def test_by_chunks_overlap_equal_to_chunk_size_raises(sample_image):
     chunk_x = sample_image.chunks[-1]
     with pytest.raises(NgioValueError):
-        by_chunks(
+        by_storage_units(
             rois=[full_image_roi()],
             ref_image=sample_image,
-            overlap_xy=chunk_x,
+            overlap_x=chunk_x,
         )

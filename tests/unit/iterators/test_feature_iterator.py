@@ -80,7 +80,7 @@ def test_feature_iterator_is_readonly():
     roi = iterator.rois[0]
     assert iterator.build_numpy_setter(roi) is None
     assert iterator.build_dask_setter(roi) is None
-    assert iterator.post_consolidate() is None
+    assert iterator.finalize() is None
 
 
 def _build_container_and_iterator():
@@ -104,7 +104,7 @@ def _build_container_and_iterator():
         input_label=ome_zarr.get_label("nuclei"),
         channel_selection=0,
         axes_order="yx",
-    ).grid(size_x=8, size_y=8)
+    ).by_grid(size_x=8, size_y=8)
     return ome_zarr, iterator
 
 

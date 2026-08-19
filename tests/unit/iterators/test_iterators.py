@@ -46,10 +46,10 @@ def test_segmentation_iterator(single_image_copy: Path):
     if image.is_3d or image.is_time_series:
         # 3D images should overlap in chunks
         with pytest.raises(NgioValueError):
-            iterator.require_no_chunks_overlap()
+            iterator.require_no_write_units_overlap()
     else:
         # 2D or 2D+channels does not overlap in chunks
-        iterator.require_no_chunks_overlap()
+        iterator.require_no_write_units_overlap()
 
     for i, (img_chunk, writer) in enumerate(iterator.iter_as_numpy()):
         label_patch = np.full(shape=img_chunk.shape, fill_value=i + 1, dtype=np.uint8)
@@ -127,7 +127,7 @@ def test_img_processing_iterator(
     iterator = iterator.by_zyx(strict=False)
     assert len(iterator.rois) == image.dimensions.get("t", 1)
 
-    iterator = iterator.grid(size_x=64, size_y=64)
+    iterator = iterator.by_grid(size_x=64, size_y=64)
     for img_chunk, writer in iterator.iter_as_numpy():
         label_patch = np.zeros_like(img_chunk, dtype=np.uint8)
         writer(label_patch)
@@ -188,20 +188,20 @@ def test_chunk_gate_measures_write_grid():
     image = ome_zarr.get_image()
 
     iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
-    iterator = iterator.grid(size_x=16, size_y=16)
+    iterator = iterator.by_grid(size_x=16, size_y=16)
 
-    assert iterator.check_if_chunks_overlap()
+    assert iterator.check_if_write_units_overlap()
     with pytest.raises(NgioValueError):
-        iterator.require_no_chunks_overlap()
+        iterator.require_no_write_units_overlap()
 
     # Same tiling against a matching output grid is safe.
     matching = ome_zarr.derive_label("matching")
     iterator = SegmentationIterator(
         image, matching, channel_selection=0, axes_order="yx"
     )
-    iterator = iterator.grid(size_x=16, size_y=16)
-    assert not iterator.check_if_chunks_overlap()
-    iterator.require_no_chunks_overlap()
+    iterator = iterator.by_grid(size_x=16, size_y=16)
+    assert not iterator.check_if_write_units_overlap()
+    iterator.require_no_write_units_overlap()
 
 
 def test_chunk_gate_shard_granularity():
@@ -214,38 +214,38 @@ def test_chunk_gate_shard_granularity():
     iterator = SegmentationIterator(
         image, sharded, channel_selection=0, axes_order="yx"
     )
-    iterator = iterator.grid(size_x=16, size_y=16)
-    assert iterator.check_if_chunks_overlap()
+    iterator = iterator.by_grid(size_x=16, size_y=16)
+    assert iterator.check_if_write_units_overlap()
 
     # The identical layout without sharding is chunk-disjoint and passes.
     unsharded = ome_zarr.derive_label("unsharded", chunks=(1, 16, 16))
     iterator = SegmentationIterator(
         image, unsharded, channel_selection=0, axes_order="yx"
     )
-    iterator = iterator.grid(size_x=16, size_y=16)
-    assert not iterator.check_if_chunks_overlap()
+    iterator = iterator.by_grid(size_x=16, size_y=16)
+    assert not iterator.check_if_write_units_overlap()
 
 
-def test_by_chunks_grid_parameter():
-    """by_chunks(grid="write") tiles on the output's write granularity, so the
-    resulting ROIs pass the write-side gate; the default grid="read" keeps the
-    input tiling this method always had."""
+def test_by_chunks_and_by_write_units():
+    """by_write_units() tiles on the output's write granularity, so the
+    resulting ROIs pass the write-side gate; by_chunks() keeps the input
+    tiling this method always had."""
     # Default-derived output: grids match, tiling passes either way
     ome_zarr = _build_ome_zarr(chunks=(1, 16, 16))
     label = ome_zarr.derive_label("default")
     image = ome_zarr.get_image()
     iterator = SegmentationIterator(image, label, channel_selection=0, axes_order="yx")
-    assert not iterator.by_chunks().check_if_chunks_overlap()
+    assert not iterator.by_chunks().check_if_write_units_overlap()
 
     # Coarser-chunked output: write tiling passes, the read default flags
     coarse = ome_zarr.derive_label("coarse", chunks=(1, 32, 32))
     iterator = SegmentationIterator(image, coarse, channel_selection=0, axes_order="yx")
-    write_tiled = iterator.by_chunks(grid="write")
+    write_tiled = iterator.by_write_units()
     assert len(write_tiled.rois) == 4  # 32x32 tiles from the output grid
-    assert not write_tiled.check_if_chunks_overlap()
+    assert not write_tiled.check_if_write_units_overlap()
     read_tiled = iterator.by_chunks()
     assert len(read_tiled.rois) == 16  # 16x16 tiles from the input grid
-    assert read_tiled.check_if_chunks_overlap()
+    assert read_tiled.check_if_write_units_overlap()
 
     # Sharded output: one tile per shard
     ome_zarr_v5 = _build_ome_zarr(chunks=(1, 16, 16), ngff_version="0.5")
@@ -256,27 +256,24 @@ def test_by_chunks_grid_parameter():
     iterator = SegmentationIterator(
         image_v5, sharded, channel_selection=0, axes_order="yx"
     )
-    shard_tiled = iterator.by_chunks(grid="write")
+    shard_tiled = iterator.by_write_units()
     assert len(shard_tiled.rois) == 1  # the single 64x64 shard
-    assert not shard_tiled.check_if_chunks_overlap()
-    assert iterator.by_chunks(grid="read").check_if_chunks_overlap()
+    assert not shard_tiled.check_if_write_units_overlap()
+    assert iterator.by_chunks().check_if_write_units_overlap()
 
-    with pytest.raises(NgioValueError):
-        iterator.by_chunks(grid="bogus")  # ty: ignore[invalid-argument-type]
-
-    # Read-only iterators fall back to the input grid even for grid="write"
+    # Read-only iterators fall back to the input grid even for by_write_units
     feature_iterator = FeatureExtractorIterator(
         input_image=image,
         input_label=label,
         channel_selection=0,
         axes_order="yx",
     )
-    assert len(feature_iterator.by_chunks(grid="write").rois) == 16
+    assert len(feature_iterator.by_write_units().rois) == 16
 
 
 def test_chunk_gate_readonly_returns_false():
     """A read-only iterator has no write hazard: the gate returns False and
-    require_no_chunks_overlap does not raise, even for chunk-sharing ROIs."""
+    require_no_write_units_overlap does not raise, even for chunk-sharing ROIs."""
     ome_zarr = _build_ome_zarr(chunks=(1, 64, 64))
     label = ome_zarr.derive_label("label")
     image = ome_zarr.get_image()
@@ -287,10 +284,10 @@ def test_chunk_gate_readonly_returns_false():
         channel_selection=0,
         axes_order="yx",
     )
-    iterator = iterator.grid(size_x=16, size_y=16)
+    iterator = iterator.by_grid(size_x=16, size_y=16)
 
-    assert iterator.check_if_chunks_overlap() is False
-    iterator.require_no_chunks_overlap()
+    assert iterator.check_if_write_units_overlap() is False
+    iterator.require_no_write_units_overlap()
 
 
 def test_by_zyx_strict_raises_ngio_error():

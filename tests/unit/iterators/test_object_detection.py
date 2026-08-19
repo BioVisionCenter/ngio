@@ -50,7 +50,7 @@ def test_seam_duplicates_are_suppressed_into_one_object():
     _, image = _image(_two_blobs())
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=8, y=8)
     )
 
@@ -73,7 +73,7 @@ def test_detect_parallel_matches_serial():
     _, image = _image(_two_blobs())
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=8, y=8)
     )
 
@@ -89,7 +89,7 @@ def test_boxes_land_in_world_coordinates():
     _, image = _image(data, pixelsize=0.5)
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=4, y=4)
     )
 
@@ -115,7 +115,7 @@ def test_halo_is_clipped_at_the_borders():
     _, image = _image(data)
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=16, y=16)
     )
 
@@ -201,7 +201,7 @@ def test_time_frames_are_never_merged_across_t():
     data = np.zeros((2, 64, 64), dtype="uint8")
     data[:, 10:20, 10:20] = 255
     _, image = _image(data, axes_names="tyx")
-    iterator = ObjectDetectionIterator(image, axes_order="yx").grid(size_t=1)
+    iterator = ObjectDetectionIterator(image, axes_order="yx").by_grid(size_t=1)
 
     table = iterator.detect(_bright_box_detector)
 
@@ -221,7 +221,7 @@ def test_detection_table_round_trips_through_the_container():
     ome_zarr, image = _image(_two_blobs())
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=8, y=8)
     )
 
@@ -298,7 +298,7 @@ def test_func_receives_the_haloed_roi():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     iterator = (
         ObjectDetectionIterator(image, axes_order="yx")
-        .grid(size_x=32, size_y=32)
+        .by_grid(size_x=32, size_y=32)
         .with_halo(x=8, y=8)
     )
 

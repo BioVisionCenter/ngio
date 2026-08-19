@@ -302,7 +302,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def post_consolidate(self) -> None:
+    def finalize(self) -> None:
         pass
 
     def iter_as_numpy(self):  # type: ignore[override]

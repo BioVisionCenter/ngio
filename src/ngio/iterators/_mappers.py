@@ -167,7 +167,7 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
     mapping: a chunk (or shard) object with exactly one writer cannot lose an
     update, in any topology. Raising rather than silently falling back to
     serial: a fallback would hide a large performance cliff behind a flag the
-    caller explicitly set, and the fix — `by_chunks(grid="write")` — is one
+    caller explicitly set, and the fix — `by_write_units()` — is one
     call away.
 
     Raises:
@@ -203,7 +203,9 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
             for other in active:
                 other_rect = footprints[other.index]
                 if chunk_rects_intersect(other_rect, rect):
-                    axes = unit.setter.slicing_ops.on_disk_axes  # type: ignore[union-attr]
+                    # Only units with a setter enter `by_array`.
+                    assert unit.setter is not None
+                    axes = unit.setter.slicing_ops.on_disk_axes
                     shared = ", ".join(
                         f"{axis_name}: {max(a_first, b_first)}..{min(a_last, b_last)}"
                         for axis_name, (a_first, a_last), (b_first, b_last) in zip(
@@ -216,7 +218,7 @@ def require_no_write_conflicts(units: Sequence[IterUnit[Any]]) -> None:
                         "write into the same write unit(s) of the output "
                         f"array — chunk/shard indices per axis: {shared}. Two "
                         "concurrent writers on one chunk/shard lose data. "
-                        'Re-tile the iterator with `by_chunks(grid="write")`, '
+                        "Re-tile the iterator with `by_write_units()`, "
                         "or run serially (drop the `mapper` argument)."
                     )
             active.append(unit)

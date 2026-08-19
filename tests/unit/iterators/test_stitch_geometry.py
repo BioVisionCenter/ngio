@@ -26,9 +26,9 @@ def _image(shape=(100, 100)):
 
 
 def _grid_rois(image, size=32):
-    from ngio.iterators._rois_utils import grid
+    from ngio.iterators._rois_utils import by_grid
 
-    return grid(
+    return by_grid(
         rois=[image.build_image_roi_table(name=None).rois()[0]],
         ref_image=image,
         size_y=size,

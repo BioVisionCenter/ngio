@@ -26,7 +26,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 
     Reads each region from the input image, hands the patch to `map`'s
     function, and writes the result to the output image — a filter, a
-    projection, a restoration model. Compose with `by_chunks(grid="write")`
+    projection, a restoration model. Compose with `by_write_units()`
     for collision-free parallel writes and `with_halo` for seamless tiles.
     """
 
@@ -35,7 +35,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         input_image: Image,
         output_image: Image,
         *,
-        input_channel_selection: ChannelSlicingInputType = None,
+        channel_selection: ChannelSlicingInputType = None,
         output_channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
@@ -48,7 +48,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             input_image (Image): The input image to be used as input for the
                 segmentation.
             output_image (Image): The image where the ROIs will be written.
-            input_channel_selection (ChannelSlicingInputType): Optional
+            channel_selection (ChannelSlicingInputType): Optional
                 selection of channels to use for the input image.
             output_channel_selection (ChannelSlicingInputType): Optional
                 selection of channels to use for the output image.
@@ -70,7 +70,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input,
-            channel_selection=input_channel_selection,
+            channel_selection=channel_selection,
             slicing_dict={},
         )
         self._output_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -78,7 +78,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             channel_selection=output_channel_selection,
             slicing_dict={},
         )
-        self._input_channel_selection = input_channel_selection
+        self._channel_selection = channel_selection
         self._output_channel_selection = output_channel_selection
         self._axes_order = axes_order
         self._input_transforms = input_transforms
@@ -91,7 +91,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         return {
             "input_image": self._input,
             "output_image": self._output,
-            "input_channel_selection": self._input_channel_selection,
+            "channel_selection": self._channel_selection,
             "output_channel_selection": self._output_channel_selection,
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
@@ -150,5 +150,5 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             roi,
         )
 
-    def post_consolidate(self):
+    def finalize(self):
         self._output.consolidate(mode=self._consolidation_mode)

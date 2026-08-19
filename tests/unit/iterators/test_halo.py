@@ -44,7 +44,7 @@ def _processing_iterator(**kwargs):
         axes_order="cyx",
         consolidation_mode="dask",
     )
-    return ome_zarr, array, iterator.by_chunks(grid="write")
+    return ome_zarr, array, iterator.by_write_units()
 
 
 def _identity(patch):
@@ -121,8 +121,8 @@ def test_halo_leaves_write_footprints_untouched():
     _, _, iterator = _processing_iterator()
     haloed = iterator.with_halo(x=4, y=4)
 
-    assert not iterator.check_if_chunks_overlap()
-    assert not haloed.check_if_chunks_overlap()
+    assert not iterator.check_if_write_units_overlap()
+    assert not haloed.check_if_write_units_overlap()
 
     plain_setter = iterator.build_numpy_setter(iterator.rois[0])
     haloed_setter = haloed.build_numpy_setter(haloed.rois[0])
@@ -145,8 +145,8 @@ def test_haloed_iterator_still_maps_in_parallel():
 def test_halo_survives_a_reshaping_call():
     """`_new_from_rois` carries the halo, so ordering of the calls is free."""
     _, _, iterator = _processing_iterator()
-    assert iterator.with_halo(x=4).by_chunks(grid="write").halo == {"x": 4}
-    assert iterator.by_chunks(grid="write").with_halo(x=4).halo == {"x": 4}
+    assert iterator.with_halo(x=4).by_write_units().halo == {"x": 4}
+    assert iterator.by_write_units().with_halo(x=4).halo == {"x": 4}
 
 
 def test_core_shaped_return_is_refused():
@@ -202,7 +202,7 @@ def test_halo_refuses_a_shape_changing_transform():
         axes_order="cyx",
         input_transforms=[ZoomTransform(input_image=image, target_image=coarse)],
         consolidation_mode="dask",
-    ).grid(size_x=16, size_y=16)
+    ).by_grid(size_x=16, size_y=16)
 
     haloed = iterator.with_halo(x=4, y=4)
     roi = haloed.rois[5]
@@ -248,7 +248,7 @@ def test_halo_on_segmentation_iterator():
         channel_selection=0,
         axes_order="yx",
         consolidation_mode="dask",
-    ).by_chunks(grid="write")
+    ).by_write_units()
 
     iterator.with_halo(x=4, y=4).map(lambda patch: np.full_like(patch, 9))
 

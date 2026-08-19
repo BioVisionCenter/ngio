@@ -53,7 +53,7 @@ def _run_with(image_data, func, stitch, *, halo=4, tile=32, mapper=None):
     ome_zarr, image, label = _setup(image_data, tile=tile)
     iterator = SegmentationIterator(
         image, label, axes_order="yx", consolidation_mode="dask", stitch=stitch
-    ).grid(size_y=tile, size_x=tile)
+    ).by_grid(size_y=tile, size_x=tile)
     if halo:
         iterator = iterator.with_halo(y=halo, x=halo)
     iterator.map(func, mapper=mapper)
@@ -213,7 +213,7 @@ def test_scratch_arrays_are_removed():
         SegmentationIterator(
             image, label, axes_order="yx", consolidation_mode="dask", stitch=True
         )
-        .grid(size_y=32, size_x=32)
+        .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
     iterator.map(_connected_components)
@@ -242,7 +242,7 @@ def test_a_supplied_scratch_store_keeps_the_label_clean():
             consolidation_mode="dask",
             stitch=StitchConfig(scratch_store=MemoryStore()),
         )
-        .grid(size_y=32, size_x=32)
+        .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
     iterator.map(_connected_components)
@@ -263,7 +263,7 @@ def test_memory_scratch_refuses_to_cross_a_process_boundary():
             consolidation_mode="dask",
             stitch=StitchConfig(scratch_store=MemoryStore()),
         )
-        .grid(size_y=32, size_x=32)
+        .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
     setter = iterator.build_numpy_setter(iterator.rois[0])
@@ -276,7 +276,7 @@ def test_stitching_requires_a_halo():
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = SegmentationIterator(
         image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-    ).grid(size_y=32, size_x=32)
+    ).by_grid(size_y=32, size_x=32)
 
     with pytest.raises(NgioValueError, match="needs a halo"):
         iterator.map(_connected_components)
@@ -316,7 +316,7 @@ def test_stitch_refuses_the_dask_path():
         SegmentationIterator(
             image, label, axes_order="yx", consolidation_mode="dask", stitch=True
         )
-        .grid(size_y=32, size_x=32)
+        .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
 
@@ -342,7 +342,7 @@ def test_stitch_refuses_tiles_split_on_an_unhaloed_axis():
         SegmentationIterator(
             image, label, axes_order="zyx", consolidation_mode="dask", stitch=True
         )
-        .grid(size_z=1, size_y=32, size_x=32)
+        .by_grid(size_z=1, size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
 
@@ -376,7 +376,7 @@ def test_failed_map_removes_the_scratch():
         SegmentationIterator(
             image, label, axes_order="yx", consolidation_mode="dask", stitch=True
         )
-        .grid(size_y=32, size_x=32)
+        .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
 

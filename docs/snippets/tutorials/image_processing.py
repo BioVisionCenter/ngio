@@ -145,7 +145,7 @@ iterator = iterator.by_zyx()
 # Optionally assert the regions do not overlap each other...
 iterator.require_no_regions_overlap()
 # ...nor share chunks, which is what makes parallel writes safe.
-iterator.require_no_chunks_overlap()
+iterator.require_no_write_units_overlap()
 
 # A blur at a region edge has no neighbours to average with, which is exactly
 # the seam artifact the dask version above warns about. `with_halo` fixes it:

@@ -230,9 +230,9 @@ The examples from here on run on a small synthetic image — two bright blobs, o
 
 `ThreadedMapper` is the fit for IO-bound work and for funcs that release the GIL (most numpy/scipy do); `"auto"` sizes the pool for round-trip-bound work. For pure-Python, GIL-holding funcs use `ProcessMapper(max_workers=...)` instead — the func must be picklable (a module-level function, not a lambda), and the store must not be in-memory.
 
-Before fanning out, both parallel mappers check every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image. Disjoint footprints are what make the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer. If two ROIs share a write unit the mapper refuses with an error naming them; the fix it suggests, `by_chunks(grid="write")`, re-tiles the iterator on the output's write grid so collisions are impossible by construction:
+Before fanning out, both parallel mappers check every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image. Disjoint footprints are what make the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer. If two ROIs share a write unit the mapper refuses with an error naming them; the fix it suggests, `by_write_units()`, re-tiles the iterator on the output's write grid so collisions are impossible by construction:
 
-The demo above already did this: `by_chunks(grid="write")` before the parallel `map`.
+The demo above already did this: `by_write_units()` before the parallel `map`.
 
 Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. The dask iterator surface (`iter_as_dask`, `map_as_dask`, `reduce_as_dask`) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use `Image.get_as_dask` instead.
 

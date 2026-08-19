@@ -394,7 +394,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     # --- writes: pyramid consolidation ------------------------------------
     # The most expensive operation in the library, and every writing iterator
-    # triggers it implicitly via `post_consolidate`.
+    # triggers it implicitly via `finalize`.
     # `auto` landed on this branch and resolves to numpy on this geometry
     # (small, dyadic, linear), so its counts must match `consolidate_numpy` --
     # the resolution itself must not cost a single extra store op.
@@ -416,7 +416,7 @@ SCENARIOS: dict[str, Scenario] = {
     ),
     # --- iterators ---------------------------------------------------------
     # A writing iterator end to end: per-ROI reads and writes, the per-ROI
-    # metadata probes, and `post_consolidate`'s *whole-pyramid* rebuild -- the
+    # metadata probes, and `finalize`'s *whole-pyramid* rebuild -- the
     # iterator knows exactly which regions it wrote and rebuilds every level
     # anyway. A future region-scoped consolidation lands here as a
     # `get.chunk`/`set.chunk` drop; this number is its acceptance meter.
@@ -439,10 +439,10 @@ SCENARIOS: dict[str, Scenario] = {
 
 
 def _rois(ctx):
-    from ngio.iterators._rois_utils import grid
+    from ngio.iterators._rois_utils import by_grid
 
     image = _image(ctx, "image", path="1")
-    rois = grid(
+    rois = by_grid(
         rois=image.build_image_roi_table().rois(),
         ref_image=image,
         size_y=64,

@@ -37,7 +37,7 @@ def tile_placements(
     """Place each ROI on the tile grid by ranking its origin.
 
     The grid cell comes from *ranking* the distinct origins along each axis, not
-    from dividing an origin by a tile size. Division is wrong: `grid()` clips the
+    from dividing an origin by a tile size. Division is wrong: `by_grid()` clips the
     final tile against the parent ROI, so a 100-pixel axis tiled at 32 ends with
     `start=96, length=4`, and `96 // 4` is 24 where the answer is 3. Ranking
     needs the whole list, which is exactly what this function is given.

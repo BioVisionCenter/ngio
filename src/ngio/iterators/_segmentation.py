@@ -37,7 +37,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 
     # Class-level defaults so subclasses that write their own `__init__` — the
     # masked iterator does — are simply not stitching, rather than missing an
-    # attribute the inherited `post_consolidate` reads. Stitching needs a tile
+    # attribute the inherited `finalize` reads. Stitching needs a tile
     # grid, which a masking ROI table does not have.
     _stitch: StitchConfig | None = None
     _stitch_plan: StitchPlan | None = None
@@ -216,7 +216,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 self._stitch_plan = None
             raise
 
-    def post_consolidate(self):
+    def finalize(self):
         # The relabel has to precede consolidation: every pyramid level is
         # derived from level 0, so stitching after would leave them disagreeing.
         if self._stitch is not None:

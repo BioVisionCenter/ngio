@@ -79,7 +79,7 @@ from ngio import NmsConfig, ObjectDetectionIterator, ThreadedMapper
 
 iterator = (
     ObjectDetectionIterator(image, nms=NmsConfig(iou_threshold=0.4))
-    .grid(size_x=128, size_y=128)
+    .by_grid(size_x=128, size_y=128)
     .with_halo(x=16, y=16)
 )
 

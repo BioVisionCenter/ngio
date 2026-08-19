@@ -53,14 +53,14 @@ def test_segmentation_iterator_consolidation_mode_passthrough():
     image = ome_zarr.get_image()
 
     with pytest.warns(NgioFutureWarning, match="consolidation_mode"):
-        SegmentationIterator(image, label).post_consolidate()
+        SegmentationIterator(image, label).finalize()
 
     with warnings.catch_warnings():
         warnings.simplefilter("error", category=NgioFutureWarning)
         iterator = SegmentationIterator(image, label, consolidation_mode="dask")
-        iterator.post_consolidate()
+        iterator.finalize()
         # The mode survives the rebuilds `by_yx`/`by_chunks` perform.
-        iterator.by_yx().post_consolidate()
+        iterator.by_yx().finalize()
 
 
 def test_image_processing_iterator_consolidation_mode_passthrough():
@@ -71,5 +71,5 @@ def test_image_processing_iterator_consolidation_mode_passthrough():
     with warnings.catch_warnings():
         warnings.simplefilter("error", category=NgioFutureWarning)
         iterator = ImageProcessingIterator(image, out, consolidation_mode="dask")
-        iterator.post_consolidate()
-        iterator.by_yx().post_consolidate()
+        iterator.finalize()
+        iterator.by_yx().finalize()

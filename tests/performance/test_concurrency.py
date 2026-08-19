@@ -150,7 +150,7 @@ def test_threaded_map_overlaps_all_units(iterator_target):
         container.get_image(),
         container.get_label("out"),
         consolidation_mode="dask",
-    ).by_chunks(grid="write")
+    ).by_write_units()
     assert len(iterator.rois) == 4
 
     with concurrency_probe(rendezvous=4, kind="chunk") as probe:
