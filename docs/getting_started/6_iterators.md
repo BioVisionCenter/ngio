@@ -1,5 +1,5 @@
 ---
-description: The four ngio iterators for building scalable image-processing pipelines.
+description: The five ngio iterators for building scalable image-processing pipelines.
 ---
 
 # 6. Iterators
@@ -93,22 +93,23 @@ When building image processing pipelines it is often useful to iterate over spec
         </svg>
 </div>
 
-ngio provides four basic `Iterator` classes, all imported from `ngio.iterators` (or from
+ngio provides five basic `Iterator` classes, all imported from `ngio.iterators` (or from
 the top-level `ngio` namespace):
 
 <!-- Figure 06 — which iterator do I want -->
 <div class="ngio-diagram">
-<svg viewBox="0 0 640 250" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f6t f6d">
-  <title id="f6t">The four iterators, by what they take and return</title>
-  <desc id="f6d">Segmentation takes an image and returns a label. Masked segmentation takes an image and a label and returns a label. Image processing takes an image and returns an image. Feature extraction takes an image and a label and returns a table.</desc>
+<svg viewBox="0 0 640 298" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f6t f6d">
+  <title id="f6t">The five iterators, by what they take and return</title>
+  <desc id="f6d">Segmentation takes an image and returns a label. Masked segmentation takes an image and a label and returns a label. Image processing takes an image and returns an image. Feature extraction takes an image and a label and returns a table. Object detection takes an image and returns a table of boxes.</desc>
 
-  <g style="stroke:var(--ngio-line)"><path d="M16 52h608M16 100h608M16 148h608"></path></g>
+  <g style="stroke:var(--ngio-line)"><path d="M16 52h608M16 100h608M16 148h608M16 196h608"></path></g>
 
   <g style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">
     <text x="16" y="31">SegmentationIterator</text>
     <text x="16" y="79">MaskedSegmentationIterator</text>
     <text x="16" y="127">ImageProcessingIterator</text>
     <text x="16" y="175">FeatureExtractorIterator</text>
+    <text x="16" y="223">ObjectDetectionIterator</text>
   </g>
 
   <defs>
@@ -132,6 +133,7 @@ the top-level `ngio` namespace):
   <use href="#n6i" x="238" y="63"></use>
   <use href="#n6i" x="238" y="111"></use>
   <use href="#n6i" x="238" y="159"></use>
+  <use href="#n6i" x="238" y="207"></use>
   <use href="#n6l" x="266" y="63"></use>
   <use href="#n6l" x="266" y="159"></use>
 
@@ -140,6 +142,7 @@ the top-level `ngio` namespace):
     <path d="M300 74h26M320 69l6 5-6 5"></path>
     <path d="M300 122h26M320 117l6 5-6 5"></path>
     <path d="M300 170h26M320 165l6 5-6 5"></path>
+    <path d="M300 218h26M320 213l6 5-6 5"></path>
   </g>
 
   <use href="#n6l" x="338" y="15"></use>
@@ -147,23 +150,26 @@ the top-level `ngio` namespace):
   <use href="#n6i" x="338" y="111"></use>
   <rect x="338.75" y="159.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
   <path d="M338 167h22M345 160v20M352 160v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
+  <rect x="338.75" y="207.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
+  <path d="M338 215h22M345 208v20M352 208v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
 
   <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color--light)">
     <text x="384" y="31">an image in, a new label out</text>
     <text x="384" y="79">the same, restricted to one mask</text>
     <text x="384" y="127">an image in, a new image out</text>
     <text x="384" y="175">read only — measurements out</text>
+    <text x="384" y="223">read only — detected boxes out</text>
   </g>
 
-  <path d="M16 206h608" style="stroke:var(--ngio-line)"></path>
-  <use href="#n6i" transform="translate(16,216) scale(0.64)"></use>
-  <use href="#n6l" transform="translate(104,216) scale(0.64)"></use>
-  <rect x="192.75" y="216.75" width="12.5" height="12.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></rect>
-  <path d="M192 221h14M197 216v14M201 216v14" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
+  <path d="M16 254h608" style="stroke:var(--ngio-line)"></path>
+  <use href="#n6i" transform="translate(16,264) scale(0.64)"></use>
+  <use href="#n6l" transform="translate(104,264) scale(0.64)"></use>
+  <rect x="192.75" y="264.75" width="12.5" height="12.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></rect>
+  <path d="M192 269h14M197 264v14M201 264v14" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
   <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;fill:var(--md-default-fg-color--light)">
-    <text x="38" y="227">image</text>
-    <text x="126" y="227">labels</text>
-    <text x="214" y="227">table</text>
+    <text x="38" y="275">image</text>
+    <text x="126" y="275">labels</text>
+    <text x="214" y="275">table</text>
   </g>
         </svg>
 </div>
@@ -173,7 +179,7 @@ the top-level `ngio` namespace):
 * The `MaskedSegmentationIterator` is similar to the `SegmentationIterator`, but it uses a masking ROI table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. For a worked example, see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * The `ImageProcessingIterator` is designed to build image processing pipelines, where an input image is processed to produce a new image. For a worked example, see the [image processing tutorial](../tutorials/image_processing.md).
 * The `FeatureExtractorIterator` is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. Its `reduce_to_table` runs a measurement over every region and returns the joined results as a single feature table — parallel per region via `mapper=`, stored by your own `add_table` call. For a worked example, see the [feature extraction tutorial](../tutorials/feature_extraction.md).
-* The `ObjectDetectionIterator` runs a detector (a YOLO model, a maxima finder) tile by tile and returns the found objects as a single masking ROI table — see [Detecting objects into a ROI table](#detecting-objects-into-a-roi-table).
+* The `ObjectDetectionIterator` runs a detector (a YOLO model, a maxima finder) tile by tile and returns the found objects as a single ROI table — see [Detecting objects into a ROI table](#detecting-objects-into-a-roi-table).
 
 ## Building one
 
@@ -212,41 +218,36 @@ More complete examples can be found in the [Fractal tasks template](https://gith
 
 `map` runs one ROI at a time by default, and that stays the default — parallel writing is explicit opt-in. Concurrency belongs to the *mapper*: pass one, and it sizes its own pool.
 
-```python
-from ngio import ProcessMapper, ThreadedMapper
+The examples from here on run on a small synthetic image — two bright blobs, one of them deliberately crossing a tile boundary:
 
-# Threads: the fit for IO-bound work and for funcs that release the GIL
-# (most numpy/scipy do). "auto" sizes the pool for round-trip-bound work.
-iterator.map(run_segmentation, mapper=ThreadedMapper("auto"))
-
-# Processes: the fit for pure-Python, GIL-holding funcs. The func must be
-# picklable (a module-level function, not a lambda), and the store must not
-# be in-memory.
-iterator.map(run_segmentation, mapper=ProcessMapper(max_workers=8))
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:synthetic_setup"
 ```
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:mapper_demo"
+```
+
+`ThreadedMapper` is the fit for IO-bound work and for funcs that release the GIL (most numpy/scipy do); `"auto"` sizes the pool for round-trip-bound work. For pure-Python, GIL-holding funcs use `ProcessMapper(max_workers=...)` instead — the func must be picklable (a module-level function, not a lambda), and the store must not be in-memory.
 
 Before fanning out, both parallel mappers check every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image. Disjoint footprints are what make the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer. If two ROIs share a write unit the mapper refuses with an error naming them; the fix it suggests, `by_chunks(grid="write")`, re-tiles the iterator on the output's write grid so collisions are impossible by construction:
 
-```python
-iterator = iterator.by_chunks(grid="write")
-iterator.map(run_segmentation, mapper=ThreadedMapper("auto"))   # cannot collide
-```
+The demo above already did this: `by_chunks(grid="write")` before the parallel `map`.
 
 Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. The dask iterator surface (`iter_as_dask`, `map_as_dask`, `reduce_as_dask`) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use `Image.get_as_dask` instead.
 
 For per-ROI measurement without writing anything, use `reduce` — it returns one result per ROI, in ROI order, and takes the same `mapper` argument:
 
-```python
-means = iterator.reduce(lambda patch: float(patch.mean()))
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:reduce_demo"
 ```
 
 ## Halos: context without seams
 
 Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. `with_halo` fixes that by reading a margin around each ROI and writing only the ROI back:
 
-```python
-iterator = iterator.by_chunks(grid="write").with_halo(x=8, y=8)
-iterator.map(smooth, mapper=ThreadedMapper("auto"))
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:halo_demo"
 ```
 
 `smooth` receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.
@@ -305,12 +306,8 @@ label.set_roi(
 
 Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. `stitch=True` fixes both:
 
-```python
-iterator = SegmentationIterator(
-    image, label, stitch=True
-).by_chunks(grid="write").with_halo(y=16, x=16)
-
-iterator.map(run_segmentation)
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:stitch_demo"
 ```
 
 The halo is required, and the reason is the criterion. Stitching joins two ids when the two tiles' predictions **overlap**, not when their objects merely touch across the cut. Two distinct objects that abut at a tile boundary are adjacent but do not overlap, so an adjacency rule would merge them and an overlap rule does not. Each tile's halo is what gives it an opinion about the strip its neighbour owns, and comparing the two opinions is what the stitch does.
@@ -351,34 +348,34 @@ If a run is interrupted between the map and the resolve, the label holds a valid
 
 ## Detecting objects into a ROI table
 
-Not every model produces a mask. An object detector — a YOLO network, a spot finder — reports **bounding boxes**, and the natural home for those is a ROI table, not a label image. The `ObjectDetectionIterator` runs a detector tile by tile and returns one `MaskingRoiTable` of the objects it found:
+Not every model produces a mask. An object detector — a YOLO network, a spot finder — reports **bounding boxes**, and the natural home for those is a ROI table, not a label image. The `ObjectDetectionIterator` runs a detector tile by tile and returns one `RoiTable` of the objects it found:
 
-```python
-from ngio import ObjectDetectionIterator
-
-iterator = ObjectDetectionIterator(
-    image, padding_x=32, padding_y=32
-).by_chunks()
-
-detections = iterator.detect(run_detector, mapper=ThreadedMapper("auto"))
-ome_zarr.add_table("detections", detections)
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:detect_demo"
 ```
 
-The detector sees one tile at a time and answers in the tile's own pixels: `(patch, roi) -> DataFrame | dict` with `x_min`/`x_max`/`y_min`/`y_max` columns bounding each box as `[min, max)` (`z_min`/`z_max` for 3D boxes), plus whatever else it reports — confidence, class — which rides along into the table unchanged. The `roi` is the (padded) region the patch covers — the same argument every iterator function receives to identify its region globally. The iterator does the bookkeeping the detector should not: it anchors each tile's boxes into the reference image's world coordinates, and it resolves the boundary problem.
+NMS is configured with `nms=NmsConfig(iou_threshold=..., score_column=...)` on the constructor, exactly as stitching is with `stitch=StitchConfig(...)`; a parallel `mapper=` on `detect` fans the tiles out like any `reduce`.
 
-That anchoring is one call you can also use yourself, in a custom flow or the manual pattern: `Roi.compose` turns the region's ROI plus a patch-local pixel box into the absolute world ROI —
+The detector sees one tile at a time and answers in the tile's own pixels: `(patch, roi) -> DataFrame | dict` with `x_min`/`x_max`/`y_min`/`y_max` columns bounding each box as `[min, max)` (`z_min`/`z_max` for 3D boxes), plus whatever else it reports — confidence, class — which rides along into the table unchanged (except the reserved `name`/`label`/`slices`/`space` column names, which the iterator itself assigns: rename a class `label` to e.g. `class_id`). The `roi` is the (haloed) region the patch covers — the same argument every iterator function receives to identify its region globally. The iterator does the bookkeeping the detector should not: it anchors each tile's boxes into the reference image's world coordinates, and it resolves the boundary problem.
 
-```python
-box = Roi.from_values(slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel")
-abs_roi = roi.compose(box, pixel_size=image.pixel_size)
-```
-
-The `space` fields are what keep this honest: `compose` refuses a world-space box (already absolute — composing it would double the offset) and a pixel-space region, so the classic silent frame mix-up raises instead. Axes the box does not pin inherit the region's extent.
-
-That problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a `padding` margin past its edge — the same move as a halo, on a read-only iterator — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box size when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `reduce_to_table`, nothing is written — storing the table is your `add_table` call.
+The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which `with_halo` is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**, configured by `nms=NmsConfig(...)` exactly as stitching is by `stitch=StitchConfig(...)`: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `reduce_to_table`, nothing is written — storing the table is your `add_table` call.
 
 Two contracts worth knowing. Every tile must report the same box dimensionality (all 2D or all 3D, scored or unscored) — mixtures raise. And a 2D detector on a 3D or timelapse image never has its boxes merged across the un-pinned axes: detections from different z-slabs or time points keep their tile's extent along those axes and are deduplicated only within it.
 
+### Anchoring a local box yourself
+
+The coordinate bookkeeping is one call you can also use in a custom flow or the manual pattern: `Roi.anchor` turns a region's ROI plus a patch-local pixel box into the absolute world ROI —
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:anchor_demo"
+```
+
+The `space` fields are what keep this honest: `anchor` refuses a world-space box (already absolute — anchoring it would double the offset) and a pixel-space region, so the classic silent frame mix-up raises instead. Axes the box does not pin inherit the region's extent.
+
+## Next steps
+
+- [Object detection tutorial](../tutorials/object_detection.md) — a spot finder through `detect`, end to end.
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.
 - [Image segmentation tutorial](../tutorials/image_segmentation.md) — segmentation and masked segmentation.
+- [Feature extraction tutorial](../tutorials/feature_extraction.md) — `reduce_to_table` on a segmented image.
 - [Iterators API reference](../api/iterators.md) — the full iterator API.

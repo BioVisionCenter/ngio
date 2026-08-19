@@ -193,6 +193,7 @@ nav:
     - "Create an OME-Zarr image": tutorials/create_ome_zarr.md
     - "Image processing": tutorials/image_processing.md
     - "Image segmentation": tutorials/image_segmentation.md
+    - "Object detection": tutorials/object_detection.md
     - "Feature extraction": tutorials/feature_extraction.md
     - "HCS exploration": tutorials/hcs_exploration.md
 

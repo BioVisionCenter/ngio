@@ -27,14 +27,16 @@ import numpy as np
 import skimage
 
 
-def otsu_threshold_segmentation(image: np.ndarray, max_label: int) -> np.ndarray:
-    """Simple segmentation using Otsu thresholding."""
+def otsu_threshold_segmentation(image: np.ndarray) -> np.ndarray:
+    """Simple segmentation using Otsu thresholding.
+
+    Note there is no bookkeeping here: the function numbers its objects from
+    1 like any segmenter, and keeping ids unique across regions is the
+    iterator's job, not the function's.
+    """
     threshold = skimage.filters.threshold_otsu(image)
     binary = image > threshold
-    label_image = skimage.measure.label(binary)
-    label_image += max_label
-    label_image = np.where(binary, label_image, 0)
-    return label_image.astype(np.uint32)
+    return skimage.measure.label(binary).astype(np.uint32)
 
 
 # --8<-- [end:segmentation_fn]
@@ -70,23 +72,21 @@ seg_iterator = SegmentationIterator(
     output_label=label,
     channel_selection="DAPI",
     axes_order=["z", "y", "x"],
+    stitch=True,
 )
 seg_iterator = seg_iterator.product(roi_table)
 
 # Split any remaining time axis, so each step yields one whole ZYX volume
 seg_iterator = seg_iterator.by_zyx()
 
-max_label = 0  # Carried across regions so the label ids never collide
-for image_data, label_writer in seg_iterator.iter_as_numpy():
-    roi_segmentation = otsu_threshold_segmentation(
-        image_data, max_label
-    )  # Segment the image
+# Each FOV reads a halo past its edge; `stitch=True` uses that overlap to give
+# every FOV its own id block and to merge objects split by a FOV boundary,
+# then renumbers everything to a dense 1..N.
+seg_iterator = seg_iterator.with_halo(x=16, y=16)
 
-    max_label = roi_segmentation.max()  # Get the max label for the next iteration
+seg_iterator.map(otsu_threshold_segmentation)
 
-    label_writer(patch=roi_segmentation)  # Write the segmentation back to the label
-
-# No need to consolidate, the iterator does it automatically after the last write
+# No need to consolidate, the iterator does it automatically after the map
 # --8<-- [end:segment]
 
 # --8<-- [start:plot_segmentation]
@@ -149,27 +149,25 @@ image = ome_zarr.get_masked_image(masking_label_name="mask")
 label = ome_zarr.derive_label("masked_new_label", overwrite=True)
 
 # Setup the masked segmentation iterator
+from ngio.transforms import UniqueLabelsTransform
+
+# Each mask's ids land in a block of their own — the ROI's label picks the
+# block, so the transform needs no per-region state and the map can even run
+# under a parallel mapper.
 seg_iterator = MaskedSegmentationIterator(
     input_image=image,
     output_label=label,
     channel_selection="DAPI",
     axes_order=["z", "y", "x"],
+    output_transforms=[UniqueLabelsTransform(10_000)],
 )
 
 # Split any remaining time axis, so each step yields one whole ZYX volume
 seg_iterator = seg_iterator.by_zyx()
 
-max_label = 0  # Carried across regions so the label ids never collide
-for image_data, label_writer in seg_iterator.iter_as_numpy():
-    roi_segmentation = otsu_threshold_segmentation(
-        image_data, max_label
-    )  # Segment the image
+seg_iterator.map(otsu_threshold_segmentation)
 
-    max_label = roi_segmentation.max()  # Get the max label for the next iteration
-
-    label_writer(patch=roi_segmentation)  # Write the segmentation back to the label
-
-# No need to consolidate, the iterator does it automatically after the last write
+# No need to consolidate, the iterator does it automatically after the map
 # --8<-- [end:masked_segment]
 
 # --8<-- [start:plot_masked_segmentation]

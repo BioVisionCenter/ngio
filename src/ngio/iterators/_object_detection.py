@@ -429,7 +429,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                 else:
                     # No confidence to rank by: the bigger box wins.
                     score = 1.0
-                    for low, length in slices.values():
+                    for _, length in slices.values():
                         score *= length
                 detections.append(
                     _Detection(

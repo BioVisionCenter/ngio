@@ -63,7 +63,7 @@ Some images are larger than memory. In that case, use the `dask` library to proc
 
 ## Step 6: image processing iterators
 
-`ngio` also processes large images with iterators. This API is not meant to replace `dask`: it lets you iterate over arbitrary regions, and it supplies default broadcasting behaviour.
+`ngio` also processes large images with iterators. This API is not meant to replace `dask`: it lets you iterate over arbitrary regions, and it supplies default broadcasting behaviour. Note how it solves the two problems the dask version left open — `with_halo` reads a margin of context so the blur has no seams, and a `ThreadedMapper` fans the regions out on a thread pool while the disjoint write footprints keep the parallel writes safe.
 
 ```python exec="true" source="material-block" session="image_processing"
 --8<-- "docs/snippets/tutorials/image_processing.py:iterators"

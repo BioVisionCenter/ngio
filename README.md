@@ -51,14 +51,16 @@ Then work through the
 ## Versioning
 
 ngio follows [semantic versioning](https://semver.org/): from 1.0 onwards the public API
-is stable, and breaking changes are reserved for major releases.
+is stable, and breaking changes are reserved for major releases. The one carve-out is
+structural protocols (`MapperProtocol` and friends): implementing them pins you to the
+documented contract, which minor releases may extend with *optional* members.
 
 ## Documentation
 
 Full documentation, including guides, tutorials and the API reference, is at
-[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). The worked
-examples are executed when the site is built, so the code and the output you read are what
-actually ran.
+[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). The tutorials'
+worked examples are executed when the site is built, so the code and the output you read
+are what actually ran.
 
 ## Citing ngio
 

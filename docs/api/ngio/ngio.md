@@ -5,6 +5,7 @@
       members:
         - AxesSetup
         - ChannelSelectionModel
+        - ConsolidationConfig
         - DaskConfig
         - DefaultNgffVersion
         - Dimensions
@@ -17,5 +18,6 @@
         - Roi
         - RoiSlice
         - StoreOrGroup
+        - ZarrConfig
         - create_synthetic_ome_zarr
         - get_config

@@ -80,8 +80,8 @@ class StitchConfig:
             raise NgioValueError(f"block_size must be > 0, got {self.block_size}.")
         if not 0.0 < self.iou_threshold <= 1.0:
             raise NgioValueError(
-                f"iou_threshold must be in (0, 1], got {self.iou_threshold}. Zero would "
-                "merge any pair that shares a single pixel."
+                f"iou_threshold must be in (0, 1], got {self.iou_threshold}. "
+                "Zero would merge any pair that shares a single pixel."
             )
 
 

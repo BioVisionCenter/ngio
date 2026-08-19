@@ -147,8 +147,16 @@ iterator.require_no_regions_overlap()
 # ...nor share chunks, which is what makes parallel writes safe.
 iterator.require_no_chunks_overlap()
 
-# Map the blur across every region
-iterator.map(lambda x: gaussian_blur(x, sigma=sigma))
+# A blur at a region edge has no neighbours to average with, which is exactly
+# the seam artifact the dask version above warns about. `with_halo` fixes it:
+# each region reads a margin of context, and the border is cropped before the
+# write, so the write footprints (and the parallel safety) are unchanged.
+iterator = iterator.with_halo(x=16, y=16)
+
+# Map the blur across every region, fanning out on a thread pool.
+from ngio import ThreadedMapper
+
+iterator.map(lambda x: gaussian_blur(x, sigma=sigma), mapper=ThreadedMapper("auto"))
 
 # No need to consolidate: the iterator does it once every region is processed
 # --8<-- [end:iterators]
