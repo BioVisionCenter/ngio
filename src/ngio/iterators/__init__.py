@@ -6,6 +6,7 @@ from ngio.iterators._feature import FeatureExtractorIterator, FeatureFuncResult
 from ngio.iterators._image_processing import ImageProcessingIterator
 from ngio.iterators._mappers import (
     BasicMapper,
+    BatchedMapper,
     IterUnit,
     MapperProtocol,
     ProcessMapper,
@@ -28,6 +29,7 @@ from ngio.iterators._stitch import StitchConfig
 __all__ = [
     "AbstractIteratorBuilder",
     "BasicMapper",
+    "BatchedMapper",
     "DetectionFuncResult",
     "FeatureExtractorIterator",
     "FeatureFuncResult",

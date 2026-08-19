@@ -45,6 +45,7 @@ from ngio.images import (
 from ngio.iterators import (
     AbstractIteratorBuilder,
     BasicMapper,
+    BatchedMapper,
     DetectionFuncResult,
     FeatureExtractorIterator,
     FeatureFuncResult,
@@ -97,6 +98,7 @@ __all__ = [
     "AbstractIteratorBuilder",
     "AxesSetup",
     "BasicMapper",
+    "BatchedMapper",
     "Channel",
     "ChannelSelectionModel",
     "ConsolidationConfig",

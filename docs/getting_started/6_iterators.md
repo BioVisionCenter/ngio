@@ -258,6 +258,16 @@ For per-ROI measurement without writing anything, use `reduce` — it returns on
 --8<-- "docs/snippets/getting_started/iterators.py:reduce_demo"
 ```
 
+## Batched inference
+
+For neural-network inference the per-call overhead usually dominates, and the model wants one batched `(B, ...)` input rather than one patch at a time. `BatchedMapper` does exactly that: it stacks up to `batch_size` patches into a single array, calls the func **once per batch**, and writes each result back to its own region:
+
+```python exec="true" source="material-block" session="iterators"
+--8<-- "docs/snippets/getting_started/iterators.py:batched_demo"
+```
+
+This is the one mapper that changes the func's contract: it receives a stacked batch with a leading batch axis and must return an array with the same leading axis. Everything else composes as usual — tilings are ragged in general (border tiles clip, halos shrink at image edges, masked regions are arbitrary), so each batch is padded up to its per-axis maximum before stacking (`pad_mode`/`pad_values` choose how) and every output is sliced back to its region's true shape before the write; a halo is trimmed after that, exactly as under any other mapper; and `for_job` partitions batch their own share. Within a batch the reads fan out on a thread pool (`read_workers`), while the writes run serially on the calling thread — like the serial mapper, batched mapping is write-safe on any tiling, no wave planning involved.
+
 ## Distributed runs: selecting a partition
 
 A mapper parallelizes within one machine. On a cluster — SLURM array tasks over a shared filesystem, where processes cannot coordinate — restrict each task to one partition of the work instead:

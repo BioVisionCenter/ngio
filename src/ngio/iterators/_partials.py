@@ -107,9 +107,7 @@ def write_partial(
     empty-table edge cases of the backends). Re-running a job overwrites its
     own partial idempotently; no other job's subgroup is touched.
     """
-    job = handler.get_handler(
-        path=f"{_PARTIALS_GROUP}/job_{job_index}", overwrite=True
-    )
+    job = handler.get_handler(path=f"{_PARTIALS_GROUP}/job_{job_index}", overwrite=True)
     if frame is not None and len(frame):
         table = GenericTable(table_data=frame.reset_index(drop=True))
         table.set_backend(handler=job)

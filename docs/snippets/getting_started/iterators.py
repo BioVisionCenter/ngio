@@ -81,6 +81,25 @@ means = seg_iterator.reduce(lambda unit: float(unit.mean()))
 print([round(mean, 1) for mean in means])
 # --8<-- [end:reduce_demo]
 
+# --8<-- [start:batched_demo]
+from ngio import BatchedMapper, ImageProcessingIterator
+
+
+def fake_model(batch: np.ndarray) -> np.ndarray:
+    # Stands in for a neural network: one (B, y, x) input, one call per batch.
+    return batch // 2
+
+
+halved = demo.derive_image(store=MemoryStore())
+nn_iterator = ImageProcessingIterator(demo_image, halved.get_image())
+
+# size 24 over 64 clips the border tiles to 16 - the ragged shapes are padded
+# to each batch's maximum before stacking, and sliced back before the write.
+nn_iterator = nn_iterator.by_grid(size_x=24, size_y=24)
+nn_iterator.map(fake_model, mapper=BatchedMapper(batch_size=4))
+print(halved.get_image().get_as_numpy().mean().round(2))
+# --8<-- [end:batched_demo]
+
 # --8<-- [start:halo_demo]
 from scipy.ndimage import uniform_filter
 

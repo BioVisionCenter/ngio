@@ -5,10 +5,13 @@ the results. A mapper is the *only* way to schedule iterator work: `map` and
 `reduce` take a `mapper` argument and nothing else, so the pool size lives on
 the mapper that owns it rather than being spelled a second time at the call.
 
-Three ship with ngio. `BasicMapper` is serial and is what `mapper=None` means.
-`ThreadedMapper` fans units out on a thread pool — the fit for round-trip-bound
-IO and for `func`s that release the GIL. `ProcessMapper` fans out on a
-spawn-based process pool — the fit for pure-Python, GIL-holding `func`s. Both
+Four ship with ngio. `BasicMapper` is serial and is what `mapper=None` means.
+`BatchedMapper` is serial too, but stacks patches into one `(B, ...)` array
+per `func` call — the fit for neural-network inference, where per-call
+overhead dominates and the model wants batched input. `ThreadedMapper` fans
+units out on a thread pool — the fit for round-trip-bound IO and for `func`s
+that release the GIL. `ProcessMapper` fans out on a spawn-based process pool
+— the fit for pure-Python, GIL-holding `func`s. Both
 parallel mappers take their pool size at construction, and both plan their
 units into conflict-free *waves* (`plan_waves`): two units whose write
 footprints share a write unit never run in the same wave, and the waves run
@@ -30,6 +33,8 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
 from typing import Any, Generic, Protocol, TypeVar, cast
+
+import numpy as np
 
 from ngio.common import Roi
 from ngio.common._concurrency import MaxWorkers, _resolve_max_workers
@@ -167,6 +172,159 @@ class BasicMapper(Generic[T, R]):
             results.append((unit.index, result))
         results.sort(key=lambda item: item[0])
         return [result for _, result in results]
+
+
+class BatchedMapper:
+    """Stack patches into `(B, ...)` batches and call `func` once per batch.
+
+    The fit for neural-network inference, where per-call overhead dominates
+    and the model wants batched input. Unlike every other mapper, `func`
+    receives a *stacked* array — a leading batch axis over up to `batch_size`
+    patches — and must return an array-like with the same leading axis whose
+    items follow `map`'s per-patch contract.
+
+    Tilings are ragged in general (`by_chunks` clips border tiles, halos
+    shrink at image borders, ROI-table regions are arbitrary), so each batch
+    is padded up to its per-axis maximum shape before stacking —
+    origin-anchored, real pixels first, padding after — and when `func`
+    preserves the batch's item shape, each output item is sliced back to its
+    patch's true shape before the write. Any halo is trimmed afterwards by
+    the setter as usual, so `func` sees patch + halo exactly as under any
+    other mapper. Read-only units collect the (trimmed) output items instead
+    of writing; `func`s that reduce away the patch axes (per-item scalars,
+    say) are returned untouched — but they see the padded pixels, so pad
+    ragged tilings with values the reduction can tolerate.
+
+    Reads within a batch fan out on a thread pool (`read_workers`) — they
+    are round-trip bound. Writes run serially on the dispatching thread, so
+    no wave planning is needed: like `BasicMapper`, this mapper is
+    write-safe in any topology, `for_job` partitions included.
+
+    Args:
+        batch_size: Number of patches stacked per `func` call. The last
+            batch may be smaller.
+        pad_mode: `np.pad` mode used to grow ragged patches to the batch
+            shape, typically `"constant"` or `"reflect"`.
+        pad_values: Fill value when `pad_mode="constant"`, ignored otherwise.
+        read_workers: Pool size for the per-batch reads. `"auto"` (the
+            default) sizes it for round-trip-bound work, an `int` pins it,
+            `1` reads serially; `None` means `"auto"`.
+    """
+
+    def __init__(
+        self,
+        batch_size: int = 8,
+        pad_mode: str = "constant",
+        pad_values: int | float = 0,
+        read_workers: MaxWorkers = "auto",
+    ) -> None:
+        if batch_size < 1:
+            raise NgioValueError(f"batch_size must be >= 1, got {batch_size}.")
+        _validate_max_workers(read_workers)
+        self._batch_size = batch_size
+        self._pad_mode = pad_mode
+        self._pad_values = pad_values
+        self._read_workers = read_workers
+
+    def _resolve_read_workers(self) -> int:
+        read_workers = "auto" if self._read_workers is None else self._read_workers
+        resolved = _resolve_max_workers(read_workers)
+        assert resolved is not None
+        return max(1, min(resolved, self._batch_size))
+
+    def _pad(self, patch: np.ndarray, batch_shape: tuple[int, ...]) -> np.ndarray:
+        # Origin-anchored: real pixels first, padding after, so the way back
+        # is a plain `[:size]` slice per axis.
+        pad_widths = tuple(
+            (0, target - size)
+            for size, target in zip(patch.shape, batch_shape, strict=True)
+        )
+        if not any(after for _, after in pad_widths):
+            return patch
+        if self._pad_mode == "constant":
+            return np.pad(
+                patch, pad_widths, mode="constant", constant_values=self._pad_values
+            )
+        return np.pad(patch, pad_widths, mode=self._pad_mode)  # ty: ignore[no-matching-overload]
+
+    def _process_batch(
+        self,
+        func: Callable[[np.ndarray], np.ndarray],
+        batch: Sequence[IterUnit[np.ndarray]],
+        patches: Sequence[np.ndarray],
+    ) -> list[tuple[int, np.ndarray]]:
+        for unit, patch in zip(batch, patches, strict=True):
+            if not isinstance(patch, np.ndarray):
+                raise NgioValueError(
+                    "BatchedMapper can only stack bare-array units, got "
+                    f"{type(patch).__name__} for ROI {unit.roi.name!r}. Iterators "
+                    "whose units carry tuples (feature extraction, object "
+                    "detection) cannot be batched."
+                )
+        try:
+            batch_shape = tuple(
+                max(sizes)
+                for sizes in zip(*(patch.shape for patch in patches), strict=True)
+            )
+        except ValueError:
+            ndims = sorted({patch.ndim for patch in patches})
+            raise NgioValueError(
+                f"Cannot stack patches of mixed dimensionality {ndims} into one batch."
+            ) from None
+
+        stacked = np.stack([self._pad(patch, batch_shape) for patch in patches])
+        out = np.asarray(func(stacked))
+        if out.shape[:1] != (len(batch),):
+            raise NgioValueError(
+                f"The batched func returned shape {out.shape} for a batch of "
+                f"{len(batch)} patches; the leading axis must be the batch axis."
+            )
+
+        # Slice each item back to its patch's pre-padding shape — but only
+        # when `func` preserved the item shape; anything else (a per-item
+        # reduction) passes through, and a writing unit's setter still
+        # rejects a wrong shape loudly.
+        trim = tuple(out.shape[1:]) == batch_shape
+        indexed: list[tuple[int, np.ndarray]] = []
+        for unit, patch, item in zip(batch, patches, out, strict=True):
+            if trim and patch.shape != batch_shape:
+                item = item[tuple(slice(0, size) for size in patch.shape)]
+            if unit.setter is not None:
+                unit.setter(item)
+                # As everywhere else: the written patch is not shipped back.
+                indexed.append((unit.index, cast("np.ndarray", None)))
+            else:
+                indexed.append((unit.index, item))
+        return indexed
+
+    def __call__(
+        self,
+        func: Callable[[np.ndarray], np.ndarray],
+        units: Iterable[IterUnit[np.ndarray]],
+    ) -> list[np.ndarray]:
+        """Apply `func` batch-wise and return the results in ROI order."""
+        units = list(units)
+        if not units:
+            return []
+        batches = [
+            units[start : start + self._batch_size]
+            for start in range(0, len(units), self._batch_size)
+        ]
+        workers = min(self._resolve_read_workers(), len(units))
+        indexed: list[tuple[int, np.ndarray]] = []
+        pool = ThreadPoolExecutor(max_workers=workers) if workers > 1 else None
+        try:
+            for batch in batches:
+                if pool is not None:
+                    patches = list(pool.map(lambda unit: unit.getter(), batch))
+                else:
+                    patches = [unit.getter() for unit in batch]
+                indexed.extend(self._process_batch(func, batch, patches))
+        finally:
+            if pool is not None:
+                pool.shutdown()
+        indexed.sort(key=lambda item: item[0])
+        return [result for _, result in indexed]
 
 
 def _collect_write_footprints(

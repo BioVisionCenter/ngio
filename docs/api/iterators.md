@@ -44,6 +44,10 @@ description: API reference for the ngio processing iterators.
 
 ::: ngio.iterators.ProcessMapper
 
+### BatchedMapper
+
+::: ngio.iterators.BatchedMapper
+
 ### BasicMapper
 
 ::: ngio.iterators.BasicMapper
