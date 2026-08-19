@@ -320,6 +320,7 @@ class MaskedImage(Image):
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         elif isinstance(patch, np.ndarray):
             path_setter = NumpySetter(
                 roi=roi,
@@ -331,6 +332,7 @@ class MaskedImage(Image):
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -568,6 +570,7 @@ class MaskedLabel(Label):
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         elif isinstance(patch, np.ndarray):
             path_setter = NumpySetter(
                 roi=roi,
@@ -579,6 +582,7 @@ class MaskedLabel(Label):
                 slicing_dict=slicing_kwargs,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "

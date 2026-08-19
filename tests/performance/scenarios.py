@@ -162,6 +162,40 @@ def _consolidation_target(ctx, mode):
     return image
 
 
+def _partial_consolidation_target(ctx):
+    """A consolidated pyramid with one rewritten quadrant.
+
+    Chunks are 64px rather than `_consolidation_target`'s 128: with one chunk
+    per level-1 plane, snapping the quadrant to the write unit covers the
+    whole level and the region path (correctly) degenerates into the full
+    rebuild -- the counts would pin nothing. At 64px the levels hold real
+    chunk grids, so only the quadrant's column of each level is touched.
+
+    The initial full consolidate and the quadrant rewrite happen here in
+    `setup`, so the measurement covers only the region-scoped rebuild.
+    """
+    container = create_empty_ome_zarr(
+        store=ctx.scratch("consolidate_partial_dask"),
+        shape=(1, 4, 256, 256),
+        axes_names=["c", "z", "y", "x"],
+        channels_meta=["Channel 1"],
+        levels=3,
+        pixelsize=(0.65, 0.65),
+        chunks=(1, 1, 64, 64),
+        compressors=None,
+        overwrite=True,
+    )
+    image = container.get_image(path="0")
+    image.set_array(patch=np.ones((1, 4, 256, 256), dtype=np.uint16))
+    image.consolidate(mode="dask")
+    image.set_array(
+        patch=np.full((1, 4, 128, 128), 2, dtype=np.uint16),
+        y=slice(0, 128),
+        x=slice(0, 128),
+    )
+    return image
+
+
 SCENARIOS: dict[str, Scenario] = {
     # --- open and metadata ------------------------------------------------
     # `cache=True` must cost strictly fewer reads than `cache=False`. These two
@@ -414,12 +448,32 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _sharded_consolidation_target(ctx),
         lambda image: image.consolidate(mode="dask"),
     ),
+    # The region-scoped rebuild after a single-quadrant rewrite -- the
+    # acceptance meter for partial consolidation -- and its control: the same
+    # target, rebuilt fully. The invariant
+    # (`test_partial_consolidation_is_cheaper`) compares the pair, so it holds
+    # whatever this geometry's absolute counts are; comparing against
+    # `consolidate_dask` instead would entangle it with that scenario's
+    # different chunk grid.
+    "consolidate_partial_dask": Scenario(
+        lambda ctx: _partial_consolidation_target(ctx),
+        lambda image: image.consolidate(
+            mode="dask",
+            regions=[(slice(None), slice(None), slice(0, 128), slice(0, 128))],
+        ),
+    ),
+    "consolidate_partial_control": Scenario(
+        lambda ctx: _partial_consolidation_target(ctx),
+        lambda image: image.consolidate(mode="dask"),
+    ),
     # --- iterators ---------------------------------------------------------
     # A writing iterator end to end: per-ROI reads and writes, the per-ROI
-    # metadata probes, and `finalize`'s *whole-pyramid* rebuild -- the
-    # iterator knows exactly which regions it wrote and rebuilds every level
-    # anyway. A future region-scoped consolidation lands here as a
-    # `get.chunk`/`set.chunk` drop; this number is its acceptance meter.
+    # metadata probes, and `finalize`'s pyramid rebuild. `by_chunks()` tiles
+    # the whole image, so the touched regions cover 100% of level 0 and the
+    # region-scoped consolidation correctly declines (`partial_max_coverage`)
+    # -- these counts pin that a full-coverage iterator costs exactly what it
+    # did before regions existed. The region path's own acceptance meter is
+    # `consolidate_partial_dask`.
     "iterator_map_numpy": Scenario(
         _iterator_target,
         lambda it: it.map_as_numpy(lambda patch: (patch > 0).astype("uint32")),

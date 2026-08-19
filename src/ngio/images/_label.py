@@ -7,8 +7,16 @@ from zarr.core.array import CompressorLike
 
 from ngio.common import compute_masking_roi
 from ngio.common._label_ops import relabel_sequential
-from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
-from ngio.images._abstract_image import AbstractImage, abstract_derive
+from ngio.common._pyramid import (
+    ChunksLike,
+    ConsolidationMode,
+    ShardsLike,
+)
+from ngio.images._abstract_image import (
+    AbstractImage,
+    ConsolidationRegions,
+    abstract_derive,
+)
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
     LabelMetaHandler,
@@ -87,11 +95,20 @@ class Label(AbstractImage):
     def consolidate(
         self,
         mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
-        """Consolidate the label on disk."""
+        """Consolidate the label on disk.
+
+        Args:
+            mode: How to build each level, see `ConsolidationMode`.
+            regions: Where this level changed -- `Roi`s or on-disk index
+                tuples -- to rebuild only what derives from it. See
+                `Image.consolidate`.
+        """
         self._consolidate(
             order="nearest",
             mode=mode,
+            regions=regions,
         )
 
     def relabel_sequential(

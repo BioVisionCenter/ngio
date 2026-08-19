@@ -200,6 +200,14 @@ A minimal read-modify-write example:
     ```python
     image.consolidate()
     ```
+    If your edits touch only part of a large image, record them with `track_writes` and consolidate selectively — only the pyramid regions that derive from the writes are rebuilt, with results identical to a full rebuild:
+    ```python
+    with image.track_writes() as regions:
+        image.set_roi(roi, patch)
+        image.set_array(other, y=slice(0, 64), x=slice(0, 64))
+    image.consolidate(regions=regions)
+    ```
+    Only `set_*` calls made through this image handle are recorded — writes through other handles, custom setter pipes, or worker processes are not seen.
 
 ### World coordinates slicing
 

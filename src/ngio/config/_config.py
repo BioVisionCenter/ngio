@@ -134,6 +134,11 @@ class ConsolidationConfig(BaseModel):
     `order` in `{"nearest", "linear"}`. Outside that envelope a size threshold
     would silently pick between two different answers.
 
+    `partial_max_coverage` bounds `consolidate(regions=...)`: once the merged
+    touched regions cover more than this fraction of the source level, region
+    bookkeeping stops paying for itself and the whole pyramid is rebuilt
+    instead -- always correct, just not selective.
+
     Example:
         ```python
         ConsolidationConfig(numpy_max_bytes=0)  # never build in memory
@@ -141,6 +146,7 @@ class ConsolidationConfig(BaseModel):
     """
 
     numpy_max_bytes: int = Field(default=256 * 2**20, ge=0)
+    partial_max_coverage: float = Field(default=0.5, ge=0.0, le=1.0)
     model_config = ConfigDict(validate_assignment=True)
 
 

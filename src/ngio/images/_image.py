@@ -14,8 +14,16 @@ from ngio.common import (
     InterpolationOrder,
     Roi,
 )
-from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
-from ngio.images._abstract_image import AbstractImage, abstract_derive
+from ngio.common._pyramid import (
+    ChunksLike,
+    ConsolidationMode,
+    ShardsLike,
+)
+from ngio.images._abstract_image import (
+    AbstractImage,
+    ConsolidationRegions,
+    abstract_derive,
+)
 from ngio.io_pipes import (
     MergeInput,
     SlicingInputType,
@@ -438,9 +446,24 @@ class Image(AbstractImage):
         self,
         order: InterpolationOrder = "linear",
         mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
-        """Consolidate the label on disk."""
-        self._consolidate(order=order, mode=mode)
+        """Consolidate the image on disk.
+
+        Args:
+            order: The interpolation order.
+            mode: How to build each level, see `ConsolidationMode`.
+            regions: Where this level changed -- typically the `Roi`s that were
+                written (`set_roi`'s own argument fits directly); raw on-disk
+                index tuples, as a setter pipe's
+                `slicing_ops.normalized_slicing_tuple` produces, also work.
+                Only the pyramid regions derived from them are rebuilt,
+                identically to a full rebuild; outside the exact envelope
+                (integral downsamples, `order` not `"cubic"`, coverage below
+                `ConsolidationConfig.partial_max_coverage`) the whole pyramid
+                is rebuilt instead, silently. `None` rebuilds everything.
+        """
+        self._consolidate(order=order, mode=mode, regions=regions)
 
 
 class ImagesContainer:

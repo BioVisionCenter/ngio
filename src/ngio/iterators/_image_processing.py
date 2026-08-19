@@ -151,4 +151,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def finalize(self):
-        self._output.consolidate(mode=self._consolidation_mode)
+        self._output.consolidate(
+            mode=self._consolidation_mode, regions=self._touched_write_regions()
+        )

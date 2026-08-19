@@ -1,9 +1,11 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
+import threading
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, Literal, TypeAlias
 
 import dask.array as da
 import numpy as np
@@ -16,9 +18,11 @@ from ngio.common import (
     Roi,
     consolidate_pyramid,
 )
+from ngio.common._dask_io import RegionType
 from ngio.common._pyramid import (
     ChunksLike,
     ConsolidationMode,
+    RegionsLike,
     ShardsLike,
     compute_scales_from_shapes,
     compute_shapes_from_scaling_factors,
@@ -69,6 +73,12 @@ from ngio.utils._zarr_utils import find_dimension_separator
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
+#: Regions for `consolidate(regions=...)` at the image level: `Roi`s -- the
+#: form the rest of the high-level API speaks -- or raw on-disk index tuples
+#: (what a setter pipe's `slicing_ops.normalized_slicing_tuple` produces), or
+#: a mix. Rois are resolved against this image's dimensions and pixel size.
+ConsolidationRegions: TypeAlias = Sequence[Roi | tuple[RegionType, ...]]
+
 
 class AbstractImage(ABC):
     """A class to handle a single image (or level) in an OME-Zarr image.
@@ -102,6 +112,11 @@ class AbstractImage(ABC):
         # (meta generation, dataset, dimensions); see
         # `_resolve_dataset_and_dimensions`.
         self._dataset_cache: tuple[int, Dataset, Dimensions] | None = None
+
+        # Active `track_writes` recorders; empty outside any context, so the
+        # per-write cost is one attribute check.
+        self._write_trackers: list[list[tuple[RegionType, ...]]] = []
+        self._tracker_lock = threading.Lock()
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
@@ -495,6 +510,49 @@ class AbstractImage(ABC):
                 f"Unsupported mode: {mode}. Supported modes are: numpy, dask."
             )
 
+    @contextmanager
+    def track_writes(self) -> Generator[list[tuple[RegionType, ...]]]:
+        """Record the region of every `set_*` write made through this handle.
+
+        Only the `set_*` methods are recorded — `set_array`, `set_roi`, and
+        their masked variants. Yields a list that accumulates one on-disk
+        index tuple per completed write, ready to hand to
+        `consolidate(regions=...)` so the pyramid rebuild covers exactly what
+        was written:
+
+        ```python
+        with image.track_writes() as regions:
+            image.set_roi(roi, patch)
+            image.set_array(other, y=slice(0, 64))
+        image.consolidate(regions=regions)
+        ```
+
+        Tracking is scoped to the context and to *this* handle in *this*
+        process: writes through setter pipes built directly on the zarr
+        array, through another handle to the same image, or in worker
+        processes (`ProcessMapper`) are not seen — iterators track their own
+        writes through their ROI list instead. Threads sharing this handle
+        all record, and a write that raises records nothing. Nested contexts
+        each keep their own list.
+        """
+        regions: list[tuple[RegionType, ...]] = []
+        with self._tracker_lock:
+            self._write_trackers.append(regions)
+        try:
+            yield regions
+        finally:
+            with self._tracker_lock:
+                self._write_trackers.remove(regions)
+
+    def _record_write(self, setter: NumpySetter | DaskSetter) -> None:
+        """Append a completed write's region to every active tracker."""
+        if not self._write_trackers:
+            return
+        region = setter.slicing_ops.normalized_slicing_tuple
+        with self._tracker_lock:
+            for tracker in self._write_trackers:
+                tracker.append(region)
+
     def _set_array(
         self,
         patch: np.ndarray | da.Array,
@@ -524,6 +582,7 @@ class AbstractImage(ABC):
                 slicing_dict=slicing_kwargs,
             )
             numpy_setter(patch)
+            self._record_write(numpy_setter)
 
         elif isinstance(patch, da.Array):
             dask_setter = DaskSetter(
@@ -535,6 +594,7 @@ class AbstractImage(ABC):
                 slicing_dict=slicing_kwargs,
             )
             dask_setter(patch)
+            self._record_write(dask_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -574,6 +634,7 @@ class AbstractImage(ABC):
                 slicing_dict=slicing_kwargs,
             )
             roi_numpy_setter(patch)
+            self._record_write(roi_numpy_setter)
 
         elif isinstance(patch, da.Array):
             roi_dask_setter = DaskSetter(
@@ -586,6 +647,7 @@ class AbstractImage(ABC):
                 slicing_dict=slicing_kwargs,
             )
             roi_dask_setter(patch)
+            self._record_write(roi_dask_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -597,14 +659,17 @@ class AbstractImage(ABC):
         self,
         order: InterpolationOrder = "linear",
         mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
         """Consolidate the image on disk.
 
         Args:
             order: The order of the consolidation.
             mode: The mode of the consolidation.
+            regions: Where this level changed, to rebuild only what derives
+                from it. See `consolidate_pyramid`.
         """
-        consolidate_image(image=self, order=order, mode=mode)
+        consolidate_image(image=self, order=order, mode=mode, regions=regions)
 
     def roi(self, name: str | None = "image") -> Roi:
         """Return the ROI covering the entire image."""
@@ -723,10 +788,36 @@ class AbstractImage(ABC):
         return self.dimensions.check_if_rescalable(other.dimensions)
 
 
+def _resolve_consolidation_regions(
+    image: AbstractImage, regions: ConsolidationRegions
+) -> RegionsLike:
+    """Resolve `Roi`s to on-disk index tuples; tuples pass through.
+
+    A `Roi` is resolved through the same pipe machinery every ROI read and
+    write goes through (world-to-pixel conversion, clamping, on-disk axis
+    order included), so `consolidate(regions=rois)` names exactly the pixels
+    `set_roi(roi, ...)` wrote. Building a getter is pure metadata -- no IO.
+    """
+    resolved = []
+    for region in regions:
+        if isinstance(region, Roi):
+            getter = NumpyGetter(
+                zarr_array=image.zarr_array,
+                dimensions=image.dimensions,
+                roi=region,
+                slicing_dict={},
+            )
+            resolved.append(getter.slicing_ops.normalized_slicing_tuple)
+        else:
+            resolved.append(region)
+    return resolved
+
+
 def consolidate_image(
     image: AbstractImage,
     order: InterpolationOrder = "linear",
     mode: ConsolidationMode | None = None,
+    regions: ConsolidationRegions | None = None,
 ) -> None:
     """Consolidate the image on disk."""
     target_paths = image.meta_handler.get_meta().paths
@@ -736,7 +827,13 @@ def consolidate_image(
         if path != image.path
     ]
     consolidate_pyramid(
-        source=image.zarr_array, targets=targets, order=order, mode=mode
+        source=image.zarr_array,
+        targets=targets,
+        order=order,
+        mode=mode,
+        regions=(
+            None if regions is None else _resolve_consolidation_regions(image, regions)
+        ),
     )
 
 

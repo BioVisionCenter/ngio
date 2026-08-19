@@ -61,6 +61,22 @@ def test_auto_consolidation_resolution_is_free(scenarios):
     assert scenarios["consolidate_auto"] == scenarios["consolidate_numpy"]
 
 
+def test_partial_consolidation_is_cheaper(scenarios):
+    """The region-scoped rebuild must cost strictly less than its control.
+
+    Same setup, same rewritten quadrant, the control rebuilds fully: only the
+    chunks that derive from the quadrant may be read and rewritten per level.
+    If these counts ever reach the control's, the region path has silently
+    degraded into a full rebuild — which is safe for correctness and exactly
+    what this gate exists to catch.
+    """
+    partial = scenarios["consolidate_partial_dask"]
+    control = scenarios["consolidate_partial_control"]
+    assert partial["get.chunk"] < control["get.chunk"]
+    assert partial["set.chunk"] < control["set.chunk"]
+    assert partial["bytes.read"] < control["bytes.read"]
+
+
 def test_op_counts_are_invariant_to_concurrency(scenarios):
     """The parallel map must tally byte-for-byte like the serial one.
 

@@ -9,7 +9,7 @@ import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict, model_validator
 
-from ngio.common._dask_io import store_dask
+from ngio.common._dask_io import RegionType, store_dask
 from ngio.common._zoom import (
     InterpolationOrder,
     _zoom_inputs_check,
@@ -27,6 +27,15 @@ from ngio.utils import (
 #: where it is bit-identical to the chunked one; see `_resolve_auto_mode`.
 ConsolidationMode: TypeAlias = Literal["dask", "numpy", "coarsen", "auto"]
 
+#: Where the source level changed, for `consolidate(regions=...)`: one on-disk
+#: index tuple per touched region, in the source array's axis order -- exactly
+#: what a setter's `slicing_ops.normalized_slicing_tuple` produces.
+RegionsLike: TypeAlias = Sequence[tuple[RegionType, ...]]
+
+#: A region as per-axis `[start, stop)` pixel bounds -- the internal canonical
+#: form every `RegionsLike` input is normalized to.
+PixelRegion: TypeAlias = tuple[tuple[int, int], ...]
+
 #: The release in which `mode` starts defaulting to `"auto"`.
 _DEFAULT_CHANGES_IN = "1.2"
 
@@ -40,15 +49,15 @@ def _read_numpy(source: zarr.Array) -> np.ndarray:
 
 def _coarsen_expr(
     source_array: da.Array,
-    target: zarr.Array,
+    target_shape: tuple[int, ...],
     order: InterpolationOrder = "linear",
     aggregation_function: Callable | None = None,
 ) -> da.Array:
-    """Coarsen a dask array onto a target's shape, as an unevaluated expression.
+    """Coarsen a dask array onto a target shape, as an unevaluated expression.
 
     Args:
         source_array: The source array to coarsen.
-        target: The array whose shape and dtype the result must match.
+        target_shape: The shape the result must match.
         order: Not really implemented for coarsening, kept for compatibility with
             the zoom function.
             order="linear" -> linear interpolation ~ np.mean
@@ -56,13 +65,13 @@ def _coarsen_expr(
         aggregation_function: The aggregation function to use.
     """
     _scale, _target_shape = _zoom_inputs_check(
-        source_array=source_array, scale=None, target_shape=target.shape
+        source_array=source_array, scale=None, target_shape=target_shape
     )
 
-    if _target_shape != target.shape:
+    if _target_shape != target_shape:
         raise NgioValueError(
             f"Coarsening would produce shape {_target_shape}, but the target "
-            f"array has shape {target.shape}."
+            f"array has shape {target_shape}."
         )
 
     if aggregation_function is None:
@@ -88,7 +97,7 @@ def _coarsen_expr(
             # in `aligned_coarsen_chunks`, which says nothing about the cause.
             raise NgioValueError(
                 f"Cannot coarsen axis {i} from size {source_array.shape[i]} to "
-                f"{target.shape[i]}: coarsening only downsamples. Use "
+                f"{target_shape[i]}: coarsening only downsamples. Use "
                 'mode="dask" or mode="numpy" to build a level larger than its '
                 "source."
             )
@@ -101,12 +110,13 @@ def _coarsen_expr(
 
 def _zoom_expr(
     source_array: da.Array,
-    target: zarr.Array,
+    target_shape: tuple[int, ...],
+    target_dtype: np.dtype,
     order: InterpolationOrder,
     mode: Literal["dask", "coarsen"],
     aggregation_function: Callable | None = None,
 ) -> da.Array:
-    """One pyramid level as an unevaluated dask expression.
+    """One pyramid level (or a region of one) as an unevaluated dask expression.
 
     The `astype` is not cosmetic. `da.coarsen(np.mean, ...)` promotes an integer
     source to float64; written to the store that float is cast back, so the next
@@ -117,12 +127,12 @@ def _zoom_expr(
     the float64 intermediate and makes coarsening markedly lighter.
     """
     if mode == "coarsen":
-        out = _coarsen_expr(source_array, target, order, aggregation_function)
+        out = _coarsen_expr(source_array, target_shape, order, aggregation_function)
     else:
-        out = dask_zoom(source_array, target_shape=target.shape, order=order)
+        out = dask_zoom(source_array, target_shape=target_shape, order=order)
 
-    if out.dtype != target.dtype:
-        out = out.astype(target.dtype)
+    if out.dtype != target_dtype:
+        out = out.astype(target_dtype)
     return out
 
 
@@ -168,7 +178,12 @@ def _on_disk_dask_zoom(
     # write unit, which is `shards or chunks`. Rechunking to `target.chunks`
     # here was worse than doing nothing on a sharded target -- that is the
     # shard's *inner* chunk shape, so every block became a partial shard write.
-    store_dask(_zoom_expr(_read_source_dask(source), target, order, "dask"), target)
+    store_dask(
+        _zoom_expr(
+            _read_source_dask(source), target.shape, target.dtype, order, "dask"
+        ),
+        target,
+    )
 
 
 def _on_disk_coarsen(
@@ -191,7 +206,12 @@ def _on_disk_coarsen(
     # See _on_disk_dask_zoom: store_dask owns the rechunk onto the write unit.
     store_dask(
         _zoom_expr(
-            _read_source_dask(source), target, order, "coarsen", aggregation_function
+            _read_source_dask(source),
+            target.shape,
+            target.dtype,
+            order,
+            "coarsen",
+            aggregation_function,
         ),
         target,
     )
@@ -306,6 +326,255 @@ def _is_integral_downsample(
         t >= 1 and s >= t and s % t == 0
         for s, t in zip(source_shape, target_shape, strict=True)
     )
+
+
+def _normalize_regions(
+    regions: RegionsLike, shape: tuple[int, ...]
+) -> list[PixelRegion]:
+    """Turn caller-facing region tuples into clamped `[start, stop)` bounds.
+
+    An `int` selects one index, a `list[int]` its bounding box -- over-covering
+    a fancy selection is safe here, since recomputing an untouched pixel just
+    rewrites the value it already had. Empty selections drop out.
+    """
+    out: list[PixelRegion] = []
+    for region in regions:
+        if len(region) != len(shape):
+            raise NgioValueError(
+                f"Region {region} has {len(region)} axes, but the source "
+                f"array has {len(shape)}."
+            )
+        bounds = []
+        for selection, dim in zip(region, shape, strict=True):
+            if isinstance(selection, slice):
+                start, stop, step = selection.indices(dim)
+                if step != 1:
+                    raise NgioValueError(
+                        f"Region {region} uses a stepped slice; regions must "
+                        "be contiguous."
+                    )
+            elif isinstance(selection, int):
+                start = selection + dim if selection < 0 else selection
+                stop = start + 1
+            elif isinstance(selection, list):
+                if not selection:
+                    start, stop = 0, 0
+                else:
+                    start, stop = min(selection), max(selection) + 1
+            else:
+                raise NgioValueError(
+                    f"Region {region} contains {selection!r}; each axis must "
+                    "be a slice, an int, or a list of ints."
+                )
+            bounds.append((max(0, start), min(dim, stop)))
+        if all(stop > start for start, stop in bounds):
+            out.append(tuple(bounds))
+    return out
+
+
+def _regions_touch(a: PixelRegion, b: PixelRegion) -> bool:
+    """Whether two half-open boxes overlap or share a face (adjacency counts)."""
+    return all(
+        a_start <= b_stop and b_start <= a_stop
+        for (a_start, a_stop), (b_start, b_stop) in zip(a, b, strict=True)
+    )
+
+
+def _merge_pass(regions: list[PixelRegion]) -> list[PixelRegion]:
+    """One sweep of union-find over touching regions, components to boxes."""
+    parent = list(range(len(regions)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    # Sweep on the most discriminating axis, as `check_if_regions_overlap`
+    # does: candidates for a touch test are only the regions still "active"
+    # (not yet ended) when a region starts, which is near-linear for the
+    # scattered boxes setters and ROI tables produce.
+    axis = max(
+        range(len(regions[0])),
+        key=lambda ax: len({region[ax][0] for region in regions}),
+    )
+    order = sorted(range(len(regions)), key=lambda i: regions[i][axis][0])
+    active: list[int] = []
+    for i in order:
+        start = regions[i][axis][0]
+        active = [j for j in active if regions[j][axis][1] >= start]
+        for j in active:
+            if _regions_touch(regions[i], regions[j]):
+                parent[find(i)] = find(j)
+        active.append(i)
+
+    boxes: dict[int, PixelRegion] = {}
+    for i, region in enumerate(regions):
+        root = find(i)
+        if root not in boxes:
+            boxes[root] = region
+        else:
+            boxes[root] = tuple(
+                (min(a_start, b_start), max(a_stop, b_stop))
+                for (a_start, a_stop), (b_start, b_stop) in zip(
+                    boxes[root], region, strict=True
+                )
+            )
+    return sorted(boxes.values())
+
+
+def _merge_regions(regions: list[PixelRegion]) -> list[PixelRegion]:
+    """Merge touching regions into disjoint bounding boxes.
+
+    Collapsing a component to its box can create new touches, so passes repeat
+    until the count is stable. Boxes over-cover an L-shaped component, which is
+    safe -- the recomputed extra pixels land on the values they already had --
+    and the coverage bail-out in `_plan_partial` caps how far that can degrade.
+    """
+    while len(regions) > 1:
+        merged = _merge_pass(regions)
+        if len(merged) == len(regions):
+            return merged
+        regions = merged
+    return regions
+
+
+def _coverage(regions: list[PixelRegion], shape: tuple[int, ...]) -> float:
+    """Fraction of the array the (disjoint, merged) regions cover."""
+    total = math.prod(shape)
+    if total == 0:
+        return 0.0
+    covered = sum(
+        math.prod(stop - start for start, stop in region) for region in regions
+    )
+    return covered / total
+
+
+def _propagate_regions(
+    parent_regions: list[PixelRegion],
+    factors: tuple[int, ...],
+    target: zarr.Array,
+) -> list[PixelRegion]:
+    """Map a parent level's written regions onto a target level, snapped.
+
+    The affected target pixels are `[start // f, ceil(stop / f))` per axis;
+    snapping outward to the target's write unit (`shards or chunks`) makes
+    every write a whole-unit write with a single writer, and -- because the
+    source window is then `region * f`, an exact multiple -- keeps the
+    blockwise zoom inside the envelope where it matches the whole-array one.
+    """
+    units = target.shards or target.chunks
+    propagated = []
+    for region in parent_regions:
+        propagated.append(
+            tuple(
+                (
+                    (start // f // unit) * unit,
+                    min(dim, math.ceil(math.ceil(stop / f) / unit) * unit),
+                )
+                for (start, stop), f, unit, dim in zip(
+                    region, factors, units, target.shape, strict=True
+                )
+            )
+        )
+    return _merge_regions(propagated)
+
+
+def _plan_partial(
+    source: zarr.Array,
+    plan: list[tuple[int, zarr.Array]],
+    merged: list[PixelRegion],
+    order: InterpolationOrder,
+) -> dict[int, list[PixelRegion]] | None:
+    """Regions to rebuild per pyramid node, or `None` for a full rebuild.
+
+    `merged` is the source level's touched regions, already normalized and
+    merged (`consolidate_pyramid` owns that step, and the empty case: no
+    touched regions consolidate nothing rather than falling back here).
+
+    The region path is only taken where it is bytes-identical to a full
+    rebuild: every edge an integral downsample and `order` in `{"nearest",
+    "linear"}` -- the same envelope `"auto"` trusts, for the same reason
+    (`_is_integral_downsample`). A source coverage above
+    `ConsolidationConfig.partial_max_coverage` also declines: past that,
+    region bookkeeping costs more than the rebuild it saves.
+
+    Keys index `[source, *targets in plan order]`, matching the plan's parent
+    indices.
+    """
+    if order == "cubic":
+        return None
+    if (
+        _coverage(merged, source.shape)
+        > get_config().consolidation.partial_max_coverage
+    ):
+        return None
+
+    node_regions: dict[int, list[PixelRegion]] = {0: merged}
+    node_shapes: list[tuple[int, ...]] = [source.shape]
+    for position, (parent, target) in enumerate(plan):
+        if not _is_integral_downsample(node_shapes[parent], target.shape):
+            return None
+        factors = tuple(
+            s // t for s, t in zip(node_shapes[parent], target.shape, strict=True)
+        )
+        node_regions[position + 1] = _propagate_regions(
+            node_regions[parent], factors, target
+        )
+        node_shapes.append(target.shape)
+    return node_regions
+
+
+def _consolidate_regions(
+    plan: list[tuple[int, zarr.Array]],
+    nodes: list[zarr.Array],
+    node_regions: dict[int, list[PixelRegion]],
+    order: InterpolationOrder,
+    mode: Literal["dask", "numpy", "coarsen"],
+) -> None:
+    """Rebuild only the planned regions, edge by edge in plan order.
+
+    Parents come before children in the plan, so every source window reads
+    pixels that are already consistent: inside the parent's rebuilt region
+    they were just written, outside it they were valid before the writes --
+    the precondition of a partial consolidation. That is also why the numpy
+    mode reads each parent window from *disk* rather than chaining levels in
+    memory: outward snapping at the child can reach past what the parent
+    rebuilt, and only the store holds those pixels.
+    """
+    for position, (parent, target) in enumerate(plan):
+        parent_array = nodes[parent]
+        factors = tuple(
+            s // t for s, t in zip(parent_array.shape, target.shape, strict=True)
+        )
+        for region in node_regions[position + 1]:
+            source_slices = tuple(
+                slice(start * f, stop * f)
+                for (start, stop), f in zip(region, factors, strict=True)
+            )
+            target_slices = tuple(slice(start, stop) for start, stop in region)
+            region_shape = tuple(stop - start for start, stop in region)
+            if mode == "numpy":
+                patch = parent_array[source_slices]
+                if not isinstance(patch, np.ndarray):
+                    raise NgioValueError(
+                        "source zarr array could not be read as a numpy array"
+                    )
+                target[target_slices] = numpy_zoom(
+                    patch, target_shape=region_shape, order=order
+                )
+            else:
+                store_dask(
+                    _zoom_expr(
+                        _read_source_dask(parent_array)[source_slices],
+                        region_shape,
+                        target.dtype,
+                        order,
+                        mode,
+                    ),
+                    target,
+                    region=target_slices,
+                )
 
 
 def _resolve_auto_mode(
@@ -432,6 +701,7 @@ def consolidate_pyramid(
     targets: list[zarr.Array],
     order: InterpolationOrder = "linear",
     mode: ConsolidationMode | None = None,
+    regions: RegionsLike | None = None,
 ) -> None:
     """Consolidate the Zarr array.
 
@@ -444,6 +714,17 @@ def consolidate_pyramid(
             `"auto"` to take the in-memory path wherever it is bit-identical to
             the chunked one. `None` means the caller did not choose: it behaves
             as `"dask"` today and warns where `"auto"` would have differed.
+        regions: Where the source level changed, as on-disk index tuples in the
+            source's axis order -- what a setter's
+            `slicing_ops.normalized_slicing_tuple` produces. Only the pyramid
+            regions derived from them are rebuilt, with results identical to a
+            full rebuild; everywhere else must already be consistent. Empty
+            regions consolidate nothing: "these are the touched regions: none"
+            means there is nothing to rebuild (`track_writes` with no writes
+            lands here). Outside the envelope where the region path is exact
+            (every edge an integral downsample, `order` not `"cubic"`), or past
+            `ConsolidationConfig.partial_max_coverage` of the source, the whole
+            pyramid is rebuilt instead, silently. `None` rebuilds everything.
     """
     for target in targets:
         if source.dtype != target.dtype:
@@ -451,7 +732,25 @@ def consolidate_pyramid(
 
     plan = _consolidation_plan(source, targets)
 
-    match resolved := _resolve_mode(source, plan, order, mode):
+    merged: list[PixelRegion] | None = None
+    if regions is not None:
+        merged = _merge_regions(_normalize_regions(regions, source.shape))
+        if not merged:
+            # Nothing was touched, so nothing derives from it. Returning
+            # before the mode resolution also keeps the `mode=None` future
+            # warning quiet -- same reasoning as the empty-plan case there.
+            return
+
+    resolved = _resolve_mode(source, plan, order, mode)
+
+    if merged is not None:
+        node_regions = _plan_partial(source, plan, merged, order)
+        if node_regions is not None:
+            nodes = [source, *(target for _, target in plan)]
+            _consolidate_regions(plan, nodes, node_regions, order, resolved)
+            return
+
+    match resolved:
         case "numpy":
             _consolidate_numpy(source, plan, order)
         case "dask" | "coarsen":

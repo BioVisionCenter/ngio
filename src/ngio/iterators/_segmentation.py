@@ -220,9 +220,16 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         # The relabel has to precede consolidation: every pyramid level is
         # derived from level 0, so stitching after would leave them disagreeing.
         if self._stitch is not None:
+            # The stitch resolve relabels level 0 wherever the union-find
+            # reached, not just under the written ROIs -- only a full rebuild
+            # is guaranteed consistent after it.
             self._stitching_plan().resolve()
             self._stitch_plan = None
-        self._output.consolidate(mode=self._consolidation_mode)
+            self._output.consolidate(mode=self._consolidation_mode)
+        else:
+            self._output.consolidate(
+                mode=self._consolidation_mode, regions=self._touched_write_regions()
+            )
 
 
 class MaskedSegmentationIterator(SegmentationIterator):

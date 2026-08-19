@@ -6,6 +6,7 @@ from types import MappingProxyType
 from typing import Generic, Literal, Self, TypeVar, overload
 
 from ngio.common import Roi
+from ngio.common._pyramid import RegionsLike
 from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._ops_slices_utils import (
@@ -446,6 +447,28 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         consolidate the output pyramid here; read-only iterators do nothing.
         """
         raise NotImplementedError
+
+    def _touched_write_regions(self) -> RegionsLike | None:
+        """The on-disk regions this iterator's setters write, or `None`.
+
+        Derived from the ROI list on the calling side rather than accumulated
+        by the setters: setters run inside `ProcessMapper` children, and
+        nothing accumulated there survives the process boundary. The ROI list
+        is the parent's source of truth for what was written -- which is why
+        writing iterators can hand this to `consolidate(regions=...)` in
+        `finalize` and rebuild only the pyramid regions they touched.
+
+        Halo and stitch wrappers forward the core write's `slicing_ops`, so
+        haloed reads and banked stitch bands do not inflate the regions.
+        Building a setter per ROI is pure metadata -- no pixel IO.
+        """
+        regions = []
+        for roi in self.rois:
+            setter = self.build_numpy_setter(roi)
+            if setter is None:
+                return None
+            regions.append(setter.slicing_ops.normalized_slicing_tuple)
+        return regions or None
 
     def _numpy_getters_generator(self) -> Generator[DataGetterProtocol[NumpyPipeType]]:
         """Return a list of numpy getter functions for all ROIs."""
