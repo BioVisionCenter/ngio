@@ -60,8 +60,11 @@ from ngio.iterators import (
     ProcessMapper,
     SegmentationIterator,
     StitchConfig,
+    TailPolicy,
     ThreadedMapper,
+    canonical_unit_order,
     compute_write_footprint,
+    plan_waves,
     write_conflict_components,
 )
 from ngio.ome_zarr_meta import (
@@ -142,9 +145,11 @@ __all__ = [
     "SegmentationIterator",
     "StitchConfig",
     "StoreOrGroup",
+    "TailPolicy",
     "ThreadedMapper",
     "ZarrConfig",
     "__version__",
+    "canonical_unit_order",
     "compute_write_footprint",
     "create_empty_ome_zarr",
     "create_empty_plate",
@@ -165,5 +170,6 @@ __all__ = [
     "open_ome_zarr_container",
     "open_ome_zarr_plate",
     "open_ome_zarr_well",
+    "plan_waves",
     "write_conflict_components",
 ]

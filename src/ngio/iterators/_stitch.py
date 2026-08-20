@@ -41,7 +41,6 @@ from ngio.io_pipes._ops_axes import AxesOps, set_as_numpy_axes_ops
 from ngio.io_pipes._ops_slices import SlicingOps
 from ngio.iterators._stitch_geometry import (
     SpanBox,
-    TileExtent,
     intersection_box,
     labels_compatible,
     sweep_pairs,
@@ -650,14 +649,3 @@ class StitchingSetter:
             set_as_numpy_axes_ops(array=banked, axes_ops=self._setter.axes_ops),
         )
         self._setter.set(offset)
-
-
-__all__ = [
-    "ScratchBanks",
-    "SpanBox",
-    "StitchConfig",
-    "StitchPlan",
-    "StitchingSetter",
-    "TileExtent",
-    "read_scratch_attrs",
-]

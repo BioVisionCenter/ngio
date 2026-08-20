@@ -11,11 +11,13 @@ from ngio.iterators._mappers import (
     MapperProtocol,
     ProcessMapper,
     ThreadedMapper,
+    canonical_unit_order,
     compute_write_footprint,
+    plan_waves,
     write_conflict_components,
 )
 from ngio.iterators._object_detection import NmsConfig, ObjectDetectionIterator
-from ngio.iterators._rois_utils import HaloMargins
+from ngio.iterators._rois_utils import HaloMargins, TailPolicy
 from ngio.iterators._segmentation import (
     MaskedSegmentationIterator,
     SegmentationIterator,
@@ -40,7 +42,10 @@ __all__ = [
     "ProcessMapper",
     "SegmentationIterator",
     "StitchConfig",
+    "TailPolicy",
     "ThreadedMapper",
+    "canonical_unit_order",
     "compute_write_footprint",
+    "plan_waves",
     "write_conflict_components",
 ]

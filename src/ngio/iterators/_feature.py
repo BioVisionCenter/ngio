@@ -261,7 +261,11 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         return None
 
     def finalize(self):
-        pass
+        """A no-op: nothing is written, so there is nothing to consolidate.
+
+        Unlike the writers' `finalize`, this stays a no-op on a `for_job`
+        slice too — the read-only gather verb is `merge_partials`.
+        """
 
     def _partials_handler(self):
         """Partials live beside the input label's levels, like a stitch scratch."""

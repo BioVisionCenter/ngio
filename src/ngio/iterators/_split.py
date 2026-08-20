@@ -1,6 +1,6 @@
 """Deterministic partitioning of iterator units into independent jobs.
 
-`split(n_jobs)` promises embarrassing independence: no write unit (a chunk, or
+`for_job` promises embarrassing independence: no write unit (a chunk, or
 a shard when the output is sharded) is ever shared between two jobs, so jobs
 need no locks, no barriers, and no channel to one another — the topology SLURM
 array tasks on a shared filesystem actually offer. The partition is built from

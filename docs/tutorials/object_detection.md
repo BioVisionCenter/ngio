@@ -32,7 +32,7 @@ into the final table.
 
 ## Step 3: detect, tile by tile
 
-The image is tiled with `grid`, and each tile reads a `with_halo` margin past its own
+The image is tiled with `by_grid`, and each tile reads a `with_halo` margin past its own
 edge — this is the one read-only iterator where the halo is allowed, because there is
 no write to crop it from. The margin means a nucleus cut by a tile boundary is seen
 whole by at least one tile; the duplicate detections that produces are resolved by

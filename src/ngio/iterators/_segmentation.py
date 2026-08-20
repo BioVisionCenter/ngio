@@ -295,7 +295,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
     def _wrap_for_stitch(
         self, setter: DataSetterProtocol[np.ndarray], roi: Roi
     ) -> DataSetterProtocol[np.ndarray]:
-        """Put the stitch wrapper outside the halo crop, so it sees the band."""
+        """Put the stitch wrapper outside the halo crop, so it sees the grown patch."""
         if self._stitch is None:
             return setter
         return StitchingSetter(
@@ -367,9 +367,9 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         A failed standalone run cannot be resolved, so the stitch scratch
         arrays are deleted rather than left as a stray `_ngio_stitch` group
         beside the resolution levels. A *partition slice* never cleans up:
-        the scratch holds the bands every other job banked, and one failed
-        job must not destroy them — re-running that job is idempotent (the
-        bands rewrite, the id offsets are derived, not counted). The
+        the scratch holds the banks every other job wrote, and one failed
+        job must not destroy them — re-running that job is idempotent (its
+        banks rewrite, the id offsets are derived, not counted). The
         already-written tiles stay in both cases.
         """
         if self._stitch is None or self._partition is not None:

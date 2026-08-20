@@ -373,7 +373,11 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         return None
 
     def finalize(self) -> None:
-        pass
+        """A no-op: nothing is written, so there is nothing to consolidate.
+
+        Unlike the writers' `finalize`, this stays a no-op on a `for_job`
+        slice too — the read-only gather verb is `merge_partials`.
+        """
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Iterate `(patch, roi)` pairs over the (haloed) tiles."""

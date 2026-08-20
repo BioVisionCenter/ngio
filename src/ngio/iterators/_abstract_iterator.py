@@ -141,7 +141,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
         Every reshaping call rebuilds the iterator from this dict; a
         constructor parameter missing from it is state that vanishes on the
-        first `.grid()`/`.by_chunks()`/`.with_halo()` with no error. Checked
+        first `.by_grid()`/`.by_chunks()`/`.with_halo()` with no error. Checked
         once per class, then cached.
         """
         checked = cls.__dict__.get("_init_kwargs_checked", False)
@@ -159,7 +159,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             raise NgioValueError(
                 f"{cls.__name__}.get_init_kwargs() omits the constructor "
                 f"parameter(s) {missing}: the iterator would silently lose "
-                "that state on the first grid()/by_chunks()/with_halo() "
+                "that state on the first by_grid()/by_chunks()/with_halo() "
                 "call. Add them to get_init_kwargs()."
             )
         cls._init_kwargs_checked = True
@@ -246,7 +246,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             raise NgioValueError(
                 f"{name} is read-only, so there is no written region for a "
                 "halo to surround. Widen the ROIs themselves instead (e.g. "
-                "`grid(...)` with a stride smaller than the size)."
+                "`by_grid(...)` with a stride smaller than the size)."
             )
         output = self.output_image
         if output is not None and _is_same_zarr_array(
@@ -378,17 +378,24 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         return self._new_from_rois(rois)
 
     def by_yx(self) -> Self:
-        """Return a new iterator that iterates over ROIs by YX coordinates."""
+        """Split each ROI into one 2D plane per remaining coordinate.
+
+        A broadcasting call, not a tiling: every ROI becomes one region per
+        `(t, z, c)` combination, each covering the full y/x extent — the
+        shape for "run this 2D function on every plane".
+        """
         rois = by_yx(self.rois, self.ref_image)
         return self._new_from_rois(rois)
 
     def by_zyx(self, strict: bool = True) -> Self:
-        """Return a new iterator that iterates over ROIs by ZYX coordinates.
+        """Split each ROI into one 3D volume per remaining coordinate.
+
+        A broadcasting call, not a tiling: every ROI becomes one region per
+        `(t, c)` combination, each covering the full z/y/x extent.
 
         Args:
-            strict (bool): If True, only iterate over ZYX if a Z axis
-                is present and not of size 1.
-
+            strict: Require a real z axis (present and larger than 1);
+                with `False`, images without one fall back to 2D planes.
         """
         rois = by_zyx(self.rois, self.ref_image, strict=strict)
         return self._new_from_rois(rois)
@@ -660,7 +667,9 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         writer. Batches follow ROI order — unlike the mappers' canonical
         wave order, so on ROIs with overlapping writes the manual loop is
         deterministic but not bit-identical to `map`. The run finalizes when
-        the generator is fully drained, exactly like `iter`.
+        the generator is fully drained, exactly like `iter` — on a stitching
+        iterator that finalize is the resolve, so drain the loop to
+        completion.
 
         Args:
             batch_size: Maximum items per batch; the last batch may be
@@ -768,6 +777,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
     ) -> Generator:
         """Create an iterator over the pixels of the ROIs.
+
+        A writing loop finalizes only when fully drained — on a stitching
+        iterator that finalize is the resolve, so abandoning the loop
+        mid-way leaves block-offset ids on disk (plus the transient scratch)
+        until a re-run or a later `finalize()`.
 
         Note:
             The dask data mode is deprecated and will be removed in ngio=1.2;
@@ -1206,10 +1220,13 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Check if any of the ROIs overlap logically.
 
         If two ROIs cover the same pixel, they are considered to overlap.
-        This does not consider chunking or other storage details.
+        This does not consider chunking or other storage details. Measured
+        on the *read* regions — with a halo, neighbouring reads overlap by
+        construction. For write safety, `check_if_write_units_overlap` is
+        the right question.
 
         Returns:
-            bool: True if any ROIs overlap. False otherwise.
+            `True` if any ROIs overlap.
         """
         if len(self.rois) < 2:
             # Less than 2 ROIs cannot overlap

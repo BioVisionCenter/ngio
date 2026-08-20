@@ -224,6 +224,12 @@ image's chunk grid, the natural unit of reading; `by_write_units()` tiles by the
 shape otherwise — which makes parallel writes collision-free by construction, so a
 parallel `map` runs as a single fully-parallel wave.
 
+Two more calls *broadcast* rather than tile: `by_yx()` splits each region into one 2D
+plane per remaining coordinate (every `t`/`z`/`c` combination, full y/x extent — the
+shape for "run this 2D function on every plane"), and `by_zyx(strict=...)` does the
+same per 3D volume. The tutorial snippets use them wherever a 2D or 3D function meets
+a higher-dimensional image.
+
 From here you would call `map` or iterate with `iter_as_numpy` to do the work;
 the [image processing tutorial](../tutorials/image_processing.md) carries this through to
 a written result.
@@ -500,7 +506,7 @@ The `space` fields are what keep this honest: `anchor` refuses a world-space box
 
 1. Detection reconciles overlap itself: the halo is a pure read margin and NMS removes the duplicate boxes — but only through `detect`. `reduce` returns raw per-tile boxes.
 2. Stitching takes any ROI list — grids with a halo, overlapping FOVs (no halo needed), ragged tables. On the masked iterator it merges sub-objects split by a tile boundary *within one mask* (tile a big object with `by_grid` + `with_halo`); tiles of different masks are never compared, and ids come out unique across every object — no `UniqueLabelsTransform` needed (combining it with `stitch` raises).
-3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright.
+3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright. One configuration to avoid: an *in-place* run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).
 4. `BatchedMapper` stacks plain arrays; these iterators hand `func` tuple payloads.
 
 Everywhere: `stitch` needs a halo or overlapping ROIs (else there is no shared prediction to compare) and stays on the numpy path; a haloed *writer* refuses `reduce` and read-only `iter`; in-place runs (same array in and out) refuse a halo; `by_write_units` on the read-only iterators falls back to the input's chunks; the deprecated dask verbs run serially; `ProcessMapper` refuses in-memory stores.

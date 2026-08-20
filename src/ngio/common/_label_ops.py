@@ -52,7 +52,7 @@ def overlap_iou(left: np.ndarray, right: np.ndarray) -> dict[tuple[int, int], fl
     """Intersection-over-union of every id pair that co-occurs in two arrays.
 
     The two arrays are independent labellings of the *same* pixels — one tile's
-    prediction over a band, and the neighbour's ids for that band. A high score
+    prediction over a region, and the neighbour's ids for the same region. A high score
     means both tiles found the same object there.
 
     Background (`0`) takes part in neither the intersections nor the areas, so
@@ -74,7 +74,7 @@ def overlap_iou(left: np.ndarray, right: np.ndarray) -> dict[tuple[int, int], fl
     pairs = np.stack([left_ids, right_ids])
     unique_pairs, intersections = np.unique(pairs, axis=1, return_counts=True)
 
-    # Areas are measured over the whole band, not just the intersecting pixels,
+    # Areas are measured over the whole region, not just the intersecting pixels,
     # so a pair that agrees on a sliver of two large objects scores low.
     left_area = dict(zip(*np.unique(left[left > 0], return_counts=True), strict=True))
     right_area = dict(
