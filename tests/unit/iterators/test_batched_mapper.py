@@ -224,3 +224,139 @@ def test_serial_reads_match_threaded_reads():
     np.testing.assert_array_equal(
         threaded_label.zarr_array[...], serial_label.zarr_array[...]
     )
+
+
+def test_iter_batched_matches_map():
+    """The manual batched loop lands the same pixels as `map`, ragged and haloed."""
+    for halo in (0, 2):
+        ome_zarr = _build_ome_zarr()
+        manual_it, manual_label = _build_segmentation_iterator(
+            ome_zarr, f"manual_{halo}", size_x=6, size_y=6
+        )
+        mapped_it, mapped_label = _build_segmentation_iterator(
+            ome_zarr, f"mapped_{halo}", size_x=6, size_y=6
+        )
+        if halo:
+            manual_it = manual_it.with_halo(x=halo, y=halo)
+            mapped_it = mapped_it.with_halo(x=halo, y=halo)
+
+        func = lambda patch: (patch > 128).astype("uint32")  # noqa: E731
+        for patches, writers in manual_it.iter_batched(3):
+            assert len(patches) == len(writers) <= 3
+            for patch, writer in zip(patches, writers, strict=True):
+                writer(func(patch))
+        mapped_it.map(func)
+
+        np.testing.assert_array_equal(
+            manual_label.zarr_array[...], mapped_label.zarr_array[...]
+        )
+
+
+def test_iter_batched_lengths_and_order():
+    """Batches follow ROI order, full batches first, the tail smaller."""
+    ome_zarr = _build_ome_zarr()
+    iterator, _ = _build_segmentation_iterator(ome_zarr, "order", size_x=8, size_y=8)
+    n_rois = len(iterator.rois)
+
+    lengths = []
+    seen = []
+    batches = iterator.iter_batched(3)
+    for patches, writers in batches:
+        lengths.append(len(patches))
+        for patch, writer in zip(patches, writers, strict=True):
+            seen.append(patch.shape)
+            writer(np.zeros_like(patch, dtype="uint32"))
+    assert sum(lengths) == n_rois
+    assert lengths[:-1] == [3] * (len(lengths) - 1)
+    assert seen == [
+        tuple(  # ROI order: the same shapes iter_as_numpy yields.
+            patch.shape
+        )
+        for patch, _ in iterator.iter_as_numpy()
+    ]
+
+
+def test_iter_batched_finalizes_on_drain():
+    """Fully draining the generator consolidates the pyramid, like `iter`."""
+    rng = np.random.default_rng(0)
+    array = rng.integers(0, 255, size=(2, 32, 32)).astype("uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=array,
+        pixelsize=1.0,
+        axes_names="cyx",
+        levels=2,
+    )
+    label = ome_zarr.derive_label(name="pyr")
+    iterator = SegmentationIterator(
+        ome_zarr.get_image(),
+        label,
+        channel_selection=0,
+        axes_order="yx",
+        consolidation_mode="dask",
+    ).by_grid(size_x=16, size_y=16)
+
+    for patches, writers in iterator.iter_batched(2):
+        for patch, writer in zip(patches, writers, strict=True):
+            writer(np.full_like(patch, 5, dtype="uint32"))
+
+    level_1 = ome_zarr.get_label("pyr", path="1").get_as_numpy()
+    assert (level_1 == 5).all(), "finalize did not rebuild the pyramid"
+
+
+def test_iter_batched_feature_payloads():
+    """The read-only feature iterator yields payload lists, no writers."""
+    ome_zarr = _build_ome_zarr()
+    iterator = FeatureExtractorIterator(
+        input_image=ome_zarr.get_image(),
+        input_label=ome_zarr.derive_label(name="fb_label"),
+        channel_selection=0,
+        axes_order="yx",
+    ).by_grid(size_x=8, size_y=8)
+
+    count = 0
+    for batch in iterator.iter_batched(3):
+        assert len(batch) <= 3
+        for image, seg, roi in batch:
+            assert image.shape == seg.shape
+            assert roi is not None
+            count += 1
+    assert count == len(iterator.rois)
+
+
+def test_iter_batched_detection_payloads():
+    """The detection iterator yields haloed `(patch, roi)` payload lists."""
+    from ngio.iterators import ObjectDetectionIterator
+
+    ome_zarr = _build_ome_zarr()
+    iterator = (
+        ObjectDetectionIterator(
+            ome_zarr.get_image(), channel_selection=0, axes_order="yx"
+        )
+        .by_grid(size_x=8, size_y=8)
+        .with_halo(x=2, y=2)
+    )
+
+    count = 0
+    for batch in iterator.iter_batched(4):
+        for patch, roi in batch:
+            assert patch.ndim >= 2
+            assert roi is not None
+            count += 1
+    assert count == len(iterator.rois)
+
+
+@pytest.mark.parametrize("batch_size", [0, -1])
+def test_iter_batched_invalid_batch_size(batch_size):
+    ome_zarr = _build_ome_zarr()
+    iterator, _ = _build_segmentation_iterator(ome_zarr, "bad", size_x=8, size_y=8)
+    with pytest.raises(NgioValueError, match="batch_size"):
+        next(iterator.iter_batched(batch_size))
+    feature = FeatureExtractorIterator(
+        input_image=ome_zarr.get_image(),
+        input_label=ome_zarr.derive_label(name="bad_label"),
+        channel_selection=0,
+        axes_order="yx",
+    )
+    with pytest.raises(NgioValueError, match="batch_size"):
+        feature.iter_batched(batch_size)

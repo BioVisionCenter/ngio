@@ -100,13 +100,29 @@ def relabel(array: np.ndarray, mapping: dict[int, int]) -> np.ndarray:
     """
     if not mapping:
         return array
-    keys = np.fromiter(sorted(mapping), dtype=np.int64, count=len(mapping))
-    values = np.array([mapping[int(key)] for key in keys], dtype=np.int64)
+    # Keys and values live in the array's own dtype: mixing signedness would
+    # promote the searchsorted comparison to float64, which is only exact up
+    # to 2**53, and an out-of-range mapped value would otherwise wrap silently
+    # in the final cast.
+    info = np.iinfo(array.dtype)
+    out_of_range = sorted(
+        value
+        for pair in mapping.items()
+        for value in pair
+        if not (info.min <= value <= info.max)
+    )
+    if out_of_range:
+        raise NgioValueError(
+            f"Relabel mapping does not fit the label dtype {array.dtype}: "
+            f"{out_of_range[:5]} out of range."
+        )
+    keys = np.fromiter(sorted(mapping), dtype=array.dtype, count=len(mapping))
+    values = np.array([mapping[int(key)] for key in keys], dtype=array.dtype)
 
     positions = np.searchsorted(keys, array)
     positions = np.clip(positions, 0, len(keys) - 1)
     matched = keys[positions] == array
-    return np.where(matched, values[positions], array).astype(array.dtype)
+    return np.where(matched, values[positions], array)
 
 
 def chunk_selections(array: zarr.Array) -> Iterator[tuple[slice, ...]]:

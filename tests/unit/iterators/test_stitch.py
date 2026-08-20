@@ -282,6 +282,69 @@ def test_stitching_requires_a_halo():
         iterator.map(_connected_components)
 
 
+def test_stitch_handles_a_ragged_roi_list():
+    """Non-grid ROIs stitch too: pairs come from pixel overlap, not a grid."""
+    from ngio.common import Roi
+
+    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    ragged = [
+        Roi.from_values(slices={"y": (0, 32), "x": (0, 40)}, name="a"),
+        Roi.from_values(slices={"y": (0, 32), "x": (32, 32)}, name="b"),
+        Roi.from_values(slices={"y": (32, 30), "x": (0, 32)}, name="c"),
+        Roi.from_values(slices={"y": (32, 32), "x": (32, 32)}, name="d"),
+    ]
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .product(ragged)
+        .with_halo(y=4, x=4)
+    )
+    iterator.map(_connected_components)
+
+    stitched = ome_zarr.get_label("seg").get_as_numpy()
+    assert len(_object_ids(stitched)) == 1
+    data = _one_object_across_the_seam()
+    np.testing.assert_array_equal(stitched > 0, data > 0)
+
+
+def test_stitch_handles_overlapping_tiles():
+    """Overlapping cores are legal: the overlap itself is the evidence."""
+    data = _one_object_across_the_seam()
+
+    for halo in (4, 0):
+        ome_zarr, image, label = _setup(data)
+        iterator = SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        ).by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
+        if halo:
+            iterator = iterator.with_halo(y=halo, x=halo)
+        iterator.map(_connected_components)
+
+        stitched = ome_zarr.get_label("seg").get_as_numpy()
+        assert len(_object_ids(stitched)) == 1, f"halo={halo}"
+        np.testing.assert_array_equal(stitched > 0, data > 0)
+
+
+def test_overlapping_tiles_parallel_matches_serial():
+    """Contested pixels land identically under every mapper (wave order)."""
+    data = _one_object_across_the_seam()
+
+    def _run_overlap(mapper=None):
+        ome_zarr, image, label = _setup(data)
+        (
+            SegmentationIterator(
+                image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+            )
+            .by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
+            .with_halo(y=4, x=4)
+            .map(_connected_components, mapper=mapper)
+        )
+        return ome_zarr.get_label("seg").get_as_numpy()
+
+    np.testing.assert_array_equal(_run_overlap(), _run_overlap(ThreadedMapper(4)))
+
+
 def test_config_rejects_a_zero_threshold():
     with pytest.raises(NgioValueError, match="iou_threshold"):
         StitchConfig(iou_threshold=0.0)
@@ -324,8 +387,10 @@ def test_stitch_refuses_the_dask_path():
         iterator.build_dask_setter(iterator.rois[0])
 
 
-def test_stitch_refuses_tiles_split_on_an_unhaloed_axis():
-    """z-tiled tiles with a yx-only halo collapse onto one grid cell: refuse."""
+def test_stitch_warns_on_tiles_split_along_an_unhaloed_axis():
+    """z-tiled tiles with a yx-only halo run, but warn: z seams stay unstitched."""
+    from ngio.utils import NgioUserWarning
+
     data = np.zeros((2, 64, 64), dtype="uint8")
     ome_zarr = create_ome_zarr_from_array(
         store=MemoryStore(),
@@ -346,7 +411,7 @@ def test_stitch_refuses_tiles_split_on_an_unhaloed_axis():
         .with_halo(y=4, x=4)
     )
 
-    with pytest.raises(NgioValueError, match="same stitch grid cell"):
+    with pytest.warns(NgioUserWarning, match="touch along 'z'"):
         iterator.map(lambda patch: np.zeros_like(patch, dtype="uint32"))
 
 

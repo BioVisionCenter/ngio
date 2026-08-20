@@ -35,7 +35,7 @@ way the rows must carry the object id in a `label` column.
 
 ## Step 4: use the FeatureExtractorIterator to create a feature table
 
-`reduce_to_table` runs the measurement over every region and joins the results
+`measure` runs the measurement over every region and joins the results
 into a `FeatureTable` referencing the input label — one call, one table. The
 per-region measurements schedule exactly like `reduce`, so a
 `mapper=ThreadedMapper("auto")` parallelizes them; the join still happens once,
@@ -48,7 +48,7 @@ at the end. The iterator writes nothing: storing the table is your explicit
 
 For flows the default join does not fit — a different table type, filtering, or
 aggregation — either pass a custom `coalesce`, or drop down to the loop that
-`reduce_to_table` replaces:
+`measure` replaces:
 
 ```python exec="true" source="material-block" session="feature_extraction"
 --8<-- "docs/snippets/tutorials/feature_extraction.py:manual_extract"

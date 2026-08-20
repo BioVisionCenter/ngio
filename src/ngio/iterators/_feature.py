@@ -51,9 +51,10 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
     ) -> None:
         self._image_getter = image_getter
         self._label_getter = label_getter
-        # Read at most once per getter: `get()` and the two properties used to
-        # each re-run the underlying read, so the documented lazy pattern
-        # (`.image` then `.label`) paid double IO.
+        # Read at most once per `get()` cycle: the properties cache so that
+        # `.image`/`.label` followed by `get()` does not pay double IO, and
+        # `get()` releases the cache so a getter kept alive in a unit list
+        # (e.g. by `reduce`) does not retain its patches after being consumed.
         self._image_data: T | None = None
         self._label_data: T | None = None
         super().__init__(
@@ -65,7 +66,10 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
         )
 
     def get(self) -> tuple[T, T, Roi]:
-        return self.image, self.label, self.roi
+        image, label = self.image, self.label
+        self._image_data = None
+        self._label_data = None
+        return image, label, self.roi
 
     @property
     def image(self) -> T:
@@ -155,7 +159,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     """Measure image/label pairs region by region; nothing is written.
 
     Each unit pairs the image patch with the label patch over the same
-    region. `reduce` collects per-region results; `reduce_to_table` joins
+    region. `reduce` collects per-region results; `measure` joins
     them into a single `FeatureTable` for the caller to store.
     """
 
@@ -269,7 +273,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def _validate_job_context(self, n_jobs: int) -> None:
         validate_partials_context(self, self._partials_handler(), n_jobs)
 
-    def reduce_to_table(
+    def measure(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
         *,
@@ -298,8 +302,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         """
         if self._partition is not None:
             raise NgioValueError(
-                "reduce_to_table on a partition slice would coalesce only "
-                "this job's share. Use `reduce_to_partial(func)` per job and "
+                "measure on a partition slice would coalesce only "
+                "this job's share. Use `measure_to_partial(func)` per job and "
                 "`merge_partials()` once, after all jobs."
             )
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
@@ -309,7 +313,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             )
         return coalesce(results)
 
-    def reduce_to_partial(
+    def measure_to_partial(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
         *,
@@ -321,7 +325,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         measurements are stored **before** any join, tagged with their global
         ROI index, so `merge_partials` can rebuild the full per-ROI result
         list and run the ONE global coalesce — bit-identical to a serial
-        `reduce_to_table`, custom `coalesce` included. Only callable on a
+        `measure`, custom `coalesce` included. Only callable on a
         `for_job` slice; re-running a job overwrites its own partial.
 
         Frames returned as dicts are normalized to DataFrames and a `label`
@@ -330,9 +334,9 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         """
         if self._partition is None:
             raise NgioValueError(
-                "reduce_to_partial is the per-job step of a distributed run: "
+                "measure_to_partial is the per-job step of a distributed run: "
                 "restrict the iterator first (`for_job(**args)`), or use "
-                "reduce_to_table() for a local run."
+                "measure() for a local run."
             )
         _, job_index, n_jobs = self._partition
         handler = self._partials_handler()
@@ -381,7 +385,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         run errors instead of returning a silently incomplete table —
         rebuilds the per-ROI result list in global ROI order, and runs the
         single (default or custom) `coalesce`, exactly as a serial
-        `reduce_to_table` would. On success the partials group is removed.
+        `measure` would. On success the partials group is removed.
         Nothing is registered: the returned table is yours to store with
         `add_table`.
         """
@@ -414,6 +418,11 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def iter_as_numpy(self):  # type: ignore[override]
         """Create an iterator over the pixels of the ROIs."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
+
+    def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
+        """Iterate `(image, label, roi)` payloads in batches of `batch_size`."""
+        self._require_valid_batch_size(batch_size)
+        return self._iter_batched_readonly(batch_size)
 
     @deprecated(
         replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",

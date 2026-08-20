@@ -1,25 +1,24 @@
-"""Stitching a tiled segmentation into one consistent labelling.
+"""Stitching a tiled segmentation: id blocks, per-tile banks, seam resolve.
 
-Each tile is segmented independently, so an object crossing a tile boundary
-comes out as two objects with two ids. Stitching resolves those into one.
+Works on any ROI list — regular grids with a halo, overlapping-FOV microscope
+layouts, ragged ROI tables. Each tile offsets its ids into its own block and
+*banks* its full grown prediction into its own scratch array (one per tile,
+global origin recorded in the attrs), so banking is conflict-free in any
+topology: no two tiles ever share a scratch write. The resolve step then
+compares every pair of banks that overlap in pixel space, unions the ids that
+agree (IoU over the shared pixels), and relabels the output in place.
 
-The evidence is **overlap between two independent predictions**, not adjacency
-across the cut. That distinction is the whole point: two objects that merely
-touch at the boundary are adjacent but do not overlap, and adjacency would merge
-them. Getting overlap evidence requires a halo — each tile reads past its own
-edge, so it has an opinion about the strip its neighbour owns — and it requires
-keeping that opinion, since the tile writes only its core. The scratch arrays
-here are where it is kept: one per haloed axis, holding the forward band each
-tile predicts inside the next tile's core.
-
-The map phase stays disjoint and parallel throughout; all the reconciling
-happens afterwards, in `resolve`.
+Where two tiles wrote the same *output* pixels and their objects do not
+match, the later write wins — deterministically, because every mapper runs
+units in the same canonical wave order (`canonical_unit_order`).
 """
 
 import threading
+import uuid
+import warnings
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
-from typing import Any, cast
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 import zarr
@@ -38,17 +37,26 @@ from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataSetterProtocol
 from ngio.io_pipes._ops_axes import AxesOps, set_as_numpy_axes_ops
 from ngio.io_pipes._ops_slices import SlicingOps
-from ngio.io_pipes._ops_slices_utils import ChunkRect, compute_chunk_rect
 from ngio.iterators._stitch_geometry import (
-    TilePlacement,
-    forward_bands,
-    neighbours_along,
-    shared_band,
-    tile_placements,
+    SpanBox,
+    TileExtent,
+    intersection_box,
+    labels_compatible,
+    sweep_pairs,
+    tile_extents,
+    touching_unstitched_axes,
 )
-from ngio.utils import NgioStore, NgioValueError, StoreOrGroup, open_group_wrapper
+from ngio.utils import (
+    NgioFileNotFoundError,
+    NgioStore,
+    NgioUserWarning,
+    NgioValueError,
+    StoreOrGroup,
+    open_group_wrapper,
+)
 
 _SCRATCH_GROUP = "_ngio_stitch"
+_LAYOUT = "per-roi/1"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -58,17 +66,17 @@ class StitchConfig:
     Attributes:
         block_size: Ids reserved per tile. Must exceed the largest label a
             single tile can produce, or ids spill into the next tile's block.
-        iou_threshold: How much two tiles' predictions must agree over the shared band
-            before their ids are called the same object. Low values merge
-            eagerly; the default errs towards leaving an object split, which is
-            fixable downstream, rather than merging two that are not.
+        iou_threshold: How much two tiles' predictions must agree over their
+            shared pixels before their ids are called the same object. Low
+            values merge eagerly; the default errs towards leaving an object
+            split, which is fixable downstream, rather than merging two that
+            are not.
         compact: Renumber the surviving ids to a dense `1..N` at the end.
-        scratch_store: Where to keep the halo bands while the map runs. `None`
-            puts them in a transient group inside the output label, which works
-            under every mapper. A `MemoryStore` is often the better choice —
-            labels compress well, so the bands are small, and nothing touches
-            the output store — but an in-memory scratch cannot cross a process
-            boundary, so `ProcessMapper` refuses it.
+        scratch_store: Where to keep the per-tile banks while the map runs.
+            `None` puts them in a transient group inside the output label,
+            which works under every mapper. A `MemoryStore` avoids touching
+            the output store — but an in-memory scratch cannot cross a
+            process boundary, so `ProcessMapper` refuses it.
     """
 
     block_size: int = 10_000
@@ -87,215 +95,14 @@ class StitchConfig:
             )
 
 
-@dataclass
+@dataclass(frozen=True)
 class _TileWork:
-    """What one tile contributes: its id block, and the bands it predicts."""
+    """What one tile contributes: its id block and its pixel-space extents."""
 
-    placement: TilePlacement
+    index: int
     offset: int
-    grown_origin: dict[str, int]
-    bands: dict[str, dict[str, tuple[int, int]]] = field(default_factory=dict)
-
-
-class StitchPlan:
-    """Everything the stitch needs, derived once from the iterator's ROIs.
-
-    Built lazily on first use, because it needs the whole ROI list — a single
-    tile does not carry enough information to place itself on the grid.
-    """
-
-    def __init__(
-        self,
-        *,
-        config: StitchConfig,
-        output: AbstractImage,
-        rois: Sequence[Roi],
-        ref_image: AbstractImage,
-        halo: dict[str, int],
-        read_roi: Any,
-        scratch_factory: Callable[[tuple[str, ...]], dict[str, zarr.Array]]
-        | None = None,
-    ) -> None:
-        """Place every tile and reserve its id block; scratch resolves lazily.
-
-        The scratch arrays are opened (or created) on first access rather
-        than here: the plan's *geometry* — placements, bands, id blocks — is
-        needed for footprint planning before any storage should be touched,
-        and in a distributed run which arrays to use (create fresh vs open
-        the prepared ones) is the iterator's decision, injected via
-        `scratch_factory`. With no factory, first access creates a fresh
-        scratch — the standalone `map` behaviour.
-        """
-        if not halo:
-            raise NgioValueError(
-                "Stitching needs a halo: without one each tile only sees its "
-                "own core, so neighbouring tiles never predict the same pixels "
-                "and there is no overlap to measure. Call `with_halo(...)` "
-                "before `map`."
-            )
-        self._config = config
-        self._output = output
-        # Ordered by the array's own axes, not by the halo dict's insertion
-        # order: `with_halo` builds its dict x-first, while a (y, x) label is
-        # indexed y-first, and a selection built in the wrong order silently
-        # reads the transpose of the intended band.
-        self._array_axes = tuple(output.dimensions.axes_handler.axes_names)
-        self._axes = tuple(name for name in self._array_axes if name in halo)
-        self._halo = halo
-        self._placements = tile_placements(rois, ref_image, self._axes)
-
-        # Two tiles in one cell means the haloed axes do not distinguish the
-        # tiles (e.g. z-tiled with a halo only on y and x). The neighbour map
-        # is keyed by cell, so the duplicates would silently shadow each other
-        # and whole seams would go unstitched.
-        seen_cells: dict[tuple[int, ...], int] = {}
-        for placement in self._placements:
-            other = seen_cells.setdefault(placement.grid, placement.index)
-            if other != placement.index:
-                raise NgioValueError(
-                    f"Tiles {rois[other].get_name()!r} and "
-                    f"{rois[placement.index].get_name()!r} occupy the same "
-                    f"stitch grid cell over the haloed axes {self._axes}: they "
-                    "differ only along an axis with no halo. Stitching needs "
-                    "the halo to cover every tiled axis — add the missing axis "
-                    "to `with_halo(...)`."
-                )
-
-        self._work: dict[str, _TileWork] = {}
-        for placement in self._placements:
-            roi = rois[placement.index]
-            if roi.get_name() in self._work:
-                raise NgioValueError(
-                    f"Two tiles share the name {roi.get_name()!r}; the stitch "
-                    "plan is keyed by name, so duplicates would silently "
-                    "shadow each other. Give the ROIs unique names."
-                )
-            grown = read_roi(roi).to_pixel(pixel_size=ref_image.pixel_size)
-            grown_origin = {}
-            for axis_name in self._axes:
-                roi_slice = grown.get(axis_name)
-                assert roi_slice is not None and roi_slice.start is not None
-                grown_origin[axis_name] = int(roi_slice.start)
-            self._work[roi.get_name()] = _TileWork(
-                placement=placement,
-                offset=(placement.index + 1) * config.block_size,
-                grown_origin=grown_origin,
-            )
-
-        for axis, axis_name in enumerate(self._axes):
-            for index, band in forward_bands(
-                self._placements, axis, halo[axis_name], self._axes
-            ).items():
-                self._work[rois[index].get_name()].bands[axis_name] = band
-
-        self._scratch_factory = scratch_factory
-        self._scratch_arrays: dict[str, zarr.Array] | None = None
-        self._scratch_lock: threading.Lock | None = threading.Lock()
-
-    @property
-    def _scratch(self) -> dict[str, zarr.Array]:
-        """The scratch arrays, resolved on first access (thread-safe)."""
-        if self._scratch_arrays is None:
-            lock = self._scratch_lock or threading.Lock()
-            with lock:
-                if self._scratch_arrays is None:
-                    if self._scratch_factory is None:
-                        self._scratch_arrays = create_scratch(
-                            self._output, self._axes, self._config.scratch_store
-                        )
-                    else:
-                        self._scratch_arrays = self._scratch_factory(self._axes)
-        return self._scratch_arrays
-
-    def __getstate__(self) -> dict:
-        """Resolve the scratch before crossing a process boundary.
-
-        The factory is a closure (unpicklable) and the lock is
-        process-local; the resolved arrays pickle by store reference, which
-        is exactly what the workers need.
-        """
-        _ = self._scratch
-        state = self.__dict__.copy()
-        state["_scratch_factory"] = None
-        state["_scratch_lock"] = None
-        return state
-
-    def __setstate__(self, state: dict) -> None:
-        self.__dict__.update(state)
-        self._scratch_lock = threading.Lock()
-
-    @property
-    def axes(self) -> tuple[str, ...]:
-        """The haloed axes, in the order the placements use."""
-        return self._axes
-
-    def work_for(self, roi: Roi) -> _TileWork:
-        """The tile record for `roi`."""
-        work = self._work.get(roi.get_name())
-        if work is None:
-            raise NgioValueError(
-                f"Tile {roi.get_name()!r} is not part of the stitch plan; the "
-                "ROI list changed after the plan was built."
-            )
-        return work
-
-    def scratch_for(self, axis_name: str) -> zarr.Array:
-        """The scratch array holding forward bands along `axis_name`."""
-        return self._scratch[axis_name]
-
-    def resolve(self) -> None:
-        """Scan the seams, union the agreeing ids, and relabel in place."""
-        union = UnionFind[int]()
-        label_array = self._output.zarr_array
-
-        for axis, axis_name in enumerate(self._axes):
-            scratch = self._scratch[axis_name]
-            for lower, upper in neighbours_along(self._placements, axis):
-                band = shared_band(
-                    lower, upper, axis, self._halo[axis_name], self._axes
-                )
-                if band is None:
-                    continue
-                selection = _band_selection(band, self._array_axes)
-                predicted = np.asarray(scratch[selection])
-                written = np.asarray(label_array[selection])
-                for (mine, theirs), score in overlap_iou(predicted, written).items():
-                    if score >= self._config.iou_threshold:
-                        union.union(mine, theirs)
-
-        mapping = union.resolve()
-        if self._config.compact:
-            # One pass: canonicalize and renumber together. Collecting the ids
-            # first would mean reading the whole label twice.
-            relabel_sequential(label_array, mapping)
-        else:
-            _apply_relabel(label_array, mapping)
-        self.cleanup()
-
-    def cleanup(self) -> None:
-        """Delete the scratch arrays ngio created."""
-        _delete_scratch(self._output, self._config.scratch_store)
-
-
-def _band_selection(
-    band: dict[str, tuple[int, int]], array_axes: Sequence[str]
-) -> tuple[slice, ...]:
-    """Index tuple for `band`, positioned by axis name over the array's axes."""
-    return tuple(
-        slice(*band[axis_name]) if axis_name in band else slice(None)
-        for axis_name in array_axes
-    )
-
-
-def _apply_relabel(label_array: zarr.Array, mapping: dict[int, int]) -> None:
-    """Rewrite ids in place, one chunk at a time."""
-    if not mapping:
-        return
-    for selection in chunk_selections(label_array):
-        block = np.asarray(label_array[selection])
-        remapped = relabel(block, mapping)
-        if not np.array_equal(remapped, block):
-            label_array[selection] = remapped
+    core: SpanBox
+    grown: SpanBox
 
 
 def _scratch_group(
@@ -316,85 +123,20 @@ def read_scratch_attrs(
             group = output._group_handler.get_group(_SCRATCH_GROUP)
         else:
             group = open_group_wrapper(scratch_store, mode="r")
-    except Exception:
+    except NgioFileNotFoundError:
+        # Only "no scratch" may answer `None` — the caller reacts by creating
+        # a fresh scratch, which would wipe banks other jobs already wrote,
+        # so an unreadable scratch must raise instead.
         return None
     return dict(group.attrs)
 
 
-def create_scratch(
-    output: AbstractImage,
-    axes: Sequence[str],
-    scratch_store: StoreOrGroup | None,
-    attrs: dict[str, Any] | None = None,
-) -> dict[str, zarr.Array]:
-    """Create the scratch arrays fresh, wiping any leftovers first.
-
-    Creation is the one moment a run may destroy scratch state: stale or
-    corrupted bands from a crashed, interrupted, or superseded run are wiped
-    here, so nothing older than this call can ever reach a resolve. With no
-    `scratch_store` the arrays live in a transient group inside the output
-    label — same store, so it works under every mapper, at the cost of a
-    non-standard group sitting beside the resolution levels until the stitch
-    resolves.
-    """
-    _delete_scratch(output, scratch_store)
-    group = _scratch_group(output, scratch_store)
-    if attrs:
-        group.attrs.update(attrs)
-    array = output.zarr_array
-    return {
-        axis_name: group.create_array(
-            name=axis_name,
-            shape=array.shape,
-            dtype=array.dtype,
-            chunks=array.chunks,
-            overwrite=True,
-        )
-        for axis_name in axes
-    }
-
-
-def open_scratch(
-    output: AbstractImage,
-    axes: Sequence[str],
-    scratch_store: StoreOrGroup | None,
-) -> dict[str, zarr.Array]:
-    """Open existing scratch arrays without touching their content.
-
-    The job and gather steps of a distributed run come through here: the
-    bands other jobs banked must survive, so nothing is created or reset.
-    Raises when the scratch is missing — the init step was skipped.
-    """
-    if read_scratch_attrs(output, scratch_store) is None:
-        raise NgioValueError(
-            "The stitch scratch does not exist: a distributed stitched run "
-            "needs `prepare_jobs(n_jobs)` to create it before any job runs."
-        )
-    group = _scratch_group(output, scratch_store)
-    arrays: dict[str, zarr.Array] = {}
-    for axis_name in axes:
-        try:
-            member = group[axis_name]
-        except KeyError as e:
-            raise NgioValueError(
-                f"The stitch scratch is missing the '{axis_name}' band array; "
-                "re-run `prepare_jobs(n_jobs)` to recreate it."
-            ) from e
-        if not isinstance(member, zarr.Array):
-            raise NgioValueError(
-                f"The stitch scratch member '{axis_name}' is not an array; "
-                "re-run `prepare_jobs(n_jobs)` to recreate the scratch."
-            )
-        arrays[axis_name] = member
-    return arrays
-
-
 def _delete_scratch(output: AbstractImage, scratch_store: StoreOrGroup | None) -> None:
-    """Remove the scratch arrays, if they are still there.
+    """Remove the scratch group, if it is still there.
 
-    Only the group ngio created inside the label is deleted. A store the caller
-    supplied is theirs, so its arrays are emptied of meaning but the store
-    itself is left for them to dispose of.
+    Only the group ngio created inside the label is deleted. A store the
+    caller supplied is theirs, so its arrays are emptied of meaning but the
+    store itself is left for them to dispose of.
     """
     if scratch_store is not None:
         return
@@ -404,14 +146,403 @@ def _delete_scratch(output: AbstractImage, scratch_store: StoreOrGroup | None) -
         pass
 
 
-class StitchingSetter:
-    """Offsets a tile's ids, banks its halo bands, then writes as usual.
+class ScratchBanks:
+    """The per-tile scratch arrays under one root group.
 
-    Sits *outside* the halo crop so it sees the grown patch — the halo band is
-    the whole point, and the crop is what throws it away. The id offset is
-    applied here rather than by a transform for the same reason: a transform on
-    the setter's chain would only ever see the cropped core, and then the band
-    and the core would disagree about what an object is called.
+    One array per tile, named `roi_{index:06d}`, shaped to the tile's grown
+    extents, with the tile's global origin, id offset, and the run's id in
+    the attrs. The `run_id` is the staleness guard: a caller-supplied
+    `scratch_store` is never wiped, so a leftover bank from an earlier run
+    must be recognisable — a bank whose `run_id` does not match the root's is
+    treated as missing, never silently read.
+    """
+
+    def __init__(self, group: zarr.Group, run_id: str, label_array: zarr.Array):
+        self._group = group
+        self._run_id = run_id
+        self._label_array = label_array
+        self._open_cache: dict[int, zarr.Array] = {}
+
+    @classmethod
+    def create(
+        cls,
+        output: AbstractImage,
+        scratch_store: StoreOrGroup | None,
+        extra_attrs: dict[str, Any] | None = None,
+    ) -> "ScratchBanks":
+        """Create the scratch root fresh, wiping any leftovers first.
+
+        Creation is the one moment a run may destroy scratch state: stale or
+        corrupted banks from a crashed, interrupted, or superseded run are
+        wiped here (or, on a caller's store, invalidated by the new
+        `run_id`), so nothing older than this call can ever reach a resolve.
+        """
+        _delete_scratch(output, scratch_store)
+        group = _scratch_group(output, scratch_store)
+        run_id = uuid.uuid4().hex
+        group.attrs.update({"layout": _LAYOUT, "run_id": run_id, **(extra_attrs or {})})
+        return cls(group, run_id, output.zarr_array)
+
+    @classmethod
+    def open(
+        cls, output: AbstractImage, scratch_store: StoreOrGroup | None
+    ) -> "ScratchBanks":
+        """Open an existing scratch root without touching its content.
+
+        The job and gather steps of a distributed run come through here: the
+        banks other jobs wrote must survive, so nothing is created or reset.
+        """
+        attrs = read_scratch_attrs(output, scratch_store)
+        if attrs is None:
+            raise NgioValueError(
+                "The stitch scratch does not exist: a distributed stitched "
+                "run needs `prepare_jobs(n_jobs)` to create it before any "
+                "job runs."
+            )
+        if attrs.get("layout") != _LAYOUT or not isinstance(attrs.get("run_id"), str):
+            raise NgioValueError(
+                "The stitch scratch was written by an incompatible ngio "
+                f"version (layout {attrs.get('layout')!r}); re-run "
+                "`prepare_jobs(n_jobs)` to recreate it."
+            )
+        group = _scratch_group(output, scratch_store)
+        return cls(group, attrs["run_id"], output.zarr_array)
+
+    @property
+    def is_memory(self) -> bool:
+        """Whether the banks live on an in-memory store."""
+        return NgioStore.ensure(self._group.store).store_type == "memory"
+
+    @staticmethod
+    def _key(index: int) -> str:
+        return f"roi_{index:06d}"
+
+    def write(self, work: _TileWork, disk_patch: np.ndarray) -> None:
+        """Bank one tile's (offset, disk-oriented) grown prediction.
+
+        Creates the tile's array — single-writer by construction, and
+        `overwrite=True` keeps a re-run of the same tile idempotent.
+        """
+        shape = tuple(stop - start for start, stop in work.grown)
+        if tuple(disk_patch.shape) != shape:
+            raise NgioValueError(
+                f"Tile {work.index} banked a patch of shape "
+                f"{tuple(disk_patch.shape)} where its grown region is "
+                f"{shape}. The function must return the grown region it was "
+                "handed, unrescaled."
+            )
+        chunks = tuple(
+            min(chunk, size)
+            for chunk, size in zip(self._label_array.chunks, shape, strict=True)
+        )
+        array = self._group.create_array(
+            name=self._key(work.index),
+            shape=shape,
+            dtype=self._label_array.dtype,
+            chunks=chunks,
+            overwrite=True,
+        )
+        array.attrs.update(
+            {
+                "index": work.index,
+                "offset": work.offset,
+                "origin": [start for start, _ in work.grown],
+                "run_id": self._run_id,
+            }
+        )
+        array[...] = disk_patch
+        self._open_cache[work.index] = array
+
+    def _open_valid(self, work: _TileWork) -> zarr.Array | None:
+        """The tile's bank, or `None` when absent, stale, or mismatched."""
+        cached = self._open_cache.get(work.index)
+        if cached is not None:
+            return cached
+        try:
+            member = self._group[self._key(work.index)]
+        except KeyError:
+            return None
+        if not isinstance(member, zarr.Array):
+            return None
+        attrs = dict(member.attrs)
+        if (
+            attrs.get("run_id") != self._run_id
+            or attrs.get("offset") != work.offset
+            or attrs.get("origin") != [start for start, _ in work.grown]
+        ):
+            return None
+        self._open_cache[work.index] = member
+        return member
+
+    def missing(self, works: Sequence[_TileWork]) -> list[int]:
+        """Indices of tiles with no valid bank."""
+        return [work.index for work in works if self._open_valid(work) is None]
+
+    def read(self, work: _TileWork, box: SpanBox) -> np.ndarray:
+        """The tile's banked prediction over `box` (global pixel coords)."""
+        array = self._open_valid(work)
+        if array is None:
+            raise NgioValueError(
+                f"Tile {work.index} has no valid bank; the run is incomplete."
+            )
+        selection = tuple(
+            slice(start - origin, stop - origin)
+            for (start, stop), (origin, _) in zip(box, work.grown, strict=True)
+        )
+        return np.asarray(array[selection])
+
+
+class StitchPlan:
+    """Everything the stitch needs, derived once from the iterator's ROIs.
+
+    Built lazily on first use, because it needs the whole ROI list — a single
+    tile does not carry enough information to know its overlaps.
+    """
+
+    def __init__(
+        self,
+        *,
+        config: StitchConfig,
+        output: AbstractImage,
+        rois: Sequence[Roi],
+        ref_image: AbstractImage,
+        halo: dict[str, int],
+        read_roi: Any,
+        scratch_factory: Callable[[], ScratchBanks] | None = None,
+        same_label_only: bool = False,
+    ) -> None:
+        """Place every tile, reserve its id block, and find the overlapping pairs.
+
+        The scratch is opened (or created) on first access rather than here:
+        the plan's geometry is needed before any storage should be touched,
+        and in a distributed run which banks to use (create fresh vs open the
+        prepared root) is the iterator's decision, injected via
+        `scratch_factory`. With no factory, first access creates a fresh
+        scratch — the standalone `map` behaviour.
+        """
+        self._config = config
+        self._output = output
+        self._halo = halo
+        self._array_axes = tuple(output.dimensions.axes_handler.axes_names)
+
+        names = [roi.get_name() for roi in rois]
+        seen: dict[str, int] = {}
+        for index, name in enumerate(names):
+            other = seen.setdefault(name, index)
+            if other != index:
+                raise NgioValueError(
+                    f"Two tiles share the name {name!r}; the stitch plan is "
+                    "keyed by name, so duplicates would silently shadow each "
+                    "other. Give the ROIs unique names."
+                )
+
+        info = np.iinfo(output.zarr_array.dtype)
+        top_id = (len(rois) + 1) * config.block_size - 1
+        if top_id > int(info.max):
+            raise NgioValueError(
+                f"{len(rois)} tiles at block_size={config.block_size} reach "
+                f"id {top_id}, past what {output.zarr_array.dtype} can hold "
+                f"({int(info.max)}). Lower block_size or widen the label "
+                "dtype."
+            )
+
+        extents = tile_extents(rois, output, read_roi, self._array_axes)
+        self._works = [
+            _TileWork(
+                index=extent.index,
+                offset=(extent.index + 1) * config.block_size,
+                core=extent.core,
+                grown=extent.grown,
+            )
+            for extent in extents
+        ]
+        self._work_by_name = dict(zip(names, self._works, strict=True))
+        self._pairs = [
+            (i, j)
+            for i, j in sweep_pairs([extent.grown for extent in extents])
+            if labels_compatible(extents[i], extents[j], same_label_only)
+        ]
+
+        if len(rois) > 1 and not self._pairs:
+            # Under the label restriction, one tile per object is a normal
+            # configuration (nothing was split), not a misconfiguration.
+            singleton_objects = same_label_only and all(
+                extent.label is not None for extent in extents
+            )
+            if singleton_objects:
+                counts: dict[int, int] = {}
+                for extent in extents:
+                    assert extent.label is not None
+                    counts[extent.label] = counts.get(extent.label, 0) + 1
+                singleton_objects = all(count < 2 for count in counts.values())
+            if singleton_objects:
+                warnings.warn(
+                    "Stitching is a per-object no-op: every object fits one "
+                    "tile, so nothing was split. Ids are still offset per tile"
+                    + (" and compacted at the end." if config.compact else "."),
+                    NgioUserWarning,
+                    stacklevel=2,
+                )
+            else:
+                core_pairs = [
+                    (i, j)
+                    for i, j in sweep_pairs([extent.core for extent in extents])
+                    if labels_compatible(extents[i], extents[j], same_label_only)
+                ]
+                if not halo and not core_pairs:
+                    raise NgioValueError(
+                        "Stitching needs a halo or overlapping ROIs: with "
+                        "neither, no two tiles ever predict the same pixel and "
+                        "there is no agreement to measure. Call "
+                        "`with_halo(...)`, or tile with overlap."
+                    )
+                warnings.warn(
+                    "Stitching found no overlapping tiles: nothing will be "
+                    "merged. Ids are still offset per tile"
+                    + (" and compacted at the end." if config.compact else "."),
+                    NgioUserWarning,
+                    stacklevel=2,
+                )
+
+        unhaloed = [
+            axis for axis, name in enumerate(self._array_axes) if name not in halo
+        ]
+        for axis in touching_unstitched_axes(extents, unhaloed, same_label_only):
+            warnings.warn(
+                f"Tiles touch along '{self._array_axes[axis]}', which has no "
+                "halo: seams along it will not be stitched. Add the axis to "
+                "`with_halo(...)` to stitch across it.",
+                NgioUserWarning,
+                stacklevel=2,
+            )
+
+        self._scratch_factory = scratch_factory
+        self._banks: ScratchBanks | None = None
+        self._scratch_lock: threading.Lock | None = threading.Lock()
+
+    @property
+    def banks(self) -> ScratchBanks:
+        """The scratch banks, resolved on first access (thread-safe)."""
+        if self._banks is None:
+            lock = self._scratch_lock
+            if lock is None:
+                # A fresh per-call lock would serialize nothing; better to
+                # refuse than to run the creation unguarded.
+                raise NgioValueError(
+                    "The stitch plan has no lock and no resolved scratch; "
+                    "it was rebuilt from an incomplete state."
+                )
+            with lock:
+                if self._banks is None:
+                    if self._scratch_factory is None:
+                        self._banks = ScratchBanks.create(
+                            self._output, self._config.scratch_store
+                        )
+                    else:
+                        self._banks = self._scratch_factory()
+        return self._banks
+
+    def __getstate__(self) -> dict:
+        """Resolve the scratch before crossing a process boundary.
+
+        The factory is a closure (unpicklable) and the lock is
+        process-local; the resolved banks pickle by store reference, which
+        is exactly what the workers need. The output image is dropped too —
+        its handler carries a file lock — because a worker only ever banks;
+        `resolve`/`cleanup` run on the parent's plan.
+        """
+        _ = self.banks
+        state = self.__dict__.copy()
+        state["_scratch_factory"] = None
+        state["_scratch_lock"] = None
+        state["_output"] = None
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        self.__dict__.update(state)
+        self._scratch_lock = threading.Lock()
+
+    def work_for(self, roi: Roi) -> _TileWork:
+        """The tile record for `roi`."""
+        work = self._work_by_name.get(roi.get_name())
+        if work is None:
+            raise NgioValueError(
+                f"Tile {roi.get_name()!r} is not part of the stitch plan; the "
+                "ROI list changed after the plan was built."
+            )
+        return work
+
+    def bank(self, work: _TileWork, disk_patch: np.ndarray) -> None:
+        """Bank one tile's offset prediction (disk-oriented)."""
+        self.banks.write(work, disk_patch)
+
+    def _require_output(self) -> AbstractImage:
+        if self._output is None:
+            raise NgioValueError(
+                "This stitch plan was shipped to a worker and only banks "
+                "there; resolve and cleanup belong to the parent's plan."
+            )
+        return self._output
+
+    def resolve(self) -> None:
+        """Compare every overlapping pair of banks, union, relabel in place."""
+        output = self._require_output()
+        banks = self.banks
+        missing = banks.missing(self._works)
+        if missing:
+            raise NgioValueError(
+                f"The stitched run is incomplete: tile(s) {missing} never "
+                "banked a prediction (or banked one from a different run). "
+                "Run the missing jobs, then finalize again."
+            )
+
+        union = UnionFind[int]()
+        for i, j in self._pairs:
+            box = intersection_box(self._works[i].grown, self._works[j].grown)
+            assert box is not None  # pairs come from the same boxes
+            left = banks.read(self._works[i], box)
+            right = banks.read(self._works[j], box)
+            # `overlap_iou` counts only pixels labelled on *both* sides, so 0
+            # (background, and a masked tile's outside) never enters the
+            # union-find and can never displace a written id.
+            for (mine, theirs), score in overlap_iou(left, right).items():
+                if score >= self._config.iou_threshold:
+                    union.union(mine, theirs)
+
+        mapping = union.resolve()
+        label_array = output.zarr_array
+        if self._config.compact:
+            # One pass: canonicalize and renumber together. Collecting the ids
+            # first would mean reading the whole label twice.
+            relabel_sequential(label_array, mapping)
+        else:
+            _apply_relabel(label_array, mapping)
+        self.cleanup()
+
+    def cleanup(self) -> None:
+        """Delete the scratch group ngio created."""
+        _delete_scratch(self._require_output(), self._config.scratch_store)
+
+
+def _apply_relabel(label_array: zarr.Array, mapping: dict[int, int]) -> None:
+    """Rewrite ids in place, one chunk at a time."""
+    if not mapping:
+        return
+    for selection in chunk_selections(label_array):
+        block = np.asarray(label_array[selection])
+        remapped = relabel(block, mapping)
+        if not np.array_equal(remapped, block):
+            label_array[selection] = remapped
+
+
+class StitchingSetter:
+    """Offsets a tile's ids, banks its grown prediction, then writes as usual.
+
+    Sits *outside* the halo crop so it sees the grown patch — the halo
+    context is the whole point, and the crop is what throws it away. The id
+    offset is applied here rather than by a transform for the same reason: a
+    transform on the setter's chain would only ever see the cropped core, and
+    then the bank and the core would disagree about what an object is called.
     """
 
     def __init__(
@@ -419,11 +550,19 @@ class StitchingSetter:
         setter: DataSetterProtocol[np.ndarray],
         plan: StitchPlan,
         roi: Roi,
+        bank_transform: Callable[[np.ndarray], np.ndarray] | None = None,
     ) -> None:
-        """Wrap `setter` for the tile covering `roi`."""
+        """Wrap `setter` for the tile covering `roi`.
+
+        `bank_transform` reshapes what is *banked*, never what is written —
+        the masked iterator uses it to zero outside-mask pixels, so the
+        banked opinion is exactly the writable one. Must be picklable (a
+        named callable, not a lambda): `ProcessMapper` pickles the setters.
+        """
         self._setter = setter
         self._plan = plan
         self._work = plan.work_for(roi)
+        self._bank_transform = bank_transform
 
     def __repr__(self) -> str:
         return f"StitchingSetter({self._setter!r}, offset={self._work.offset})"
@@ -457,97 +596,45 @@ class StitchingSetter:
         """Refuse to cross a process boundary with an in-memory scratch.
 
         `ProcessMapper` pickles the units, and a `MemoryStore` pickles by
-        *value*: each worker would bank its bands into a private copy and the
-        parent would resolve against nothing. The mappers' own store check only
-        inspects the setter's target array, so it cannot see this — but pickling
-        is exactly the moment it would go wrong, so the refusal belongs here.
+        *value*: each worker would bank into a private copy and the parent
+        would resolve against nothing. The mappers' own store check only
+        inspects the setter's target array, so it cannot see this — but
+        pickling is exactly the moment it would go wrong, so the refusal
+        belongs here.
         """
-        for axis_name, array in self._plan._scratch.items():
-            if NgioStore.ensure(array.store).store_type == "memory":
-                raise NgioValueError(
-                    "A stitch scratch on an in-memory store cannot be used with "
-                    f"ProcessMapper: the '{axis_name}' bands would be banked into "
-                    "each worker's private copy and lost. Pass a persistent "
-                    "`scratch_store` to StitchConfig (or leave it unset to use "
-                    "the output's own store), or map with ThreadedMapper."
-                )
+        if self._plan.banks.is_memory:
+            raise NgioValueError(
+                "A stitch scratch on an in-memory store cannot be used with "
+                "ProcessMapper: each worker would bank into its own private "
+                "copy and the predictions would be lost. Pass a persistent "
+                "`scratch_store` to StitchConfig (or leave it unset to use "
+                "the output's own store), or map with ThreadedMapper."
+            )
         return self.__dict__
 
     def __call__(self, patch: np.ndarray) -> None:
         return self.set(patch)
 
     def set(self, patch: np.ndarray) -> None:
-        """Offset the grown patch, bank its bands, then hand it on."""
+        """Offset the grown patch, bank it, then hand it on."""
         check_offset_fits(patch, self._work.offset, self._plan._config.block_size)
         offset = offset_labels(patch, self._work.offset)
-        self._bank_bands(offset)
+        banked = (
+            offset if self._bank_transform is None else self._bank_transform(offset)
+        )
+        self._plan.bank(
+            self._work,
+            set_as_numpy_axes_ops(array=banked, axes_ops=self._setter.axes_ops),
+        )
         self._setter.set(offset)
 
-    def _band_destinations(self) -> dict[str, tuple]:
-        """Per haloed axis, the on-disk selection this tile's band writes."""
-        core_selection = list(self._setter.slicing_ops.normalized_slicing_tuple)
-        on_disk_axes = self._setter.slicing_ops.on_disk_axes
-        destinations = {}
-        for axis_name, band in self._work.bands.items():
-            destination = list(core_selection)
-            for band_axis, (start, stop) in band.items():
-                destination[on_disk_axes.index(band_axis)] = slice(start, stop)
-            destinations[axis_name] = tuple(destination)
-        return destinations
 
-    @property
-    def extra_write_footprints(self) -> list[tuple[Any, ChunkRect]]:
-        """The scratch chunks this tile's forward bands will write.
-
-        Declared so the wave scheduler and the job splitter treat band
-        banking like any other write: bands are pixel-disjoint by the
-        forward-band argument, but two tiles' bands can still share a
-        scratch *chunk* — a read-modify-write race if they ran concurrently.
-        Scratch arrays are chunked like the label and never sharded, so the
-        claim granularity is the label's chunk grid; the geometry is pure
-        metadata, computable before any scratch array exists.
-        """
-        claims: list[tuple[Any, ChunkRect]] = []
-        slicing_ops = self._setter.slicing_ops
-        for axis_name, destination in self._band_destinations().items():
-            rect = compute_chunk_rect(
-                shape=slicing_ops.on_disk_shape,
-                chunks=self._setter.zarr_array.chunks,
-                slicing_tuple=destination,
-            )
-            if rect is not None:
-                claims.append(
-                    ((id(self._setter.zarr_array), "stitch-band", axis_name), rect)
-                )
-        return claims
-
-    def _bank_bands(self, patch: np.ndarray) -> None:
-        """Copy this tile's forward bands into the scratch arrays.
-
-        Pixel-safe concurrently with every other tile: a tile's forward band
-        lies inside the *next* tile's core and is clipped to it, so no two
-        tiles ever write the same scratch pixel. Chunk-level safety is the
-        schedulers' job: the bands are declared via `extra_write_footprints`,
-        so two tiles sharing a scratch chunk never run in the same wave — or
-        land in different jobs of a distributed run.
-        """
-        output_axes = self._setter.axes_ops.output_axes
-        destinations = self._band_destinations()
-
-        for axis_name, band in self._work.bands.items():
-            patch_selection = []
-            for patch_axis in output_axes:
-                if patch_axis in band:
-                    origin = self._work.grown_origin[patch_axis]
-                    start, stop = band[patch_axis]
-                    patch_selection.append(slice(start - origin, stop - origin))
-                else:
-                    patch_selection.append(slice(None))
-            band_patch = patch[tuple(patch_selection)]
-
-            # Indexed through `Any`: the selection mixes slices with the ints
-            # and index lists the core slicing may carry, which zarr's stubs
-            # only describe one shape at a time.
-            self._plan.scratch_for(axis_name)[cast("Any", destinations[axis_name])] = (
-                set_as_numpy_axes_ops(array=band_patch, axes_ops=self._setter.axes_ops)
-            )
+__all__ = [
+    "ScratchBanks",
+    "SpanBox",
+    "StitchConfig",
+    "StitchPlan",
+    "StitchingSetter",
+    "TileExtent",
+    "read_scratch_attrs",
+]

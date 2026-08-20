@@ -107,6 +107,11 @@ def store_dask(
     A region that does not cover whole units still costs a read-modify-write on
     its boundary units — unavoidable, and safe, since each has a single writer.
 
+    Serial callers only: the budget is applied through a process-global
+    `dask.config` scope, so two concurrent `store_dask` calls can run under
+    each other's budget. The dask iterator verbs enforce this by rejecting
+    parallel mappers.
+
     Args:
         patch: The data to write.
         zarr_array: The array to write into. Must already exist.

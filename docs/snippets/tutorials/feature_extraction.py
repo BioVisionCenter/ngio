@@ -96,7 +96,7 @@ iterator = FeatureExtractorIterator(
 # Measure every region and join the per-region results into ONE FeatureTable.
 # Pass `mapper=ThreadedMapper("auto")` to fan the measurements out in parallel;
 # the join always happens once, at the end. Nothing is written yet.
-feat_table = iterator.reduce_to_table(extract_features)
+feat_table = iterator.measure(extract_features)
 
 # Storing the table is a separate, explicit step.
 ome_zarr.add_table("nuclei_regionprops", feat_table, overwrite=True)

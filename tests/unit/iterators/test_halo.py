@@ -60,6 +60,27 @@ def _sum_over_patch(patch):
     return np.full_like(patch, patch.sum() % 251)
 
 
+def test_halo_refuses_in_place_iteration():
+    """Same array in and out: a grown read covers a neighbour tile's write."""
+    ome_zarr, _ = _container()
+    image = ome_zarr.get_image()
+    iterator = ImageProcessingIterator(
+        image, image, axes_order="cyx", consolidation_mode="dask"
+    ).by_write_units()
+    with pytest.raises(NgioValueError, match="In-place"):
+        iterator.with_halo(x=4, y=4)
+
+
+def test_halo_refuses_readonly_verbs_on_a_writer():
+    """`reduce`/readonly `iter` would silently measure the grown regions."""
+    _, _, iterator = _processing_iterator()
+    haloed = iterator.with_halo(x=4, y=4)
+    with pytest.raises(NgioValueError, match="grown regions"):
+        haloed.reduce(lambda patch: float(patch.mean()))
+    with pytest.raises(NgioValueError, match="grown regions"):
+        haloed.iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
+
+
 def test_halo_is_transparent_for_a_pointwise_function():
     """A function that ignores its neighbours must write the same bytes."""
     _, _, plain = _processing_iterator()

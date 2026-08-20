@@ -242,6 +242,83 @@ def test_masked_segmentation_parallel_matches_serial():
     )
 
 
+def _overlapping_bbox_iterator(store):
+    """Two objects whose *bounding boxes* overlap but whose pixels do not.
+
+    The organoid case: bbox overlap forces the objects into the same write
+    units, so correctness rests on wave scheduling plus the masked write's
+    read-modify-write protection — not on disjoint boxes.
+    """
+    ome_zarr = _build_ome_zarr(store, chunks=(1, 16, 16))
+    masking = ome_zarr.derive_label("masking")
+    mask = np.zeros(masking.shape, dtype="uint32")
+    # Two diagonal blobs: bboxes [4:28, 4:28] and [20:44, 20:44] overlap in
+    # [20:28, 20:28], the pixels stay disjoint.
+    mask[..., 4:28, 4:20] = 1
+    mask[..., 4:20, 20:28] = 1
+    mask[..., 28:44, 20:44] = 2
+    mask[..., 20:28, 28:44] = 2
+    masking.set_array(mask)
+    masking.consolidate()
+    ome_zarr.add_table("masking_ROI_table", masking.build_masking_roi_table())
+
+    image = ome_zarr.get_masked_image(masking_label_name="masking")
+    out = ome_zarr.derive_label("out")
+    iterator = MaskedSegmentationIterator(
+        image, out, channel_selection=0, axes_order="yx"
+    )
+    return ome_zarr, iterator
+
+
+def test_masked_overlapping_bboxes_parallel_matches_serial():
+    """Overlapping bounding boxes with disjoint pixels stay bit-correct."""
+    serial_zarr, serial_it = _overlapping_bbox_iterator(MemoryStore())
+    assert serial_it.check_if_regions_overlap()
+    serial_it.map_as_numpy(_threshold)
+
+    threaded_zarr, threaded_it = _overlapping_bbox_iterator(MemoryStore())
+    threaded_it.map_as_numpy(_threshold, mapper=ThreadedMapper(4))
+
+    serial = serial_zarr.get_label("out").get_as_numpy()
+    np.testing.assert_array_equal(serial, threaded_zarr.get_label("out").get_as_numpy())
+    # The masked write protects each object's pixels from its neighbour: the
+    # second object's pass over the shared bbox must not clear the first —
+    # one tile's background 0 never overwrites another tile's written ids.
+    mask = serial_zarr.get_label("masking").get_as_numpy()
+    assert (serial[mask == 0] == 0).all()
+    for object_label in (1, 2):
+        inside = serial[mask == object_label]
+        assert inside.any(), f"object {object_label} lost its written ids"
+
+
+def test_serial_map_matches_parallel_on_overlapping_writes():
+    """BasicMapper adopts wave order: contested pixels land identically."""
+    from ngio.iterators._mappers import canonical_unit_order
+
+    def _fill_mean(patch):
+        return np.full_like(patch, int(patch.mean()) or 1)
+
+    serial_zarr, serial_base = _colliding_iterator(MemoryStore())
+    serial_it = serial_base.by_grid(size_y=24, size_x=24, tail="shift")
+    assert serial_it.check_if_regions_overlap()
+    serial_it.map_as_numpy(_fill_mean)
+
+    threaded_zarr, threaded_base = _colliding_iterator(MemoryStore())
+    threaded_base.by_grid(size_y=24, size_x=24, tail="shift").map_as_numpy(
+        _fill_mean, mapper=ThreadedMapper(4)
+    )
+
+    np.testing.assert_array_equal(
+        serial_zarr.get_label("coarse").get_as_numpy(),
+        threaded_zarr.get_label("coarse").get_as_numpy(),
+    )
+
+    # With no conflicts the canonical order is plain index order.
+    _, disjoint = _segmentation_iterator(MemoryStore())
+    units = list(disjoint._numpy_units_generator())
+    assert [u.index for u in canonical_unit_order(units)] == [u.index for u in units]
+
+
 def test_process_mapper_refuses_memory_stores():
     _, iterator = _segmentation_iterator(MemoryStore())
     with pytest.raises(NgioValueError, match="MemoryStore pickles by value"):
@@ -284,7 +361,7 @@ def _measure_labels(image, label, roi):
     }
 
 
-def test_reduce_to_table_across_processes(tmp_path: Path):
+def test_measure_across_processes(tmp_path: Path):
     """Per-ROI dicts pickle back from the workers; the joined table matches serial."""
     from ngio.iterators import FeatureExtractorIterator
 
@@ -303,8 +380,8 @@ def test_reduce_to_table_across_processes(tmp_path: Path):
         axes_order="yx",
     ).by_grid(size_x=16, size_y=16)
 
-    serial = iterator.reduce_to_table(_measure_labels)
-    from_processes = iterator.reduce_to_table(
+    serial = iterator.measure(_measure_labels)
+    from_processes = iterator.measure(
         _measure_labels, mapper=ProcessMapper(max_workers=2)
     )
     assert from_processes.dataframe.equals(serial.dataframe)

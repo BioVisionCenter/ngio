@@ -339,7 +339,8 @@ class ZarrGroupHandler:
             self._group = self.reopen_group()
         self._group_cache.clear()
         self._array_cache.clear()
-        for handler in self._handlers_cache.cache.values():
+        # Snapshot: a concurrent `get_handler` may insert mid-iteration.
+        for handler in list(self._handlers_cache.cache.values()):
             handler.invalidate_meta()
 
     def clean_cache(self) -> None:
@@ -424,6 +425,23 @@ class ZarrGroupHandler:
         # attrs cache both describe the state from before it.
         self.invalidate_meta()
 
+    def _evict_subtree(self, path: str) -> None:
+        """Drop `path` and everything below it from all three caches.
+
+        A deleted or overwritten group invalidates its whole subtree: a cached
+        child group, array, or handler would keep serving the old store state.
+        """
+        prefix = path.rstrip("/") + "/"
+        for cache in (
+            self._group_cache._cache,
+            self._array_cache._cache,
+            self._handlers_cache._cache,
+        ):
+            # Snapshot: a concurrent `get_handler` may insert mid-iteration.
+            for key in list(cache):
+                if key == path or key.startswith(prefix):
+                    cache.pop(key, None)
+
     def create_group(self, path: str, overwrite: bool = False) -> zarr.Group:
         """Create a group in the group."""
         if self.group.read_only:
@@ -436,6 +454,8 @@ class ZarrGroupHandler:
                 f"A Zarr group already exists at {path}, "
                 "consider setting overwrite=True."
             ) from e
+        if overwrite:
+            self._evict_subtree(path)
         self._group_cache.set(path, group, overwrite=overwrite)
         return group
 
@@ -521,14 +541,22 @@ class ZarrGroupHandler:
             create_mode (bool): If True, create the group if it does not exist.
             overwrite (bool): If True, overwrite the group if it exists.
         """
-        handler = self._handlers_cache.get(path)
-        if handler is not None:
-            return handler
+        if not overwrite:
+            # An `overwrite=True` call must not be served from cache: the
+            # cached handler points at the group about to be recreated.
+            handler = self._handlers_cache.get(path)
+            if handler is not None:
+                return handler
         group = self.get_group(path, create_mode=create_mode, overwrite=overwrite)
         mode = "r" if group.read_only else "r+"
         handler = ZarrGroupHandler(
             store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode=mode
         )
+        if overwrite:
+            # The group was just recreated (evicting the subtree); replace
+            # rather than adopt whatever a racing builder may have cached.
+            self._handlers_cache.set(path, handler)
+            return handler
         # `setdefault`, not `set`: a handler that lost this race and stayed
         # reachable would sit outside `invalidate_meta`'s cascade and keep
         # serving whatever it cached.
@@ -547,8 +575,7 @@ class ZarrGroupHandler:
         if self.group.read_only:
             raise NgioValueError("Cannot delete a group in read only mode.")
         self.group.__delitem__(path)
-        self._group_cache._cache.pop(path, None)
-        self._handlers_cache._cache.pop(path, None)
+        self._evict_subtree(path)
 
     def delete_self(self) -> None:
         """Delete the current group."""

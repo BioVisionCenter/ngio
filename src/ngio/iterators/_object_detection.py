@@ -44,7 +44,7 @@ from ngio.iterators._partials import (
     write_partial,
 )
 from ngio.tables import RoiTable
-from ngio.utils import NgioValueError
+from ngio.utils import NgioValueError, deprecated
 
 NumpyPipeType: TypeAlias = tuple[np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, Roi]
@@ -277,7 +277,11 @@ def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
             )
             for axis in axes
         }
-        rois.append(Roi.from_values(slices=slices, name=None, space="pixel", **record))
+        # Concatenating tiles with heterogeneous extra fields NaN-fills the
+        # union of columns; those fill values are not detector output and a
+        # serial `detect` never sees them.
+        extras = {key: value for key, value in record.items() if not pd.isna(value)}
+        rois.append(Roi.from_values(slices=slices, name=None, space="pixel", **extras))
     return rois
 
 
@@ -374,6 +378,22 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def iter_as_numpy(self):  # type: ignore[override]
         """Iterate `(patch, roi)` pairs over the (haloed) tiles."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
+
+    def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
+        """Iterate `(patch, roi)` payloads in batches of `batch_size`."""
+        self._require_valid_batch_size(batch_size)
+        return self._iter_batched_readonly(batch_size)
+
+    @deprecated(
+        replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
+        removed_in="1.2",
+    )
+    def iter_as_dask(self):  # type: ignore[override]
+        """Iterate `(patch, roi)` pairs over the (haloed) tiles.
+
+        Deprecated: removed in ngio=1.2.
+        """
+        return self._iter(lazy=False, data_mode="dask", iterator_mode="readonly")
 
     def detect(
         self,
@@ -496,7 +516,9 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         rebuilds every tile's raw boxes and runs the full serial pipeline
         once, globally: anchoring, the cross-tile invariant checks, NMS, and
         the dense `1..N` renumbering. Bit-identical to a serial `detect` by
-        construction. On success the partials group is removed. Nothing is
+        construction (one exception: an extra field a detector sets to `NaN`
+        does not survive the partial round-trip).
+        On success the partials group is removed. Nothing is
         registered: the returned table is yours to store with `add_table`.
         """
         if self._partition is not None:

@@ -19,11 +19,13 @@ back to back, each at full pool width. Within a wave, disjointness is what
 makes the parallel writes safe *without any lock, in any topology* — a chunk
 or shard object with a single writer cannot lose an update, whether the
 writers are threads or processes, where a lock could only ever protect one
-process. Tiling with `by_write_units()` yields a single wave. One caveat:
-writes overlapping at the *pixel* level always land in different waves, and
-the wave order may differ from a serial run's unit order — mask-merged and
-pixel-disjoint writes are order-independent, so only genuinely overlapping
-plain writes can differ from serial.
+process. Tiling with `by_write_units()` yields a single wave.
+
+Wave order is the *canonical* write order: the serial mappers run units in
+flattened wave order too (`canonical_unit_order`), so writes overlapping at
+the pixel level land identically under every mapper — the later wave wins,
+deterministically. With no conflicts the canonical order is plain index
+order.
 """
 
 import logging
@@ -157,9 +159,13 @@ class BasicMapper(Generic[T, R]):
         func: Callable[[T], R],
         units: Iterable[IterUnit[T]],
     ) -> list[R]:
-        """Apply `func` to every unit and return the results in ROI order."""
+        """Apply `func` to every unit and return the results in ROI order.
+
+        Units run in canonical (flattened wave) order, so pixel-overlapping
+        writes land exactly as they would under a parallel mapper.
+        """
         results: list[tuple[int, R]] = []
-        for unit in units:
+        for unit in canonical_unit_order(list(units)):
             result = func(unit.getter())
             if unit.setter is not None:
                 # map_as_* is the only writing entry point and its func is
@@ -302,8 +308,13 @@ class BatchedMapper:
         func: Callable[[np.ndarray], np.ndarray],
         units: Iterable[IterUnit[np.ndarray]],
     ) -> list[np.ndarray]:
-        """Apply `func` batch-wise and return the results in ROI order."""
-        units = list(units)
+        """Apply `func` batch-wise and return the results in ROI order.
+
+        Batches are cut over the canonical (flattened wave) unit order, so
+        pixel-overlapping writes land exactly as under every other mapper;
+        with no conflicts the batches follow plain index order.
+        """
+        units = canonical_unit_order(list(units))
         if not units:
             return []
         batches = [
@@ -426,7 +437,9 @@ def _write_conflict_edges(
     return adjacency
 
 
-def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
+def plan_waves(
+    units: Sequence[IterUnit[T]], *, log: bool = True
+) -> list[list[IterUnit[T]]]:
     """Partition units into conflict-free waves by first-fit greedy coloring.
 
     Two units whose write footprints share a write unit (a chunk, or a shard
@@ -439,10 +452,15 @@ def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
     pure function of the unit sequence. A conflict-free set — a
     `by_write_units()` tiling, say — yields a single wave.
 
-    Note that units whose writes overlap at the *pixel* level always land in
-    different waves, but the wave order may differ from a serial run's unit
-    order; mask-merged and pixel-disjoint writes are order-independent either
-    way.
+    Flattened wave order is the canonical write order for every mapper
+    (`canonical_unit_order`), so units whose writes overlap at the *pixel*
+    level land in the same order serially and in parallel: the later wave
+    wins, deterministically.
+
+    Args:
+        units: The units to schedule.
+        log: Emit schedule-quality log messages. The parallel mappers keep
+            this on; serial callers ordering their units pass `False`.
     """
     if not units:
         return []
@@ -464,6 +482,8 @@ def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
             waves.append([])
         waves[color].append(unit)
 
+    if not log:
+        return waves
     if len(waves) == len(units) and len(units) > 1:
         logger.warning(
             "Parallel map degraded to a serial schedule: every one of the "
@@ -481,6 +501,17 @@ def plan_waves(units: Sequence[IterUnit[T]]) -> list[list[IterUnit[T]]]:
     return waves
 
 
+def canonical_unit_order(units: Sequence[IterUnit[T]]) -> list[IterUnit[T]]:
+    """Units in flattened wave order — the one write order every mapper uses.
+
+    Wave 0 in index order, then wave 1, and so on. With no write conflicts
+    this is plain index order, so for disjoint tilings it changes nothing;
+    with pixel-overlapping writes it makes "who wrote last" a pure function
+    of the unit sequence, identical for serial and parallel runs.
+    """
+    return [unit for wave in plan_waves(units, log=False) for unit in wave]
+
+
 def write_conflict_components(units: Sequence[IterUnit[Any]]) -> list[list[int]]:
     """Connected components of the write-conflict graph, as unit-index lists.
 
@@ -493,7 +524,7 @@ def write_conflict_components(units: Sequence[IterUnit[Any]]) -> list[list[int]]
 
     A component is the unit of independence: units in different components
     never share a write unit, so they need no coordination in any topology.
-    That is the property `split(n_jobs)` builds on — a component never spans
+    That is the property `for_job` builds on — a component never spans
     two jobs. Each component is a sorted list of `unit.index`; components are
     ordered by their smallest index, and the whole result is a pure function
     of the unit sequence.

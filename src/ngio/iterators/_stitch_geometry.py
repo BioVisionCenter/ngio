@@ -1,160 +1,170 @@
-"""Tile geometry for stitching: grid indices, and the bands tiles share.
+"""Tile geometry for stitching: pixel-space extents and the pairs sharing pixels.
 
-The seam scan needs to know two things about a list of tile ROIs: which grid
-cell each one occupies, and where two neighbouring tiles' predictions cover the
-same pixels. Both are computed from the ROI list as a whole, which is what makes
-them robust — a single ROI does not carry enough information to place itself.
+The stitch needs to know, for every tile, which pixels of the label it wrote
+(its *core*) and which pixels it had an opinion about (its *grown* read, core
+plus halo), and which pairs of tiles overlap anywhere in that opinion. All of
+it is computed in the label's own pixel space over the label's own axes — no
+grid is assumed, so any ROI list works: regular grids, overlapping FOV
+layouts, ragged tables.
 """
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from ngio.common._roi import Roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.utils import NgioValueError
 
+#: Per-axis half-open pixel interval `[start, stop)`, one entry per label axis.
+SpanBox = tuple[tuple[int, int], ...]
+
 
 @dataclass(frozen=True)
-class TilePlacement:
-    """Where one tile sits, in pixels and in grid cells.
+class TileExtent:
+    """One tile's pixel-space extents over the label's axes.
 
     Attributes:
         index: Position in the iterator's `rois` list.
-        grid: The tile's cell per axis, in the order of `axes`.
-        origin: The core region's first pixel per axis.
-        stop: One past the core region's last pixel per axis.
+        core: The written region, per label axis.
+        grown: The read region (core plus halo), per label axis.
+        label: The ROI's masking label, when it carries one — sub-tiles of a
+            masked object inherit the object's label.
     """
 
     index: int
-    grid: tuple[int, ...]
-    origin: tuple[int, ...]
-    stop: tuple[int, ...]
+    core: SpanBox
+    grown: SpanBox
+    label: int | None = None
 
 
-def tile_placements(
-    rois: Sequence[Roi], ref_image: AbstractImage, axes: Sequence[str]
-) -> list[TilePlacement]:
-    """Place each ROI on the tile grid by ranking its origin.
+def _roi_spans(
+    roi: Roi, label_image: AbstractImage, axes: Sequence[str], what: str
+) -> SpanBox:
+    """The ROI's `[start, stop)` per label axis; unpinned axes span fully."""
+    roi_px = roi.to_pixel(pixel_size=label_image.pixel_size)
+    spans = []
+    for axis_name in axes:
+        dim = label_image.dimensions.get(axis_name, default=1)
+        roi_slice = roi_px.get(axis_name)
+        if roi_slice is None or roi_slice.start is None or roi_slice.length is None:
+            spans.append((0, int(dim)))
+            continue
+        start = int(roi_slice.start)
+        stop = start + int(roi_slice.length)
+        if stop <= start:
+            raise NgioValueError(
+                f"Tile {roi.get_name()!r}: the {what} region is empty along "
+                f"'{axis_name}' ({start}..{stop})."
+            )
+        spans.append((start, stop))
+    return tuple(spans)
 
-    The grid cell comes from *ranking* the distinct origins along each axis, not
-    from dividing an origin by a tile size. Division is wrong: `by_grid()` clips the
-    final tile against the parent ROI, so a 100-pixel axis tiled at 32 ends with
-    `start=96, length=4`, and `96 // 4` is 24 where the answer is 3. Ranking
-    needs the whole list, which is exactly what this function is given.
+
+def tile_extents(
+    rois: Sequence[Roi],
+    label_image: AbstractImage,
+    read_roi: Callable[[Roi], Roi],
+    axes: Sequence[str],
+) -> list[TileExtent]:
+    """Every tile's core and grown extents, in label pixel space.
 
     Args:
         rois: The tiles, in iterator order.
-        ref_image: The image the ROIs are expressed against; supplies pixel size.
-        axes: The axes to place along, e.g. `("y", "x")`.
-
-    Returns:
-        One placement per ROI, in the same order.
-
-    Raises:
-        NgioValueError: If a ROI does not pin one of `axes`.
+        label_image: The output label; supplies pixel size and axis extents.
+        read_roi: Grows a core ROI by the halo (the iterator's `_read_roi`).
+        axes: The label's on-disk axes, in order.
     """
-    pixel_size = ref_image.pixel_size
-    bounds: list[tuple[tuple[int, ...], tuple[int, ...]]] = []
-    for roi in rois:
-        roi_px = roi.to_pixel(pixel_size=pixel_size)
-        origin, stop = [], []
-        for axis_name in axes:
-            roi_slice = roi_px.get(axis_name)
-            if roi_slice is None or roi_slice.start is None or roi_slice.length is None:
-                raise NgioValueError(
-                    f"Tile {roi.get_name()!r} does not pin axis '{axis_name}', so "
-                    "it cannot be placed on the tile grid."
-                )
-            start = int(roi_slice.start)
-            origin.append(start)
-            stop.append(start + int(roi_slice.length))
-        bounds.append((tuple(origin), tuple(stop)))
-
-    ranks = [
-        {start: rank for rank, start in enumerate(sorted({b[0][ax] for b in bounds}))}
-        for ax in range(len(axes))
-    ]
     return [
-        TilePlacement(
+        TileExtent(
             index=index,
-            grid=tuple(ranks[ax][origin[ax]] for ax in range(len(axes))),
-            origin=origin,
-            stop=stop,
+            core=_roi_spans(roi, label_image, axes, "written"),
+            grown=_roi_spans(read_roi(roi), label_image, axes, "read"),
+            label=roi.label,
         )
-        for index, (origin, stop) in enumerate(bounds)
+        for index, roi in enumerate(rois)
     ]
 
 
-def neighbours_along(
-    placements: Sequence[TilePlacement], axis: int
-) -> list[tuple[TilePlacement, TilePlacement]]:
-    """Pairs of tiles that are adjacent along `axis`, lower cell first.
+def intersection_box(a: SpanBox, b: SpanBox) -> SpanBox | None:
+    """The per-axis intersection of two boxes, or `None` when they are disjoint."""
+    box = []
+    for (a_start, a_stop), (b_start, b_stop) in zip(a, b, strict=True):
+        start, stop = max(a_start, b_start), min(a_stop, b_stop)
+        if stop <= start:
+            return None
+        box.append((start, stop))
+    return tuple(box)
 
-    Adjacent means one grid step apart on `axis` and identical on every other,
-    so each pair shares a face rather than merely an edge or a corner.
+
+def sweep_pairs(spans: Sequence[SpanBox]) -> list[tuple[int, int]]:
+    """All unordered index pairs whose boxes intersect on every axis.
+
+    Sort-and-sweep on the axis with the most distinct starts, comparing each
+    box only against those still open there — near-linear on tilings, worst
+    case O(n²) when everything overlaps everything (in which case the output
+    is that big anyway). Deterministic: pairs come back sorted.
     """
-    by_cell = {placement.grid: placement for placement in placements}
-    pairs = []
-    for placement in placements:
-        neighbour_cell = list(placement.grid)
-        neighbour_cell[axis] += 1
-        neighbour = by_cell.get(tuple(neighbour_cell))
-        if neighbour is not None:
-            pairs.append((placement, neighbour))
-    return pairs
+    if len(spans) < 2:
+        return []
+    n_axes = len(spans[0])
+    sweep_axis = max(range(n_axes), key=lambda ax: len({box[ax][0] for box in spans}))
+    order = sorted(range(len(spans)), key=lambda i: spans[i][sweep_axis][0])
+
+    pairs: list[tuple[int, int]] = []
+    active: list[int] = []
+    for i in order:
+        start = spans[i][sweep_axis][0]
+        active = [j for j in active if spans[j][sweep_axis][1] > start]
+        for j in active:
+            if intersection_box(spans[i], spans[j]) is not None:
+                pairs.append((min(i, j), max(i, j)))
+        active.append(i)
+    return sorted(pairs)
 
 
-def shared_band(
-    lower: TilePlacement,
-    upper: TilePlacement,
-    axis: int,
-    halo: int,
-    axes: Sequence[str],
-) -> dict[str, tuple[int, int]] | None:
-    """The pixels where `lower`'s halo reaches into `upper`'s core.
+def labels_compatible(a: TileExtent, b: TileExtent, same_label_only: bool) -> bool:
+    """Whether a pair of tiles may be compared, under the label restriction.
 
-    That band is where the two tiles both have an opinion: `lower` predicted it
-    from its grown read, and `upper` owns it and wrote it. Comparing the two is
-    the whole basis of the stitch.
-
-    Returns:
-        Per-axis `(start, stop)` in pixels, or `None` when the halo does not
-        reach — a zero halo, or tiles that do not actually touch.
+    With `same_label_only` (the masked iterator), only tiles of the same
+    masked object are comparable — an object cannot span two masks, so
+    cross-label comparisons could never merge anything. Unlabelled tiles are
+    always comparable.
     """
-    if halo <= 0:
-        return None
-    reach = min(lower.stop[axis] + halo, upper.stop[axis])
-    if reach <= upper.origin[axis]:
-        return None
-
-    band: dict[str, tuple[int, int]] = {}
-    for ax, axis_name in enumerate(axes):
-        if ax == axis:
-            band[axis_name] = (upper.origin[axis], reach)
-        else:
-            start = max(lower.origin[ax], upper.origin[ax])
-            stop = min(lower.stop[ax], upper.stop[ax])
-            if stop <= start:
-                return None
-            band[axis_name] = (start, stop)
-    return band
+    if not same_label_only:
+        return True
+    return a.label is None or b.label is None or a.label == b.label
 
 
-def forward_bands(
-    placements: Sequence[TilePlacement], axis: int, halo: int, axes: Sequence[str]
-) -> dict[int, dict[str, tuple[int, int]]]:
-    """The band each tile contributes on `axis`, keyed by tile index.
+def touching_unstitched_axes(
+    extents: Sequence[TileExtent],
+    unhaloed_axes: Sequence[int],
+    same_label_only: bool = False,
+) -> list[int]:
+    """Axes along which two cores touch face-to-face with no halo to cross.
 
-    Only the *forward* band is kept — the one reaching into the next tile along
-    the axis. That is enough to give every adjacent pair one comparison, and it
-    makes the scratch layer for this axis collision-free by construction: tile
-    `k` writes inside tile `k+1`'s core and nowhere else, and `shared_band`
-    clips to that core, so no two tiles ever touch the same pixel. Tiles at the
-    far edge contribute nothing.
+    Such a pair produces no grown-region overlap on that axis, so the seam
+    between them is silently unstitched — worth a warning, not an error:
+    ragged and per-region ROI lists legitimately contain such adjacency.
+    Under `same_label_only`, only same-object pairs count: two *different*
+    masked objects touching is not a seam anyone wants stitched.
     """
-    bands: dict[int, dict[str, tuple[int, int]]] = {}
-    for lower, upper in neighbours_along(placements, axis):
-        band = shared_band(lower, upper, axis, halo, axes)
-        if band is not None:
-            bands[lower.index] = band
-    return bands
+    touching: list[int] = []
+    for axis in unhaloed_axes:
+        # Extending every box by one pixel on `axis` turns face-contact into
+        # overlap; any pair found this way that a plain sweep does not find
+        # is exactly a touching pair.
+        extended = [
+            tuple(
+                (start, stop + 1) if ax == axis else (start, stop)
+                for ax, (start, stop) in enumerate(extent.core)
+            )
+            for extent in extents
+        ]
+        plain = set(sweep_pairs([extent.core for extent in extents]))
+        if any(
+            pair not in plain
+            and labels_compatible(extents[pair[0]], extents[pair[1]], same_label_only)
+            for pair in sweep_pairs(extended)
+        ):
+            touching.append(axis)
+    return touching

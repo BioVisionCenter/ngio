@@ -37,10 +37,10 @@ class MergePolicy(Protocol):
     exactly the region being written.
 
     Note:
-        Read only the region you are given. ngio's parallel mappers are safe
-        because they refuse two ROIs that share a write unit, which gives each
-        unit sole ownership of the pixels it reads; a policy reaching past
-        `ctx.slicing` would break that silently.
+        Read only the region you are given. ngio's parallel mappers schedule
+        ROIs that share a write unit into separate waves, so each running
+        write has sole ownership of the pixels it reads; a policy reaching
+        past `ctx.slicing` would break that silently.
 
     Compatibility policy: future ngio versions will only ever add *optional*
     members to this protocol, probed with `getattr` — a policy implementing
@@ -85,6 +85,7 @@ def _merge_keep_nonzero(
 # regions give the same answer whatever order they are visited in — exactly,
 # because the merge runs in the array's own space and nothing is resampled
 # between visits. `keep_nonzero` is not: it is "the last nonzero write wins".
+# `sum` follows numpy's arithmetic: on integer dtypes it wraps on overflow.
 _MERGE_RULES: dict[str, MergeFunction] = {
     "max": _merge_max,
     "min": _merge_min,

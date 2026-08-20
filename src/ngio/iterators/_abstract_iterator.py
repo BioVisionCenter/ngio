@@ -48,6 +48,16 @@ R = TypeVar("R")
 T = TypeVar("T")
 
 
+def _is_same_zarr_array(left, right) -> bool:
+    """Whether two zarr array handles point at the same stored array."""
+    if left is right:
+        return True
+    try:
+        return left.store == right.store and left.path == right.path
+    except (AttributeError, TypeError):
+        return False
+
+
 class JobArgs(TypedDict):
     """One entry of `prepare_jobs`'s parallelization list.
 
@@ -237,6 +247,16 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 f"{name} is read-only, so there is no written region for a "
                 "halo to surround. Widen the ROIs themselves instead (e.g. "
                 "`grid(...)` with a stride smaller than the size)."
+            )
+        output = self.output_image
+        if output is not None and _is_same_zarr_array(
+            self._ref_image.zarr_array, output.zarr_array
+        ):
+            raise NgioValueError(
+                "In-place iteration cannot take a halo: each tile's grown "
+                "read covers pixels that neighbouring tiles write, so the "
+                "result depends on execution order. Write to a different "
+                "image or label, or drop the halo."
             )
         new_instance = self._new_from_rois(self.rois)
         new_instance._halo = {ax: m for ax, m in halo.items() if m > 0}
@@ -599,6 +619,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             raise NgioValueError(f"Invalid mode: {data_mode}")
 
         if iterator_mode == "readonly":
+            self._require_no_halo_on_readonly_verbs()
             if lazy:
                 return getters
             else:
@@ -608,6 +629,67 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         else:
             gen = self._read_and_write_generator(getters, setters)
             return ((getter(), setter) for getter, setter in gen)
+
+    def _iter_batched_readonly(self, batch_size: int) -> Generator[list, None, None]:
+        getters = self._iter(lazy=True, data_mode="numpy", iterator_mode="readonly")
+        batch: list = []
+        for getter in getters:
+            batch.append(getter)
+            if len(batch) == batch_size:
+                yield [getter() for getter in batch]
+                batch = []
+        if batch:
+            yield [getter() for getter in batch]
+
+    def _require_valid_batch_size(self, batch_size: int) -> None:
+        if batch_size < 1:
+            raise NgioValueError(f"batch_size must be >= 1, got {batch_size}.")
+
+    def iter_batched(
+        self, batch_size: int = 8
+    ) -> Generator[
+        tuple[list[NumpyPipeType], list[DataSetterProtocol[NumpyPipeType]]],
+        None,
+        None,
+    ]:
+        """Iterate the ROIs in batches: `(patches, writers)` per batch.
+
+        Two aligned lists of up to `batch_size` items — stack the patches
+        yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
+        automatic padding), run the model once, and hand each result to its
+        writer. Batches follow ROI order, and the run finalizes when the
+        generator is fully drained, exactly like `iter`.
+
+        Args:
+            batch_size: Maximum items per batch; the last batch may be
+                smaller.
+
+        Example:
+            ```python
+            for patches, writers in iterator.iter_batched(8):
+                outs = model(np.stack(patches))
+                for writer, out in zip(writers, outs):
+                    writer(out)
+            ```
+        """
+        self._require_valid_batch_size(batch_size)
+        getters = self._numpy_getters_generator()
+        setters = self._numpy_setters_generator()
+        batch: list = []
+        for getter, setter in zip(getters, setters, strict=True):
+            if setter is None:
+                name = self.__class__.__name__
+                raise NgioValueError(f"Iterator is read-only: {name}")
+            batch.append((getter, setter))
+            if len(batch) == batch_size:
+                yield [g() for g, _ in batch], [s for _, s in batch]
+                batch = []
+        if batch:
+            yield [g() for g, _ in batch], [s for _, s in batch]
+        # After the final batch, like `iter`: the consumer has had its chance
+        # to call the writers by the time it requests past the last yield.
+        if self._partition is None:
+            self.finalize()
 
     @overload
     def iter(
@@ -734,11 +816,31 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         self, units: list[IterUnit[NumpyPipeType]] | list[IterUnit[DaskPipeType]]
     ) -> None:
         """Raise if every unit is read-only: there is nothing for `map` to write."""
-        if units and all(unit.setter is None for unit in units):
+        # `output_image` first, so a read-only iterator with an *empty* ROI
+        # list still refuses instead of silently succeeding.
+        if self.output_image is None or (
+            units and all(unit.setter is None for unit in units)
+        ):
             name = self.__class__.__name__
             raise NgioValueError(
                 f"{name} is read-only: map has nothing to write back. "
                 "Use reduce (or iter) to compute without writing."
+            )
+
+    def _require_no_halo_on_readonly_verbs(self) -> None:
+        """Refuse `reduce`/readonly `iter` on a haloed *writing* iterator.
+
+        The halo is defined against the write: read grown, crop, write the
+        core. A read-only verb has no write to crop, so it would silently
+        hand `func` the grown regions. (Read-only iterators that opt into a
+        halo — object detection — reconcile the overlap themselves.)
+        """
+        if self._halo and self.output_image is not None:
+            raise NgioValueError(
+                "This iterator writes, and its halo belongs to the write "
+                "path (read grown, write the core). A read-only reduce/iter "
+                "would silently measure the grown regions instead. Rebuild "
+                "the iterator without `with_halo(...)` to measure."
             )
 
     def _require_splittable(self) -> None:
@@ -746,7 +848,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
         The base allows it everywhere: writers distribute their writes, and
         the read-only iterators distribute via their partial verbs
-        (`reduce_to_partial` / `detect_to_partial`) plus a `merge_partials`
+        (`measure_to_partial` / `detect_to_partial`) plus a `merge_partials`
         gather. Subclasses with an unsupported configuration raise here.
         """
 
@@ -804,12 +906,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         in-memory stores cannot work across separate processes. Jobs beyond
         the number of independent unit groups come back empty and their
         `map` is a no-op. A *stitched* segmentation additionally requires
-        `prepare_jobs(n_jobs)` to have created the scratch band arrays; its
-        band writes join the conflict graph, so tiles whose bands share a
-        scratch chunk travel together (a tile grid aligned with the label's
-        chunk grid still splits fully). Read-only iterators require
+        `prepare_jobs(n_jobs)` to have created the scratch root; each tile
+        banks into its own array, so banking adds no conflicts and a
+        stitched iterator splits exactly as a plain map would. Read-only
+        iterators require
         `prepare_jobs` too, and distribute through their partial verbs —
-        `reduce_to_partial` / `detect_to_partial` per job, `merge_partials`
+        `measure_to_partial` / `detect_to_partial` per job, `merge_partials`
         as the gather — because their joins (coalesce, NMS) are global.
         `write_conflict_components` exposes the grouping this partition is
         built from.
@@ -990,6 +1092,25 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Alias for `map()`."""
         return self.map(func, mapper=mapper)
 
+    def _require_serial_dask_mapper(
+        self, mapper: "MapperProtocol[DaskPipeType, R] | None"
+    ) -> "MapperProtocol[DaskPipeType, R]":
+        """The dask verbs run serially; reject any parallel mapper.
+
+        `store_dask` scopes a process-global dask config option, so
+        concurrent dask writers are unsafe by construction.
+        """
+        if mapper is None:
+            return BasicMapper[DaskPipeType, R]()
+        if isinstance(mapper, BasicMapper):
+            return mapper
+        raise NgioValueError(
+            "The dask verbs run serially: dask schedules its own workers, "
+            f"and the write path is not safe under {type(mapper).__name__}. "
+            "Pass no mapper here, or use the numpy verbs with a parallel "
+            "mapper."
+        )
+
     @deprecated(
         replacement="map() / map_as_numpy(mapper=...)",
         removed_in="1.2",
@@ -1004,15 +1125,12 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
         Deprecated: removed in ngio=1.2.
 
-        A parallel `mapper` is pointless here: the dask pipes are already
-        executed by dask's own scheduler, and stacking a thread pool on top
-        of it oversubscribes rather than accelerates.
+        Runs serially: the dask pipes are already executed by dask's own
+        scheduler, and the dask write path (`store_dask`) scopes a global
+        dask config option, so concurrent callers are unsafe. A parallel
+        `mapper` raises.
         """
-        if mapper is None:
-            _mapper = BasicMapper[DaskPipeType, DaskPipeType]()
-        else:
-            _mapper = mapper
-
+        _mapper = self._require_serial_dask_mapper(mapper)
         units = list(self._dask_units_generator())
         self._require_writable_units(units)
         _mapper(func, units)
@@ -1041,6 +1159,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             One result per ROI, in ROI order: `results[i]` corresponds to
             `self.rois[i]`, regardless of the mapper's execution order.
         """
+        self._require_no_halo_on_readonly_verbs()
         if mapper is None:
             mapper = BasicMapper[NumpyPipeType, R]()
         return mapper(func, list(self._numpy_units_generator(with_setters=False)))
@@ -1069,18 +1188,16 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Deprecated: removed in ngio=1.2.
 
         Units are built read-only even on writable iterators: nothing is
-        written and `finalize` does not run. A parallel `mapper` is
-        pointless here: the units hand `func` *lazy* dask arrays, so the
-        per-unit work is graph construction, not IO — see `map_as_dask`.
+        written and `finalize` does not run. Runs serially — the units hand
+        `func` *lazy* dask arrays, so the per-unit work is graph
+        construction, not IO. A parallel `mapper` raises (see `map_as_dask`).
 
         Returns:
             One result per ROI, in ROI order: `results[i]` corresponds to
             `self.rois[i]`, regardless of the mapper's execution order.
         """
-        if mapper is None:
-            _mapper = BasicMapper[DaskPipeType, R]()
-        else:
-            _mapper = mapper
+        self._require_no_halo_on_readonly_verbs()
+        _mapper = self._require_serial_dask_mapper(mapper)
         return _mapper(func, list(self._dask_units_generator(with_setters=False)))
 
     def check_if_regions_overlap(self) -> bool:

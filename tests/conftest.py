@@ -20,13 +20,18 @@ ZENODO_DOWNLOAD_DIR = Path(__file__).parent.parent / "data"
 TEST_DATA_DIR = Path(__file__).parent / "data"
 
 
-def _download_dataset(name: str) -> Path:
-    """Download (or reuse the cached copy of) a Zenodo test dataset.
+def _download_dataset(name: str, stamp_dir: Path) -> Path:
+    """Download a Zenodo test dataset and re-extract it from its zip.
 
-    Called lazily from session fixtures so that test collection never
-    blocks on the network; with a warm cache no network access happens.
-    The file lock serializes concurrent pytest-xdist workers on a cold
-    cache, and `re_unzip=False` skips re-extracting an existing dataset.
+    Called lazily from session fixtures so that test collection never blocks
+    on the network; with a warm cache no network access happens. The datasets
+    in `./data` are shared with the docs snippets, which *mutate* them in
+    place, so the extracted copy cannot be trusted across runs: the first
+    fixture to want a dataset re-extracts it from the pristine zip
+    (`re_unzip=True`) and drops a stamp in `stamp_dir` — this pytest run's
+    shared temp dir — so later fixtures (and other xdist workers, which would
+    otherwise re-extract under a live `copytree`) skip the extraction. The
+    file lock serializes the workers around the check.
 
     Caveat: `filelock`'s Windows backend can hand one lock to two holders, so
     on Windows this does not reliably serialize the workers — see the reason
@@ -37,20 +42,33 @@ def _download_dataset(name: str) -> Path:
     download would corrupt the shared fixtures.
     """
     os.makedirs(ZENODO_DOWNLOAD_DIR, exist_ok=True)
+    stamp = stamp_dir / f"{name}.pristine"
     with FileLock(ZENODO_DOWNLOAD_DIR / f"{name}.lock"):
-        return download_ome_zarr_dataset(
-            name, download_dir=ZENODO_DOWNLOAD_DIR, re_unzip=False
+        re_unzip = not stamp.exists()
+        path = download_ome_zarr_dataset(
+            name, download_dir=ZENODO_DOWNLOAD_DIR, re_unzip=re_unzip
         )
+        stamp.touch()
+        return path
 
 
 @pytest.fixture(scope="session")
-def cardiomyocyte_tiny_source_path() -> Path:
-    return _download_dataset("CardiomyocyteTiny")
+def _dataset_stamp_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A directory shared by every xdist worker of this pytest run."""
+    base = tmp_path_factory.getbasetemp()
+    # Under xdist each worker gets `<run dir>/popen-gw*`; the parent is the
+    # run dir all workers share. Without xdist, the base is the run dir.
+    return base.parent if base.name.startswith("popen-") else base
 
 
 @pytest.fixture(scope="session")
-def cardiomyocyte_small_mip_source_path() -> Path:
-    return _download_dataset("CardiomyocyteSmallMip")
+def cardiomyocyte_tiny_source_path(_dataset_stamp_dir: Path) -> Path:
+    return _download_dataset("CardiomyocyteTiny", _dataset_stamp_dir)
+
+
+@pytest.fixture(scope="session")
+def cardiomyocyte_small_mip_source_path(_dataset_stamp_dir: Path) -> Path:
+    return _download_dataset("CardiomyocyteSmallMip", _dataset_stamp_dir)
 
 
 @pytest.fixture

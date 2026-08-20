@@ -258,6 +258,72 @@ def test_stitched_jobs_match_serial_stitched(tmp_path: Path):
     assert "_ngio_stitch" not in list(label._group_handler.group.keys())
 
 
+def _overlapping_stitched_iterator(ome_zarr):
+    return (
+        SegmentationIterator(
+            ome_zarr.get_image(),
+            ome_zarr.get_label("seg"),
+            axes_order="yx",
+            consolidation_mode="dask",
+            stitch=True,
+        )
+        .by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
+        .with_halo(y=4, x=4)
+    )
+
+
+def test_distributed_overlapping_tiles_match_serial(tmp_path: Path):
+    """Overlapping tiles: one job by construction, and job ≡ serial.
+
+    Overlapping cores share label chunks, so they form one conflict
+    component and land in one job — that is what keeps contested pixels
+    deterministic across a distributed run.
+    """
+    serial_zarr = _stitched_setup(tmp_path / "overlap_serial.zarr")
+    serial_zarr.derive_label("seg")
+    _overlapping_stitched_iterator(serial_zarr).map(_label_components)
+    reference = serial_zarr.get_label("seg").get_as_numpy()
+
+    ome_zarr = _stitched_setup(tmp_path / "overlap_jobs.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _overlapping_stitched_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    assert len(args_list) == 1, "overlapping tiles are one conflict component"
+
+    for args in args_list:
+        _overlapping_stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+    _overlapping_stitched_iterator(ome_zarr).finalize()
+
+    np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
+
+
+def test_stitched_finalize_lists_missing_banks(tmp_path: Path):
+    """A half-finished run must error, naming the jobs that never banked."""
+    ome_zarr = _stitched_setup(tmp_path / "stitch_missing.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    assert len(args_list) > 1
+
+    # Run every job but the first.
+    for args in args_list[1:]:
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+    with pytest.raises(NgioValueError, match="never banked"):
+        _stitched_iterator(ome_zarr).finalize()
+
+
+def test_stitched_reprepare_invalidates_old_banks(tmp_path: Path):
+    """Banks from a superseded prepare are stale, not silently resolved."""
+    ome_zarr = _stitched_setup(tmp_path / "stitch_stale.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in args_list:
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+
+    # A second prepare wipes/invalidates everything the first run banked.
+    _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    with pytest.raises(NgioValueError, match="never banked"):
+        _stitched_iterator(ome_zarr).finalize()
+
+
 def test_stitched_for_job_requires_prepare(tmp_path: Path):
     ome_zarr = _stitched_setup(tmp_path / "stitch_noprep.zarr")
     ome_zarr.derive_label("seg")
@@ -316,12 +382,13 @@ def test_standalone_stitched_map_still_works(tmp_path: Path):
     )
 
 
-def test_misaligned_stitched_bands_couple_components(tmp_path: Path):
-    """Tiles finer than the label chunks: band claims coarsen the partition.
+def test_stitching_does_not_coarsen_the_partition(tmp_path: Path):
+    """Banking claims nothing shared: each tile banks into its own array.
 
-    Without the band claims, tiles in different label chunks would look
-    independent while banking into the same scratch chunk — the read-modify-
-    write race the claims exist to prevent.
+    Under the old shared-band scratch, stitching tiles finer than the label
+    chunks coupled otherwise-independent tiles into one component. Per-ROI
+    banks are conflict-free by construction, so a stitched iterator splits
+    exactly like a plain one.
     """
     ome_zarr = _stitched_setup(tmp_path / "stitch_misaligned.zarr")
     ome_zarr.derive_label("seg")
@@ -338,7 +405,7 @@ def test_misaligned_stitched_bands_couple_components(tmp_path: Path):
     stitched_components = write_conflict_components(
         list(stitched._numpy_units_generator())
     )
-    assert len(stitched_components) < len(plain_components)
+    assert stitched_components == plain_components
 
 
 def _run_stitched_job(store: str, job_index: int, n_jobs: int) -> None:
@@ -537,12 +604,12 @@ def test_feature_merge_matches_serial(tmp_path: Path, custom_coalesce: bool):
 
     coalesce = _global_norm_coalesce if custom_coalesce else None
     serial_oz = _feature_setup(tmp_path / "feat_serial.zarr")
-    serial = _feature_iterator(serial_oz).reduce_to_table(_measure, coalesce=coalesce)
+    serial = _feature_iterator(serial_oz).measure(_measure, coalesce=coalesce)
 
     ome_zarr = _feature_setup(tmp_path / "feat_jobs.zarr")
     args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     for args in reversed(args_list):
-        _feature_iterator(ome_zarr).for_job(**args).reduce_to_partial(_measure)
+        _feature_iterator(ome_zarr).for_job(**args).measure_to_partial(_measure)
     merged = _feature_iterator(ome_zarr).merge_partials(coalesce=coalesce)
 
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
@@ -557,10 +624,10 @@ def test_feature_finished_verbs_refuse_on_slices(tmp_path: Path):
     args_list = iterator.prepare_jobs(n_jobs=2)
     restricted = _feature_iterator(ome_zarr).for_job(**args_list[0])
 
-    with pytest.raises(NgioValueError, match="reduce_to_partial"):
-        restricted.reduce_to_table(_measure)
+    with pytest.raises(NgioValueError, match="measure_to_partial"):
+        restricted.measure(_measure)
     with pytest.raises(NgioValueError, match="for_job"):
-        _feature_iterator(ome_zarr).reduce_to_partial(_measure)
+        _feature_iterator(ome_zarr).measure_to_partial(_measure)
     with pytest.raises(NgioValueError, match="unrestricted"):
         restricted.merge_partials()
 
@@ -569,7 +636,7 @@ def test_feature_merge_refuses_incomplete_run(tmp_path: Path):
     ome_zarr = _feature_setup(tmp_path / "feat_incomplete.zarr")
     args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     # Only one of two jobs runs.
-    _feature_iterator(ome_zarr).for_job(**args_list[0]).reduce_to_partial(_measure)
+    _feature_iterator(ome_zarr).for_job(**args_list[0]).measure_to_partial(_measure)
     with pytest.raises(NgioValueError, match="incomplete"):
         _feature_iterator(ome_zarr).merge_partials()
 
@@ -697,14 +764,14 @@ def _run_feature_job(store: str, job_index: int, n_jobs: int) -> None:
     ome_zarr = open_ome_zarr_container(store)
     _feature_iterator(ome_zarr).for_job(
         job_index=job_index, n_jobs=n_jobs
-    ).reduce_to_partial(_measure)
+    ).measure_to_partial(_measure)
 
 
 def test_feature_jobs_across_processes_match_serial(tmp_path: Path):
     import pandas as pd
 
     serial_oz = _feature_setup(tmp_path / "feat_proc_serial.zarr")
-    serial = _feature_iterator(serial_oz).reduce_to_table(_measure)
+    serial = _feature_iterator(serial_oz).measure(_measure)
 
     store = tmp_path / "feat_procs.zarr"
     ome_zarr = _feature_setup(store)

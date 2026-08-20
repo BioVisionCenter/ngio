@@ -64,6 +64,22 @@ def test_dask_trio_warns_deprecation():
         iterator.reduce_as_dask(lambda x: float(x.mean().compute()))
 
 
+def test_dask_verbs_reject_parallel_mappers():
+    # `store_dask` scopes a global dask config option, so the dask verbs
+    # only run serially.
+    from ngio.utils import NgioValueError
+
+    iterator = _build_iterator()
+    with pytest.warns(NgioDeprecationWarning, match="ngio=1.2"):
+        with pytest.raises(NgioValueError, match="run serially"):
+            iterator.map_as_dask(lambda x: x, mapper=ThreadedMapper(2))
+    with pytest.warns(NgioDeprecationWarning, match="ngio=1.2"):
+        with pytest.raises(NgioValueError, match="run serially"):
+            iterator.reduce_as_dask(
+                lambda x: float(x.mean().compute()), mapper=ThreadedMapper(2)
+            )
+
+
 def test_map_is_equivalent_to_alias():
     iterator = _build_iterator()
     label = iterator.output_image

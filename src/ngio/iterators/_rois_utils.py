@@ -133,6 +133,16 @@ def _axis_intervals(
             intervals.append((last_start, first))
             intervals.append((last_start + first, total - first))
 
+    if not intervals:
+        # Only `drop` can get here: an axis shorter than the tile size has
+        # nothing but a tail. Silently yielding zero tiles would turn the
+        # whole `map`/`reduce` into a no-op.
+        raise NgioValueError(
+            f"tail='drop' along '{axis_name}' drops every tile: the axis "
+            f"(size {dim}) is shorter than the tile (size {size}). Shrink "
+            "the tile or use tail='clip'."
+        )
+
     # `shift` can collapse the tail onto the previous tile; keep one of each.
     seen: set[tuple[int, int]] = set()
     unique = []

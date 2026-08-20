@@ -100,6 +100,19 @@ nn_iterator.map(fake_model, mapper=BatchedMapper(batch_size=4))
 print(halved.get_image().get_as_numpy().mean().round(2))
 # --8<-- [end:batched_demo]
 
+# --8<-- [start:iter_batched_demo]
+manual = demo.derive_image(store=MemoryStore())
+loop_iterator = ImageProcessingIterator(demo_image, manual.get_image())
+# Uniform 32px tiles, so stacking the batch is a plain np.stack.
+loop_iterator = loop_iterator.by_grid(size_x=32, size_y=32)
+
+for patches, writers in loop_iterator.iter_batched(batch_size=4):
+    outs = fake_model(np.stack(patches))
+    for writer, out in zip(writers, outs, strict=True):
+        writer(out)
+print(manual.get_image().get_as_numpy().mean().round(2))
+# --8<-- [end:iter_batched_demo]
+
 # --8<-- [start:halo_demo]
 from scipy.ndimage import uniform_filter
 

@@ -23,7 +23,7 @@ from typing import Any
 import pandas as pd
 
 from ngio.tables.v1._generic_table import GenericTable
-from ngio.utils import NgioValueError, ZarrGroupHandler
+from ngio.utils import NgioFileNotFoundError, NgioValueError, ZarrGroupHandler
 
 _PARTIALS_GROUP = "_ngio_partials"
 
@@ -56,9 +56,11 @@ def read_partials_root_attrs(handler: ZarrGroupHandler) -> dict[str, Any] | None
     """The partials group's attributes, or `None` when no group exists."""
     try:
         root = handler.get_handler(path=_PARTIALS_GROUP, create_mode=False)
-        return root.load_attrs()
-    except Exception:
+    except NgioFileNotFoundError:
+        # Only "no group" means "not prepared"; any other failure (an
+        # unreadable store, a group that is an array) must surface.
         return None
+    return root.load_attrs()
 
 
 def prepare_partials(iterator: Any, handler: ZarrGroupHandler, n_jobs: int) -> None:
@@ -176,7 +178,9 @@ def merge_partial_frames(
     for job_index in expected:
         try:
             attrs, frame = read_partial(handler, job_index)
-        except Exception:
+        except NgioFileNotFoundError:
+            # Only an absent job subgroup counts as "not run yet"; a partial
+            # that exists but cannot be read is corruption and must raise.
             missing.append(job_index)
             continue
         if attrs.get("fingerprint") != root_attrs.get("fingerprint"):

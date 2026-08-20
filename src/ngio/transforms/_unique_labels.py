@@ -3,6 +3,7 @@ from typing import cast
 import dask.array as da
 import numpy as np
 
+from ngio.common._label_ops import check_offset_fits
 from ngio.io_pipes import IoPipeContext
 from ngio.io_pipes._ops_transforms import ArrayLike, elementwise
 from ngio.utils import NgioValueError
@@ -81,31 +82,7 @@ class UniqueLabelsTransform:
 
     def _check_fits(self, array: np.ndarray, offset: int) -> None:
         """Refuse ids that would not survive the array's dtype or its block."""
-        dtype = array.dtype
-        if not np.issubdtype(dtype, np.integer):
-            raise NgioValueError(
-                f"UniqueLabelsTransform needs an integer patch, got {dtype}. "
-                "Label images are integer-typed; a float patch here usually "
-                "means the segmentation was not cast before writing."
-            )
-        largest = int(np.max(array)) if array.size else 0
-        if largest >= self._block_size:
-            raise NgioValueError(
-                f"This patch holds label id {largest}, which does not fit in "
-                f"a block of {self._block_size} ids: it would spill into the "
-                "next region's block and collide with its labels. Raise "
-                "block_size above the largest id any single region can "
-                "produce."
-            )
-        limit = int(np.iinfo(dtype).max)
-        if largest + offset > limit:
-            raise NgioValueError(
-                f"Offsetting this patch by {offset} would reach "
-                f"{largest + offset}, past what {dtype} can hold ({limit}). "
-                f"Lower block_size (currently {self._block_size}), use fewer "
-                "blocks, or widen the label dtype — `derive_label` defaults to "
-                "uint32, but a uint16 label runs out quickly."
-            )
+        check_offset_fits(array, offset, self._block_size)
 
     def on_get(self, array: ArrayLike, ctx: IoPipeContext) -> ArrayLike:
         """Shift this region's labels back down to their local ids."""

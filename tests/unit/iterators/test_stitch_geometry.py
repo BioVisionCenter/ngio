@@ -1,129 +1,133 @@
-"""Tests for the tile geometry behind stitching, and for union-find."""
+"""Pixel-space tile extents, pair sweeps, and the union-find they feed."""
 
 import numpy as np
+import pytest
 from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
+from ngio.common import Roi
 from ngio.common._union_find import UnionFind
 from ngio.iterators._stitch_geometry import (
-    forward_bands,
-    neighbours_along,
-    shared_band,
-    tile_placements,
+    TileExtent,
+    intersection_box,
+    sweep_pairs,
+    tile_extents,
+    touching_unstitched_axes,
 )
+from ngio.utils import NgioValueError
 
 
-def _image(shape=(100, 100)):
-    return create_ome_zarr_from_array(
+def _label_image(shape=(100, 100), chunks=(32, 32)):
+    ome_zarr = create_ome_zarr_from_array(
         store=MemoryStore(),
         array=np.zeros(shape, dtype="uint8"),
         pixelsize=1.0,
         axes_names="yx",
         levels=1,
-        chunks=(32, 32),
+        chunks=chunks,
         consolidation_mode="dask",
-    ).get_image()
-
-
-def _grid_rois(image, size=32):
-    from ngio.iterators._rois_utils import by_grid
-
-    return by_grid(
-        rois=[image.build_image_roi_table(name=None).rois()[0]],
-        ref_image=image,
-        size_y=size,
-        size_x=size,
     )
+    return ome_zarr.derive_label("seg")
 
 
-def test_grid_index_survives_a_clipped_last_tile():
-    """A 100px axis tiled at 32 ends with start=96, length=4.
-
-    `96 // 4` is 24; the answer is 3. Ranking the distinct origins gets it right
-    without needing to know the tile size at all.
-    """
-    image = _image(shape=(100, 100))
-    rois = _grid_rois(image, size=32)
-    placements = tile_placements(rois, image, axes=("y", "x"))
-
-    starts = sorted({p.origin[1] for p in placements})
-    assert starts == [0, 32, 64, 96]
-    last = next(p for p in placements if p.origin == (96, 96))
-    assert last.grid == (3, 3)
-    assert last.stop == (100, 100), "the final tile is clipped, not full-size"
-    # Every cell is distinct, which is what the id offsets rely on.
-    assert len({p.grid for p in placements}) == len(placements)
+def _roi(name, y, x):
+    return Roi.from_values(slices={"y": y, "x": x}, name=name)
 
 
-def test_neighbours_are_face_adjacent_only():
-    image = _image(shape=(64, 64))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    assert len(placements) == 4
+def test_tile_extents_cover_core_and_grown():
+    label = _label_image()
+    rois = [_roi("a", (0, 32), (0, 32)), _roi("b", (0, 32), (32, 32))]
 
-    pairs = neighbours_along(placements, axis=1)
-    assert {(a.grid, b.grid) for a, b in pairs} == {((0, 0), (0, 1)), ((1, 0), (1, 1))}
-    # Diagonal cells never pair: they share a corner, not a face.
-    for a, b in pairs:
-        assert a.grid[0] == b.grid[0]
+    def read_roi(roi):  # a fake 4px halo, clipped at the image border
+        roi_px = roi.to_pixel(pixel_size=label.pixel_size)
+        grown = {}
+        for axis in ("y", "x"):
+            roi_slice = roi_px.get(axis)
+            start = max(0, int(roi_slice.start) - 4)
+            stop = min(100, int(roi_slice.start + roi_slice.length) + 4)
+            grown[axis] = (start, stop - start)
+        return Roi.from_values(slices=grown, name=roi.name, space="pixel")
 
-
-def test_shared_band_is_inside_the_upper_tile():
-    image = _image(shape=(64, 64))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    lower, upper = neighbours_along(placements, axis=1)[0]
-
-    band = shared_band(lower, upper, axis=1, halo=4, axes=("y", "x"))
-    assert band is not None
-    # The band starts where the upper tile starts and is `halo` wide.
-    assert band["x"] == (32, 36)
-    assert band["y"] == (0, 32)
-
-
-def test_shared_band_is_none_without_a_halo():
-    image = _image(shape=(64, 64))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    lower, upper = neighbours_along(placements, axis=1)[0]
-    assert shared_band(lower, upper, axis=1, halo=0, axes=("y", "x")) is None
-
-
-def test_shared_band_clips_to_the_upper_tile():
-    """A halo wider than the neighbour cannot read past it."""
-    image = _image(shape=(100, 100))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    lower = next(p for p in placements if p.grid == (0, 2))
-    upper = next(p for p in placements if p.grid == (0, 3))
-
-    band = shared_band(lower, upper, axis=1, halo=8, axes=("y", "x"))
-    assert band is not None
-    assert band["x"] == (96, 100), "the clipped last tile is only 4px wide"
-
-
-def test_forward_bands_never_collide():
-    """One band per tile per axis, each inside the next tile's core."""
-    image = _image(shape=(100, 100))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    bands = forward_bands(placements, axis=1, halo=8, axes=("y", "x"))
-
-    # Far-edge tiles contribute nothing; every other tile contributes one band.
-    assert all(placements[i].grid[1] < 3 for i in bands)
-
-    seen: set[tuple[int, int]] = set()
-    for band in bands.values():
-        pixels = {(y, x) for y in range(*band["y"]) for x in range(*band["x"])}
-        assert not (pixels & seen), "two tiles wrote the same scratch pixel"
-        seen |= pixels
-
-
-def test_forward_bands_stay_inside_the_clipped_last_tile():
-    """A halo wider than the neighbour is clipped, never spilling past it."""
-    image = _image(shape=(100, 100))
-    placements = tile_placements(_grid_rois(image, size=32), image, axes=("y", "x"))
-    bands = forward_bands(placements, axis=1, halo=16, axes=("y", "x"))
-
-    third_column = next(
-        bands[p.index] for p in placements if p.grid == (0, 2) and p.index in bands
+    extents = tile_extents(rois, label, read_roi, ("y", "x"))
+    assert extents[0] == TileExtent(
+        index=0, core=((0, 32), (0, 32)), grown=((0, 36), (0, 36))
     )
-    assert third_column["x"] == (96, 100)
+    assert extents[1].grown == ((0, 36), (28, 68))
+
+
+def test_tile_extents_unpinned_axis_spans_fully():
+    label = _label_image()
+    rois = [Roi.from_values(slices={"x": (0, 50), "y": (0, 100)}, name="a")]
+    extents = tile_extents(rois, label, lambda roi: roi, ("y", "x"))
+    assert extents[0].core == ((0, 100), (0, 50))
+
+
+def test_tile_extents_refuses_an_empty_region():
+    label = _label_image()
+    rois = [_roi("a", (10, 0), (0, 32))]
+    with pytest.raises(NgioValueError, match="empty"):
+        tile_extents(rois, label, lambda roi: roi, ("y", "x"))
+
+
+def test_intersection_box():
+    assert intersection_box(((0, 10), (0, 10)), ((5, 15), (5, 15))) == (
+        (5, 10),
+        (5, 10),
+    )
+    assert intersection_box(((0, 10), (0, 10)), ((10, 20), (0, 10))) is None
+
+
+def test_sweep_pairs_face_and_corner_neighbours():
+    """A 2x2 grid of grown boxes: 4 face pairs and 2 corner pairs."""
+    boxes = [
+        ((0, 36), (0, 36)),
+        ((0, 36), (28, 64)),
+        ((28, 64), (0, 36)),
+        ((28, 64), (28, 64)),
+    ]
+    assert sweep_pairs(boxes) == [(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)]
+
+
+def test_sweep_pairs_disjoint_and_single():
+    assert sweep_pairs([((0, 10), (0, 10)), ((20, 30), (20, 30))]) == []
+    assert sweep_pairs([((0, 10), (0, 10))]) == []
+    # Touching (half-open) is not overlap.
+    assert sweep_pairs([((0, 10), (0, 10)), ((0, 10), (10, 20))]) == []
+
+
+def test_sweep_pairs_matches_brute_force_on_a_ragged_layout():
+    rng = np.random.default_rng(7)
+    boxes = []
+    for _ in range(60):
+        y0, x0 = rng.integers(0, 80, size=2)
+        boxes.append(
+            (
+                (int(y0), int(y0 + rng.integers(5, 30))),
+                (int(x0), int(x0 + rng.integers(5, 30))),
+            )
+        )
+    brute = sorted(
+        (i, j)
+        for i in range(len(boxes))
+        for j in range(i + 1, len(boxes))
+        if intersection_box(boxes[i], boxes[j]) is not None
+    )
+    assert sweep_pairs(boxes) == brute
+
+
+def test_touching_unstitched_axes():
+    extents = [
+        TileExtent(index=0, core=((0, 1), (0, 64)), grown=((0, 1), (0, 64))),
+        TileExtent(index=1, core=((1, 2), (0, 64)), grown=((1, 2), (0, 64))),
+    ]
+    # z (axis 0) has no halo and the cores touch face to face there.
+    assert touching_unstitched_axes(extents, [0]) == [0]
+    # Overlapping (not just touching) pairs are already stitched: no warning.
+    overlapping = [
+        TileExtent(index=0, core=((0, 2), (0, 64)), grown=((0, 2), (0, 64))),
+        TileExtent(index=1, core=((1, 3), (0, 64)), grown=((1, 3), (0, 64))),
+    ]
+    assert touching_unstitched_axes(overlapping, [0]) == []
 
 
 def test_union_find_groups_transitively():

@@ -130,6 +130,43 @@ def test_group_handler_delete(tmp_path: Path):
         handler.delete_self()
 
 
+def test_get_handler_overwrite_bypasses_the_cache(tmp_path: Path):
+    """`overwrite=True` must recreate the group, not serve the cached handler."""
+    store = tmp_path / "test_get_handler_overwrite.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+
+    child = handler.get_handler("scratch")
+    child.write_attrs({"stale": True})
+
+    fresh = handler.get_handler("scratch", overwrite=True)
+    assert fresh.load_attrs() == {}
+    # The replacement is what the cache serves from now on.
+    assert handler.get_handler("scratch") is fresh
+
+
+def test_delete_group_evicts_descendant_handlers(tmp_path: Path):
+    """Deleting a group must not leave nested handlers serving the old state.
+
+    This is the distributed-partials cycle: `prepare → write per-job groups →
+    merge → delete the scratch root`, then run a second cycle in the same
+    process. The second cycle's nested `overwrite=True` handlers must point at
+    the recreated groups.
+    """
+    store = tmp_path / "test_delete_group_evicts.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+
+    for cycle in range(2):
+        root = handler.get_handler("scratch", overwrite=True)
+        job = handler.get_handler("scratch/job_0", overwrite=True)
+        job.write_attrs({"cycle": cycle})
+        read_back = handler.get_handler("scratch/job_0", create_mode=False)
+        assert read_back.load_attrs() == {"cycle": cycle}
+        assert not root.group.read_only
+        handler.delete_group("scratch")
+        with pytest.raises(NgioFileNotFoundError):
+            handler.get_group("scratch/job_0")
+
+
 def test_group_handler_read(tmp_path: Path):
     store = tmp_path / "test_group_handler_read.zarr"
 

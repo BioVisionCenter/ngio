@@ -88,6 +88,20 @@ class HaloCroppingSetter(Generic[T]):
         """The applied `(before, after)` halo per axis."""
         return self._margins
 
+    @property
+    def merge(self):
+        """The wrapped setter's merge policy."""
+        return getattr(self._setter, "merge", None)
+
+    @property
+    def extra_write_footprints(self):
+        """The wrapped setter's side-channel write claims.
+
+        Forwarded so the wave scheduler still sees them if a claiming setter
+        is ever wrapped by the crop (today the stitch setter sits outside it).
+        """
+        return getattr(self._setter, "extra_write_footprints", None)
+
     def __call__(self, patch: T) -> None:
         return self.set(patch)
 

@@ -122,16 +122,16 @@ def _measure_as_frame(image, label, roi):
     return pd.DataFrame(_measure_as_dict(image, label, roi))
 
 
-def test_reduce_to_table_returns_a_feature_table():
+def test_measure_returns_a_feature_table():
     """Both result shapes coalesce into the same table; the write is the caller's."""
     ome_zarr, iterator = _build_container_and_iterator()
 
-    from_dicts = iterator.reduce_to_table(_measure_as_dict)
+    from_dicts = iterator.measure(_measure_as_dict)
     assert sorted(from_dicts.dataframe.index.tolist()) == [1, 2]
     assert from_dicts.dataframe.index.name == "label"
     assert "feats" not in ome_zarr.list_tables(), "nothing is written implicitly"
 
-    from_frames = iterator.reduce_to_table(_measure_as_frame)
+    from_frames = iterator.measure(_measure_as_frame)
     assert from_frames.dataframe.equals(from_dicts.dataframe)
 
     # The caller stores the table; a round-trip through the container works.
@@ -140,17 +140,17 @@ def test_reduce_to_table_returns_a_feature_table():
     assert read_back.dataframe.equals(from_dicts.dataframe)
 
 
-def test_reduce_to_table_parallel_matches_serial():
+def test_measure_parallel_matches_serial():
     from ngio.iterators import ThreadedMapper
 
     _, iterator = _build_container_and_iterator()
 
-    serial = iterator.reduce_to_table(_measure_as_dict)
-    threaded = iterator.reduce_to_table(_measure_as_dict, mapper=ThreadedMapper(4))
+    serial = iterator.measure(_measure_as_dict)
+    threaded = iterator.measure(_measure_as_dict, mapper=ThreadedMapper(4))
     assert threaded.dataframe.equals(serial.dataframe)
 
 
-def test_reduce_to_table_custom_coalesce():
+def test_measure_custom_coalesce():
     import pandas as pd
 
     from ngio.tables import GenericTable
@@ -161,11 +161,11 @@ def test_reduce_to_table_custom_coalesce():
         joined = pd.concat([pd.DataFrame(r) for r in results if r["label"]])
         return GenericTable(pd.DataFrame({"total_objects": [len(joined)]}))
 
-    table = iterator.reduce_to_table(_measure_as_dict, coalesce=totals)
+    table = iterator.measure(_measure_as_dict, coalesce=totals)
     assert table.dataframe["total_objects"].tolist() == [2]
 
 
-def test_reduce_to_table_all_empty_raises():
+def test_measure_all_empty_raises():
     from ngio.utils import NgioValueError
 
     _, iterator = _build_container_and_iterator()
@@ -174,10 +174,10 @@ def test_reduce_to_table_all_empty_raises():
         return {"label": [], "mean": []}
 
     with pytest.raises(NgioValueError, match="zero rows"):
-        iterator.reduce_to_table(nothing)
+        iterator.measure(nothing)
 
 
-def test_reduce_to_table_requires_a_label_key():
+def test_measure_requires_a_label_key():
     from ngio.utils import NgioValueError
 
     _, iterator = _build_container_and_iterator()
@@ -186,14 +186,20 @@ def test_reduce_to_table_requires_a_label_key():
         return {"mean": [1.0]}
 
     with pytest.raises(NgioValueError, match="no 'label' column"):
-        iterator.reduce_to_table(unlabelled)
+        iterator.measure(unlabelled)
 
 
-def test_feature_getter_reads_once():
-    """`get()` and the properties share one read per underlying getter."""
+def test_feature_getter_reads_once_and_releases():
+    """`.image`/`.label` then `get()` share one read; `get()` drops the cache."""
     _, iterator = _build_container_and_iterator()
 
     getter = iterator.build_numpy_getter(iterator.rois[0])
-    image, label, _ = getter.get()
-    assert getter.image is image
-    assert getter.label is label
+    image = getter.image
+    label = getter.label
+    got_image, got_label, _ = getter.get()
+    assert got_image is image
+    assert got_label is label
+    # A consumed getter must not retain its patches: `reduce` keeps every
+    # unit alive until the whole run returns.
+    assert getter._image_data is None
+    assert getter._label_data is None
