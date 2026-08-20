@@ -456,7 +456,7 @@ class ZarrGroupHandler:
             ) from e
         if overwrite:
             self._evict_subtree(path)
-        self._group_cache.set(path, group, overwrite=overwrite)
+        self._group_cache.set(path, group)
         return group
 
     def get_group(
@@ -488,7 +488,7 @@ class ZarrGroupHandler:
 
         group = self.group.get(path, default=None)
         if isinstance(group, zarr.Group):
-            self._group_cache.set(path, group, overwrite=overwrite)
+            self._group_cache.set(path, group)
             return group
 
         if isinstance(group, zarr.Array):
@@ -508,7 +508,7 @@ class ZarrGroupHandler:
             group = self.group.get(path, default=None)
             if not isinstance(group, zarr.Group):
                 raise
-        self._group_cache.set(path, group, overwrite=overwrite)
+        self._group_cache.set(path, group)
         return group
 
     def get_array(self, path: str) -> zarr.Array:

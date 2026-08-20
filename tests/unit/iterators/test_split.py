@@ -331,6 +331,31 @@ def test_stitched_for_job_requires_prepare(tmp_path: Path):
         _stitched_iterator(ome_zarr).for_job(0, n_jobs=2)
 
 
+def test_drifted_gather_refuses_and_preserves_banks(tmp_path: Path):
+    """A consolidate task with the wrong plan must not wipe the jobs' banks."""
+    ome_zarr = _stitched_setup(tmp_path / "stitch_drifted_gather.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr, size=32).prepare_jobs(n_jobs=2)
+    for args in args_list:
+        _stitched_iterator(ome_zarr, size=32).for_job(**args).map(_label_components)
+
+    label = ome_zarr.get_label("seg")
+    banks_before = sorted(label._group_handler.group["_ngio_stitch"].keys())
+    assert banks_before, "jobs banked nothing"
+
+    retiled = _stitched_iterator(ome_zarr, size=16)
+    with pytest.raises(NgioValueError, match="Refusing to wipe"):
+        retiled.finalize()
+    banks_after = sorted(label._group_handler.group["_ngio_stitch"].keys())
+    assert banks_after == banks_before
+
+    # The matching gather still works afterwards.
+    _stitched_iterator(ome_zarr, size=32).finalize()
+    np.testing.assert_array_equal(
+        label.get_as_numpy(), _stitched_serial_reference(tmp_path)
+    )
+
+
 def test_stitched_fingerprint_mismatch_refuses(tmp_path: Path):
     """A job built with a different tiling than the prepared one fails loud."""
     ome_zarr = _stitched_setup(tmp_path / "stitch_drift.zarr")

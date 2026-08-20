@@ -35,7 +35,7 @@ class NgioCache(Generic[T]):
             return default
         return self._cache.get(key, default)
 
-    def set(self, key: str, value: T, overwrite: bool = True) -> None:
+    def set(self, key: str, value: T) -> None:
         if not self._use_cache:
             self._cache_sanity_check()
             return

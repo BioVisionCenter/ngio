@@ -1,4 +1,5 @@
 import itertools
+import math
 from collections.abc import Mapping
 from typing import Literal
 
@@ -48,9 +49,14 @@ def halo_roi(
         if roi_slice is None or roi_slice.start is None or roi_slice.length is None:
             # An axis the ROI does not pin has nothing to grow around.
             continue
-        start = int(roi_slice.start)
-        end = start + int(roi_slice.length)
         dim = ref_image.dimensions.get(axis_name, default=1)
+        # floor/ceil + clamp, exactly as the slicing normalization rounds a
+        # non-integer pixel ROI (`_slicing_tuple_boundary_check`): the margins
+        # must measure the distance between the *written* core and the *read*
+        # grown region, both of which are cut by that normalization. The halo
+        # crop's shape check is the loud proof the two stay in agreement.
+        start = max(0, min(math.floor(roi_slice.start), dim))
+        end = max(0, min(math.ceil(roi_slice.start + roi_slice.length), dim))
         new_start = max(0, start - margin)
         new_end = min(dim, end + margin)
         before, after = start - new_start, new_end - end

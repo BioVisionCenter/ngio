@@ -657,8 +657,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Two aligned lists of up to `batch_size` items — stack the patches
         yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
         automatic padding), run the model once, and hand each result to its
-        writer. Batches follow ROI order, and the run finalizes when the
-        generator is fully drained, exactly like `iter`.
+        writer. Batches follow ROI order — unlike the mappers' canonical
+        wave order, so on ROIs with overlapping writes the manual loop is
+        deterministic but not bit-identical to `map`. The run finalizes when
+        the generator is fully drained, exactly like `iter`.
 
         Args:
             batch_size: Maximum items per batch; the last batch may be

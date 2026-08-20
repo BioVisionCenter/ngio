@@ -33,6 +33,11 @@ def _download_dataset(name: str, stamp_dir: Path) -> Path:
     otherwise re-extract under a live `copytree`) skip the extraction. The
     file lock serializes the workers around the check.
 
+    The stamp lives in this *run's* shared temp dir, so each pytest
+    invocation re-extracts once — which also means two concurrent pytest
+    runs (or a docs build alongside one) would re-extract under each other's
+    reads. One runner at a time on a machine, same as the docs/test split.
+
     Caveat: `filelock`'s Windows backend can hand one lock to two holders, so
     on Windows this does not reliably serialize the workers — see the reason
     text in `ZarrGroupHandler._create_lock`, which is why ngio itself warns

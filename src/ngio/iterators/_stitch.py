@@ -10,7 +10,9 @@ agree (IoU over the shared pixels), and relabels the output in place.
 
 Where two tiles wrote the same *output* pixels and their objects do not
 match, the later write wins — deterministically, because every mapper runs
-units in the same canonical wave order (`canonical_unit_order`).
+units in the same canonical wave order (`canonical_unit_order`). The manual
+loops (`iter`, `iter_batched`) run in ROI order instead: deterministic too,
+but not bit-identical to a `map` on contested pixels.
 """
 
 import threading
@@ -161,7 +163,9 @@ class ScratchBanks:
         self._group = group
         self._run_id = run_id
         self._label_array = label_array
-        self._open_cache: dict[int, zarr.Array] = {}
+        #: Whether this handle *created* the root (vs opened a prepared one) —
+        #: an error path may clean up what it created, never what it opened.
+        self.created = False
 
     @classmethod
     def create(
@@ -181,7 +185,9 @@ class ScratchBanks:
         group = _scratch_group(output, scratch_store)
         run_id = uuid.uuid4().hex
         group.attrs.update({"layout": _LAYOUT, "run_id": run_id, **(extra_attrs or {})})
-        return cls(group, run_id, output.zarr_array)
+        banks = cls(group, run_id, output.zarr_array)
+        banks.created = True
+        return banks
 
     @classmethod
     def open(
@@ -251,13 +257,14 @@ class ScratchBanks:
             }
         )
         array[...] = disk_patch
-        self._open_cache[work.index] = array
 
     def _open_valid(self, work: _TileWork) -> zarr.Array | None:
-        """The tile's bank, or `None` when absent, stale, or mismatched."""
-        cached = self._open_cache.get(work.index)
-        if cached is not None:
-            return cached
+        """The tile's bank, or `None` when absent, stale, or mismatched.
+
+        Deliberately uncached: a cached handle would keep answering after
+        another run wiped the scratch, reading back zeros where the `run_id`
+        guard should have said "missing".
+        """
         try:
             member = self._group[self._key(work.index)]
         except KeyError:
@@ -271,7 +278,6 @@ class ScratchBanks:
             or attrs.get("origin") != [start for start, _ in work.grown]
         ):
             return None
-        self._open_cache[work.index] = member
         return member
 
     def missing(self, works: Sequence[_TileWork]) -> list[int]:
@@ -305,7 +311,6 @@ class StitchPlan:
         config: StitchConfig,
         output: AbstractImage,
         rois: Sequence[Roi],
-        ref_image: AbstractImage,
         halo: dict[str, int],
         read_roi: Any,
         scratch_factory: Callable[[], ScratchBanks] | None = None,
@@ -425,13 +430,9 @@ class StitchPlan:
         """The scratch banks, resolved on first access (thread-safe)."""
         if self._banks is None:
             lock = self._scratch_lock
-            if lock is None:
-                # A fresh per-call lock would serialize nothing; better to
-                # refuse than to run the creation unguarded.
-                raise NgioValueError(
-                    "The stitch plan has no lock and no resolved scratch; "
-                    "it was rebuilt from an incomplete state."
-                )
+            # `__getstate__` nulls the lock, but `__setstate__` always
+            # restores one; only a hand-built state could get here.
+            assert lock is not None
             with lock:
                 if self._banks is None:
                     if self._scratch_factory is None:
@@ -447,15 +448,21 @@ class StitchPlan:
 
         The factory is a closure (unpicklable) and the lock is
         process-local; the resolved banks pickle by store reference, which
-        is exactly what the workers need. The output image is dropped too —
-        its handler carries a file lock — because a worker only ever banks;
-        `resolve`/`cleanup` run on the parent's plan.
+        is exactly what the workers need. Everything a worker does not use
+        is dropped: the output image (its handler carries a file lock), and
+        the plan geometry (`_works`/`_pairs` — shipping O(tiles times pairs)
+        per pickled unit would dominate `ProcessMapper` IPC). A worker only
+        banks through its own setter's `_TileWork`; `resolve`/`cleanup`
+        run on the parent's plan and refuse on a worker copy.
         """
         _ = self.banks
         state = self.__dict__.copy()
         state["_scratch_factory"] = None
         state["_scratch_lock"] = None
         state["_output"] = None
+        state["_works"] = []
+        state["_pairs"] = []
+        state["_work_by_name"] = {}
         return state
 
     def __setstate__(self, state: dict) -> None:
@@ -487,9 +494,25 @@ class StitchPlan:
     def resolve(self) -> None:
         """Compare every overlapping pair of banks, union, relabel in place."""
         output = self._require_output()
+        if (
+            self._banks is None
+            and read_scratch_attrs(output, self._config.scratch_store) is None
+        ):
+            # Never *create* a scratch on the resolve path: with nothing
+            # banked there is nothing to resolve, and creation would leave a
+            # stray `_ngio_stitch` group beside the label.
+            raise NgioValueError(
+                "Nothing to resolve: no stitched map has banked predictions "
+                "here — the run never mapped, or it already finalized."
+            )
         banks = self.banks
         missing = banks.missing(self._works)
         if missing:
+            if banks.created:
+                # This handle just wiped/created the scratch, so nothing in
+                # it is another job's work; remove it rather than leave an
+                # empty group beside the label.
+                self.cleanup()
             raise NgioValueError(
                 f"The stitched run is incomplete: tile(s) {missing} never "
                 "banked a prediction (or banked one from a different run). "

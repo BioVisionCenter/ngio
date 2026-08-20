@@ -162,7 +162,7 @@ def test_masked_stitch_with_coarser_masking_label():
     """The masking label at a coarser level still masks the banks correctly."""
     from ngio.images._masked_image import MaskedImage
 
-    ome_zarr, mask = _masked_setup(MemoryStore(), levels=2)
+    ome_zarr, _ = _masked_setup(MemoryStore(), levels=2)
     image = ome_zarr.get_image()
     coarse = ome_zarr.get_label("organoids", path="1")
     masked = MaskedImage(

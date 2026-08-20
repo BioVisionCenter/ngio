@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from ngio.common._roi import Roi
 from ngio.images._abstract_image import AbstractImage
+from ngio.io_pipes._io_pipe_ops import setup_io_pipe
 from ngio.utils import NgioValueError
 
 #: Per-axis half-open pixel interval `[start, stop)`, one entry per label axis.
@@ -40,17 +41,33 @@ class TileExtent:
 def _roi_spans(
     roi: Roi, label_image: AbstractImage, axes: Sequence[str], what: str
 ) -> SpanBox:
-    """The ROI's `[start, stop)` per label axis; unpinned axes span fully."""
-    roi_px = roi.to_pixel(pixel_size=label_image.pixel_size)
+    """The ROI's `[start, stop)` per label axis; unpinned axes span fully.
+
+    Derived from the *same* slicing normalization the setters use
+    (`setup_io_pipe` → `SlicingOps`, floor/ceil + clamp), never
+    re-implemented: the bank shapes must agree with the patches the setters
+    produce, and a second rounding implementation is how the two drift.
+    """
+    ctx = setup_io_pipe(
+        zarr_array=label_image.zarr_array,
+        dimensions=label_image.dimensions,
+        remove_channel_selection=True,
+        roi=roi,
+    )
     spans = []
     for axis_name in axes:
-        dim = label_image.dimensions.get(axis_name, default=1)
-        roi_slice = roi_px.get(axis_name)
-        if roi_slice is None or roi_slice.start is None or roi_slice.length is None:
-            spans.append((0, int(dim)))
+        dim = int(label_image.dimensions.get(axis_name, default=1))
+        selection = ctx.slicing.get(axis_name, normalize=True)
+        if isinstance(selection, int):
+            spans.append((selection, selection + 1))
             continue
-        start = int(roi_slice.start)
-        stop = start + int(roi_slice.length)
+        if isinstance(selection, list):
+            raise NgioValueError(
+                f"Tile {roi.get_name()!r}: stitching needs contiguous "
+                f"selections, got a list selection along '{axis_name}'."
+            )
+        start = 0 if selection.start is None else int(selection.start)
+        stop = dim if selection.stop is None else int(selection.stop)
         if stop <= start:
             raise NgioValueError(
                 f"Tile {roi.get_name()!r}: the {what} region is empty along "
@@ -149,6 +166,7 @@ def touching_unstitched_axes(
     masked objects touching is not a seam anyone wants stitched.
     """
     touching: list[int] = []
+    plain = set(sweep_pairs([extent.core for extent in extents]))
     for axis in unhaloed_axes:
         # Extending every box by one pixel on `axis` turns face-contact into
         # overlap; any pair found this way that a plain sweep does not find
@@ -160,7 +178,6 @@ def touching_unstitched_axes(
             )
             for extent in extents
         ]
-        plain = set(sweep_pairs([extent.core for extent in extents]))
         if any(
             pair not in plain
             and labels_compatible(extents[pair[0]], extents[pair[1]], same_label_only)

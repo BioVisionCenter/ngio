@@ -184,7 +184,6 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 config=self._stitch,
                 output=self._output,
                 rois=self.rois,
-                ref_image=self._ref_image,
                 halo=self.halo,
                 read_roi=self._read_roi,
                 scratch_factory=self._scratch_factory,
@@ -240,6 +239,17 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             return ScratchBanks.open(self._output, store)
         if attrs is not None and self._scratch_matches(attrs):
             return ScratchBanks.open(self._output, store)
+        if attrs is not None and "fingerprint" in attrs:
+            # A prepared distributed scratch that does not match this plan:
+            # wiping it would destroy every job's banked prediction. Only
+            # `prepare_jobs` may start over.
+            raise NgioValueError(
+                "A prepared stitch scratch exists but was made for a "
+                "different plan: the tiling, halo, stitch config, or n_jobs "
+                "changed. Refusing to wipe the jobs' banked predictions — "
+                "rebuild the iterator to match, or re-run "
+                "`prepare_jobs(n_jobs)` to deliberately start over."
+            )
         return ScratchBanks.create(self._output, store)
 
     def _prepare_distributed(self, n_jobs: int) -> None:

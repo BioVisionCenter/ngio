@@ -282,6 +282,109 @@ def test_stitching_requires_a_halo():
         iterator.map(_connected_components)
 
 
+def test_stitch_with_non_integer_pixel_origins():
+    """World-space ROIs at pixelsize 0.325: spans must match the setters'.
+
+    The bank shapes are derived from the same slicing normalization the
+    setters use (floor/ceil + clamp), so non-pixel-aligned FOV tables and
+    border-overrunning ROIs stitch instead of dying on the first tile.
+    """
+    from ngio.common import Roi
+
+    data = np.zeros((64, 64), dtype="uint8")
+    data[20:28, 24:40] = 255  # one object across the ROI overlap zone
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=data,
+        pixelsize=0.325,
+        axes_names="yx",
+        levels=1,
+        chunks=(32, 32),
+        consolidation_mode="dask",
+    )
+    image = ome_zarr.get_image()
+    label = ome_zarr.derive_label("seg")
+
+    extent = 64 * 0.325  # 20.8 world units
+    rois = [
+        # Non-integer pixel origins, and B overruns the right border.
+        Roi.from_values(slices={"y": (0.0, extent), "x": (0.0, 11.0)}, name="a"),
+        Roi.from_values(slices={"y": (0.0, extent), "x": (9.8, 11.6)}, name="b"),
+    ]
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .product(rois)
+        .with_halo(y=4, x=4)
+    )
+    iterator.map(_connected_components)
+
+    stitched = ome_zarr.get_label("seg").get_as_numpy()
+    assert len(_object_ids(stitched)) == 1
+    np.testing.assert_array_equal(stitched > 0, data > 0)
+
+
+def test_stale_banks_are_missing_not_zeros():
+    """A wiped scratch must read as missing, never as silent zeros."""
+    from ngio.iterators._stitch import ScratchBanks, _TileWork
+
+    _, _, label = _setup(_one_object_across_the_seam())
+    work = _TileWork(
+        index=0, offset=10_000, core=((0, 32), (0, 32)), grown=((0, 36), (0, 36))
+    )
+
+    first = ScratchBanks.create(label, None)
+    first.write(work, np.ones((36, 36), dtype=label.zarr_array.dtype))
+    assert first.missing([work]) == []
+
+    # A second run wipes and recreates the scratch under the first handle.
+    ScratchBanks.create(label, None)
+    assert first.missing([work]) == [0]
+
+
+def test_second_finalize_raises_and_leaves_no_scratch():
+    """Finalize is not idempotent, but it must fail clean, not create state."""
+    ome_zarr, image, label = _setup(_one_object_across_the_seam())
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+    iterator.map(_connected_components)  # maps and finalizes
+
+    fresh = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+    with pytest.raises(NgioValueError, match="Nothing to resolve"):
+        fresh.finalize()
+    handler_keys = list(ome_zarr.get_label("seg")._group_handler.group.keys())
+    assert "_ngio_stitch" not in handler_keys
+
+
+def test_plan_pickle_drops_geometry():
+    """Workers only bank: the pickled plan must not ship works/pairs/output."""
+    _, image, label = _setup(_one_object_across_the_seam())
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+    plan = iterator._stitching_plan()
+    state = plan.__getstate__()
+    assert state["_works"] == []
+    assert state["_pairs"] == []
+    assert state["_output"] is None
+
+
 def test_stitch_handles_a_ragged_roi_list():
     """Non-grid ROIs stitch too: pairs come from pixel overlap, not a grid."""
     from ngio.common import Roi

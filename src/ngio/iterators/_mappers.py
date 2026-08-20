@@ -360,13 +360,15 @@ def _collect_extra_claims(
 ) -> dict[Any, list[tuple[int, ChunkRect]]]:
     """Side-channel write claims by claim key, as `(unit.index, rect)` pairs.
 
-    A setter that writes anywhere besides its own target array — the
-    stitching setter banking halo bands into scratch arrays — declares those
-    writes through the optional `extra_write_footprints` member (probed with
-    `getattr`, per the mapper compatibility policy): `(key, rect)` pairs,
-    where the key identifies the side array and the rect is the claim on its
-    chunk grid. Claims under the same key conflict like footprints on one
-    array; claims under different keys never do.
+    A setter that writes anywhere besides its own target array may declare
+    those writes through the optional `extra_write_footprints` member
+    (probed with `getattr`, per the mapper compatibility policy): `(key,
+    rect)` pairs, where the key identifies the side array and the rect is
+    the claim on its chunk grid. Claims under the same key conflict like
+    footprints on one array; claims under different keys never do. No ngio
+    setter declares any today — the stitch banks into per-tile arrays with a
+    single writer each — but the protocol stays for third-party setters
+    (`HaloCroppingSetter` forwards it).
     """
     claims: dict[Any, list[tuple[int, ChunkRect]]] = {}
     for unit in units:
@@ -417,9 +419,8 @@ def _write_conflict_edges(
 
     Keyed and valued by `unit.index`. Units targeting different output
     arrays never conflict through their footprints — but a setter's
-    side-channel claims (`extra_write_footprints`, e.g. stitch bands) join
-    the graph too, so two units banking into the same scratch chunk are
-    edges exactly like two units writing the same label chunk.
+    side-channel claims (`extra_write_footprints`, if it declares any) join
+    the graph too, exactly like footprints on a shared array.
     """
     adjacency: dict[int, set[int]] = {index: set() for index in footprints}
     by_array: dict[int, list[tuple[int, ChunkRect]]] = {}
