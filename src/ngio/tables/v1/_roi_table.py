@@ -6,7 +6,7 @@ https://fractal-analytics-platform.github.io/fractal-tasks-core/tables/
 
 import logging
 from collections.abc import Iterable, Mapping
-from typing import Any, Literal
+from typing import Any, Literal, Self
 from uuid import uuid4
 
 import pandas as pd
@@ -466,9 +466,7 @@ class GenericRoiTableV1(AbstractBaseTable):
         return roi
 
     @classmethod
-    def from_table_data(
-        cls, table_data: TabularData, meta: BackendMeta
-    ) -> "GenericRoiTableV1":
+    def from_table_data(cls, table_data: TabularData, meta: BackendMeta) -> Self:
         """Create a new ROI table from a table data."""
         _, rois = _table_to_rois(
             table=table_data,
