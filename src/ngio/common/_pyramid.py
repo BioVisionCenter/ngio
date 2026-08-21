@@ -840,6 +840,18 @@ class PyramidLevel(BaseModel):
             self.chunks = tuple(normalized_chunks)
 
         if isinstance(self.shards, tuple):
+            if self.chunks == "auto":
+                # zarr infers "auto" chunks from the full array shape and then
+                # requires shard % chunk == 0 — it does not auto-chunk within
+                # the shard — so this combination fails deep in zarr, after
+                # the group metadata is on disk.
+                raise NgioValueError(
+                    f"An explicit shard shape {self.shards} needs an explicit "
+                    "chunk shape: with chunks='auto' zarr infers chunks from "
+                    "the array shape and then rejects a shard that is not a "
+                    "whole multiple of them. Pass `chunks=` as well, or use "
+                    "shards='auto'."
+                )
             if len(self.shards) != len(self.shape):
                 raise NgioValueError(
                     "Shards must have the same length as shape "
@@ -928,6 +940,26 @@ class ImagePyramidBuilder(BaseModel):
     other_array_kwargs: Mapping[str, Any] = {}
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @model_validator(mode="after")
+    def _require_v3_for_shards(self) -> "ImagePyramidBuilder":
+        # Every array creation funnels through this builder, and it is
+        # constructed before anything touches the store — so this is the one
+        # place a v2+shards mistake can fail *before* a half-built container
+        # (group + OME metadata, no arrays) lands on disk.
+        if self.zarr_format != 2:
+            return self
+        for level in self.levels:
+            if level.shards == "auto":
+                # The only valid v2 meaning of "let ngio decide": no sharding.
+                level.shards = None
+            elif level.shards is not None:
+                raise NgioValueError(
+                    "Sharding requires zarr format 3 (OME-Zarr >= 0.5); got "
+                    f"shards={level.shards!r} for level {level.path!r}. Pass "
+                    'shards=None, or create with ngff_version="0.5".'
+                )
+        return self
 
     @classmethod
     def from_scaling_factors(

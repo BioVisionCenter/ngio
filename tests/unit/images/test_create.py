@@ -258,6 +258,14 @@ def test_create_with_sharding(tmp_path: Path):
     assert img.zarr_array.chunks == (2, 1, 16, 16)
     assert img.zarr_array.shards == (4, 3, 16, 16)
 
+    # The derived label inherits the sharding, minus the squeezed channel axis.
+    label = ome_zarr.get_label("label_sharded")
+    assert label.zarr_array.chunks == (1, 32, 32)
+    assert label.zarr_array.shards == (3, 64, 64)
+    deep_label = ome_zarr.get_label("label_sharded", path="2")
+    assert deep_label.zarr_array.shards == (3, 16, 16)
+    assert label.zarr_array.compressors == img.zarr_array.compressors
+
 
 def test_pyramid_clamps_singleton_dimensions():
     store = MemoryStore()
@@ -341,3 +349,148 @@ def test_derive_from_legacy_images(tmp_path: Path, ngff_version: str):
         img = ome_zarr.get_image(path=path_img)
         lbl = ome_zarr.get_label(name="my_label_level_1", path=path_lbl)
         assert img.shape[-2:] == lbl.shape[-2:]
+
+
+@pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
+def test_create_round_trip_compressors_and_shards(tmp_path: Path, ngff_version):
+    """An explicit non-default codec (and sharding, on 0.5) survives a reopen."""
+    from ngio import open_ome_zarr_container
+
+    store = tmp_path / f"roundtrip_{ngff_version}.zarr"
+    data = np.arange(64 * 64, dtype="uint16").reshape(64, 64)
+    if ngff_version == "0.4":
+        from numcodecs import Blosc
+
+        create_ome_zarr_from_array(
+            store=store,
+            array=data,
+            pixelsize=0.5,
+            axes_names="yx",
+            levels=2,
+            ngff_version="0.4",
+            compressors=Blosc(cname="zstd", clevel=7),
+        )
+    else:
+        from zarr.codecs import BloscCodec
+
+        create_ome_zarr_from_array(
+            store=store,
+            array=data,
+            pixelsize=0.5,
+            axes_names="yx",
+            levels=2,
+            ngff_version="0.5",
+            compressors=BloscCodec(cname="zstd", clevel=7),
+            chunks=(16, 16),
+            shards=(32, 32),
+        )
+
+    reopened = open_ome_zarr_container(store)
+    for path in ("0", "1"):
+        arr = reopened.get_image(path=path).zarr_array
+        (codec,) = [c for c in arr.compressors if "losc" in type(c).__name__]
+        # numcodecs carries `cname` as a str, the v3 codec as an enum.
+        cname = getattr(codec, "cname", None)
+        cname = getattr(cname, "value", cname)
+        assert (cname, getattr(codec, "clevel", None)) == ("zstd", 7)
+        if ngff_version == "0.5":
+            assert arr.shards is not None
+    np.testing.assert_array_equal(reopened.get_image(path="0").get_as_numpy(), data)
+
+
+def test_consolidate_preserves_shards_and_compressors(tmp_path: Path):
+    from zarr.codecs import BloscCodec
+
+    ome_zarr = create_empty_ome_zarr(
+        store=tmp_path / "consolidate_sharded.zarr",
+        shape=(64, 64),
+        pixelsize=0.5,
+        chunks=(16, 16),
+        shards=(32, 32),
+        compressors=BloscCodec(cname="zstd", clevel=7),
+        dtype="uint16",
+        levels=3,
+        ngff_version="0.5",
+    )
+    image = ome_zarr.get_image()
+    image.set_array(np.arange(64 * 64, dtype="uint16").reshape(64, 64))
+    image.consolidate()
+
+    for path in ("1", "2"):
+        arr = ome_zarr.get_image(path=path).zarr_array
+        assert arr.shards is not None
+        assert any(type(c).__name__ == "BloscCodec" for c in arr.compressors)
+        assert np.asarray(arr[...]).max() > 0, "downsampled data landed"
+
+
+def test_shards_with_ngff_04_raises_before_write(tmp_path: Path):
+    # Raised inside the builder's validator, so pydantic wraps the
+    # NgioValueError — same surface as the other builder-input errors.
+    store = tmp_path / "v2_sharded.zarr"
+    with pytest.raises(ValidationError, match="zarr format 3"):
+        create_empty_ome_zarr(
+            store=store,
+            shape=(64, 64),
+            pixelsize=0.5,
+            chunks=(16, 16),
+            shards=(32, 32),
+            ngff_version="0.4",
+        )
+    assert not store.exists(), "nothing may land on disk before the guard"
+
+
+def test_auto_chunks_with_explicit_shards_raises_before_write(tmp_path: Path):
+    store = tmp_path / "auto_chunks_sharded.zarr"
+    with pytest.raises(ValidationError, match="explicit chunk shape"):
+        create_empty_ome_zarr(
+            store=store,
+            shape=(64, 64),
+            pixelsize=0.5,
+            shards=(32, 32),
+            ngff_version="0.5",
+        )
+    assert not store.exists()
+
+
+def test_shards_auto_on_v2_creates_unsharded(tmp_path: Path):
+    ome_zarr = create_empty_ome_zarr(
+        store=tmp_path / "v2_auto.zarr",
+        shape=(64, 64),
+        pixelsize=0.5,
+        shards="auto",
+        ngff_version="0.4",
+    )
+    assert ome_zarr.get_image().zarr_array.shards is None
+
+
+def test_cross_format_derive_requires_explicit_compressors(tmp_path: Path):
+    v3 = create_empty_ome_zarr(
+        store=tmp_path / "v3.zarr",
+        shape=(64, 64),
+        pixelsize=0.5,
+        chunks=(16, 16),
+        shards=(32, 32),
+        ngff_version="0.5",
+    )
+    # v3 -> v2: inherited codecs are v3 objects, inherited shards are illegal.
+    target = tmp_path / "derived_v2.zarr"
+    with pytest.raises(NgioValueError, match="compressors"):
+        v3.derive_image(store=target, ngff_version="0.4")
+    assert not target.exists()
+    with pytest.raises(NgioValueError, match="cannot shard"):
+        v3.derive_image(store=target, ngff_version="0.4", compressors="auto")
+    assert not target.exists()
+    derived = v3.derive_image(
+        store=target, ngff_version="0.4", compressors="auto", shards="auto"
+    )
+    assert derived.get_image().zarr_array.shards is None
+
+    # v2 -> v3: same rule for the codecs; there are no shards to inherit.
+    v2 = create_empty_ome_zarr(
+        store=tmp_path / "v2.zarr", shape=(64, 64), pixelsize=0.5, ngff_version="0.4"
+    )
+    target_v3 = tmp_path / "derived_v3.zarr"
+    with pytest.raises(NgioValueError, match="compressors"):
+        v2.derive_image(store=target_v3, ngff_version="0.5")
+    assert not target_v3.exists()
+    v2.derive_image(store=target_v3, ngff_version="0.5", compressors="auto")

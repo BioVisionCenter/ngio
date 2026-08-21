@@ -40,6 +40,8 @@ The design rationale that used to live in this file now lives in the docs — se
 - A whole-array dask write now verifies its block grid gives each write unit exactly one writer, raising loudly instead of leaning on a silenced dask warning.
 - `relabel_sequential` and the stitch compaction walk sharded labels per shard, not per inner chunk (each inner-chunk write was a full-shard read-modify-write).
 - A `BatchedMapper` reduction on a ragged batch raises: the result is computed on padded patches, so the padding had already leaked into the values.
+- Invalid sharding/compression setups fail before anything is written, with named errors instead of a raw zarr error after the group metadata already landed (a half-built container): shards on OME-Zarr 0.4, an explicit shard shape with `chunks="auto"`, and a cross-format derive inheriting codecs or shards (`compressors="auto"` picks the target format's default; `shards="auto"` on a 0.4 target means no sharding).
+- `find_dimension_separator` accepts the v2 chunk-key encoding on zarr v3 arrays, so deriving from such stores no longer fails.
 - Stale table names are skipped by typed listings instead of *creating* a group for the missing table; shards clip to whole chunk multiples instead of producing a geometry zarr rejects; `mode="coarsen"` asked to upsample raises a named error instead of a bare divide-by-zero; a dropped channel selection is no longer validated before the removal that exempted it; a zero-sized axis reports itself instead of blaming the tail policy; stitch plan warnings fire at the start of `map`, pointing at the caller, not mid-run from a worker.
 
 ### Behaviour changes

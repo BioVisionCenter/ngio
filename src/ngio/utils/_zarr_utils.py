@@ -597,17 +597,23 @@ def find_dimension_separator(array: zarr.Array) -> Literal[".", "/"]:
     Returns:
         Literal[".", "/"]: The dimension separator used in the store.
     """
-    from zarr.core.chunk_key_encodings import DefaultChunkKeyEncoding
+    from zarr.core.chunk_key_encodings import (
+        DefaultChunkKeyEncoding,
+        V2ChunkKeyEncoding,
+    )
 
     if array.metadata.zarr_format == 2:
         separator = array.metadata.dimension_separator
     else:
-        separator = array.metadata.chunk_key_encoding
-        if not isinstance(separator, DefaultChunkKeyEncoding):
+        encoding = array.metadata.chunk_key_encoding
+        # Both encodings carry a `.separator` that maps cleanly; a v3 array
+        # written with the v2 encoding (e.g. converted in place) is valid.
+        if not isinstance(encoding, DefaultChunkKeyEncoding | V2ChunkKeyEncoding):
             raise NgioValueError(
-                "Only DefaultChunkKeyEncoding is supported in this example."
+                f"Cannot determine the dimension separator: unsupported chunk "
+                f"key encoding {type(encoding).__name__}."
             )
-        separator = separator.separator
+        separator = encoding.separator
     return separator
 
 

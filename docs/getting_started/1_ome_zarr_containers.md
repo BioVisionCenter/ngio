@@ -295,6 +295,45 @@ new_ome_zarr_image = create_empty_ome_zarr(
 
 This will create an empty OME-Zarr image with the specified shape and pixel sizes.
 
+### Chunks, shards, and compression
+
+Both creation functions accept the array geometry and codec directly; the settings
+apply to **every** pyramid level, clipped per level so a deep level never exceeds
+its own shape:
+
+```python
+from zarr.codecs import BloscCodec
+
+sharded = create_empty_ome_zarr(
+    store="sharded_ome.zarr",
+    shape=(16, 2048, 2048),
+    pixelsize=0.65,
+    ngff_version="0.5",
+    chunks=(1, 256, 256),
+    shards=(4, 2048, 2048),
+    compressors=BloscCodec(cname="zstd", clevel=5),
+)
+```
+
+A few rules, all enforced before anything is written:
+
+- Sharding needs OME-Zarr 0.5 (zarr format 3); on `ngff_version="0.4"` pass
+  `shards=None`, or `shards="auto"`, which means no sharding there.
+- An explicit shard shape needs an explicit chunk shape — with `chunks="auto"`
+  zarr would infer chunks the shard is not a multiple of.
+- On 0.4 the codec is a `numcodecs` object (`numcodecs.Blosc(...)`); on 0.5 a
+  zarr v3 codec (`zarr.codecs.BloscCodec(...)`). The two are not interchangeable.
+
+`derive_image` / `derive_label` inherit `chunks`, `shards`, `compressors`,
+`dtype`, and the dimension separator from the reference image unless you pass a
+value explicitly. When deriving *across* formats (`ngff_version=` differs from
+the reference), inheriting codecs or shards cannot work, so ngio asks you to be
+explicit: `compressors="auto"` selects the target format's default, and
+`shards="auto"` derives unsharded onto a 0.4 target.
+
+Anything beyond these (`fill_value`, `filters`, `serializer`, ...) goes through
+`extra_array_kwargs`, which is forwarded to `zarr.create_array` as-is.
+
 ## Opening remote OME-Zarr containers
 
 You can use `ngio` to open remote OME-Zarr containers.

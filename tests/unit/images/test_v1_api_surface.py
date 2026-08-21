@@ -37,10 +37,32 @@ def test_derive_image_dtype_can_still_be_overridden(float_container, tmp_path):
     assert derived.get_image().dtype == "uint8"
 
 
-def test_derive_image_inherits_compressors_and_separator(float_container, tmp_path):
-    source = float_container.get_image().zarr_array
-    derived = float_container.derive_image(store=tmp_path / "derived_c.zarr")
-    assert derived.get_image().zarr_array.compressors == source.compressors
+def test_derive_image_inherits_compressors_and_separator(tmp_path):
+    """A non-default codec and separator must actually propagate.
+
+    Asserted against explicit non-default values — comparing a derived
+    default against a source default proves nothing.
+    """
+    from numcodecs import Blosc
+
+    from ngio import create_empty_ome_zarr
+    from ngio.utils._zarr_utils import find_dimension_separator
+
+    source_container = create_empty_ome_zarr(
+        store=tmp_path / "source_c.zarr",
+        shape=(32, 32),
+        pixelsize=0.5,
+        compressors=Blosc(cname="zstd", clevel=7),
+        dimension_separator=".",
+    )
+    derived = source_container.derive_image(store=tmp_path / "derived_c.zarr")
+    arr = derived.get_image().zarr_array
+    (codec,) = [c for c in arr.compressors if "losc" in type(c).__name__]
+    assert (getattr(codec, "cname", None), getattr(codec, "clevel", None)) == (
+        "zstd",
+        7,
+    )
+    assert find_dimension_separator(arr) == "."
 
 
 def test_derive_label_from_image_is_uint32(float_container):

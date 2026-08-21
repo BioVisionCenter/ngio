@@ -397,6 +397,21 @@ def test_pyramid_level_clips_shards_to_a_chunk_multiple(
     )
 
 
+def test_pyramid_level_refuses_auto_chunks_with_explicit_shards():
+    """zarr infers "auto" chunks from the full shape, then rejects the shard."""
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError, match="explicit chunk shape"):
+        PyramidLevel(
+            path="0",
+            shape=(64, 64),
+            scale=(1.0, 1.0),
+            translation=(0.0, 0.0),
+            chunks="auto",
+            shards=(4, 16),
+        )
+
+
 def test_coarsen_refuses_to_upsample(tmp_path: Path):
     """Coarsening upward names the cause instead of dividing by zero inside dask.
 

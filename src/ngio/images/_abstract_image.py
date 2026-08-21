@@ -1212,6 +1212,32 @@ def abstract_derive(
     if dimension_separator is None:
         dimension_separator = find_dimension_separator(ref_image.zarr_array)
 
+    if ngff_version is None:
+        ngff_version = ref_meta.version
+
+    # Inheriting concrete codecs or shards across zarr formats can only fail:
+    # numcodecs and v3 codec objects are never interchangeable, and v2 cannot
+    # shard. `None` means "inherit" here, so the escape hatch is `"auto"`
+    # (the target format's default; for shards on a v2 target, no sharding).
+    ref_format = ref_image.zarr_array.metadata.zarr_format
+    target_format = 2 if ngff_version == "0.4" else 3
+    if target_format != ref_format:
+        if compressors is None:
+            raise NgioValueError(
+                f"Cannot inherit compressors across zarr formats (the "
+                f"reference is zarr v{ref_format}, "
+                f"ngff_version={ngff_version!r} writes zarr "
+                f"v{target_format}): the codec objects are not "
+                'interchangeable. Pass compressors explicitly — "auto" '
+                "selects the target format's default."
+            )
+        if shards is None and ref_image.zarr_array.shards is not None:
+            raise NgioValueError(
+                "Cannot inherit sharding onto an OME-Zarr 0.4 (zarr v2) "
+                'target: v2 cannot shard. Pass shards="auto" to derive '
+                'unsharded, or keep ngff_version="0.5".'
+            )
+
     if compressors is None:
         compressors = ref_image.zarr_array.compressors  # type: ignore
 
@@ -1229,9 +1255,6 @@ def abstract_derive(
         shards=shards,
         translation=translation,
     )
-
-    if ngff_version is None:
-        ngff_version = ref_meta.version
 
     shapes, axes, chunks, shards, translation, scales = _apply_channel_policy(
         ref_image=ref_image,
