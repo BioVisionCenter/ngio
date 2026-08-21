@@ -699,7 +699,9 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
                 dst[:] = array[:]
             else:
                 dask_array = da.from_zarr(array)
-                da.to_zarr(dask_array, dst, overwrite=False)
+                # No creation kwargs: `dst` already exists, and dask 2025.12
+                # deprecates loose **kwargs (`overwrite`) with a FutureWarning.
+                da.to_zarr(dask_array, dst)
     # Copy subgroups
     for name, subgroup in src_group.groups():
         dest_subgroup = dest_group.create_group(name, overwrite=True)

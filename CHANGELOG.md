@@ -37,7 +37,7 @@ The design rationale that used to live in this file now lives in the docs — se
 
 ### Behaviour changes
 
-- **The `dask[array]` floor is raised to 2025.11** — the first release whose `to_zarr` aligns writes to the target's write unit. (Note the reversal: v0.4.5 pinned `<2025.11` for a different dask bug.)
+- **The `dask[array]` floor is raised to 2025.12** — the first release whose `to_zarr` both aligns writes to the target's write unit and warns (rather than raises, [dask#12159](https://github.com/dask/dask/issues/12159)) on the rechunk it does so.
 - **The iterator surface was normalized for its promotion out of `experimental`** — one-time renames, no shims (the 1.0 surface was explicitly experimental): `grid()` → `by_grid()`, `by_chunks(grid="write")` → `by_write_units()`, `overlap_xy` → `overlap_x`/`overlap_y`, `check_if_chunks_overlap` → `check_if_write_units_overlap` (now measured on the write target, at shard granularity when sharded), `post_consolidate()` → `finalize()`, `ImageProcessingIterator(input_channel_selection=)` → `channel_selection=`. `MapperProtocol` changed shape the same way (`(func, units)`; no known custom mappers exist).
 - Serial `map` over overlapping write footprints runs in wave order, not ROI order — "who wrote last" is identical under every mapper; disjoint tilings are unaffected.
 - A crashed stitched/distributed run can leave transient `_ngio_stitch`/`_ngio_partials` groups beside the resolution levels — unregistered, ignored by older ngio, wiped by the next run.
