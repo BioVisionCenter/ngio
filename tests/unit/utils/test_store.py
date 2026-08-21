@@ -551,16 +551,19 @@ class TestRetryEndToEnd:
         with pytest.raises(OSError, match="flaky"):
             ZarrGroupHandler(store=flaky, mode="a")
 
-    def test_user_local_group_is_left_unwrapped(self, tmp_path):
+    def test_user_local_group_is_left_unwrapped(self, tmp_path, monkeypatch):
         """A pass-through wrapper is not worth what it costs the codec pipeline.
 
         zarr silently falls back to `BatchedCodecPipeline` for any store its
         configured pipeline does not recognise, and `NgioStore` is one of those
         — so wrapping a plain local store forfeits `zarrs` while, under the
-        default policy, adding nothing.
+        default policy, adding nothing. On Windows the wrapper is always kept
+        (its sharing-violation retry is unconditional), so the platform flag is
+        forced off to pin the bypass on every platform.
         """
         from ngio.utils import ZarrGroupHandler
 
+        monkeypatch.setattr(retry_mod, "_IS_WINDOWS", False)
         group = zarr.open_group(store=tmp_path / "user.zarr", mode="a")
         handler = ZarrGroupHandler(store=group, mode="a")
 
@@ -570,6 +573,21 @@ class TestRetryEndToEnd:
         # The services are still there, over the bare store.
         assert isinstance(handler.store, NgioStore)
         assert handler.store._store is group.store
+
+    def test_user_local_group_is_wrapped_on_windows(self, tmp_path, monkeypatch):
+        """Windows always keeps the wrapper: the sharing-violation retry in
+        `NgioStore._io` is unconditional there, so the bypass never fires even
+        under the default (no-retry) policy.
+        """
+        from ngio.utils import ZarrGroupHandler
+
+        monkeypatch.setattr(retry_mod, "_IS_WINDOWS", True)
+        group = zarr.open_group(store=tmp_path / "user.zarr", mode="a")
+        handler = ZarrGroupHandler(store=group, mode="a")
+
+        assert isinstance(handler.group.store, NgioStore)
+        # Reopened onto a wrapper over the *same* underlying store.
+        assert handler.group.store._store is group.store
 
     def test_user_group_is_wrapped_when_retries_are_configured(
         self, tmp_path, monkeypatch

@@ -33,8 +33,12 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
 
     # The group holds the bare store under the default retry policy, so that
     # zarr can dispatch a store-aware codec pipeline on it; the handler still
-    # exposes the `NgioStore` services over it.
-    assert isinstance(handler.group.store, LocalStore)
+    # exposes the `NgioStore` services over it. On Windows the wrapper is
+    # always kept: its sharing-violation retry is unconditional.
+    if _retry._IS_WINDOWS:
+        assert isinstance(handler.group.store, NgioStore)
+    else:
+        assert isinstance(handler.group.store, LocalStore)
     assert isinstance(handler.store, NgioStore)
     assert handler.store.local_root == store
     assert handler.use_cache == cache
@@ -76,8 +80,14 @@ def test_group_handler_from_group(tmp_path: Path):
 
     handler = ZarrGroupHandler(store=group, cache=True, mode="a")
     # A plain local store is already the normalized form under the default
-    # retry policy, so the group is adopted rather than reopened onto a wrapper.
-    assert handler.group.store is group.store
+    # retry policy, so the group is adopted rather than reopened onto a wrapper
+    # — except on Windows, where the wrapper's unconditional sharing-violation
+    # retry means the group is reopened onto one, over the same store.
+    if _retry._IS_WINDOWS:
+        assert isinstance(handler.group.store, NgioStore)
+        assert handler.group.store._store is group.store
+    else:
+        assert handler.group.store is group.store
     assert handler.group.path == group.path
     assert isinstance(handler.store, NgioStore)
     assert handler.store._store is group.store
