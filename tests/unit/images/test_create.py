@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import zarr
 from pydantic import ValidationError
 from zarr.storage import MemoryStore
 
@@ -494,3 +495,25 @@ def test_cross_format_derive_requires_explicit_compressors(tmp_path: Path):
         v2.derive_image(store=target_v3, ngff_version="0.5")
     assert not target_v3.exists()
     v2.derive_image(store=target_v3, ngff_version="0.5", compressors="auto")
+
+
+def test_create_from_array_in_preopened_group(tmp_path: Path):
+    """`store=<pre-opened zarr.Group>` must survive the internal cached reopen.
+
+    The canonical HCS-converter pattern hands `create_ome_zarr_from_array` a
+    live group (`plate.get_image_store(...)`). The populate step reopens that
+    group with `cache=True`; trusting the caller object's in-memory attributes
+    made it read `{}` where the just-written NGFF document should be.
+    """
+    group = zarr.open_group(tmp_path / "preopened.zarr", mode="a")
+    array = np.random.randint(0, 255, (64, 64), dtype="uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        array=array,
+        store=group,
+        pixelsize=0.5,
+        axes_names=["y", "x"],
+        levels=2,
+        overwrite=True,
+    )
+    image = ome_zarr.get_image()
+    np.testing.assert_array_equal(image.get_as_numpy(), array)

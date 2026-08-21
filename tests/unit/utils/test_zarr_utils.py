@@ -526,3 +526,23 @@ def test_writes_are_visible_through_a_stale_consolidated_metadata(tmp_path: Path
 
     assert handler.load_attrs()["members"] == ["added_after_consolidation"]
     assert "child" in handler.group
+
+
+def test_cached_handler_on_a_preopened_group_reads_fresh_attrs(tmp_path: Path):
+    """A `cache=True` handler must not pin a caller group's stale attributes.
+
+    A pre-opened `zarr.Group` carries the attributes from when the caller opened
+    it. Writes made since through another handler on the same store were
+    invisible to that snapshot, and `cache=True` trusted and pinned it — which
+    broke `create_ome_zarr_from_array(store=<pre-opened group>)`, whose cached
+    reopen saw `{}` where the just-written NGFF document should be.
+    """
+    store = tmp_path / "preopened.zarr"
+    caller_group = zarr.open_group(store, mode="a")
+
+    writer = ZarrGroupHandler(store=store, cache=False, mode="r+")
+    writer.write_attrs({"written": "after-caller-open"})
+    assert caller_group.attrs.asdict() == {}
+
+    cached = ZarrGroupHandler(store=caller_group, cache=True, mode="r+")
+    assert cached.load_attrs() == {"written": "after-caller-open"}

@@ -161,6 +161,14 @@ class ZarrGroupHandler:
 
         group = open_group_wrapper(store=store, mode=mode, zarr_format=zarr_format)
         self._group = group
+        # A caller-supplied, already-open group carries whatever attributes were
+        # in memory when the *caller* opened it — writes made since, e.g.
+        # through another handler on the same store, are invisible to that
+        # snapshot. `cache=True` would trust and pin it, so the first cached
+        # read reopens from the store instead (see `load_attrs`). Groups ngio
+        # opened itself are fresh by construction, and `open_group_wrapper`
+        # hands back a new object whenever it had to reopen.
+        self._attrs_maybe_stale = group is store
         self.use_cache = cache
 
         self._group_cache: NgioCache[zarr.Group] = NgioCache(use_cache=cache)
@@ -313,12 +321,16 @@ class ZarrGroupHandler:
         """
         mode = "r" if self.read_only else "r+"
         group = self.reopen_group()
-        return ZarrGroupHandler(
+        handler = ZarrGroupHandler(
             store=group,
             zarr_format=group.metadata.zarr_format,
             cache=self.use_cache,
             mode=mode,
         )
+        # `reopen_group` just read the group from the store; the pre-opened
+        # safety reopen would be a redundant round-trip.
+        handler._attrs_maybe_stale = False
+        return handler
 
     def invalidate_meta(self) -> None:
         """Drop cached metadata, keeping child handlers and the lock alive.
@@ -337,6 +349,7 @@ class ZarrGroupHandler:
             # and the three caches are disabled and empty, so reopening here
             # would be a pure extra round-trip on every write.
             self._group = self.reopen_group()
+            self._attrs_maybe_stale = False
         self._group_cache.clear()
         self._array_cache.clear()
         # Snapshot: a concurrent `get_handler` may insert mid-iteration.
@@ -403,10 +416,16 @@ class ZarrGroupHandler:
         if self._attrs_cache is not None:
             return deepcopy(self._attrs_cache)
         if self.use_cache:
-            # `self._group`, not a reopen: it is current by construction and
-            # refreshed by `invalidate_meta`, and its attributes are already in
-            # memory — so the first read of a cached handler costs nothing
-            # either, not just the repeats.
+            if self._attrs_maybe_stale:
+                # Constructed from a pre-opened caller group: its in-memory
+                # attributes may predate writes on the same store. One store
+                # read here, cached as usual from then on.
+                self._group = self.reopen_group()
+                self._attrs_maybe_stale = False
+            # `self._group`, not a reopen: it is current by construction (or
+            # just refreshed above) and refreshed by `invalidate_meta`, and its
+            # attributes are already in memory — so the first read of a cached
+            # handler costs nothing either, not just the repeats.
             attrs = self._group.attrs.asdict()
             self._attrs_cache = attrs
             return deepcopy(attrs)
@@ -552,6 +571,10 @@ class ZarrGroupHandler:
         handler = ZarrGroupHandler(
             store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode=mode
         )
+        # `get_group` handed over a group that is current within this handler's
+        # caching regime (and invalidation cascades to the child); the
+        # pre-opened safety reopen would cost one read per child for nothing.
+        handler._attrs_maybe_stale = False
         if overwrite:
             # The group was just recreated (evicting the subtree); replace
             # rather than adopt whatever a racing builder may have cached.
