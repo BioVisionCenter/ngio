@@ -195,10 +195,18 @@ class BatchedMapper:
     stacking (origin-anchored: real pixels first, padding after); a
     shape-preserving output is sliced back to each patch's true shape
     before the write, and halos are trimmed by the setter as usual. A
-    per-item reduction passes through untouched — it sees the padded
-    pixels, so pad with values it tolerates. Reads within a batch fan out
-    on a thread pool; writes run serially on the dispatching thread, so
+    per-item reduction is allowed only on a uniform batch — on a ragged
+    one its result is computed on padded pixels and there is no padding
+    to slice back off, so it raises. Reads within a batch fan out on a
+    thread pool; writes run serially on the dispatching thread, so
     batched mapping is write-safe on any tiling.
+
+    Stacking is a numpy operation, so unlike its siblings this mapper is
+    not generic over the payload type: it accepts bare `np.ndarray` units
+    only (tuple payloads raise). Its pool argument is named
+    `read_workers`, not `max_workers`, because it sizes something
+    different — the other mappers' pools run `func`, this one's only
+    reads; `func` always runs once per batch on the dispatching thread.
 
     Args:
         batch_size: Number of patches stacked per `func` call. The last

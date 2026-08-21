@@ -113,7 +113,7 @@ Two knobs ngio forwards into zarr's own runtime configuration. Both default to `
 
 ### When changes take effect
 
-- **`async_concurrency` is read by zarr on every call**, so changing it at runtime works: re-apply with `ngio.utils.apply_zarr_config(get_config())` after mutating `get_config().zarr`, or set it directly with `zarr.config.set({"async.concurrency": 64})` (also usable as a context manager for a single operation).
+- **`async_concurrency` is read by zarr on every call**, so changing it at runtime works: set it directly with `zarr.config.set({"async.concurrency": 64})` (also usable as a context manager for a single operation).
 - **`threading_max_workers` is snapshotted by zarr into a process-global executor at the first zarr operation.** ngio applies this section during `import ngio` for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file.
 
 ## Next steps

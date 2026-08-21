@@ -20,8 +20,8 @@ from ngio.config import get_config
 from ngio.utils import (
     NgioFutureWarning,
     NgioValueError,
-    stacklevel_of_first_caller,
 )
+from ngio.utils._warnings import stacklevel_of_first_caller
 
 #: How `consolidate` builds each level. `"auto"` takes the in-memory path only
 #: where it is bit-identical to the chunked one; see `_resolve_auto_mode`.

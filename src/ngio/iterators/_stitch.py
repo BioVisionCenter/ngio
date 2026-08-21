@@ -54,8 +54,8 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     open_group_wrapper,
-    stacklevel_of_first_caller,
 )
+from ngio.utils._warnings import stacklevel_of_first_caller
 
 _SCRATCH_GROUP = "_ngio_stitch"
 _LAYOUT = "per-roi/1"

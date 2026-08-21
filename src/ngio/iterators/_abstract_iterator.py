@@ -68,7 +68,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     parameter (`channel_selection`, `input_transforms`) refers to the *input*
     image; output-side parameters are always prefixed
     (`output_channel_selection`, `output_transforms`), and parameters
-    targeting another object name it (`label_transforms`).
+    targeting another object name it (`label_transforms`). A parameter that
+    configures a *downstream* consolidation is spelled `consolidation_mode`
+    (here and on `Label.relabel_sequential`); only `consolidate()` itself
+    shortens it to `mode`, where the prefix would be redundant.
     """
 
     _rois: list[Roi]

@@ -18,11 +18,14 @@ from ngio.utils._errors import (
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
 from ngio.utils._retry import retry_io
 from ngio.utils._store import NgioStore
+
+# `stacklevel_of_first_caller` (ngio.utils._warnings) and `apply_zarr_config`
+# (ngio.utils._zarr_utils) are internal helpers; ngio's own modules import
+# them from their private homes.
 from ngio.utils._warnings import (
     NgioDeprecationWarning,
     NgioFutureWarning,
     NgioUserWarning,
-    stacklevel_of_first_caller,
 )
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
@@ -30,7 +33,6 @@ from ngio.utils._zarr_utils import (
     NgioSupportedStore,
     StoreOrGroup,
     ZarrGroupHandler,
-    apply_zarr_config,
     copy_group,
     open_group_wrapper,
     refresh_s3fs_config,
@@ -53,7 +55,6 @@ __all__ = [
     "NgioValueError",
     "StoreOrGroup",
     "ZarrGroupHandler",
-    "apply_zarr_config",
     "copy_group",
     "deprecated",
     "deprecated_alias",
@@ -64,5 +65,4 @@ __all__ = [
     "print_datasets_infos",
     "refresh_s3fs_config",
     "retry_io",
-    "stacklevel_of_first_caller",
 ]

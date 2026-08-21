@@ -12,7 +12,8 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Literal, TypeVar
 
-from ngio.utils import NgioFutureWarning, NgioValueError, stacklevel_of_first_caller
+from ngio.utils import NgioFutureWarning, NgioValueError
+from ngio.utils._warnings import stacklevel_of_first_caller
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
