@@ -50,6 +50,7 @@
 - Stale table names are skipped by typed listings instead of *creating* a group for the missing table; shards clip to whole chunk multiples instead of producing a geometry zarr rejects; `mode="coarsen"` asked to upsample raises a named error instead of a bare divide-by-zero; a dropped channel selection is no longer validated before the removal that exempted it; a zero-sized axis reports itself instead of blaming the tail policy; stitch plan warnings fire at the start of `map`, pointing at the caller, not mid-run from a worker.
 - `create_ome_zarr_from_array(store=<pre-opened zarr.Group>)` failed validating `{}`: the populate step's cached reopen trusted the caller group's in-memory attributes, which predate the metadata write. A `cache=True` handler built on a pre-opened group now takes its first attribute read from the store — the canonical `plate.get_image_store(...) → create_ome_zarr_from_array(...)` converter pattern works again.
 - `GenericRoiTableV1.from_table_data` returns `Self` again, not the base class — the narrowed annotation made `RoiTableV1` fail the `Table` protocol under type checkers, flagging every downstream `add_table(name, roi_table)`.
+- `plate.get_images(max_workers=...)` forwards `max_workers` to its internal `images_paths()` listing. Dropping it on that hop kept the per-well walk serial and fired the plate fan-out `NgioFutureWarning` at callers who had already opted in — its own documented remedy could not silence it, transitively from every table helper built on `get_images`.
 
 ### Behaviour changes
 

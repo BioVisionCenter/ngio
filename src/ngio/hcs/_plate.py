@@ -490,7 +490,7 @@ class OmeZarrPlate:
         Returns:
             A dictionary of images, keyed by image path.
         """
-        paths = self.images_paths(acquisition=acquisition)
+        paths = self.images_paths(acquisition=acquisition, max_workers=max_workers)
         images = _map_workers(self._get_image, paths, max_workers=max_workers)
         return dict(zip(paths, images, strict=True))
 

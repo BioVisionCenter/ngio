@@ -2,9 +2,10 @@
 
 from pathlib import Path
 
+import numpy as np
 import pytest
 
-from ngio import create_empty_plate
+from ngio import create_empty_plate, create_ome_zarr_from_array
 from ngio.ome_zarr_meta import ImageInWellPath
 from ngio.utils import NgioFutureWarning
 
@@ -70,3 +71,44 @@ def test_the_notice_points_at_the_caller_not_at_ngio(plate):
     assert nested[0].filename == this_file
     # ...and they are distinct locations, so neither hides the other.
     assert direct[0].lineno != nested[0].lineno
+
+
+@pytest.fixture
+def populated_plate(tmp_path: Path):
+    images = [
+        ImageInWellPath(row="A", column="01", path="0"),
+        ImageInWellPath(row="A", column="02", path="0"),
+    ]
+    plate = create_empty_plate(
+        tmp_path / "populated.zarr", name="plate", images=images, overwrite=True
+    )
+    for column in ("01", "02"):
+        store = plate.get_image_store(row="A", column=column, image_path="0")
+        create_ome_zarr_from_array(
+            array=np.zeros((8, 8), dtype="uint8"),
+            store=store,
+            pixelsize=1.0,
+            axes_names=["y", "x"],
+            levels=1,
+            consolidation_mode="auto",
+        )
+    return plate
+
+
+@pytest.mark.parametrize(
+    "call",
+    [
+        lambda plate: plate.get_images(max_workers="auto"),
+        lambda plate: plate.list_image_tables(max_workers="auto"),
+    ],
+)
+def test_opting_in_silences_the_nested_fan_outs_too(populated_plate, call, recwarn):
+    """`max_workers="auto"` must reach every fan-out a call runs internally.
+
+    `get_images` lists paths through `images_paths` → `get_wells` before
+    opening anything; dropping the forward on that hop made the notice fire
+    at callers who had already opted in — transitively from every
+    table-listing helper built on `get_images`.
+    """
+    call(populated_plate)
+    assert [w for w in recwarn if issubclass(w.category, NgioFutureWarning)] == []
