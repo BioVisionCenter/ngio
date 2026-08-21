@@ -3,6 +3,8 @@ from pydantic import ValidationError
 
 from ngio import PixelSize
 from ngio.common import Roi, RoiSlice
+from ngio.tables import RoiTable
+from ngio.tables._tables_container import open_table, write_table
 from ngio.utils import NgioValueError
 
 
@@ -78,7 +80,7 @@ def test_basic_rois_ops():
     assert roi_i is not None
     assert roi_i.label == 1
 
-    roi2.label = 2
+    roi2 = roi2.model_copy(update={"label": 2})
     with pytest.raises(NgioValueError):
         roi.intersection(roi2)
 
@@ -728,3 +730,51 @@ def test_anchor_origin_agrees_with_canonical_slicing():
             box_slice = anchored.get(axis)
             assert box_slice is not None and box_slice.start is not None
             assert int(box_slice.start) == read_origin, (slices, axis)
+
+
+def test_roi_models_are_frozen():
+    """In-place mutation raises instead of silently diverging.
+
+    A mutated `Roi` inside a table used to serialize its pre-mutation values:
+    the table's DataFrame cache rebuilds only via `add()`. Frozen models turn
+    every such site into an immediate error; `update_slice`/`model_copy` are
+    the supported ways to build a changed ROI.
+    """
+    roi = Roi.from_values(
+        name="roi", slices={"x": (0.0, 8.0), "y": (0.0, 8.0), "z": (0.0, 1.0)}
+    )
+
+    with pytest.raises(ValidationError, match="frozen"):
+        roi.label = 3
+    with pytest.raises(ValidationError, match="frozen"):
+        roi.name = "renamed"
+    x_slice = roi.get("x")
+    assert x_slice is not None
+    with pytest.raises(ValidationError, match="frozen"):
+        x_slice.length = 4.0
+
+    # The supported patterns still work on frozen models.
+    renamed = roi.model_copy(update={"name": "renamed"})
+    assert renamed.name == "renamed"
+    grown = roi.update_slice("z", (0.0, 5.0))
+    z_slice = grown.get("z")
+    assert z_slice is not None and z_slice.length == 5.0
+
+
+def test_updated_roi_round_trips_through_a_table(tmp_path):
+    """`update_slice` + `add(overwrite=True)` reaches the serialized table.
+
+    The exact scenario in-place mutation used to get silently wrong: change a
+    ROI's z extent, write the table, read it back — the change must be there.
+    """
+    roi = Roi.from_values(
+        name="roi", slices={"x": (0.0, 8.0), "y": (0.0, 8.0), "z": (0.0, 1.0)}
+    )
+    table = RoiTable(rois=[roi])
+    table.add(roi.update_slice("z", (0.0, 5.0)), overwrite=True)
+
+    write_table(store=tmp_path / "rois.zarr", table=table, backend="anndata")
+    loaded = open_table(store=tmp_path / "rois.zarr")
+    assert isinstance(loaded, RoiTable)
+    z_slice = loaded.get("roi").get("z")
+    assert z_slice is not None and z_slice.length == 5.0
