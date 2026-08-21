@@ -28,6 +28,7 @@
 - `NgioConfig` gained three sections, each with a public model: `zarr` (`ZarrConfig`), `dask` (`DaskConfig`), and `consolidation` (`ConsolidationConfig`).
 - Every `max_workers` accepts `"auto"`; `refresh()` on containers and plates re-reads all held metadata; the scheduling primitives (`plan_waves`, `canonical_unit_order`, `TailPolicy`, …) are public in `ngio.iterators`.
 - New public names: `NgioFutureWarning`, `ChannelSlicingInputType` (`ngio.images`), `ConsolidationMode` and `RegionsLike` (`ngio.common`), and `AbstractImage.write_granularity()` — the shape zarr writes atomically.
+- `Image.resolve_channel_selection(selection)` resolves anything the `get_*` methods accept as `channel_selection` — index, label, `ChannelSelectionModel`, or a sequence of those — to its slicing entry, touching only metadata. This is the supported way to validate a selection before loading data (Fractal tasks previously imported the private parser for their `skip_if_missing` checks).
 
 ### Fixes
 
