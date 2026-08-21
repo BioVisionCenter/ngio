@@ -272,6 +272,8 @@
       
         
       
+        
+      
     
     
     
@@ -772,6 +774,8 @@
       
         
       
+        
+      
     
     
     
@@ -887,6 +891,33 @@
     
   
   Image segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../object_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Object detection
 
     
   </span>
@@ -1643,6 +1674,8 @@
       
         
       
+        
+      
     
     
     
@@ -1728,6 +1761,33 @@
     
   
   ngio.common
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.config
 
     
   </span>
@@ -2237,6 +2297,8 @@
       
         
       
+        
+      
     
     
     
@@ -2299,7 +2361,7 @@ plate from scratch.</p>
 </span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Rows: </span><span class="si">{</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">rows</span><span class="si">}</span><span class="s2">, Columns: </span><span class="si">{</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">columns</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
 </span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># Get all the images in the plate</span>
-</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">get_images</span><span class="p">())</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">hcs_zarr</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
@@ -2312,7 +2374,7 @@ Rows: ['B'], Columns: ['03']
 <h2 id="step-2-aggregate-tables-across-all-images">Step 2: aggregate tables across all images<a class="headerlink" href="#step-2-aggregate-tables-across-all-images" title="Permanent link">&para;</a></h2>
 <p></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Aggregate all table across all images</span>
-</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">table</span> <span class="o">=</span> <span class="n">hcs_zarr</span><span class="o">.</span><span class="n">concatenate_image_tables</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;nuclei&quot;</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">table</span> <span class="o">=</span> <span class="n">hcs_zarr</span><span class="o">.</span><span class="n">concatenate_image_tables</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;nuclei&quot;</span><span class="p">,</span> <span class="n">max_workers</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">)</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="nb">print</span><span class="p">(</span><span class="n">table_html</span><span class="p">(</span><span class="n">table</span><span class="o">.</span><span class="n">dataframe</span><span class="o">.</span><span class="n">head</span><span class="p">()))</span>
 </span></code></pre></div>
 <div class="result" markdown="1" >

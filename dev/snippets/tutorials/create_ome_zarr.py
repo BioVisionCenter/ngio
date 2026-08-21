@@ -37,6 +37,7 @@ ome_zarr = create_ome_zarr_from_array(
     store="./data/human_mitosis.zarr",
     array=skimage.data.human_mitosis(),
     pixelsize=0.1,  # Just a guess
+    consolidation_mode="auto",
     overwrite=True,
 )
 print(ome_zarr)

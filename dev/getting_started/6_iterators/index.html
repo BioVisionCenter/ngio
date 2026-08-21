@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="The four ngio iterators for building scalable image-processing pipelines.">
+        <meta name="description" content="The five ngio iterators for building scalable image-processing pipelines.">
       
       
       
@@ -261,6 +261,8 @@
   
     
       
+      
+        
       
         
       
@@ -772,6 +774,139 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parallel-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Parallel mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batched-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Batched inference
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-runs-selecting-a-partition" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed runs: selecting a partition
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed runs: selecting a partition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-three-phase-recipe-prepare_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The three-phase recipe: <code>prepare_jobs</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distributed-stitching" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed stitching
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distributed-measurement-and-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed measurement and detection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#halos-context-without-seams" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Halos: context without seams
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stitching-a-tiled-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stitching a tiled segmentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detecting-objects-into-a-roi-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detecting objects into a ROI table
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detecting objects into a ROI table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anchoring-a-local-box-yourself" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Anchoring a local box yourself
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-each-iterator-supports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What each iterator supports
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -833,6 +968,8 @@
   
     
     
+      
+        
       
         
       
@@ -956,6 +1093,33 @@
     
   
   Image segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/object_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Object detection
 
     
   </span>
@@ -1610,6 +1774,8 @@
       
         
       
+        
+      
     
     
     
@@ -1695,6 +1861,33 @@
     
   
   ngio.common
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.config
 
     
   </span>
@@ -2107,6 +2300,139 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#parallel-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Parallel mapping
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#batched-inference" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Batched inference
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#distributed-runs-selecting-a-partition" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed runs: selecting a partition
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Distributed runs: selecting a partition">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-three-phase-recipe-prepare_jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        The three-phase recipe: <code>prepare_jobs</code>
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distributed-stitching" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed stitching
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#distributed-measurement-and-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Distributed measurement and detection
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#halos-context-without-seams" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Halos: context without seams
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stitching-a-tiled-segmentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Stitching a tiled segmentation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#detecting-objects-into-a-roi-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Detecting objects into a ROI table
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Detecting objects into a ROI table">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#anchoring-a-local-box-yourself" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Anchoring a local box yourself
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-each-iterator-supports" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What each iterator supports
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2307,21 +2633,22 @@
         </svg>
 </div>
 
-<p>ngio provides four basic <code>Iterator</code> classes, all imported from <code>ngio.iterators</code> (or from
+<p>ngio provides five basic <code>Iterator</code> classes, all imported from <code>ngio.iterators</code> (or from
 the top-level <code>ngio</code> namespace):</p>
 <!-- Figure 06 — which iterator do I want -->
 <div class="ngio-diagram">
-<svg viewBox="0 0 640 250" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f6t f6d">
-  <title id="f6t">The four iterators, by what they take and return</title>
-  <desc id="f6d">Segmentation takes an image and returns a label. Masked segmentation takes an image and a label and returns a label. Image processing takes an image and returns an image. Feature extraction takes an image and a label and returns a table.</desc>
+<svg viewBox="0 0 640 298" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f6t f6d">
+  <title id="f6t">The five iterators, by what they take and return</title>
+  <desc id="f6d">Segmentation takes an image and returns a label. Masked segmentation takes an image and a label and returns a label. Image processing takes an image and returns an image. Feature extraction takes an image and a label and returns a table. Object detection takes an image and returns a table of boxes.</desc>
 
-  <g style="stroke:var(--ngio-line)"><path d="M16 52h608M16 100h608M16 148h608"></path></g>
+  <g style="stroke:var(--ngio-line)"><path d="M16 52h608M16 100h608M16 148h608M16 196h608"></path></g>
 
   <g style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">
     <text x="16" y="31">SegmentationIterator</text>
     <text x="16" y="79">MaskedSegmentationIterator</text>
     <text x="16" y="127">ImageProcessingIterator</text>
     <text x="16" y="175">FeatureExtractorIterator</text>
+    <text x="16" y="223">ObjectDetectionIterator</text>
   </g>
 
   <defs>
@@ -2345,6 +2672,7 @@ the top-level <code>ngio</code> namespace):</p>
   <use href="#n6i" x="238" y="63"></use>
   <use href="#n6i" x="238" y="111"></use>
   <use href="#n6i" x="238" y="159"></use>
+  <use href="#n6i" x="238" y="207"></use>
   <use href="#n6l" x="266" y="63"></use>
   <use href="#n6l" x="266" y="159"></use>
 
@@ -2353,6 +2681,7 @@ the top-level <code>ngio</code> namespace):</p>
     <path d="M300 74h26M320 69l6 5-6 5"></path>
     <path d="M300 122h26M320 117l6 5-6 5"></path>
     <path d="M300 170h26M320 165l6 5-6 5"></path>
+    <path d="M300 218h26M320 213l6 5-6 5"></path>
   </g>
 
   <use href="#n6l" x="338" y="15"></use>
@@ -2360,32 +2689,36 @@ the top-level <code>ngio</code> namespace):</p>
   <use href="#n6i" x="338" y="111"></use>
   <rect x="338.75" y="159.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
   <path d="M338 167h22M345 160v20M352 160v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
+  <rect x="338.75" y="207.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
+  <path d="M338 215h22M345 208v20M352 208v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
 
   <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color--light)">
     <text x="384" y="31">an image in, a new label out</text>
     <text x="384" y="79">the same, restricted to one mask</text>
     <text x="384" y="127">an image in, a new image out</text>
     <text x="384" y="175">read only — measurements out</text>
+    <text x="384" y="223">read only — detected boxes out</text>
   </g>
 
-  <path d="M16 206h608" style="stroke:var(--ngio-line)"></path>
-  <use href="#n6i" transform="translate(16,216) scale(0.64)"></use>
-  <use href="#n6l" transform="translate(104,216) scale(0.64)"></use>
-  <rect x="192.75" y="216.75" width="12.5" height="12.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></rect>
-  <path d="M192 221h14M197 216v14M201 216v14" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
+  <path d="M16 254h608" style="stroke:var(--ngio-line)"></path>
+  <use href="#n6i" transform="translate(16,264) scale(0.64)"></use>
+  <use href="#n6l" transform="translate(104,264) scale(0.64)"></use>
+  <rect x="192.75" y="264.75" width="12.5" height="12.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></rect>
+  <path d="M192 269h14M197 264v14M201 264v14" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
   <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;fill:var(--md-default-fg-color--light)">
-    <text x="38" y="227">image</text>
-    <text x="126" y="227">labels</text>
-    <text x="214" y="227">table</text>
+    <text x="38" y="275">image</text>
+    <text x="126" y="275">labels</text>
+    <text x="214" y="275">table</text>
   </g>
         </svg>
 </div>
 
 <ul>
-<li>The <code>SegmentationIterator</code> is designed to build segmentation pipelines, where an input image is processed to produce a segmentation mask. For a worked example, see the <a href="../../tutorials/image_segmentation/">image segmentation tutorial</a>.</li>
-<li>The <code>MaskedSegmentationIterator</code> is similar to the <code>SegmentationIterator</code>, but it uses a <abbr title="A ROI table indexed by label id, mapping each segmented object to its bounding region">masking ROI</abbr> table to restrict the segmentation to masks. This is useful when you want to segment only specific regions of the image, for example, segmenting cells only within a specific tissue region. For a worked example, see the <a href="../../tutorials/image_segmentation/">image segmentation tutorial</a>.</li>
-<li>The <code>ImageProcessingIterator</code> is designed to build image processing pipelines, where an input image is processed to produce a new image. For a worked example, see the <a href="../../tutorials/image_processing/">image processing tutorial</a>.</li>
-<li>The <code>FeatureExtractorIterator</code> is a read-only iterator designed to iterate over pairs of images and labels to extract features from the image based on the labels. For a worked example, see the <a href="../../tutorials/feature_extraction/">feature extraction tutorial</a>.</li>
+<li><code>SegmentationIterator</code> — segment an image into a label; see the <a href="../../tutorials/image_segmentation/">image segmentation tutorial</a>.</li>
+<li><code>MaskedSegmentationIterator</code> — the same, restricted to the objects of a <abbr title="A ROI table indexed by label id, mapping each segmented object to its bounding region">masking ROI</abbr> table (segment cells only within a tissue region, say); same tutorial.</li>
+<li><code>ImageProcessingIterator</code> — image in, new image out (a filter, a projection, a restoration model); see the <a href="../../tutorials/image_processing/">image processing tutorial</a>.</li>
+<li><code>FeatureExtractorIterator</code> — read-only; <code>measure</code> joins per-region measurements into one feature table; see the <a href="../../tutorials/feature_extraction/">feature extraction tutorial</a>.</li>
+<li><code>ObjectDetectionIterator</code> — read-only; <code>detect</code> turns a tile-by-tile detector into one deduplicated <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table; see <a href="#detecting-objects-into-a-roi-table">Detecting objects into a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table</a>.</li>
 </ul>
 <h2 id="building-one">Building one<a class="headerlink" href="#building-one" title="Permanent link">&para;</a></h2>
 <p>Every iterator is constructed from the images it reads and writes, then narrowed. A fresh
@@ -2414,10 +2747,18 @@ iterator covers the whole image as a single region:</p>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
-ImageProcessingIterator(regions=1)
+ImageProcessingIterator(rois=1)
 
 
 </div>
+<p>The constructors share a small vocabulary of keyword arguments:
+<code>channel_selection</code> restricts the input reads to given channels, <code>axes_order</code>
+fixes the axes order of the patches the function sees (<code>"yx"</code> above),
+<code>input_transforms</code>/<code>output_transforms</code> apply
+<a href="../../api/ngio/transforms/">transforms</a> around the function, and the writing
+iterators take <code>consolidation_mode</code> (how the output pyramid is rebuilt at the
+end) and, on segmentation, <code>stitch</code>. The full signatures live in the
+<a href="../../api/iterators/">API reference</a>.</p>
 <p><code>product</code> replaces that single region with the ones a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table names — here the
 microscope fields of view:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Narrow it to the regions named by a ROI table</span>
@@ -2426,7 +2767,7 @@ microscope fields of view:</p>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
-ImageProcessingIterator(regions=4)
+ImageProcessingIterator(rois=4)
 
 
 </div>
@@ -2443,14 +2784,468 @@ name='FOV_2' slices=[z: 0.0->1.0, y: 0.0->351.0, x: 416.0->832.0] label=None spa
 
 
 </div>
-<p>From here you would call <code>map_as_numpy</code> or iterate with <code>iter_as_numpy</code> to do the work;
+<p>Beyond a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table, four tiling calls reshape the regions, and each name says what it
+tiles by. <code>by_grid(size_x=..., size_y=..., ...)</code> lays a regular grid of the sizes you
+ask for; where the grid does not divide the axis, its <code>tail=</code> policy decides what
+happens to the leftover — <code>"clip"</code> (the default) shrinks the last tile to the border,
+<code>"balance"</code> re-splits the last two tiles so a thin overhang never yields a thin tile
+(100 px at 32 gives <code>32, 32, 18, 18</code> rather than <code>32, 32, 32, 4</code>), <code>"shift"</code> slides
+the last tile back to stay full-size (it then overlaps its neighbour — fine for
+detection or a merge; a plain parallel write schedules the overlap into a separate
+wave, see below), and <code>"drop"</code> discards it.
+<code>by_blocks(num_x=..., num_y=...)</code> is the complement — you say how many tiles, not how
+big, and the partition is balanced by construction. <code>by_chunks()</code> tiles by the <em>input</em>
+image's chunk grid, the natural unit of reading; <code>by_write_units()</code> tiles by the
+<em>output</em>'s write granularity — the shard shape when the output is sharded, the chunk
+shape otherwise, inspectable as <code>image.write_granularity()</code> — which makes parallel
+writes collision-free by construction, so a parallel <code>map</code> runs as a single
+fully-parallel wave.</p>
+<p>Two more calls <em>broadcast</em> rather than tile: <code>by_yx()</code> splits each region into one 2D
+plane per remaining coordinate (every <code>t</code>/<code>z</code>/<code>c</code> combination, full y/x extent — the
+shape for "run this 2D function on every plane"), and <code>by_zyx(strict=...)</code> does the
+same per 3D volume. The tutorial snippets use them wherever a 2D or 3D function meets
+a higher-dimensional image.</p>
+<p>From here you would call <code>map</code> or iterate with <code>iter_as_numpy</code> to do the work;
 the <a href="../../tutorials/image_processing/">image processing tutorial</a> carries this through to
-a written result.</p>
+a written result. (<code>iter_as_numpy</code> is <code>iter(data_mode="numpy")</code> — a bare
+<code>iter()</code> still defaults to dask and warns; numpy becomes the default in
+<code>ngio=1.2</code>.)</p>
 <p>More complete examples can be found in the <a href="https://github.com/fractal-analytics-platform/fractal-tasks-template">Fractal tasks template</a>.</p>
+<h2 id="parallel-mapping">Parallel mapping<a class="headerlink" href="#parallel-mapping" title="Permanent link">&para;</a></h2>
+<p><code>map</code> runs one <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> at a time by default, and that stays the default — parallel writing is explicit opt-in. Concurrency belongs to the <em>mapper</em>: pass one, and it sizes its own pool.</p>
+<p>The examples from here on run on a small synthetic image — two bright blobs, one of them deliberately crossing a tile boundary:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">zarr.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_ome_zarr_from_array</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># A small synthetic image to demonstrate on: two bright blobs, one of them</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># crossing the boundary between two 32x32 tiles.</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">data</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">poisson</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="mi">64</span><span class="p">,</span> <span class="mi">64</span><span class="p">))</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;uint16&quot;</span><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">data</span><span class="p">[</span><span class="mi">10</span><span class="p">:</span><span class="mi">20</span><span class="p">,</span> <span class="mi">26</span><span class="p">:</span><span class="mi">38</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">200</span>  <span class="c1"># crosses the tile seam at x=32</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">data</span><span class="p">[</span><span class="mi">40</span><span class="p">:</span><span class="mi">50</span><span class="p">,</span> <span class="mi">8</span><span class="p">:</span><span class="mi">18</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">200</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="n">demo</span> <span class="o">=</span> <span class="n">create_ome_zarr_from_array</span><span class="p">(</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>    <span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">(),</span> <span class="n">array</span><span class="o">=</span><span class="n">data</span><span class="p">,</span> <span class="n">pixelsize</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">axes_names</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">,</span> <span class="n">levels</span><span class="o">=</span><span class="mi">1</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">)</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">demo_image</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+
+
+</div>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">SegmentationIterator</span><span class="p">,</span> <span class="n">ThreadedMapper</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">skimage.measure</span><span class="w"> </span><span class="kn">import</span> <span class="n">label</span> <span class="k">as</span> <span class="n">connected_components</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="k">def</span><span class="w"> </span><span class="nf">segment</span><span class="p">(</span><span class="n">patch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">return</span> <span class="n">connected_components</span><span class="p">(</span><span class="n">patch</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="s2">&quot;uint32&quot;</span><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">seg</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_label</span><span class="p">(</span><span class="s2">&quot;seg&quot;</span><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">seg_iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">seg</span><span class="p">,</span> <span class="n">axes_order</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">)</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># Tiles on the OUTPUT&#39;s write grid, so the parallel map runs as one wave.</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">seg_iterator</span> <span class="o">=</span> <span class="n">seg_iterator</span><span class="o">.</span><span class="n">by_write_units</span><span class="p">()</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">seg_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">segment</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">ThreadedMapper</span><span class="p">(</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;labelled pixels: </span><span class="si">{</span><span class="nb">int</span><span class="p">((</span><span class="n">seg</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="w"> </span><span class="o">&gt;</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+labelled pixels: 220
+
+
+</div>
+<p><code>ThreadedMapper</code> is the fit for IO-bound work and for funcs that release the GIL (most numpy/scipy do); <code>"auto"</code> sizes the pool for round-trip-bound work. For pure-Python, GIL-holding funcs use <code>ProcessMapper(max_workers=...)</code> instead — the func must be picklable (a module-level function, not a lambda), and the store must not be in-memory.</p>
+<p>Parallel writes need no locks: the mappers schedule the <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> into
+conflict-free <strong>waves</strong>, so no two concurrent writes ever touch the same
+chunk or shard. <code>by_write_units()</code> gives a single fully-parallel wave by
+construction; other tilings just run more waves.</p>
+<details class="note">
+<summary>How the schedule works</summary>
+<p>Before fanning out, the parallel mappers plan every <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s <em>write
+footprint</em> — the chunks (or shards, when the output is sharded) it will
+write on the <strong>output</strong> image — into waves: <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> sharing a write unit
+land in different waves, and the waves run back to back, each at full
+pool width. More sharing means more waves, down to an effectively serial
+schedule when every <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> collides (ngio logs a warning there rather than
+refusing). This is also what lets a masked iterator parallelize out of
+the box: per-object bounding boxes routinely share chunks even when the
+boxes themselves do not overlap.</p>
+<p>Wave order is the <strong>canonical write order</strong>, and the serial mappers run
+it too — so for <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> whose <em>pixels</em> genuinely overlap (a <code>by_grid</code>
+stride below the size, a <code>"shift"</code> tail), which write wins the shared
+pixels is identical under every mapper. The one exception is the
+hand-driven loops (<code>iter</code>, <code>iter_batched</code>), which run in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order:
+deterministic, but not bit-identical to <code>map</code> on contested pixels.
+Mask-protected and pixel-disjoint writes are order-independent either
+way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"min"</code>, <code>"sum"</code>).</p>
+</details>
+<p>Two contracts are yours: under threads the <code>func</code> must be thread-safe, and under processes it must be picklable. ngio's side — the per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> readers and writers — is safe in both settings. The dask iterator surface (<code>iter_as_dask</code>, <code>map_as_dask</code>, <code>reduce_as_dask</code>) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use <code>Image.get_as_dask</code> instead.</p>
+<p>For per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> measurement without writing anything, use <code>reduce</code> — it returns one result per <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>, in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order, and takes the same <code>mapper</code> argument:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">means</span> <span class="o">=</span> <span class="n">seg_iterator</span><span class="o">.</span><span class="n">reduce</span><span class="p">(</span><span class="k">lambda</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">mean</span><span class="p">()))</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nb">print</span><span class="p">([</span><span class="nb">round</span><span class="p">(</span><span class="n">mean</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">mean</span> <span class="ow">in</span> <span class="n">means</span><span class="p">])</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+[20.7]
+
+
+</div>
+<h2 id="batched-inference">Batched inference<a class="headerlink" href="#batched-inference" title="Permanent link">&para;</a></h2>
+<p>For neural-network inference the per-call overhead usually dominates, and the model wants one batched <code>(B, ...)</code> input rather than one patch at a time. <code>BatchedMapper</code> does exactly that: it stacks up to <code>batch_size</code> patches into a single array, calls the func <strong>once per batch</strong>, and writes each result back to its own region:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">BatchedMapper</span><span class="p">,</span> <span class="n">ImageProcessingIterator</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">fake_model</span><span class="p">(</span><span class="n">batch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="c1"># Stands in for a neural network: one (B, y, x) input, one call per batch.</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">return</span> <span class="n">batch</span> <span class="o">//</span> <span class="mi">2</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">halved</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_image</span><span class="p">(</span><span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">nn_iterator</span> <span class="o">=</span> <span class="n">ImageProcessingIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">halved</span><span class="o">.</span><span class="n">get_image</span><span class="p">())</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># size 24 over 64 clips the border tiles to 16 - the ragged shapes are padded</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># to each batch&#39;s maximum before stacking, and sliced back before the write.</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">nn_iterator</span> <span class="o">=</span> <span class="n">nn_iterator</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">24</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">24</span><span class="p">)</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="n">nn_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">fake_model</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">BatchedMapper</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="nb">print</span><span class="p">(</span><span class="n">halved</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+10.11
+
+
+</div>
+<p>This is the one mapper that changes the func's contract: it receives a stacked batch with a leading batch axis and must return an array with the same leading axis. Everything else composes as usual — tilings are ragged in general (border tiles clip, halos shrink at image edges, masked regions are arbitrary), so each batch is padded up to its per-axis maximum before stacking (<code>pad_mode</code>/<code>pad_values</code> choose how) and every output is sliced back to its region's true shape before the write; a halo is trimmed after that, exactly as under any other mapper; and <code>for_job</code> partitions batch their own share.</p>
+<p>Within a batch the reads fan out on a thread pool (<code>read_workers</code>), while the writes run serially on the calling thread. Batches are cut over the same canonical (wave) order as every other mapper, so contested pixels land identically — and the serial writes make batched mapping write-safe on any tiling.</p>
+<p>Prefer to drive the loop yourself? <code>iter_batched</code> yields <code>(patches, writers)</code> — two aligned lists of up to <code>batch_size</code> items, in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like <code>iter</code>; on the read-only iterators it yields the payload lists alone (<code>(image, label, roi)</code> tuples for features, <code>(patch, roi)</code> for detection):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">manual</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_image</span><span class="p">(</span><span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">loop_iterator</span> <span class="o">=</span> <span class="n">ImageProcessingIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">manual</span><span class="o">.</span><span class="n">get_image</span><span class="p">())</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Uniform 32px tiles, so stacking the batch is a plain np.stack.</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loop_iterator</span> <span class="o">=</span> <span class="n">loop_iterator</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">for</span> <span class="n">patches</span><span class="p">,</span> <span class="n">writers</span> <span class="ow">in</span> <span class="n">loop_iterator</span><span class="o">.</span><span class="n">iter_batched</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">outs</span> <span class="o">=</span> <span class="n">fake_model</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">patches</span><span class="p">))</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">for</span> <span class="n">writer</span><span class="p">,</span> <span class="n">out</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">writers</span><span class="p">,</span> <span class="n">outs</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nb">print</span><span class="p">(</span><span class="n">manual</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+10.11
+
+
+</div>
+<h2 id="distributed-runs-selecting-a-partition">Distributed runs: selecting a partition<a class="headerlink" href="#distributed-runs-selecting-a-partition" title="Permanent link">&para;</a></h2>
+<p>A mapper parallelizes within one machine. On a cluster — SLURM array tasks over a shared filesystem, where processes cannot coordinate — restrict each task to one partition of the work instead:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">n_jobs</span> <span class="o">=</span> <span class="mi">4</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">job_index</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># e.g. int($SLURM_ARRAY_TASK_ID)</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">n_jobs</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span></code></pre></div>
+<p>and, in a dependent job once every array task has finished, the gather step:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>  <span class="c1"># same construction</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">iterator</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span></code></pre></div>
+<p><code>for_job</code> is a builder call like <code>by_grid</code> or <code>with_halo</code> — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, <code>map(func, mapper=...)</code> included. It comes <em>last</em> in the chain (reshaping a restricted iterator refuses), and its <code>map</code> deliberately does <strong>not</strong> finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date.</p>
+<p>Each job builds the identical iterator — construction is metadata-only and deterministic, so this is cheap — and derives the same partition on its own; there is nothing to hand from one job to another. Partitions never share a write unit, so the jobs need no locks and no coordination, in any order and any overlap in time; regions whose footprints conflict simply travel in the same partition, where the ordinary wave planning handles them.</p>
+<p>Effective parallelism therefore equals the number of independent groups, which follows the <strong>output's</strong> chunking. Inspect it before submitting: <code>[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]</code>. One fat list plus empties means the output chunking (or a tiling like <code>by_zyx</code>, which splits along t only) is the constraint, not the cluster — a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ngio.iterators.write_conflict_components&lt;/span&gt;" href="../../api/iterators/#ngio.iterators.write_conflict_components"><code>write_conflict_components</code></a> makes the grouping auditable.</p>
+<p>The requirements mirror the model: every job must use the same <code>n_jobs</code> and the same iterator construction; the store must not be in-memory (each process would write its own private copy). Read-only iterators refuse to partition — their gathers (feature coalescing, detection NMS) are global joins.</p>
+<h3 id="the-three-phase-recipe-prepare_jobs">The three-phase recipe: <code>prepare_jobs</code><a class="headerlink" href="#the-three-phase-recipe-prepare_jobs" title="Permanent link">&para;</a></h3>
+<p>Schedulers like Fractal run distributed work as <strong>init → parallel tasks → <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr></strong>, where the init task builds a <em>parallelization list</em> (one JSON of arguments per parallel task). <code>prepare_jobs</code> is that init step: it performs any setup the iterator needs — always wiping stale scratch state from earlier runs first — and returns the list, with empty partitions already dropped:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># init task</span>
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">args_list</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">prepare_jobs</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># -&gt; [{&quot;job_index&quot;: 0, &quot;n_jobs&quot;: 4}, {&quot;job_index&quot;: 1, &quot;n_jobs&quot;: 4}, ...]</span>
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># parallel task, once per entry</span>
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># consolidate task, after all parallel tasks</span>
+</span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
+</span><span id="__span-3-12"><a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="n">iterator</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span></code></pre></div>
+<p>For a plain writing iterator <code>prepare_jobs</code> is optional — the two-step recipe above works on its own. A <strong>stitching</strong> segmentation requires it: the scratch band arrays must exist, race-free, before any job banks into them, and the init step is the one safe moment to create them.</p>
+<h3 id="distributed-stitching">Distributed stitching<a class="headerlink" href="#distributed-stitching" title="Permanent link">&para;</a></h3>
+<p>With <code>prepare_jobs</code> in the recipe, <code>stitch=True</code> distributes too. The init step creates only the scratch <em>root</em>; each job creates and writes its own tiles' bank arrays; the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task's <code>finalize()</code> verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:</p>
+<ul>
+<li><strong>Banking claims nothing shared</strong>, so a stitched iterator splits into jobs exactly as the plain map would (overlapping tiles share label chunks, so a contiguous overlapping layout travels as one job).</li>
+<li><strong>A failed job never destroys the others' banks</strong> — re-run just that job (banking is idempotent) and gather as planned.</li>
+<li><strong>Every step validates a plan fingerprint</strong> stamped at init: change the tiling, halo, stitch config, or <code>n_jobs</code> between phases and the run fails loudly.</li>
+</ul>
+<p>The <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.</p>
+<h3 id="distributed-measurement-and-detection">Distributed measurement and detection<a class="headerlink" href="#distributed-measurement-and-detection" title="Permanent link">&para;</a></h3>
+<p>The read-only iterators end in a <em>global join</em> — one feature coalesce, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their distributed form therefore stores each job's <strong>raw pre-join records</strong> as a <em>partial</em>, and the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> step runs the single global join:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># init task</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">args_list</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">prepare_jobs</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># parallel task, once per entry of args_list</span>
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">measure_to_partial</span><span class="p">(</span><span class="n">measure</span><span class="p">)</span>      <span class="c1"># features</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># iterator.for_job(**args).detect_to_partial(detector)   # detection</span>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># consolidate task, after all parallel tasks</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">table</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">merge_partials</span><span class="p">()</span>
+</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">container</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;measurements&quot;</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>               <span class="c1"># storing stays yours</span>
+</span></code></pre></div>
+<p>The result is bit-identical to a serial <code>measure</code> / <code>detect</code> — including a <strong>custom <code>coalesce</code></strong>, which runs once at merge time over the reconstructed per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> results (dicts normalized to DataFrames, a <code>label</code> index to a <code>label</code> column). Partials live in a transient <code>_ngio_partials</code> group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to <code>list_tables</code>, and removed by the merge; the final table is registered only by your own <code>add_table</code> call.</p>
+<p>The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (<code>measure</code>, <code>detect</code>) refuse on a <code>for_job</code> slice, pointing at their partial counterparts.</p>
+<h2 id="halos-context-without-seams">Halos: context without seams<a class="headerlink" href="#halos-context-without-seams" title="Permanent link">&para;</a></h2>
+<p>Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. <code>with_halo</code> fixes that by reading a margin around each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> and writing only the <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> back:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">uniform_filter</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">smooth</span><span class="p">(</span><span class="n">patch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="k">return</span> <span class="n">uniform_filter</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">5</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">blurred</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_image</span><span class="p">(</span><span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="n">blur_iterator</span> <span class="o">=</span> <span class="n">ImageProcessingIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">blurred</span><span class="o">.</span><span class="n">get_image</span><span class="p">())</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># 8 px of context per side; the function returns the grown region and the</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="c1"># border is cropped off before the write - no seams, same write footprints.</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="n">blur_iterator</span> <span class="o">=</span> <span class="n">blur_iterator</span><span class="o">.</span><span class="n">by_write_units</span><span class="p">()</span><span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="n">blur_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">smooth</span><span class="p">,</span> <span class="n">mapper</span><span class="o">=</span><span class="n">ThreadedMapper</span><span class="p">(</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="nb">print</span><span class="p">(</span><span class="n">blurred</span><span class="o">.</span><span class="n">get_image</span><span class="p">()</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+19.94
+
+
+</div>
+<p><code>smooth</code> receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.</p>
+<p>The <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping <em>writes</em> would have to be serialized; overlapping reads cost nothing.</p>
+<p>Read the same trick backwards and it is a "trim": if you want each tile's outer margin discarded rather than written, that is exactly a halo of that width.</p>
+<h2 id="stitching-a-tiled-segmentation">Stitching a tiled segmentation<a class="headerlink" href="#stitching-a-tiled-segmentation" title="Permanent link">&para;</a></h2>
+<p>Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. <code>stitch=True</code> fixes both:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">stitched</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_label</span><span class="p">(</span><span class="s2">&quot;stitched&quot;</span><span class="p">)</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">stitch_iterator</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">stitched</span><span class="p">,</span> <span class="n">axes_order</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">,</span> <span class="n">stitch</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">stitch_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Two objects, two ids - the seam-crossing blob was merged back into one.</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;objects: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="nb">set</span><span class="p">(</span><span class="n">stitched</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">ravel</span><span class="p">())</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">})</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+objects: [1, 2]
+
+
+</div>
+<p>Any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list stitches: a regular grid with a halo, an overlapping-<abbr title="Field of View — the area captured in a single microscope acquisition">FOV</abbr> microscope layout, a ragged <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table. The criterion is that two tiles' predictions <strong>overlap</strong>, not that their objects merely touch across a cut — two distinct objects that abut at a boundary are adjacent but do not overlap, so an adjacency rule would merge them and the overlap rule does not. The shared opinion comes from a halo (each tile reads past its own edge), from the tiles genuinely overlapping (<abbr title="Field of View — the area captured in a single microscope acquisition">FOV</abbr> layouts need no halo — the overlap <em>is</em> the evidence), or both; with neither, stitching refuses, since no two tiles ever predict the same pixel.</p>
+<p>During the map each tile banks its grown prediction into transient per-tile scratch arrays, removed once the stitch resolves. Where two tiles wrote the same <em>output</em> pixels and their objects did not match, the later write wins — deterministically, because every mapper runs in the same wave order.</p>
+<p><code>MaskedSegmentationIterator</code> takes <code>stitch=True</code> too, for tiling <em>within</em> a mask: a huge masked object tiled with <code>by_grid</code> + <code>with_halo</code> gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no <code>UniqueLabelsTransform</code> is needed (combining it with <code>stitch</code> raises).</p>
+<p>Tune it with <code>StitchConfig</code>:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio.iterators</span><span class="w"> </span><span class="kn">import</span> <span class="n">StitchConfig</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">stitch</span><span class="o">=</span><span class="n">StitchConfig</span><span class="p">(</span><span class="n">iou_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="mi">50_000</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>By default the banks are kept in a transient group inside the output label, which works under every mapper. <code>scratch_store</code> puts them elsewhere — often worth doing, since labels compress well:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">zarr.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">StitchConfig</span><span class="p">(</span><span class="n">scratch_store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
+</span></code></pre></div>
+<p>That keeps the output store untouched and leaves nothing behind if a run dies. The one restriction is <code>ProcessMapper</code>: a <code>MemoryStore</code> pickles by value, so each worker would bank into a private copy — ngio refuses that rather than losing the predictions silently.</p>
+<p><code>iou_threshold</code> is how much two tiles must agree before their ids are joined. The default errs towards leaving an object split rather than merging two that are not — an over-split label can be fixed downstream, a wrong merge cannot. <code>block_size</code> is how many ids each tile is given, and must exceed the largest count a single tile can produce.</p>
+<p>Compaction is not exclusive to stitching — <code>label.relabel_sequential()</code> renumbers any label to a dense <code>1..N</code> on its own (its <code>consolidation_mode=</code> controls the pyramid rebuild that follows):</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">label</span><span class="o">.</span><span class="n">relabel_sequential</span><span class="p">()</span>
+</span></code></pre></div>
+<p>Either way the numbering is assigned in first-encounter order over the chunk grid rather than by sorting the existing ids. That keeps it to a single pass over the label, and means which object ends up as <code>1</code> follows the array rather than the tile it came from.</p>
+<p>If a run is interrupted between the map and the resolve, the label holds a valid but over-split segmentation; re-running the resolve is safe, because it is idempotent.</p>
+<h2 id="detecting-objects-into-a-roi-table">Detecting objects into a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table<a class="headerlink" href="#detecting-objects-into-a-roi-table" title="Permanent link">&para;</a></h2>
+<p>Not every model produces a mask. An object detector — a YOLO network, a spot finder — reports <strong>bounding boxes</strong>, and the natural home for those is a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table, not a label image. The <code>ObjectDetectionIterator</code> runs a detector tile by tile and returns one <code>RoiTable</code> of the objects it found:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">ObjectDetectionIterator</span><span class="p">,</span> <span class="n">Roi</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">find_bright_boxes</span><span class="p">(</span><span class="n">patch</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Roi</span><span class="p">]:</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">ys</span><span class="p">,</span> <span class="n">xs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nonzero</span><span class="p">(</span><span class="n">patch</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">if</span> <span class="ow">not</span> <span class="nb">len</span><span class="p">(</span><span class="n">ys</span><span class="p">):</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="k">return</span> <span class="p">[]</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="n">x_min</span><span class="p">,</span> <span class="n">y_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">xs</span><span class="o">.</span><span class="n">min</span><span class="p">()),</span> <span class="nb">int</span><span class="p">(</span><span class="n">ys</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>    <span class="k">return</span> <span class="p">[</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>        <span class="n">Roi</span><span class="o">.</span><span class="n">from_values</span><span class="p">(</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>            <span class="n">slices</span><span class="o">=</span><span class="p">{</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>                <span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">x_min</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">xs</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">x_min</span><span class="p">),</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>                <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">y_min</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="n">ys</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">y_min</span><span class="p">),</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>            <span class="p">},</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>            <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>            <span class="n">space</span><span class="o">=</span><span class="s2">&quot;pixel&quot;</span><span class="p">,</span>
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>            <span class="n">confidence</span><span class="o">=</span><span class="nb">float</span><span class="p">((</span><span class="n">patch</span> <span class="o">&gt;</span> <span class="mi">100</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>        <span class="p">)</span>
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>    <span class="p">]</span>
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>
+</span><span id="__span-0-22"><a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="n">detect_iterator</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-23"><a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a>    <span class="n">ObjectDetectionIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">axes_order</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">)</span>
+</span><span id="__span-0-24"><a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>    <span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+</span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="p">)</span>
+</span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">detections</span> <span class="o">=</span> <span class="n">detect_iterator</span><span class="o">.</span><span class="n">detect</span><span class="p">(</span><span class="n">find_bright_boxes</span><span class="p">)</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="n">demo</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;detections&quot;</span><span class="p">,</span> <span class="n">detections</span><span class="p">)</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="nb">print</span><span class="p">(</span><span class="n">detections</span><span class="o">.</span><span class="n">dataframe</span><span class="p">[[</span><span class="s2">&quot;x_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;y_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;confidence&quot;</span><span class="p">]])</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+            x_micrometer  y_micrometer  confidence
+FieldIndex                                        
+1                   13.0           5.0      0.0750
+2                    4.0          20.0      0.0625
+
+
+</div>
+<p>NMS is configured with <code>nms=NmsConfig(iou_threshold=..., score_column=...)</code> on the constructor, exactly as stitching is with <code>stitch=StitchConfig(...)</code>; a parallel <code>mapper=</code> on <code>detect</code> fans the tiles out like any <code>reduce</code>.</p>
+<p>The detector sees one tile at a time and answers in the tile's own pixels; the iterator does the bookkeeping the detector should not — anchoring each tile's boxes into the reference image's world coordinates, and resolving the boundary problem.</p>
+<div class="admonition note">
+<p class="admonition-title">Box contract</p>
+<ul>
+<li><code>(patch) -&gt; list[Roi]</code>, each box in the tile's own pixels:
+  <code>Roi.from_values(slices={"x": (x0, width), "y": (y0, height)}, name=None, space="pixel", confidence=0.9)</code>.
+  <code>space="pixel"</code> is required; a world-space box is refused — patch-local
+  numbers in a world-labelled Roi would land every box in the wrong place
+  silently.</li>
+<li>Boxes pin <code>x</code> and <code>y</code> (optionally <code>z</code>), and every tile must report the
+  same dimensionality, scored or unscored — mixtures raise.</li>
+<li>Extra fields (confidence, class) ride into the table unchanged; <code>name</code>
+  and <code>label</code> are refused — the iterator assigns them when it renumbers
+  the survivors (put a class in an extra field, e.g. <code>class_id</code>).</li>
+<li>A 2D detector on a 3D or timelapse image is deduplicated only within
+  each z-slab or time point; boxes keep their tile's extent along the
+  axes they do not pin.</li>
+</ul>
+</div>
+<p>The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which <code>with_halo</code> is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard <strong>non-maximum suppression</strong>: boxes overlapping at or above <code>iou_threshold</code> (default <code>0.5</code>) are one object, and the one ranked higher by the <code>score_column</code> (<code>"confidence"</code> by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense <code>1..N</code> and returned; like <code>measure</code>, nothing is written — storing the table is your <code>add_table</code> call.</p>
+<h3 id="anchoring-a-local-box-yourself">Anchoring a local box yourself<a class="headerlink" href="#anchoring-a-local-box-yourself" title="Permanent link">&para;</a></h3>
+<p>The coordinate bookkeeping is one call you can also use in a custom flow or the manual pattern: <code>Roi.anchor</code> turns a region's <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> plus a patch-local pixel box into the absolute world <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> —</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">tile_roi</span> <span class="o">=</span> <span class="n">detect_iterator</span><span class="o">.</span><span class="n">rois</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">box</span> <span class="o">=</span> <span class="n">Roi</span><span class="o">.</span><span class="n">from_values</span><span class="p">(</span><span class="n">slices</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;x&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">30</span><span class="p">),</span> <span class="s2">&quot;y&quot;</span><span class="p">:</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">25</span><span class="p">)},</span> <span class="n">name</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">space</span><span class="o">=</span><span class="s2">&quot;pixel&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">abs_roi</span> <span class="o">=</span> <span class="n">tile_roi</span><span class="o">.</span><span class="n">anchor</span><span class="p">(</span><span class="n">box</span><span class="p">,</span> <span class="n">pixel_size</span><span class="o">=</span><span class="n">demo_image</span><span class="o">.</span><span class="n">pixel_size</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">abs_roi</span><span class="p">)</span>
+</span></code></pre></div>
+<div class="result" markdown="1" >
+
+name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=None space='world'
+
+
+</div>
+<p>The <code>space</code> fields are what keep this honest: <code>anchor</code> refuses a world-space box (already absolute — anchoring it would double the offset) and a pixel-space region, so the classic silent frame mix-up raises instead. Axes the box does not pin inherit the region's extent.</p>
+<h2 id="what-each-iterator-supports">What each iterator supports<a class="headerlink" href="#what-each-iterator-supports" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>ImageProcessing</code></th>
+<th><code>Segmentation</code></th>
+<th><code>MaskedSegmentation</code></th>
+<th><code>FeatureExtractor</code></th>
+<th><code>ObjectDetection</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Writes to</td>
+<td>image</td>
+<td>label</td>
+<td>label (masked)</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Terminal verb</td>
+<td><code>map</code></td>
+<td><code>map</code></td>
+<td><code>map</code></td>
+<td><code>measure</code></td>
+<td><code>detect</code></td>
+</tr>
+<tr>
+<td><code>reduce</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>⚠ [1]</td>
+</tr>
+<tr>
+<td><code>with_halo</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✓ [1]</td>
+</tr>
+<tr>
+<td><code>stitch=True</code></td>
+<td>—</td>
+<td>✓ [2]</td>
+<td>✓ within a mask [2]</td>
+<td>—</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Overlapping <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr></td>
+<td>✓ [3]</td>
+<td>✓ [3]</td>
+<td>✓ [3]</td>
+<td>✓</td>
+<td>✓ [1]</td>
+</tr>
+<tr>
+<td><code>ThreadedMapper</code> / <code>ProcessMapper</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td><code>BatchedMapper</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗ [4]</td>
+<td>✗ [4]</td>
+</tr>
+<tr>
+<td>Distributed finishing verb</td>
+<td><code>finalize</code></td>
+<td><code>finalize</code></td>
+<td><code>finalize</code></td>
+<td><code>merge_partials</code></td>
+<td><code>merge_partials</code></td>
+</tr>
+</tbody>
+</table>
+<ol>
+<li>Detection reconciles overlap itself: the halo is a pure read margin and NMS removes the duplicate boxes — but only through <code>detect</code>. <code>reduce</code> returns raw per-tile boxes.</li>
+<li>Stitching takes any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list. On the masked iterator it merges sub-objects split by a tile boundary <em>within one mask</em>; tiles of different masks are never compared, and ids come out unique across every object — no <code>UniqueLabelsTransform</code> needed (combining it with <code>stitch</code> raises).</li>
+<li>Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative <code>merge=</code> (<code>"max"</code>, <code>"sum"</code>) removes the order-dependence outright. One configuration to avoid: an <em>in-place</em> run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).</li>
+<li><code>BatchedMapper</code> stacks plain arrays; these iterators hand <code>func</code> tuple payloads.</li>
+</ol>
+<p>Restrictions that hold everywhere:</p>
+<ul>
+<li><code>stitch</code> needs a halo or overlapping <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr>, and stays on the numpy path.</li>
+<li>A haloed <em>writer</em> refuses <code>reduce</code> and read-only <code>iter</code>; an in-place run (same array in and out) refuses a halo.</li>
+<li><code>by_write_units</code> on the read-only iterators falls back to the input's chunks.</li>
+<li>The deprecated dask verbs run serially, and <code>ProcessMapper</code> refuses in-memory stores.</li>
+</ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
+<li><a href="../../tutorials/object_detection/">Object detection tutorial</a> — a spot finder through <code>detect</code>, end to end.</li>
 <li><a href="../../tutorials/image_processing/">Image processing tutorial</a> — an iterator applied end to end.</li>
 <li><a href="../../tutorials/image_segmentation/">Image segmentation tutorial</a> — segmentation and masked segmentation.</li>
+<li><a href="../../tutorials/feature_extraction/">Feature extraction tutorial</a> — <code>measure</code> on a segmented image.</li>
 <li><a href="../../api/iterators/">Iterators API reference</a> — the full iterator API.</li>
 </ul>
 

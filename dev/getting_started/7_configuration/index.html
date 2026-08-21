@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Configure ngio via ngio_config.json, including the io_retry policy.">
+        <meta name="description" content="Configure ngio via ngio_config.json, including the io_retry policy, the dask write-block cap, consolidation, and zarr's concurrency.">
       
       
       
@@ -261,6 +261,8 @@
   
     
       
+      
+        
       
         
       
@@ -811,10 +813,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#semantics-worth-knowing" class="md-nav__link">
+  <a href="#when-the-policy-is-read" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Semantics worth knowing
+        When the policy is read
       </span>
     </span>
   </a>
@@ -834,6 +836,73 @@
       </span>
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dask-writes-dask" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dask writes (<code>dask</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dask writes (dask)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-cap-can-and-cannot-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What the cap can and cannot do
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pyramid-consolidation-consolidation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pyramid consolidation (<code>consolidation</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zarr-runtime-zarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Zarr runtime (<code>zarr</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Zarr runtime (zarr)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-changes-take-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When changes take effect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -872,6 +941,8 @@
   
     
     
+      
+        
       
         
       
@@ -995,6 +1066,33 @@
     
   
   Image segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/object_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Object detection
 
     
   </span>
@@ -1649,6 +1747,8 @@
       
         
       
+        
+      
     
     
     
@@ -1734,6 +1834,33 @@
     
   
   ngio.common
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.config
 
     
   </span>
@@ -2158,10 +2285,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#semantics-worth-knowing" class="md-nav__link">
+  <a href="#when-the-policy-is-read" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        Semantics worth knowing
+        When the policy is read
       </span>
     </span>
   </a>
@@ -2181,6 +2308,73 @@
       </span>
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#dask-writes-dask" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Dask writes (<code>dask</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Dask writes (dask)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#what-the-cap-can-and-cannot-do" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        What the cap can and cannot do
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pyramid-consolidation-consolidation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Pyramid consolidation (<code>consolidation</code>)
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#zarr-runtime-zarr" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Zarr runtime (<code>zarr</code>)
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Zarr runtime (zarr)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#when-changes-take-effect" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        When changes take effect
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2310,8 +2504,14 @@
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">    </span><span class="p">},</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">    </span><span class="nt">&quot;s3fs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="nt">&quot;custom_retry_markers&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;RequestTimeTooSkewed&quot;</span><span class="p">]</span>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="p">}</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="p">}</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">    </span><span class="nt">&quot;dask&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="nt">&quot;write_block_max_bytes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">8388608</span>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="p">},</span>
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="nt">&quot;zarr&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">        </span><span class="nt">&quot;async_concurrency&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">64</span>
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">    </span><span class="p">}</span>
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="p">}</span>
 </span></code></pre></div>
 <p><code>get_config()</code> returns that object — an <code>NgioConfig</code> — so you can inspect or change the configuration at runtime:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">get_config</span>
@@ -2340,16 +2540,70 @@
 <li><code>retry_all_errors</code>: retry every error. This is <strong>discouraged</strong> — it also retries errors that will never succeed (permissions, missing keys, bugs), multiplying the time to failure. Enabling it emits an <code>NgioUserWarning</code>, and it is mutually exclusive with <code>retry_on</code>. Prefer narrowing <code>retry_on</code> to the specific transient errors you observe.</li>
 </ul>
 <p>ngio's own errors (<code>NgioError</code> subclasses, e.g. validation errors) are never retried, in any mode.</p>
-<h3 id="semantics-worth-knowing">Semantics worth knowing<a class="headerlink" href="#semantics-worth-knowing" title="Permanent link">&para;</a></h3>
+<h3 id="when-the-policy-is-read">When the policy is read<a class="headerlink" href="#when-the-policy-is-read" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong>Zarr IO snapshots the policy at open time.</strong> Every group ngio opens is backed by a store that copies the current <code>io_retry</code> at construction. The snapshot travels with the store — including into pickled dask task graphs, so workers retry with the policy that was active on the driver. Changing <code>get_config().io_retry</code> afterwards does not affect already-open containers.</li>
 <li><strong>Non-zarr IO reads the policy at call time.</strong> The table backends and store probes check the current global config on every call, so runtime changes apply immediately there.</li>
 <li>Retries are logged as warnings, including the error, attempt count, and sleep time. ngio names its loggers <code>ngio:&lt;module&gt;</code> (here <code>ngio:ngio.utils._retry</code>) — note the colon, which means they are not children of a <code>ngio</code> logger in Python's dot-separated hierarchy, so attach handlers to the full name.</li>
-<li><strong>Windows file-sharing conflicts are always retried</strong>, whatever <code>io_retry</code> says. Windows refuses to replace or remove a file while another handle to it is open, and refuses to open one that a replace has left delete-pending — so a concurrent <em>reader</em> can break a writer's atomic rename, and that rename can break concurrent readers. Both directions are matched: the write side raises <code>WinError 5</code>, <code>32</code> or <code>33</code>, while the read side goes through the C runtime and raises a plain <code>PermissionError</code> carrying <code>EACCES</code> and no Win32 code. The conflict clears in milliseconds, so ngio absorbs it with a short bounded retry (up to ~0.5s, logged at debug level) before the error ever reaches <code>io_retry</code>. This is a platform quirk rather than a policy, so it is not configurable; after the bound the original error is raised. Nothing changes on Linux or macOS. If <code>retry_on</code> also matches <code>PermissionError</code>, the two layers compose multiplicatively.</li>
+<li>
+<p><strong>Windows file-sharing conflicts are always retried</strong>, whatever <code>io_retry</code> says: concurrent readers and writers on Windows can transiently break each other's file replaces, so ngio absorbs those errors with a short bounded retry (up to ~0.5s, logged at debug level) before anything reaches <code>io_retry</code>. Not configurable; nothing changes on Linux or macOS.</p>
+<details class="info">
+<summary>The Windows details</summary>
+<p>Windows refuses to replace or remove a file while another handle to it is open, and refuses to open one that a replace has left delete-pending — so a concurrent <em>reader</em> can break a writer's atomic rename, and that rename can break concurrent readers. Both directions are matched: the write side raises <code>WinError 5</code>, <code>32</code> or <code>33</code>, while the read side goes through the C runtime and raises a plain <code>PermissionError</code> carrying <code>EACCES</code> and no Win32 code. After the retry bound the original error is raised, and if <code>retry_on</code> also matches <code>PermissionError</code>, the two layers compose multiplicatively.</p>
+</details>
+</li>
 </ul>
 <h2 id="s3fs-retry-markers-s3fs">s3fs retry markers (<code>s3fs</code>)<a class="headerlink" href="#s3fs-retry-markers-s3fs" title="Permanent link">&para;</a></h2>
 <p><code>s3fs.custom_retry_markers</code> is a separate, lower-level mechanism: it registers an error handler inside <code>s3fs</code> itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew <code>RequestTimeTooSkewed</code> errors). Apply changes at runtime with <code>ngio.utils.refresh_s3fs_config(get_config())</code>.</p>
 <p>The two mechanisms are complementary and independent: <code>s3fs</code> retries individual S3 requests inside a single ngio IO call, while <code>io_retry</code> retries the whole ngio IO call. If both are enabled and their triggers overlap, an error can be retried at both layers, so the effective number of attempts is multiplicative — keep the two configurations narrow.</p>
+<h2 id="dask-writes-dask">Dask writes (<code>dask</code>)<a class="headerlink" href="#dask-writes-dask" title="Permanent link">&para;</a></h2>
+<p><code>dask.write_block_max_bytes</code> caps how much data ngio lets dask assemble in memory before writing it, in bytes. It defaults to <strong>8 MiB</strong>.</p>
+<p>Every dask write — pyramid consolidation, <code>set_array</code>, <code>set_roi</code> — goes through <code>da.to_zarr</code>, which glues whole <em>write units</em> (a shard if the array is sharded, a chunk otherwise) into larger <em>blocks</em> sized to dask's own <code>array.chunk-size</code>, 128 MiB by default. The unit grid is what makes the write safe; the block grid is only batching. Since a write unit is commonly a few hundred KiB, the dask default packs around a thousand of them into one resident block, and peak memory is roughly the number of blocks in flight times their size.</p>
+<p>Capping that is close to free. Consolidating a 3-level pyramid, peak memory and wall clock:</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>2 GB image</th>
+<th>4 GB image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>8 MiB (default)</td>
+<td>87.6 MB, 9.45 s</td>
+<td>141.3 MB, 19.16 s</td>
+</tr>
+<tr>
+<td><code>null</code> (dask's 128 MiB)</td>
+<td>370.5 MB, 10.22 s</td>
+<td>565.2 MB, 20.18 s</td>
+</tr>
+</tbody>
+</table>
+<p>A 75% cut for no cost in wall clock, and about 0.4% more tasks in the graph. Set it to <code>null</code> to defer to dask's <code>array.chunk-size</code>, or lower it further to trade a little batching for a little memory — below roughly 4 MiB the gain flattens out, because what remains is the dask task graph itself, which no cap reaches.</p>
+<h3 id="what-the-cap-can-and-cannot-do">What the cap can and cannot do<a class="headerlink" href="#what-the-cap-can-and-cannot-do" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong>It is a ceiling, never a floor.</strong> It cannot raise an <code>array.chunk-size</code> you set lower yourself, and it never takes the budget below one write unit — a block smaller than a unit would mean two writers on one unit, which is exactly the lost-update hazard the write path is built to make impossible.</li>
+<li><strong>A coarse geometry ignores it.</strong> If one write unit is already larger than the cap — a 105 MiB shard, say — every block is exactly one unit whatever the cap says, because that is already the smallest block that can be written safely. Lowering the cap further changes nothing.</li>
+<li><strong>In that case memory is set by your chunk shape, not by this setting.</strong> Peak is roughly workers × unit size, so a 256 MiB shard on eight threads is around 2 GB in flight and no value here reaches it. If that is your situation, the lever is the chunk or shard shape you wrote the array with; see the pixel-size and chunking guidance when choosing it.</li>
+</ul>
+<h2 id="pyramid-consolidation-consolidation">Pyramid consolidation (<code>consolidation</code>)<a class="headerlink" href="#pyramid-consolidation-consolidation" title="Permanent link">&para;</a></h2>
+<p><code>consolidation.numpy_max_bytes</code> bounds when <code>consolidate(mode="auto")</code> may build a pyramid in memory instead of through dask. It defaults to <strong>256 MiB</strong>, measured against the <em>source</em> level rather than the whole pyramid — the in-memory chain never holds more than two adjacent levels, so peak memory is around 1.6× the source.</p>
+<p>The in-memory path is 3–5× faster where it applies, and <code>"auto"</code> only takes it where the two paths are provably identical: an integral-ratio downsample at <code>order</code> <code>"nearest"</code> or <code>"linear"</code>, below the size bound. Outside that envelope <code>"auto"</code> silently uses the chunk-bounded dask path, so it can never trade an answer for speed. Set <code>numpy_max_bytes</code> to <code>0</code> to make <code>"auto"</code> never build in memory.</p>
+<p>An explicit <code>mode="numpy"</code> is not bounded by this setting — a caller who asks for the in-memory path gets it, whatever the size.</p>
+<p><code>consolidation.partial_max_coverage</code> (default <strong>0.5</strong>) bounds <code>consolidate(regions=...)</code>: once the merged touched regions cover more than this fraction of the source level, region bookkeeping stops paying for itself and the whole pyramid is rebuilt instead — always correct, just not selective.</p>
+<h2 id="zarr-runtime-zarr">Zarr runtime (<code>zarr</code>)<a class="headerlink" href="#zarr-runtime-zarr" title="Permanent link">&para;</a></h2>
+<p>Two knobs ngio forwards into zarr's own runtime configuration. Both default to <code>null</code>, which leaves zarr exactly as found — the default ngio config changes nothing about how zarr runs.</p>
+<ul>
+<li><code>async_concurrency</code>: how many store requests zarr keeps in flight for one operation (zarr's own default is 10). <strong>This is the knob that matters on a remote store</strong>: a read spanning 64 chunks is otherwise fetched in ~7 serialized waves of 10, each paying a full round-trip. On S3 or HTTP, values of 32–64 are reasonable starting points; on a local filesystem it makes little difference.</li>
+<li><code>threading_max_workers</code>: the size of zarr's thread executor for decode work. Rarely worth setting; zarr sizes it sensibly by default.</li>
+</ul>
+<h3 id="when-changes-take-effect">When changes take effect<a class="headerlink" href="#when-changes-take-effect" title="Permanent link">&para;</a></h3>
+<ul>
+<li><strong><code>async_concurrency</code> is read by zarr on every call</strong>, so changing it at runtime works: set it directly with <code>zarr.config.set({"async.concurrency": 64})</code> (also usable as a context manager for a single operation).</li>
+<li><strong><code>threading_max_workers</code> is snapshotted by zarr into a process-global executor at the first zarr operation.</strong> ngio applies this section during <code>import ngio</code> for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file.</li>
+</ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
 <li><a href="../0_quickstart/">Quickstart</a> — if you have not opened a container yet.</li>

@@ -37,6 +37,9 @@
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/image_segmentation/</loc>
       </url>
       <url>
+        <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/object_detection/</loc>
+      </url>
+      <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/feature_extraction/</loc>
       </url>
       <url>
@@ -86,6 +89,9 @@
       </url>
       <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/api/ngio/common/</loc>
+      </url>
+      <url>
+        <loc>https://biovisioncenter.github.io/ngio/dev/api/ngio/config/</loc>
       </url>
       <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/api/ngio/io_pipes/</loc>

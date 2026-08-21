@@ -272,6 +272,8 @@
       
         
       
+        
+      
     
     
     
@@ -894,6 +896,8 @@
       
         
       
+        
+      
     
     
     
@@ -1006,6 +1010,33 @@
     
   
   Image segmentation
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../tutorials/object_detection/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Object detection
 
     
   </span>
@@ -1660,6 +1691,8 @@
       
         
       
+        
+      
     
     
     
@@ -1745,6 +1778,33 @@
     
   
   ngio.common
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ngio/config/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  ngio.config
 
     
   </span>
@@ -2502,11 +2562,12 @@ Plate([rows x columns] (1 x 1))
 </div>
 <h2 id="getting-the-images">Getting the images<a class="headerlink" href="#getting-the-images" title="Permanent link">&para;</a></h2>
 <p><code>get_well_images</code> takes the row and column of a well and returns a dictionary mapping each image path to its <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-class&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-class-name&quot;&gt;ngio.OmeZarrContainer&lt;/span&gt;" href="../../api/ome_zarr_container/#ngio.OmeZarrContainer"><code>OmeZarrContainer</code></a>.</p>
+<p>These plate-wide calls accept <code>max_workers</code>: <code>"auto"</code> opens the images concurrently — several times faster on a remote store, where each open is round-trip bound — while the current default still reads one at a time (and warns; in <code>ngio=1.2</code> the default becomes <code>"auto"</code>). Pass <code>max_workers=1</code> to pin serial reads silently.</p>
 <div class="tabbed-set tabbed-alternate" data-tabs="3:4"><input checked="checked" id="__tabbed_3_1" name="__tabbed_3" type="radio" /><input id="__tabbed_3_2" name="__tabbed_3" type="radio" /><input id="__tabbed_3_3" name="__tabbed_3" type="radio" /><input id="__tabbed_3_4" name="__tabbed_3" type="radio" /><div class="tabbed-labels"><label for="__tabbed_3_1">All images</label><label for="__tabbed_3_2">All images in a well</label><label for="__tabbed_3_3">Specific image</label><label for="__tabbed_3_4">Filter by <abbr title="One imaging round of a plate; a well may contain images from several acquisitions">acquisition</abbr></label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <p>Get all images in the plate:
-<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">ome_zarr_plate</span><span class="o">.</span><span class="n">get_images</span><span class="p">())</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">print</span><span class="p">(</span><span class="n">ome_zarr_plate</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
