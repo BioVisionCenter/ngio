@@ -92,6 +92,7 @@ All removals scheduled for `ngio=1.2`. The default-flip entries warn as `NgioFut
 ### Chores
 
 - The exact operation-count baselines behind the numbers above are committed under `tests/performance/` and gated in CI.
+- Fixed the Windows CI test failures from the `v1.1.0a1` build: three tests asserted the bare-`LocalStore` bypass unconditionally, but on Windows `NgioStore` always wraps local stores (its sharing-violation retry is unconditional). The tests are now platform-aware, and the Windows-wrap decision is covered on every platform via a monkeypatched test.
 
 ## [v1.0.1]
 
