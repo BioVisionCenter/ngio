@@ -16,7 +16,7 @@ guides and tutorials are executed when the site is built, so the outputs shown a
 
 - [Quickstart](https://biovisioncenter.github.io/ngio/stable/getting_started/0_quickstart/): Installation and opening your first OME-Zarr container.
 - [OME-Zarr containers](https://biovisioncenter.github.io/ngio/stable/getting_started/1_ome_zarr_containers/): The container object, metadata inspection and modification, deriving and creating images, and remote stores.
-- [Images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/2_images/): Selecting resolution levels by path or pixel size, reading as numpy or dask, slicing, writing with set_array and consolidate, and working with labels.
+- [Images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/2_images/): Selecting resolution levels by path or pixel size, reading as numpy or dask, slicing, writing with set_array/set_roi and consolidate, merge policies (merge=), masking transforms, unique label ids across regions, and region-scoped consolidation with track_writes.
 - [Tables](https://biovisioncenter.github.io/ngio/stable/getting_started/3_tables/): Listing and loading ROI, masking ROI and feature tables, and creating new tables in memory or on disk.
 - [Masked images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/4_masked_images/): Label-indexed access to image regions, zoom_factor, and masked read/write operations.
 - [HCS plates](https://biovisioncenter.github.io/ngio/stable/getting_started/5_hcs/): Plate structure, rows, columns and acquisitions, retrieving images, and creating plates.

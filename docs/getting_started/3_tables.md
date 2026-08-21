@@ -28,7 +28,7 @@ List all available tables and load a specific one:
 --8<-- "docs/snippets/getting_started/get_started.py:list_tables"
 ```
 
-ngio recognises four typed tables — `roi_table`, `masking_roi_table`, `feature_table` and `condition_table` — plus the untyped `generic_table`, which is what anything it cannot classify is loaded as. The three you will meet most often are below; see the [table specifications](../table_specs/overview.md) for the rest.
+ngio recognises four typed tables — `roi_table`, `masking_roi_table`, `feature_table` and `condition_table` — plus the untyped `generic_table`, which is what anything it cannot classify is loaded as. `list_tables(filter_types=...)` restricts a listing to one type, and `tables_container.table_types()` maps every table name to its type in one call. The three you will meet most often are below; see the [table specifications](../table_specs/overview.md) for the rest.
 
 === "ROI table"
     ROI tables can be used to store arbitrary regions of interest (ROIs) in the image.

@@ -215,9 +215,11 @@ You can update the axes names and units:
     ```
 
 === "Axes units"
-    Set the space and time units:
+    Set the space and time units, each on its own (setting one leaves the
+    other untouched; both also apply to the labels unless `set_labels=False`):
     ```python
-    ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
+    ome_zarr_container.set_space_unit("micrometer")
+    ome_zarr_container.set_time_unit("second")
     ```
 
 ### Image name
@@ -366,6 +368,27 @@ from ngio.utils import fractal_fsspec_store
 store = fractal_fsspec_store(url="https://fractal_url...", fractal_token="**your_secret_token**")
 ome_zarr_container = open_ome_zarr_container(store)
 ```
+
+## Caching and freshness
+
+`open_ome_zarr_container(store, cache=...)` decides how long metadata is
+trusted:
+
+- **`cache=False` (the default)** re-reads the raw metadata from the store on
+  every access, so writes made through *another* handle — another process, a
+  Fractal task, a second container object — are picked up as they happen.
+- **`cache=True`** holds all metadata for the object's lifetime: after the
+  first read, listing tables or reading pixel sizes costs no store requests.
+  The trade is staleness — the object will not see outside writes until you
+  ask.
+
+`refresh()` is the escape hatch for both modes: it re-reads everything the
+container holds. It is not a no-op even under `cache=False` — a few derived
+values (an image's decoded metadata and its `dimensions`) are memoized per
+object regardless of the flag, and `refresh()` drops those too.
+
+Writes made through the *same* container are always visible to it,
+whatever the mode.
 
 ## Next steps
 

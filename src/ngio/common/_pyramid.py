@@ -23,14 +23,14 @@ from ngio.utils import (
 )
 from ngio.utils._warnings import stacklevel_of_first_caller
 
-#: How `consolidate` builds each level. `"auto"` takes the in-memory path only
-#: where it is bit-identical to the chunked one; see `_resolve_auto_mode`.
 ConsolidationMode: TypeAlias = Literal["dask", "numpy", "coarsen", "auto"]
+"""How `consolidate` builds each level. `"auto"` takes the in-memory path only
+where it is bit-identical to the chunked one; see `_resolve_auto_mode`."""
 
-#: Where the source level changed, for `consolidate(regions=...)`: one on-disk
-#: index tuple per touched region, in the source array's axis order — exactly
-#: what a setter's `slicing_ops.normalized_slicing_tuple` produces.
 RegionsLike: TypeAlias = Sequence[tuple[RegionType, ...]]
+"""Where the source level changed, for `consolidate(regions=...)`: one on-disk
+index tuple per touched region, in the source array's axis order — exactly
+what a setter's `slicing_ops.normalized_slicing_tuple` produces."""
 
 #: A region as per-axis `[start, stop)` pixel bounds — the internal canonical
 #: form every `RegionsLike` input is normalized to.

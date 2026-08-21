@@ -217,6 +217,7 @@ nav:
     - "ngio":
       - "ngio": api/ngio/ngio.md
       - "ngio.common": api/ngio/common.md
+      - "ngio.config": api/ngio/config.md
       - "ngio.io_pipes": api/ngio/io_pipes.md
       - "ngio.iterators": api/ngio/iterators.md
       - "ngio.images": api/ngio/images.md

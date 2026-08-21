@@ -225,7 +225,7 @@ image.set_array(
 )
 
 # Consolidate the changes to all resolution levels, see below for more details
-image.consolidate()
+image.consolidate(mode="auto")
 # --8<-- [end:set_array_example]
 
 # --8<-- [start:roi_slicing]

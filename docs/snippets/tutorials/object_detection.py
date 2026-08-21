@@ -70,6 +70,7 @@ ome_zarr = create_ome_zarr_from_array(
     store="./data/human_mitosis_detection.zarr",
     array=data,
     pixelsize=0.1,  # Just a guess
+    consolidation_mode="auto",
     overwrite=True,
 )
 image = ome_zarr.get_image()

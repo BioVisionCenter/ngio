@@ -72,6 +72,7 @@ seg_iterator = SegmentationIterator(
     output_label=label,
     channel_selection="DAPI",
     axes_order=["z", "y", "x"],
+    consolidation_mode="auto",
     stitch=True,
 )
 seg_iterator = seg_iterator.product(roi_table)
@@ -120,7 +121,7 @@ mask_data[:, 200:-200, 3000:-500] = 2
 mask_data[:, 600:-600, 1200:-1000] = 0
 mask_data[:, 700:-700, 1600:-1500] = 3
 mask.set_array(mask_data, axes_order=["z", "y", "x"])
-mask.consolidate()
+mask.consolidate(mode="auto")
 # --8<-- [end:create_mask]
 
 # --8<-- [start:plot_mask]
@@ -159,6 +160,7 @@ seg_iterator = MaskedSegmentationIterator(
     output_label=label,
     channel_selection="DAPI",
     axes_order=["z", "y", "x"],
+    consolidation_mode="auto",
     output_transforms=[UniqueLabelsTransform(10_000)],
 )
 

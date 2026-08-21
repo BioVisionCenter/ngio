@@ -340,9 +340,11 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _container(ctx, "tables"),
         lambda c: [c.list_roi_tables() for _ in range(3)],
     ),
-    # An image with no `/tables` at all. Answering "nothing" was the *most*
-    # expensive listing per call, because the failed probe was never
-    # remembered — so this must be flat in the number of calls.
+    # An image with no `/tables` at all, opened with the default
+    # `cache=False`: every call re-probes, because another writer may add
+    # tables at any time — so this scales with the number of calls, and each
+    # probe should stay as cheap as one group open. (Under `cache=True` the
+    # "no tables" answer is remembered and repeats are free.)
     "list_tables_absent_x3": Scenario(
         lambda ctx: _container(ctx, "image_no_tables"),
         lambda c: [c.list_tables() for _ in range(3)],

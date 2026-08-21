@@ -12,13 +12,13 @@ from ngio.utils._warnings import stacklevel_of_first_caller
 _T = TypeVar("_T")
 _R = TypeVar("_R")
 
-#: Accepted by every `max_workers` argument. `1` is serial deliberately;
-#: `"auto"` picks a pool sized for round-trip-bound work. `None` means
-#: "unspecified", and what that resolves to belongs to the call site: the
-#: plate fan-outs run serially (until the `ngio=1.2` default flip they warn
-#: about), the parallel mappers treat it as `"auto"` — asking for such a
-#: mapper is already the opt-in.
 MaxWorkers = int | Literal["auto"] | None
+"""Accepted by every `max_workers` argument. `1` is serial deliberately;
+`"auto"` picks a pool sized for round-trip-bound work. `None` means
+"unspecified", and what that resolves to belongs to the call site: the
+plate fan-outs run serially (until the `ngio=1.2` default flip they warn
+about), the parallel mappers treat it as `"auto"` — asking for such a
+mapper is already the opt-in."""
 
 #: The release in which `max_workers` starts defaulting to `"auto"`.
 _DEFAULT_CHANGES_IN = "1.2"

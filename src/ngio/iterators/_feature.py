@@ -35,10 +35,10 @@ DaskPipeType: TypeAlias = tuple[da.Array, da.Array, Roi]
 
 T = TypeVar("T", np.ndarray, da.Array)
 
-#: What a per-ROI feature function may return: a DataFrame, or the cheaper
-#: dict-of-columns (`{"label": [...], "area": [...]}`) that concatenates
-#: without building one frame per ROI.
 FeatureFuncResult: TypeAlias = pd.DataFrame | dict[str, list]
+"""What a per-ROI feature function may return: a DataFrame, or the cheaper
+dict-of-columns (`{"label": [...], "area": [...]}`) that concatenates
+without building one frame per ROI."""
 
 
 class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):

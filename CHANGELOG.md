@@ -2,41 +2,41 @@
 
 ## [Unreleased]
 
-**Highlights**:
-
-- **The IO layer got much faster**: metadata is no longer re-read and re-decoded on every access (~250x on the hottest property, zero store reads when cached), dask writes align to the array's write unit (no more whole-shard read-modify-writes, and `zarrs` finally engages on local stores), and plate walking is flat instead of quadratic.
-- **Iterators run at scale**: `map`/`reduce` fan out on threads or processes (`ThreadedMapper`/`ProcessMapper`, lock-free via conflict-free waves), read context with `with_halo(...)` at unchanged parallelism, batch patches for neural networks (`BatchedMapper`, `iter_batched`), and distribute across SLURM/Fractal tasks with the `prepare_jobs → for_job → finalize` recipe.
-- **New capabilities**: `stitch=True` merges objects split across region boundaries on *any* ROI list — grids, overlapping FOVs, ragged tables, tiled masked objects; the new `ObjectDetectionIterator` turns a tile-by-tile detector into one deduplicated ROI table ([#111](https://github.com/BioVisionCenter/ngio/issues/111)); `FeatureExtractorIterator.measure` joins per-region measurements into a single `FeatureTable`.
-
-The design rationale that used to live in this file now lives in the docs — see the iterators guide for halos, waves, stitching and distributed runs.
+The IO layer got much faster, the iterators scale from a thread pool to a
+cluster, and segmentation workflows gain stitching, batched inference, and
+object detection. The design rationale lives in the docs' iterators guide.
 
 ### Features
 
-- **Parallel mappers**: `ThreadedMapper` (IO-bound, GIL-releasing funcs) and `ProcessMapper` (pure-Python funcs; pixels never cross the process boundary). Writes run in conflict-free waves, and wave order is the canonical write order for every mapper — serial included — so overlapping writes land identically everywhere. The default stays serial.
-- **`BatchedMapper(batch_size=...)`**: one stacked `(B, ...)` array per `func` call; ragged tiles padded before stacking, outputs sliced back before the write. **`iter_batched(batch_size)`** for manual batched loops (writers yield `(patches, writers)`; finalizes on full drain). **`reduce(func, mapper=...)`**: per-ROI results, nothing written.
-- **`with_halo(x=, y=, ...)`**: read a grown region, write only the core; write footprints — and so parallelism — unchanged. Misuse refuses loudly (read-only iterators, in-place runs, `reduce` on a haloed writer, shape-changing data transforms).
-- **Stitching, on any ROI list**: `stitch=True` gives each tile an id block, banks its grown prediction into its own transient scratch array (conflict-free in any topology), and merges ids by IoU over every overlapping pair of banks, compacting to a dense `1..N`. Works with a halo, with overlapping FOVs (the overlap itself is the evidence), or both; contested pixels are deterministic (last wave wins); an interrupted run leaves a valid, merely over-split label. **`MaskedSegmentationIterator(stitch=True)`** merges sub-objects split by tile boundaries *within* one mask; different masks are never compared, ids come out unique and dense, and `UniqueLabelsTransform` is not needed (combining it with `stitch` raises).
-- **Distributed runs**: `prepare_jobs(n_jobs)` → `for_job(**args).map(func)` per task (no write unit is ever shared between partitions; identical construction derives the same partition everywhere) → one gather: `finalize()` for writers (the stitched gather verifies every bank and refuses a half-finished or drifted run), `merge_partials()` for the read-only iterators, whose `measure_to_partial`/`detect_to_partial` store raw pre-join records for one global join — bit-identical to a serial run, custom `coalesce` included.
-- **`ObjectDetectionIterator`** ([#111](https://github.com/BioVisionCenter/ngio/issues/111)): `detect(func)` runs `(patch) -> list[Roi]` per tile (boxes in patch pixels), anchors them to world coordinates, deduplicates by greedy NMS (`nms=NmsConfig(...)`), and returns one renumbered `RoiTable`; misconfigured boxes refuse loudly. `Roi.anchor` — the region ROI plus a patch-local box gives the absolute ROI — is public.
-- **`FeatureExtractorIterator.measure`**: runs `func(image, label, roi)` per ROI and joins the results into one `FeatureTable` (custom `coalesce` supported). **`Label.relabel_sequential()`** renumbers any label to a dense `1..N` in one pass.
-- **`merge=` on writes**: combine with what is on disk — `"max"`/`"min"`/`"sum"` (order-independent), `"keep_nonzero"`, a callable, or a policy. Masking split into its two operations: `MaskTransform` fills on read, `MaskMerge` protects on write; one implementation replaces the four masked pipe classes (`get_roi_masked`/`set_roi_masked` unchanged). **`UniqueLabelsTransform`** gives each region a disjoint id block — derived, not counted, so it is parallel-safe and idempotent.
-- **The transform contract is two methods** — `on_get(array, ctx)` / `on_set(array, ctx)`, both backends, everything importable from `ngio.transforms`; a transform that silently materialises a dask array now fails loudly.
-- **Canonical `iter()`/`map()`/`reduce()`** (numpy is the backend; `*_as_numpy` stay as aliases) and tiling calls that say what they tile by: `by_grid(size_*, stride_*, tail=...)`, `by_blocks(num_*)`, `by_chunks()`, `by_write_units()` (collision-free parallel writes by construction).
-- **Consolidation**: `mode="auto"` takes the 3–5x-faster in-memory path exactly where it is provably identical to the chunked one; `consolidate(regions=...)` rebuilds only the pyramid regions that changed, byte-identical to a full rebuild — writing iterators use it automatically.
-- **`Image.track_writes()`**: a context manager that records the region of every `set_*` write and yields the list, ready to hand to `consolidate(regions=...)`.
-- **Config & plumbing**: `NgioConfig` gained three sections, each with a public model — `zarr` (`ZarrConfig`: `async_concurrency`, `threading_max_workers`), `dask` (`DaskConfig`: `write_block_max_bytes`), and `consolidation` (`ConsolidationConfig`: the `mode="auto"` thresholds); every `max_workers` accepts `"auto"`; `refresh()` on containers and plates re-reads all held metadata; the scheduling primitives (`plan_waves`, `canonical_unit_order`, `TailPolicy`, …) are public in `ngio.iterators`.
-- **New public names**: `NgioFutureWarning` (the default-flip warning class, filterable on its own), `ChannelSlicingInputType` (`ngio.images`), `ConsolidationMode` and `RegionsLike` (`ngio.common`), and `AbstractImage.write_granularity()` — the shape zarr writes atomically (`shards or chunks`), the unit the wave scheduler and `by_write_units()` reason in.
+- `ThreadedMapper` and `ProcessMapper` parallelize `map`/`reduce`. Writes run in conflict-free waves, and wave order is the canonical write order for every mapper — serial included — so overlapping writes land identically everywhere. The default stays serial.
+- `BatchedMapper(batch_size=...)` stacks patches into one `(B, ...)` array per `func` call, for neural-network inference; `iter_batched(batch_size)` is the manual batched loop.
+- `reduce(func, mapper=...)` returns per-ROI results, writing nothing.
+- `with_halo(x=, y=, ...)` reads a grown region and writes only the core; write footprints — and so parallelism — are unchanged, and misuse refuses loudly.
+- `stitch=True` merges objects split across region boundaries into one id, on any ROI list — grids with a halo, overlapping FOVs, ragged tables — compacting ids to a dense `1..N`; an interrupted run leaves a valid, merely over-split label. On `MaskedSegmentationIterator` it merges sub-objects within one mask (no `UniqueLabelsTransform` needed; combining raises).
+- Distributed runs: `prepare_jobs(n_jobs)` → `for_job(**args).map(func)` per SLURM/Fractal task → one gather (`finalize()` for writers, `merge_partials()` for the read-only iterators). Partitions never share a write unit, every step validates a plan fingerprint, and the result matches a serial run.
+- `ObjectDetectionIterator.detect(func)` ([#111](https://github.com/BioVisionCenter/ngio/issues/111)) runs a `(patch) -> list[Roi]` detector per tile, anchors the boxes to world coordinates, deduplicates by NMS (`nms=NmsConfig(...)`), and returns one renumbered `RoiTable`; `Roi.anchor` is public.
+- `FeatureExtractorIterator.measure` joins per-ROI `func(image, label, roi)` results into one `FeatureTable` (custom `coalesce` supported).
+- `Label.relabel_sequential()` renumbers any label to a dense `1..N` in one pass.
+- `merge=` on writes combines with what is on disk: `"max"`/`"min"`/`"sum"` (order-independent), `"keep_nonzero"`, a callable, or a policy. `MaskTransform` fills on read and `MaskMerge` protects on write, replacing the four masked pipe classes (`get_roi_masked`/`set_roi_masked` unchanged).
+- `UniqueLabelsTransform` gives each region a disjoint id block — derived, not counted, so parallel-safe and idempotent.
+- The transform contract is two methods, `on_get(array, ctx)`/`on_set(array, ctx)`, importable from `ngio.transforms`; a transform that silently materialises a dask array fails loudly.
+- Canonical `iter()`/`map()`/`reduce()` (numpy backend; `*_as_numpy` stay as aliases) and tiling calls that say what they tile by: `by_grid(size_*, stride_*, tail=...)`, `by_blocks(num_*)`, `by_chunks()`, `by_write_units()`.
+- `consolidate(mode="auto")` takes the 3–5x-faster in-memory path exactly where it is provably identical to the chunked one.
+- `consolidate(regions=...)` rebuilds only the pyramid regions that changed, byte-identical to a full rebuild; writing iterators use it automatically, and `Image.track_writes()` records the regions for you.
+- `NgioConfig` gained three sections, each with a public model: `zarr` (`ZarrConfig`), `dask` (`DaskConfig`), and `consolidation` (`ConsolidationConfig`).
+- Every `max_workers` accepts `"auto"`; `refresh()` on containers and plates re-reads all held metadata; the scheduling primitives (`plan_waves`, `canonical_unit_order`, `TailPolicy`, …) are public in `ngio.iterators`.
+- New public names: `NgioFutureWarning`, `ChannelSlicingInputType` (`ngio.images`), `ConsolidationMode` and `RegionsLike` (`ngio.common`), and `AbstractImage.write_granularity()` — the shape zarr writes atomically.
 
 ### Fixes
 
-- **Metadata updates no longer drop what they were not about** ([#231](https://github.com/BioVisionCenter/ngio/issues/231)): `set_axes_units`/`set_axes_names` silently reset OMERO channels (NGFF 0.5) and a label's source metadata; subclass state is now preserved.
-- **ngio's own writes could be invisible on a store carrying consolidated metadata** — ngio now ignores `.zmetadata` everywhere (it never wrote any).
-- **A dask write could lose updates** when the write unit exceeded dask's block budget; the budget now covers one write unit, and the process-global `DASK_STORE_LOCK` (which never worked across processes) is gone — `da.to_zarr` gives each write unit exactly one writer.
-- **Writing through a chain of two or more transforms now inverts the chain** — it applied the inverses in forward order, silently wrong for any user chain on a write path.
-- **A merge can no longer broadcast a wrong-shaped patch or hand zarr a promoted dtype** (a float patch under `merge="max"` used to wrap-cast, `-1.0` becoming `65535`); integer `"sum"` still wraps within the dtype — numpy addition, documented.
-- **The zoom transform's edge cases are pinned**: negative starts clamp like the read, empty selections zoom to empty patches, and a scaled list selection raises instead of silently stretching non-adjacent pixels.
+- Metadata updates no longer drop what they were not about ([#231](https://github.com/BioVisionCenter/ngio/issues/231)): `set_axes_units`/`set_axes_names` silently reset OMERO channels (NGFF 0.5) and a label's source metadata; subclass state is now preserved.
+- ngio's own writes could be invisible on a store carrying consolidated metadata — ngio now ignores `.zmetadata` everywhere (it never wrote any).
+- A dask write could lose updates when the write unit exceeded dask's block budget; the budget now covers one write unit, and the process-global `DASK_STORE_LOCK` (which never worked across processes) is gone — `da.to_zarr` gives each write unit exactly one writer.
+- Writing through a chain of two or more transforms now inverts the chain — it applied the inverses in forward order, silently wrong for any user chain on a write path.
+- A merge can no longer broadcast a wrong-shaped patch or hand zarr a promoted dtype (a float patch under `merge="max"` used to wrap-cast, `-1.0` becoming `65535`); integer `"sum"` still wraps within the dtype — numpy addition, documented.
+- The zoom transform's edge cases are pinned: negative starts clamp like the read, empty selections zoom to empty patches, and a scaled list selection raises instead of silently stretching non-adjacent pixels.
 - `cache=False` re-probes: a container's remembered "no tables" answer and a table's memoised type could outlive writes made through another handle; both now honour the cache flag.
-- `normalize_anndata` dropped `.raw` while normalizing `obs`; it is carried through again (the result still shares its other components with the input rather than copying them).
+- `normalize_anndata` dropped `.raw` while normalising `obs`; it is carried through again (the result still shares its other components with the input rather than copying them).
 - A failed `map` on a stitched iterator cleaned up the scratch even when it had only *opened* a prepared root (a resumed run, or the gather step) — one failure could delete every job's banked predictions. Cleanup now runs only when the failing run created the scratch itself.
 - The write-conflict graph keyed output arrays by handle identity, so two `zarr.Array` handles onto one stored array were never compared — a latent lost update under parallel mappers. It now keys on the stored array (store + path).
 - A whole-array dask write now verifies its block grid gives each write unit exactly one writer, raising loudly instead of leaning on a silenced dask warning.
@@ -48,11 +48,11 @@ The design rationale that used to live in this file now lives in the docs — se
 
 ### Behaviour changes
 
-- **The `dask[array]` floor is raised to 2025.12** — the first release whose `to_zarr` both aligns writes to the target's write unit and warns (rather than raises, [dask#12159](https://github.com/dask/dask/issues/12159)) on the rechunk it does so.
-- **The iterator surface was normalized for its promotion out of `experimental`** — one-time renames, no shims (the 1.0 surface was explicitly experimental): `grid()` → `by_grid()`, `by_chunks(grid="write")` → `by_write_units()`, `overlap_xy` → `overlap_x`/`overlap_y`, `check_if_chunks_overlap` → `check_if_write_units_overlap` and `require_no_chunks_overlap` → `require_no_write_units_overlap` (both now measured on the write target, at shard granularity when sharded), `post_consolidate()` → `finalize()`, `ImageProcessingIterator(input_channel_selection=)` → `channel_selection=`. `MapperProtocol` changed shape the same way (`(func, units)`; no known custom mappers exist).
+- The `dask[array]` floor rises to 2025.12 — the first release whose `to_zarr` both aligns writes to the target's write unit and warns (rather than raises, [dask#12159](https://github.com/dask/dask/issues/12159)) on the rechunk it does so.
+- **The promotion out of `experimental` renames the iterator surface** — one-time renames, no shims (the 1.0 surface was explicitly experimental): `grid()` → `by_grid()`, `by_chunks(grid="write")` → `by_write_units()`, `overlap_xy` → `overlap_x`/`overlap_y`, `check_if_chunks_overlap` → `check_if_write_units_overlap` and `require_no_chunks_overlap` → `require_no_write_units_overlap` (both now measured on the write target, at shard granularity when sharded), `post_consolidate()` → `finalize()`, `ImageProcessingIterator(input_channel_selection=)` → `channel_selection=`. `MapperProtocol` changed shape the same way (`(func, units)`; no known custom mappers exist).
 - Serial `map` over overlapping write footprints runs in wave order, not ROI order — "who wrote last" is identical under every mapper; disjoint tilings are unaffected.
 - A crashed stitched/distributed run can leave transient `_ngio_stitch`/`_ngio_partials` groups beside the resolution levels — unregistered, ignored by older ngio, wiped by the next run.
-- **`cache=True` actually caches**: metadata is held for the object's lifetime (outside writes need `refresh()`), `image.dimensions` is fixed per object, and caching now composes with the atomic plate/well operations (the lock refreshes on entry and release). `cache=False` is unchanged and remains the default.
+- `cache=True` actually caches: metadata is held for the object's lifetime (outside writes need `refresh()`), `image.dimensions` is fixed per object, and caching composes with the atomic plate/well operations. `cache=False` is unchanged and remains the default.
 - `max_workers=0` raises instead of running silently serial; `by_grid(tail="drop")` raises when it would drop every tile; a writing `map` no longer holds every written patch in memory until it returns.
 - ngio no longer wraps a plain local store in `NgioStore` when the retry policy is a no-op (the wrapper cost `zarrs` for nothing), and a codec pipeline that silently fell back now warns once per store type.
 - `measure` returns an empty `FeatureTable` when zero objects are found — the same contract as `detect` — instead of raising.
@@ -79,14 +79,16 @@ All removals scheduled for `ngio=1.2`. The default-flip entries warn as `NgioFut
 
 ### Performance
 
-Exact operation-count baselines are committed under `tests/performance/` and gated in CI.
+- Metadata is no longer re-read and re-decoded per access: `image.dimensions` — read once per ROI by every iterator — drops from ~520µs to ~2µs, and to zero store reads under `cache=True`.
+- Plate walking is flat instead of quadratic: `create_empty_plate` 733 → 178 metadata reads (14.4 MB → 128 KB written on a 384-image plate); per-well image paths 75 → 9 reads.
+- Dask writes align to the write unit: sharded writes stop read-modify-writing whole shards (128 chunk reads → 2 on a 1 MB write); in-memory blocks are capped at 8 MiB for a ~75% peak-memory cut at no wall-clock cost.
+- `zarrs` actually engages on local stores: `set_array` 76 → 17 ms, `get_as_numpy` 39 → 9 ms on a 32 MB image.
+- Consolidation reads less: sharded sources read at their write unit (324 chunk reads → 8), the numpy path chains levels through memory, coarsening drops its float64 intermediate (~3× peak), and the dask mode stops computing every source chunk twice.
+- Tables and overlap checks: type-filtered listings are one memoised pass under `cache=True` (95 reads → 2 warm; `cache=False` re-reads per call, by contract), ROI tables rebuild their DataFrame only on change, and `check_if_regions_overlap` sweeps instead of scanning all pairs (2,048 ROIs: 1,083 ms → 31 ms; `check_if_write_units_overlap` remains all-pairs).
 
-- **Metadata is no longer re-read and re-decoded per access**: `image.dimensions` — read once per ROI by every iterator — drops from ~520µs to ~2µs, and to zero store reads under `cache=True`.
-- **Plate walking is flat instead of quadratic**: `create_empty_plate` 733 → 178 metadata reads (14.4 MB → 128 KB written on a 384-image plate); per-well image paths 75 → 9 reads.
-- **Dask writes align to the write unit**: sharded writes stop read-modify-writing whole shards (128 chunk reads → 2 on a 1 MB write); in-memory blocks are capped at 8 MiB for a ~75% peak-memory cut at no wall-clock cost.
-- **`zarrs` actually engages on local stores**: `set_array` 76 → 17 ms, `get_as_numpy` 39 → 9 ms on a 32 MB image.
-- **Consolidation reads less**: sharded sources read at their write unit (324 chunk reads → 8), the numpy path chains levels through memory, coarsening drops its float64 intermediate (~3× peak), and the dask mode stops computing every source chunk twice.
-- **Tables and overlap checks**: type-filtered listings are one memoised pass (95 reads → 2 warm), ROI tables rebuild their DataFrame only on change, and `check_if_regions_overlap` sweeps instead of scanning all pairs (2,048 ROIs: 1,083 ms → 31 ms; `check_if_write_units_overlap` remains all-pairs).
+### Chores
+
+- The exact operation-count baselines behind the numbers above are committed under `tests/performance/` and gated in CI.
 
 ## [v1.0.1]
 

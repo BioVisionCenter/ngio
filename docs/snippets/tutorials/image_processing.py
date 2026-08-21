@@ -82,7 +82,7 @@ blurred_image.set_array(patch=blurred_image_data, axes_order=["c", "z", "y", "x"
 
 # `set_array` wrote to one resolution level only, so the rest of the pyramid is
 # still empty. `consolidate` rebuilds the other levels from it.
-blurred_image.consolidate()
+blurred_image.consolidate(mode="auto")
 # --8<-- [end:apply_blur]
 
 # --8<-- [start:plot_blur]
@@ -121,12 +121,14 @@ print(blurred_image_dask)
 # --8<-- [end:dask_blur]
 
 # --8<-- [start:iterators]
+from ngio import ThreadedMapper
 from ngio.iterators import ImageProcessingIterator
 
 iterator = ImageProcessingIterator(
     input_image=image,
     output_image=blurred_image,
     axes_order=["c", "z", "y", "x"],
+    consolidation_mode="auto",
 )
 
 # A freshly built iterator covers the entire image in one region.
@@ -154,8 +156,6 @@ iterator.require_no_write_units_overlap()
 iterator = iterator.with_halo(x=16, y=16)
 
 # Map the blur across every region, fanning out on a thread pool.
-from ngio import ThreadedMapper
-
 iterator.map(lambda x: gaussian_blur(x, sigma=sigma), mapper=ThreadedMapper("auto"))
 
 # No need to consolidate: the iterator does it once every region is processed

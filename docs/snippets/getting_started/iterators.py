@@ -77,7 +77,7 @@ print(f"labelled pixels: {int((seg.get_as_numpy() > 0).sum())}")
 # --8<-- [end:mapper_demo]
 
 # --8<-- [start:reduce_demo]
-means = seg_iterator.reduce(lambda unit: float(unit.mean()))
+means = seg_iterator.reduce(lambda patch: float(patch.mean()))
 print([round(mean, 1) for mean in means])
 # --8<-- [end:reduce_demo]
 

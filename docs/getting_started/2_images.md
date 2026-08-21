@@ -1,5 +1,5 @@
 ---
-description: "Read and write OME-Zarr pixel data: resolution levels, numpy and dask access, slicing, and labels."
+description: "Read and write OME-Zarr pixel data: resolution levels, numpy and dask access, slicing, labels, merge policies, and region-scoped consolidation."
 ---
 
 # 2. Images and labels
@@ -187,7 +187,11 @@ image.set_array(data)
 ```
 
 It accepts a numpy array or a dask array, and takes the same slicing and `axes_order`
-arguments as the getters, so you can write back exactly the region you read.
+arguments as the getters, so you can write back exactly the region you read. Writes
+can also *combine* with what is on disk instead of replacing it — see
+[Merging instead of overwriting](#merging-instead-of-overwriting) and
+[Keeping label ids unique across regions](#keeping-label-ids-unique-across-regions)
+below.
 
 A minimal read-modify-write example:
 
@@ -297,7 +301,7 @@ image.set_roi(roi, patch, merge="max")
 
 `"max"`, `"min"` and `"sum"` are commutative and associative, so overlapping regions give the same answer whatever order they are written in. `"keep_nonzero"` ("the last nonzero write wins") and a custom `(existing, patch, ctx) -> array` rule do depend on the order.
 
-The merge is a separate argument rather than an entry in `transforms=`, and the distinction matters. A transform is a function of the patch alone, which is why the chain composes and inverts with no rules about order or position. A merge also depends on what is already there, so it runs once, after the chain — by which point the patch is in the array's own space and the destination is read raw. Both sides are in the same space, which is what makes the comparison meaningful and keeps untouched pixels byte-identical instead of round-tripping them through a transform and back.
+The merge is a separate argument rather than an entry in `transforms=`: a transform is a function of the patch alone, while a merge also depends on what is already there — so it runs once, after the chain, with both sides in the array's own space. That is what makes the comparison meaningful and keeps untouched pixels byte-identical.
 
 Masking follows the same split. On a read it fills outside the mask, which is a transform; on a write it protects outside the mask, which is a merge:
 
@@ -323,7 +327,7 @@ label.set_roi(roi, patch, transforms=[UniqueLabelsTransform(1000, block_index=4)
 
 `block_size` has to exceed the largest label any one region can produce, or ids spill into the next region's block. Inside a masked iterator you can leave `block_index` out — the ROI's own label supplies it.
 
-The offset is derived from the block index rather than counted up as regions are processed. That is what makes it work in parallel: there is no shared counter to synchronize, it survives `ProcessMapper`, and it is idempotent — re-running a region after a failure reproduces exactly the ids it wrote before, where a counter would hand out a fresh set and strand the old one.
+The offset is derived from the block index rather than counted up as regions are processed, so it is parallel-safe (no shared counter to synchronize), survives `ProcessMapper`, and is idempotent — a re-run region reproduces exactly the ids it wrote before.
 
 Being an ordinary transform, it composes with a merge:
 

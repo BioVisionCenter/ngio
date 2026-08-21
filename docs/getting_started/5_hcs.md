@@ -144,6 +144,8 @@ The `OmeZarrPlate` object provides multiple methods to retrieve the path to the 
 
 `get_well_images` takes the row and column of a well and returns a dictionary mapping each image path to its [`OmeZarrContainer`][ngio.OmeZarrContainer].
 
+These plate-wide calls accept `max_workers`: `"auto"` opens the images concurrently — several times faster on a remote store, where each open is round-trip bound — while the current default still reads one at a time (and warns; in `ngio=1.2` the default becomes `"auto"`). Pass `max_workers=1` to pin serial reads silently.
+
 === "All images"
     Get all images in the plate:
     ```python exec="true" source="material-block" session="hcs_plate"
