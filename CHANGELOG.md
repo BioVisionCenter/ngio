@@ -1,10 +1,12 @@
 # Changelog
 
-## [Unreleased]
+## [v1.1.0]
 
-The IO layer got much faster, the iterators scale from a thread pool to a
-cluster, and segmentation workflows gain stitching, batched inference, and
-object detection. The design rationale lives in the docs' iterators guide.
+**Highlights**:
+
+- **The IO layer got much faster**: metadata is no longer re-read and re-decoded on every access (~250x on the hottest property, zero store reads when cached), dask writes align to the array's write unit (no more whole-shard read-modify-writes, and `zarrs` finally engages on local stores), and plate walking is flat instead of quadratic.
+- **Iterators run at scale**: `map`/`reduce` fan out on threads or processes (`ThreadedMapper`/`ProcessMapper`, lock-free via conflict-free waves), read context with `with_halo(...)` at unchanged parallelism, batch patches for neural networks (`BatchedMapper`, `iter_batched`), and distribute across SLURM/Fractal tasks with the `prepare_jobs → for_job → finalize` recipe.
+- **New capabilities**: `stitch=True` merges objects split across region boundaries on *any* ROI list — grids, overlapping FOVs, ragged tables, tiled masked objects; the new `ObjectDetectionIterator` turns a tile-by-tile detector into one deduplicated ROI table ([#111](https://github.com/BioVisionCenter/ngio/issues/111)); `FeatureExtractorIterator.measure` joins per-region measurements into a single `FeatureTable`.
 
 ### Features
 
