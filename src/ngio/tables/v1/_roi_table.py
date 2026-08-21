@@ -73,13 +73,28 @@ INDEX_COLUMNS = [
     "label",
 ]
 
-OPTIONAL_COLUMNS = ORIGIN_COLUMNS + TRANSLATION_COLUMNS + PLATE_COLUMNS + INDEX_COLUMNS
+# Written by `ObjectDetectionIterator.detect`: the default NMS score column.
+DETECTION_COLUMNS = [
+    "confidence",
+]
+
+OPTIONAL_COLUMNS = (
+    ORIGIN_COLUMNS
+    + TRANSLATION_COLUMNS
+    + PLATE_COLUMNS
+    + INDEX_COLUMNS
+    + DETECTION_COLUMNS
+)
 
 
 def _check_optional_columns(col_name: str) -> None:
-    """Check if the column name is in the optional columns."""
+    """Warn, once per call, about a column outside the ROI table specification."""
     if col_name not in OPTIONAL_COLUMNS + TIME_COLUMNS:
-        logger.warning(f"Column {col_name} is not in the optional columns.")
+        logger.warning(
+            f"Column '{col_name}' is not part of the ROI table specification. "
+            "ngio round-trips it as a Roi extra field, but other readers may "
+            "ignore it."
+        )
 
 
 def _dataframe_to_rois(
@@ -154,6 +169,9 @@ def _rois_to_dataframe(
     Only the values are read; `Roi.name` is optional, so the keys may be `None`.
     """
     data = []
+    # Checked once per distinct column after the loop, not once per ROI — a
+    # detection table's `class_id` should warn once, not once per object.
+    extra_columns: set[str] = set()
     for roi in rois.values():
         # This normalization is necessary for backward compatibility
         if roi.space != "world":
@@ -195,9 +213,12 @@ def _rois_to_dataframe(
 
         extra = roi.model_extra or {}
         for col in extra:
-            _check_optional_columns(col)
+            extra_columns.add(col)
             row[col] = extra[col]
         data.append(row)
+
+    for col in sorted(extra_columns):
+        _check_optional_columns(col)
 
     dataframe = pd.DataFrame(data)
     if dataframe.empty:

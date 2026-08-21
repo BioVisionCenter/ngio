@@ -105,9 +105,26 @@ def test_extra_columns_roundtrip_and_unknown_column_warning(caplog):
         df = table.dataframe
     assert df.loc["roi_1", "plate_name"] == "plate_a"
     assert df.loc["roi_1", "not_a_known_column"] == "foo"
-    # Unknown (non-optional) columns are reported via a logger warning
+    # Unknown (non-specification) columns are reported via a logger warning
     assert "not_a_known_column" in caplog.text
-    assert "is not in the optional columns" in caplog.text
+    assert "not part of the ROI table specification" in caplog.text
+
+
+def test_unknown_column_warns_once_per_conversion_not_per_roi(caplog):
+    rois = [_make_roi(f"roi_{i}", class_id=i) for i in range(5)]
+    with caplog.at_level(logging.WARNING):
+        _ = RoiTableV1(rois=rois).dataframe
+    mentions = [rec for rec in caplog.records if "class_id" in rec.getMessage()]
+    assert len(mentions) == 1
+
+
+def test_confidence_is_a_recognised_column(caplog):
+    """`detect` writes `confidence` (the NMS default); it must not warn."""
+    rois = [_make_roi(f"roi_{i}", confidence=0.9) for i in range(3)]
+    with caplog.at_level(logging.WARNING):
+        df = RoiTableV1(rois=rois).dataframe
+    assert "confidence" in df.columns
+    assert "confidence" not in caplog.text
 
 
 def test_read_unknown_extra_column_warning(caplog):
