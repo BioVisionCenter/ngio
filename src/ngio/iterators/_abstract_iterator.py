@@ -186,34 +186,17 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def with_halo(self, x: int = 0, y: int = 0, z: int = 0, t: int = 0) -> Self:
         """Read a margin of context around each ROI, but write only the ROI.
 
-        The function is handed the grown region and must return it grown too;
-        the extra border is cropped off before the write. This is how you get
-        seamless tiles — each tile sees past its own edge, so a smoothing or a
-        segmentation has the context it needs — and how you "trim" a tile,
-        which is the same operation seen from the other side.
-
-        On a read-only iterator that opts in (the object-detection iterator),
-        the halo is a pure read margin: there is no write to crop it from, and
-        the iterator itself reconciles the overlapping context (NMS resolves
-        the duplicate detections the margin produces). Other read-only
-        iterators refuse, so a `reduce` never silently measures grown regions.
-
-        The ROIs themselves do not move, so the write footprints are unchanged
-        and a haloed iterator parallelizes exactly as far as it did without
-        one. That is the point of doing this on the read side: overlapping
-        *writes* would have to be serialized, overlapping reads cost nothing.
-
-        Margins are in pixels of the reference image and are clipped at its
-        borders, so an edge tile simply grows on the sides where there is room.
+        The function receives the grown region and must return it grown too;
+        the border is cropped before the write, so tiles come out seamless.
+        Margins are reference-image pixels, clipped at the borders. Write
+        footprints are unchanged, so a haloed iterator parallelizes exactly
+        as far as it did without one.
 
         Note:
-            Because the margins are counted in reference-image pixels, they do
-            not survive a rescale: a shape-changing transform on the data path
-            (a `ZoomTransform`, say) leaves the patch on a different grid from
-            the margins, and the crop refuses rather than guessing. To work at
-            a lower resolution, iterate on a coarser pyramid level instead. A
-            `MaskTransform` is unaffected — its zoom rescales the *label* it
-            reads, never the data array — and composes with a halo normally.
+            The margins do not survive a rescale: a shape-changing transform
+            on the data path (a `ZoomTransform`) makes the crop refuse —
+            iterate on a coarser pyramid level instead. A `MaskTransform`
+            composes normally (its zoom rescales the label it reads).
 
         Args:
             x: Pixels added on each side along x.
@@ -225,8 +208,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             A new iterator reading with the halo.
 
         Raises:
-            NgioValueError: On a read-only iterator, which has no write region
-                for the halo to be defined against, or for a negative margin.
+            NgioValueError: On a read-only iterator (no write to crop the
+                halo from; the detection iterator opts in and reconciles the
+                overlap with NMS), on an in-place iterator, or for a
+                negative margin.
 
         Example:
             ```python
@@ -887,50 +872,36 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def for_job(self, job_index: int, n_jobs: int) -> Self:
         """Restrict the iterator to one of `n_jobs` independent partitions.
 
-        The distributed counterpart of a parallel mapper: partition the
-        units into `n_jobs` embarrassingly independent jobs and keep job
-        `job_index`'s share. No write unit (a chunk, or a shard when the
-        output is sharded) is ever shared between two partitions — units
-        whose write footprints conflict travel together — so the jobs need
-        no locks, no barriers, and no channel to one another: safe to run
-        as separate SLURM array tasks on a shared filesystem, in any order
-        and any overlap in time. The partition is a pure function of the
-        iterator's ROIs and the output geometry, so every process that
-        builds the same iterator derives the same partition on its own.
+        No write unit is ever shared between two partitions, so the jobs
+        need no locks, no barriers, and no channel to one another — safe as
+        separate SLURM array tasks, in any order. Every job must build an
+        identical iterator (construction is metadata-only and the partition
+        derives deterministically from it), apply `for_job` *last* in the
+        builder chain, and its `map` deliberately does not finalize: the
+        gather step is the unrestricted iterator's `finalize()` (writers) or
+        `merge_partials()` (read-only iterators), once, after all jobs.
+        Stitched and read-only runs also need `prepare_jobs(n_jobs)` first.
+        See the distributed-runs guide in the iterators docs.
 
-        The returned iterator executes as usual (`map(func, mapper=...)`),
-        with one difference: it does **not** finalize — the pyramid resolve
-        is the one global step and belongs to the unrestricted iterator,
-        once after all jobs (a SLURM job dependency is the barrier). The
-        typical array task, and its dependent gather task:
+        Args:
+            job_index: This job's partition, `0 <= job_index < n_jobs`
+                (e.g. `int($SLURM_ARRAY_TASK_ID)`). Partitions beyond the
+                number of independent unit groups are empty no-ops.
+            n_jobs: How many partitions the run is split into; must match
+                across every job and the gather.
 
-        ```python
-        n_jobs = 4
-        job_index = 0  # e.g. int($SLURM_ARRAY_TASK_ID)
+        Returns:
+            The restricted iterator; further reshaping refuses.
 
-        iterator = SegmentationIterator(image, label, ...).by_chunks()
-        iterator.for_job(job_index, n_jobs=n_jobs).map(func)
+        Example:
+            ```python
+            # array task:
+            iterator = SegmentationIterator(image, label).by_chunks()
+            iterator.for_job(job_index, n_jobs=n_jobs).map(func)
 
-        # gather task, after all jobs:
-        SegmentationIterator(image, label, ...).by_chunks().finalize()
-        ```
-
-        Every job must build an identical iterator — same construction,
-        same tiling calls, same `n_jobs`; construction is metadata-only, so
-        this is cheap. `for_job` comes *last* in the builder chain
-        (reshaping a slice would invalidate its selection and refuses), and
-        in-memory stores cannot work across separate processes. Jobs beyond
-        the number of independent unit groups come back empty and their
-        `map` is a no-op. A *stitched* segmentation additionally requires
-        `prepare_jobs(n_jobs)` to have created the scratch root; each tile
-        banks into its own array, so banking adds no conflicts and a
-        stitched iterator splits exactly as a plain map would. Read-only
-        iterators require
-        `prepare_jobs` too, and distribute through their partial verbs —
-        `measure_to_partial` / `detect_to_partial` per job, `merge_partials`
-        as the gather — because their joins (coalesce, NMS) are global.
-        `write_conflict_components` exposes the grouping this partition is
-        built from.
+            # gather task, after all jobs:
+            SegmentationIterator(image, label).by_chunks().finalize()
+            ```
         """
         if self._partition is not None:
             _, current_index, current_n = self._partition
@@ -960,31 +931,27 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def prepare_jobs(self, n_jobs: int) -> list[JobArgs]:
         """Set up a distributed run and return its parallelization list.
 
-        The init step of the three-phase distributed recipe (init → parallel
-        jobs → consolidate, the shape schedulers like Fractal run natively):
-        it computes the partition, performs whatever setup the iterator needs
-        — always **clearing any stale scratch state from earlier runs first**,
-        so a crashed or superseded run can never leak into this one — and
-        returns one `JobArgs` per non-empty partition, ready to become the
-        scheduler's parallelization list:
+        The init step of the three-phase recipe (init → parallel jobs →
+        consolidate): performs the iterator's setup — always clearing stale
+        scratch state from earlier runs first — and returns one `JobArgs`
+        per non-empty partition. Optional for plain writers; a stitching or
+        read-only run requires it (the scratch root must exist, race-free,
+        before any job writes into it).
 
-        ```python
-        # init task
-        args_list = iterator.prepare_jobs(n_jobs=4)
-        # -> [{"job_index": 0, "n_jobs": 4}, ...]
+        Args:
+            n_jobs: How many partitions to split into; empty ones are
+                dropped from the list.
 
-        # parallel task, per entry
-        iterator.for_job(**args).map(func)
+        Returns:
+            One `{"job_index": ..., "n_jobs": ...}` dict per non-empty
+            partition — JSON-ready, splatting into `for_job(**args)`.
 
-        # consolidate task, after all jobs
-        iterator.finalize()
-        ```
-
-        Empty partitions are dropped from the list — no task is submitted
-        for a share with nothing to do. For plain writing iterators this
-        call is optional (there is nothing to set up; `for_job` alone
-        works); a *stitching* segmentation requires it, because the scratch
-        band arrays must exist — race-free — before any job banks into them.
+        Example:
+            ```python
+            args_list = iterator.prepare_jobs(n_jobs=4)  # init task
+            iterator.for_job(**args).map(func)  # per parallel task
+            iterator.finalize()  # consolidate task
+            ```
         """
         if self._partition is not None:
             raise NgioValueError(
@@ -1260,7 +1227,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         loop.
 
         Returns:
-            bool: True if any ROIs overlap in chunks, False otherwise.
+            `True` if any two ROIs share a write unit.
         """
         if len(self.rois) < 2:
             # Less than 2 ROIs cannot overlap

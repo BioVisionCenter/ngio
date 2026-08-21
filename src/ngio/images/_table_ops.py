@@ -213,9 +213,9 @@ def _load_image_table(
     mode: Literal["eager", "lazy"] = "eager",
     strict: bool = True,
 ) -> TableWithExtras | None:
-    """Load `name` from `image` and materialize it according to `mode`.
+    """Load `name` from `image` and materialise it according to `mode`.
 
-    The materialization is what makes this worth running on a worker thread:
+    The materialisation is what makes this worth running on a worker thread:
     it forces the IO here instead of leaving it to the concatenation step.
     """
     if not strict and name not in image.list_tables():

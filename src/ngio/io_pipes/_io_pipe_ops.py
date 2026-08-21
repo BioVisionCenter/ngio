@@ -70,7 +70,7 @@ def _merged(
             f"Merge policy '{type(merge).__name__}' returned a "
             f"{type(merged).__name__} instead of a {expected_type.__name__} — "
             "it does not support this data path (e.g. a numpy-only policy used "
-            "through the dask API, or one materializing a dask array)."
+            "through the dask API, or one materialising a dask array)."
         )
     if tuple(merged.shape) != tuple(existing.shape):
         raise NgioValueError(

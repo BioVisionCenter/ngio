@@ -31,7 +31,7 @@ class NgioDeprecationWarning(DeprecationWarning):
 
 
 class NgioUserWarning(UserWarning):
-    """Warning for ngio user-facing behavioral issues."""
+    """Warning for ngio user-facing behavioural issues."""
 
 
 class NgioFutureWarning(FutureWarning):

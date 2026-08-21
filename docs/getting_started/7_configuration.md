@@ -62,7 +62,7 @@ Fields:
 
 ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never retried, in any mode.
 
-### Semantics worth knowing
+### When the policy is read
 
 - **Zarr IO snapshots the policy at open time.** Every group ngio opens is backed by a store that copies the current `io_retry` at construction. The snapshot travels with the store — including into pickled dask task graphs, so workers retry with the policy that was active on the driver. Changing `get_config().io_retry` afterwards does not affect already-open containers.
 - **Non-zarr IO reads the policy at call time.** The table backends and store probes check the current global config on every call, so runtime changes apply immediately there.
@@ -90,7 +90,7 @@ Capping that is close to free. Consolidating a 3-level pyramid, peak memory and 
 
 A 75% cut for no cost in wall clock, and about 0.4% more tasks in the graph. Set it to `null` to defer to dask's `array.chunk-size`, or lower it further to trade a little batching for a little memory — below roughly 4 MiB the gain flattens out, because what remains is the dask task graph itself, which no cap reaches.
 
-### Semantics worth knowing
+### What the cap can and cannot do
 
 - **It is a ceiling, never a floor.** It cannot raise an `array.chunk-size` you set lower yourself, and it never takes the budget below one write unit — a block smaller than a unit would mean two writers on one unit, which is exactly the lost-update hazard the write path is built to make impossible.
 - **A coarse geometry ignores it.** If one write unit is already larger than the cap — a 105 MiB shard, say — every block is exactly one unit whatever the cap says, because that is already the smallest block that can be written safely. Lowering the cap further changes nothing.
@@ -111,7 +111,7 @@ Two knobs ngio forwards into zarr's own runtime configuration. Both default to `
 - `async_concurrency`: how many store requests zarr keeps in flight for one operation (zarr's own default is 10). **This is the knob that matters on a remote store**: a read spanning 64 chunks is otherwise fetched in ~7 serialized waves of 10, each paying a full round-trip. On S3 or HTTP, values of 32–64 are reasonable starting points; on a local filesystem it makes little difference.
 - `threading_max_workers`: the size of zarr's thread executor for decode work. Rarely worth setting; zarr sizes it sensibly by default.
 
-### Semantics worth knowing
+### When changes take effect
 
 - **`async_concurrency` is read by zarr on every call**, so changing it at runtime works: re-apply with `ngio.utils.apply_zarr_config(get_config())` after mutating `get_config().zarr`, or set it directly with `zarr.config.set({"async.concurrency": 64})` (also usable as a context manager for a single operation).
 - **`threading_max_workers` is snapshotted by zarr into a process-global executor at the first zarr operation.** ngio applies this section during `import ngio` for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file.

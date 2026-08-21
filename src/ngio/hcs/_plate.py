@@ -331,8 +331,8 @@ class OmeZarrPlate:
 
     def _image_path(self, row: str, column: int | str, path: str) -> str:
         """Return the image path in the plate."""
-        # One `_well_path` -- i.e. one plate-metadata read -- not two: `get_well`
-        # resolves it, then the f-string used to resolve it again.
+        # One `_well_path` -- i.e. one plate-metadata read -- shared by the
+        # well lookup and the path below.
         well_path = self._well_path(row=row, column=column)
         well = self._get_well(well_path=well_path)
         if path not in well.paths():
@@ -383,9 +383,9 @@ class OmeZarrPlate:
             column (int | str): The column of the well.
             acquisition (int | None): The acquisition id to filter the images.
         """
-        # Resolved once, not once per image. This used to call `_image_path`
-        # per path, each of which re-opened the well and re-read the whole plate
-        # document twice -- so the cost grew with the square of the well's image
+        # Resolved once, not once per image: a per-image `_image_path` call
+        # re-opens the well and re-reads the plate document, so the cost would
+        # grow with the square of the well's image
         # count, to re-derive a prefix already in hand. The membership check
         # `_image_path` performs is vacuous here: these paths come from
         # `well.paths()` itself.

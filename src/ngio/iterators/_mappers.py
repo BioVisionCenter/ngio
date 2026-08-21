@@ -1,31 +1,18 @@
 """Mappers for iterators.
 
-Mappers execute a function over the units produced by an iterator and collect
-the results. A mapper is the *only* way to schedule iterator work: `map` and
-`reduce` take a `mapper` argument and nothing else, so the pool size lives on
-the mapper that owns it rather than being spelled a second time at the call.
+A mapper executes a function over the units an iterator produces and
+collects the results; `map` and `reduce` take a `mapper` argument and
+nothing else, so the pool size lives on the mapper that owns it.
 
-Four ship with ngio. `BasicMapper` is serial and is what `mapper=None` means.
-`BatchedMapper` is serial too, but stacks patches into one `(B, ...)` array
-per `func` call — the fit for neural-network inference, where per-call
-overhead dominates and the model wants batched input. `ThreadedMapper` fans
-units out on a thread pool — the fit for round-trip-bound IO and for `func`s
-that release the GIL. `ProcessMapper` fans out on a spawn-based process pool
-— the fit for pure-Python, GIL-holding `func`s. Both
-parallel mappers take their pool size at construction, and both plan their
-units into conflict-free *waves* (`plan_waves`): two units whose write
-footprints share a write unit never run in the same wave, and the waves run
-back to back, each at full pool width. Within a wave, disjointness is what
-makes the parallel writes safe *without any lock, in any topology* — a chunk
-or shard object with a single writer cannot lose an update, whether the
-writers are threads or processes, where a lock could only ever protect one
-process. Tiling with `by_write_units()` yields a single wave.
-
-Wave order is the *canonical* write order: the serial mappers run units in
-flattened wave order too (`canonical_unit_order`), so writes overlapping at
-the pixel level land identically under every mapper — the later wave wins,
-deterministically. With no conflicts the canonical order is plain index
-order.
+Four ship with ngio: `BasicMapper` (serial, what `mapper=None` means),
+`BatchedMapper` (serial, one stacked `(B, ...)` array per `func` call),
+`ThreadedMapper` (thread pool), and `ProcessMapper` (spawned processes).
+Every mapper runs the units in the same canonical order — flattened
+conflict-free waves; `plan_waves` carries the safety argument — so
+overlapping writes land identically whichever mapper runs them: the later
+wave wins, deterministically. With no conflicts the canonical order is
+plain index order, and `by_write_units()` yields a single fully-parallel
+wave.
 """
 
 import logging
@@ -183,28 +170,19 @@ class BasicMapper(Generic[T, R]):
 class BatchedMapper:
     """Stack patches into `(B, ...)` batches and call `func` once per batch.
 
-    The fit for neural-network inference, where per-call overhead dominates
-    and the model wants batched input. Unlike every other mapper, `func`
-    receives a *stacked* array — a leading batch axis over up to `batch_size`
-    patches — and must return an array-like with the same leading axis whose
-    items follow `map`'s per-patch contract.
+    The fit for neural-network inference. Unlike every other mapper, `func`
+    receives a *stacked* array — a leading batch axis over up to
+    `batch_size` patches — and must return an array-like with the same
+    leading axis whose items follow `map`'s per-patch contract.
 
-    Tilings are ragged in general (`by_chunks` clips border tiles, halos
-    shrink at image borders, ROI-table regions are arbitrary), so each batch
-    is padded up to its per-axis maximum shape before stacking —
-    origin-anchored, real pixels first, padding after — and when `func`
-    preserves the batch's item shape, each output item is sliced back to its
-    patch's true shape before the write. Any halo is trimmed afterwards by
-    the setter as usual, so `func` sees patch + halo exactly as under any
-    other mapper. Read-only units collect the (trimmed) output items instead
-    of writing; `func`s that reduce away the patch axes (per-item scalars,
-    say) are returned untouched — but they see the padded pixels, so pad
-    ragged tilings with values the reduction can tolerate.
-
-    Reads within a batch fan out on a thread pool (`read_workers`) — they
-    are round-trip bound. Writes run serially on the dispatching thread, so
-    no wave planning is needed: like `BasicMapper`, this mapper is
-    write-safe in any topology, `for_job` partitions included.
+    Ragged tilings are padded per batch to the per-axis maximum before
+    stacking (origin-anchored: real pixels first, padding after); a
+    shape-preserving output is sliced back to each patch's true shape
+    before the write, and halos are trimmed by the setter as usual. A
+    per-item reduction passes through untouched — it sees the padded
+    pixels, so pad with values it tolerates. Reads within a batch fan out
+    on a thread pool; writes run serially on the dispatching thread, so
+    batched mapping is write-safe on any tiling.
 
     Args:
         batch_size: Number of patches stacked per `func` call. The last
@@ -559,10 +537,9 @@ class ThreadedMapper(Generic[T, R]):
     sync API); `func` must be thread-safe too — that part of the contract is
     the caller's.
 
-    Before any fan-out the units are planned into conflict-free waves
-    (`plan_waves`), run back to back on one pool; within a wave disjointness
-    is what makes the parallel writes lock-free. With one unit, or a resolved
-    pool of one, this is exactly `BasicMapper`.
+    Units run in conflict-free waves, back to back on one pool — see
+    `plan_waves`. With one unit, or a resolved pool of one, this is exactly
+    `BasicMapper`.
 
     Args:
         max_workers: `"auto"` (the default) sizes the pool for
@@ -658,10 +635,9 @@ class ProcessMapper(Generic[T, R]):
     `None` (which `map_as_*` discards anyway); only `reduce_as_*` results are
     pickled back to the parent.
 
-    The same wave planning as `ThreadedMapper` applies, and it is the entire
-    cross-process safety argument: within a wave the write units are
-    disjoint, so they need no lock — and no lock ngio could take would work
-    across processes anyway.
+    Units run in conflict-free waves (see `plan_waves`) — which is the
+    entire cross-process safety argument: no lock ngio could take would
+    work across processes anyway.
 
     Constraints:
     - `func` (and any transforms the units carry) must be picklable — a

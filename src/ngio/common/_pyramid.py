@@ -714,17 +714,15 @@ def consolidate_pyramid(
             `"auto"` to take the in-memory path wherever it is bit-identical to
             the chunked one. `None` means the caller did not choose: it behaves
             as `"dask"` today and warns where `"auto"` would have differed.
-        regions: Where the source level changed, as on-disk index tuples in the
-            source's axis order -- what a setter's
-            `slicing_ops.normalized_slicing_tuple` produces. Only the pyramid
-            regions derived from them are rebuilt, with results identical to a
-            full rebuild; everywhere else must already be consistent. Empty
-            regions consolidate nothing: "these are the touched regions: none"
-            means there is nothing to rebuild (`track_writes` with no writes
-            lands here). Outside the envelope where the region path is exact
-            (every edge an integral downsample, `order` not `"cubic"`), or past
-            `ConsolidationConfig.partial_max_coverage` of the source, the whole
-            pyramid is rebuilt instead, silently. `None` rebuilds everything.
+        regions: Where the source level changed, as on-disk index tuples in
+            the source's axis order (what a setter's
+            `slicing_ops.normalized_slicing_tuple` produces). Only the
+            pyramid regions derived from them are rebuilt, bit-identical to
+            a full rebuild; empty regions rebuild nothing. Where the region
+            path is not exact (a non-integral downsample edge,
+            `order="cubic"`), or past
+            `ConsolidationConfig.partial_max_coverage` of the source, the
+            whole pyramid is rebuilt instead. `None` rebuilds everything.
     """
     for target in targets:
         if source.dtype != target.dtype:

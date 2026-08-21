@@ -32,13 +32,10 @@ into the final table.
 
 ## Step 3: detect, tile by tile
 
-The image is tiled with `by_grid`, and each tile reads a `with_halo` margin past its own
-edge — this is the one read-only iterator where the halo is allowed, because there is
-no write to crop it from. The margin means a nucleus cut by a tile boundary is seen
-whole by at least one tile; the duplicate detections that produces are resolved by
-non-maximum suppression, configured with `nms=NmsConfig(...)`. The per-tile detection
-fans out under a `mapper` like any `reduce`; nothing is written until your own
-`add_table` call.
+The image is tiled with `by_grid` plus a `with_halo` read margin, so a nucleus cut by
+a tile boundary is seen whole by at least one tile; NMS resolves the duplicates that
+produces — the full mechanics are in the
+[iterators guide](../getting_started/6_iterators.md#detecting-objects-into-a-roi-table).
 
 ```python exec="true" source="material-block" session="object_detection"
 --8<-- "docs/snippets/tutorials/object_detection.py:detect"

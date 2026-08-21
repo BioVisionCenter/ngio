@@ -174,7 +174,7 @@ def _require_backend_type(
             f"Transform '{type(transform).__name__}' returned a "
             f"{type(array).__name__} instead of a {expected_type.__name__} — "
             "it does not support this data path (e.g. a numpy-only transform "
-            "used through the dask API, or a transform materializing a dask "
+            "used through the dask API, or a transform materialising a dask "
             "array)."
         )
 

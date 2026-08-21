@@ -1,4 +1,4 @@
-"""Ngio's zarr store wrapper: retry behavior + uniform store services.
+"""Ngio's zarr store wrapper: retry behaviour + uniform store services.
 
 `NgioStore` is the single place in ngio that dispatches on concrete zarr
 store types (local, fsspec, memory, zip). Everything else should ask the
@@ -63,7 +63,7 @@ def _warn_if_unknown_store(store: Store) -> None:
         warnings.warn(
             f"Store type {type(store)} is not explicitly supported. "
             f"Supported types are: {_KNOWN_STORES}. "
-            "Proceeding, but this may lead to unexpected behavior.",
+            "Proceeding, but this may lead to unexpected behaviour.",
             NgioUserWarning,
             stacklevel=3,
         )
@@ -97,7 +97,7 @@ def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
 
 
 class NgioStore(WrapperStore[Store]):
-    """A zarr store wrapper adding retry behavior and uniform store services.
+    """A zarr store wrapper adding retry behaviour and uniform store services.
 
     All IO methods retry errors according to the `RetryConfig` policy
     (snapshotted from `get_config().io_retry` at construction unless given
@@ -336,7 +336,7 @@ class NgioStore(WrapperStore[Store]):
         self, op_name: str, factory: Callable[[], AsyncIterator[str]]
     ) -> AsyncIterator[str]:
         # A partially-consumed generator cannot be safely retried, so the
-        # listing is materialized inside the retried call and re-yielded.
+        # listing is materialised inside the retried call and re-yielded.
         if self._retry.max_retries == 0 and not _retry._IS_WINDOWS:
             return factory()
 

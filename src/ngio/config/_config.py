@@ -155,21 +155,11 @@ class DaskConfig(BaseModel):
 
     Every dask write goes through `da.to_zarr`, which glues whole write units
     (`shards or chunks`, often a few hundred KiB) into blocks sized to dask's
-    own `array.chunk-size` -- 128 MiB by default. Peak memory is roughly the
-    number of blocks in flight times their size, so that default packs ~1000
-    units into one resident block for nothing: the unit grid is what makes the
-    write safe, the block grid is only batching.
-
-    Capping it is close to free. Consolidating a 3-level pyramid, peak memory:
-
-    | cap  | 2 GB      | 4 GB       |
-    |------|-----------|------------|
-    | 8MiB |  87.6 MB  |  141.3 MB  |
-    | none | 370.5 MB  |  565.2 MB  |
-
-    The default of 8 MiB is a 75% cut for +0.37% task count and no wall-clock
-    cost (19.16 s against 20.18 s at 4 GB). Below ~4 MiB the gain flattens out,
-    because what remains is the dask task graph itself, which no cap reaches.
+    own `array.chunk-size` -- 128 MiB by default, packing hundreds of units
+    into one resident block for nothing: the unit grid is what makes the
+    write safe, the block grid is only batching. The default 8 MiB cap cuts
+    peak memory roughly 4x at no wall-clock cost; the benchmark table lives
+    in the configuration guide.
 
     `None` defers to dask's `array.chunk-size`. The cap is a ceiling only: it
     never raises a lower `array.chunk-size` you set yourself, and never lowers

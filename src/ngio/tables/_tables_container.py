@@ -346,8 +346,8 @@ class TablesContainer:
 
         table_handler = self._get_table_group_handler(name)
 
-        # Read once: `TableMeta` picks the class, the concrete model is built
-        # by the class, and both used to read this same document separately.
+        # Read once: `TableMeta` picks the class and the concrete model is
+        # built by the class — both consume this same document.
         attrs = table_handler.load_attrs()
         meta = _get_meta(table_handler, attrs=attrs)
         return ImplementedTables().get_table(

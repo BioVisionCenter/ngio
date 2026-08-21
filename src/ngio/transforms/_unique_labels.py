@@ -100,7 +100,7 @@ class UniqueLabelsTransform:
             self._check_fits(array, offset)
         else:
             # The dask path cannot look at the values now; check each block as
-            # it materializes, so overflow raises at compute time instead of
+            # it materialises, so overflow raises at compute time instead of
             # wrapping silently.
             def _checked(block: np.ndarray) -> np.ndarray:
                 self._check_fits(block, offset)

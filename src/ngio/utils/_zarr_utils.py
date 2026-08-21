@@ -86,7 +86,7 @@ def open_group_wrapper(
     The group is opened on an `NgioStore` whenever that wrapper changes
     behaviour — a configured `io_retry`, or Windows, where the sharing-violation
     retry is unconditional — so those store IO calls (including dask-worker
-    chunk reads/writes) honor the policy. With the default policy on a plain
+    chunk reads/writes) honour the policy. With the default policy on a plain
     local store the bare store is handed to zarr instead: `NgioStore` is a
     `WrapperStore`, and zarr silently falls back to its own codec pipeline for
     stores a third-party pipeline does not recognise, so wrapping a pass-through
@@ -228,9 +228,9 @@ class ZarrGroupHandler:
         if self._lock is not None:
             return self._lock
 
-        # Caching used to be refused here. It is compatible now: `locked()`
-        # invalidates on entry and exit, so a read-modify-write under the lock
-        # cannot be served a value cached from before the lock was taken.
+        # Caching and locking are compatible: `locked()` invalidates on entry
+        # and exit, so a read-modify-write under the lock cannot be served a
+        # value cached from before the lock was taken.
         local_root = self.store.local_root
         if local_root is None:
             raise NgioValueError(

@@ -1079,9 +1079,9 @@ def _parse_channel_selection(
     """Parse the channel selection input into a list of channel indices."""
     if channel_selection is None:
         return {}
-    # Read once, then reuse: every path below used to reach through the image to
-    # `channels_meta`, and each of those is a full metadata reload. Selecting
-    # four channels by label cost four of them before a pixel was touched.
+    # Read once, then reuse: each `channels_meta` access is a full metadata
+    # reload, so selecting four channels by label would otherwise cost four
+    # of them before a pixel was touched.
     channels_meta = image.channels_meta
     if isinstance(channel_selection, int | str | ChannelSelectionModel):
         channel_index = _parse_str_or_model(channels_meta, channel_selection)

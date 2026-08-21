@@ -252,7 +252,9 @@ The examples from here on run on a small synthetic image — two bright blobs, o
 
 `ThreadedMapper` is the fit for IO-bound work and for funcs that release the GIL (most numpy/scipy do); `"auto"` sizes the pool for round-trip-bound work. For pure-Python, GIL-holding funcs use `ProcessMapper(max_workers=...)` instead — the func must be picklable (a module-level function, not a lambda), and the store must not be in-memory.
 
-Before fanning out, both parallel mappers plan every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image — into conflict-free **waves**: ROIs sharing a write unit land in different waves, and the waves run back to back, each at full pool width. Within a wave the footprints are disjoint, which is what makes the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer at a time. A tiling with no shared write units — `by_write_units()`, as in the demo above — runs as a single fully-parallel wave; more sharing means more waves, down to an effectively serial schedule when every ROI collides (ngio logs a warning there rather than refusing). This is what lets a masked iterator parallelize out of the box: per-object bounding boxes routinely share chunks even when the boxes themselves do not overlap, and the wave count stays around the worst chunk's object multiplicity.
+Before fanning out, both parallel mappers plan every ROI's *write footprint* — the chunks (or shards, when the output is sharded) it will write on the **output** image — into conflict-free **waves**: ROIs sharing a write unit land in different waves, and the waves run back to back, each at full pool width. Within a wave the footprints are disjoint, which is what makes the parallel writes safe without any locking, for threads and processes alike: each chunk or shard object has exactly one writer at a time.
+
+A tiling with no shared write units — `by_write_units()`, as in the demo above — runs as a single fully-parallel wave; more sharing means more waves, down to an effectively serial schedule when every ROI collides (ngio logs a warning there rather than refusing). This is what lets a masked iterator parallelize out of the box: per-object bounding boxes routinely share chunks even when the boxes themselves do not overlap, and the wave count stays around the worst chunk's object multiplicity.
 
 For ROIs whose *pixels* genuinely overlap (a `by_grid` with a stride below the size, or a `"shift"` tail, on a writing iterator): such writes always land in different waves, and wave order is the **canonical write order** — the serial mappers run it too, so which write wins the shared pixels is identical under every mapper. The one exception is the hand-driven loops (`iter`, `iter_batched`), which run in ROI order: deterministic, but not bit-identical to `map` on contested pixels. Mask-protected and pixel-disjoint writes are order-independent either way, as is an order-independent `merge=` (`"max"`, `"min"`, `"sum"`).
 
@@ -272,7 +274,9 @@ For neural-network inference the per-call overhead usually dominates, and the mo
 --8<-- "docs/snippets/getting_started/iterators.py:batched_demo"
 ```
 
-This is the one mapper that changes the func's contract: it receives a stacked batch with a leading batch axis and must return an array with the same leading axis. Everything else composes as usual — tilings are ragged in general (border tiles clip, halos shrink at image edges, masked regions are arbitrary), so each batch is padded up to its per-axis maximum before stacking (`pad_mode`/`pad_values` choose how) and every output is sliced back to its region's true shape before the write; a halo is trimmed after that, exactly as under any other mapper; and `for_job` partitions batch their own share. Within a batch the reads fan out on a thread pool (`read_workers`), while the writes run serially on the calling thread — like the serial mapper, batched mapping is write-safe on any tiling, no wave planning involved.
+This is the one mapper that changes the func's contract: it receives a stacked batch with a leading batch axis and must return an array with the same leading axis. Everything else composes as usual — tilings are ragged in general (border tiles clip, halos shrink at image edges, masked regions are arbitrary), so each batch is padded up to its per-axis maximum before stacking (`pad_mode`/`pad_values` choose how) and every output is sliced back to its region's true shape before the write; a halo is trimmed after that, exactly as under any other mapper; and `for_job` partitions batch their own share.
+
+Within a batch the reads fan out on a thread pool (`read_workers`), while the writes run serially on the calling thread — like the serial mapper, batched mapping is write-safe on any tiling, no wave planning involved.
 
 Prefer to drive the loop yourself? `iter_batched` yields `(patches, writers)` — two aligned lists of up to `batch_size` items, in ROI order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like `iter`; on the read-only iterators it yields the payload lists alone (`(image, label, roi)` tuples for features, `(patch, roi)` for detection):
 
@@ -356,7 +360,9 @@ table = iterator.merge_partials()
 container.add_table("measurements", table)               # storing stays yours
 ```
 
-The result is bit-identical to a serial `measure` / `detect` — including a **custom `coalesce`**, which runs once at merge time over the reconstructed per-ROI results (dicts normalized to DataFrames, a `label` index to a `label` column). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call. The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (`measure`, `detect`) refuse on a `for_job` slice, pointing at their partial counterparts.
+The result is bit-identical to a serial `measure` / `detect` — including a **custom `coalesce`**, which runs once at merge time over the reconstructed per-ROI results (dicts normalized to DataFrames, a `label` index to a `label` column). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
+
+The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (`measure`, `detect`) refuse on a `for_job` slice, pointing at their partial counterparts.
 
 ## Halos: context without seams
 
@@ -371,52 +377,6 @@ Tiling an image and processing each tile independently leaves artifacts at the j
 The ROIs themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping *writes* would have to be serialized; overlapping reads cost nothing.
 
 Read the same trick backwards and it is a "trim": if you want each tile's outer margin discarded rather than written, that is exactly a halo of that width.
-
-## Merging instead of overwriting
-
-By default a write replaces what is on disk. `merge=` combines with it instead:
-
-```python
-image.set_roi(roi, patch, merge="max")
-```
-
-`"max"`, `"min"` and `"sum"` are commutative and associative, so overlapping regions give the same answer whatever order they are written in. `"keep_nonzero"` ("the last nonzero write wins") and a custom `(existing, patch, ctx) -> array` rule do depend on the order.
-
-The merge is a separate argument rather than an entry in `transforms=`, and the distinction matters. A transform is a function of the patch alone, which is why the chain composes and inverts with no rules about order or position. A merge also depends on what is already there, so it runs once, after the chain — by which point the patch is in the array's own space and the destination is read raw. Both sides are in the same space, which is what makes the comparison meaningful and keeps untouched pixels byte-identical instead of round-tripping them through a transform and back.
-
-Masking follows the same split. On a read it fills outside the mask, which is a transform; on a write it protects outside the mask, which is a merge:
-
-```python
-from ngio.transforms import MaskMerge, MaskTransform
-
-patch = image.get_roi(roi, transforms=[MaskTransform(label=nuclei, target_image=image)])
-image.set_roi(roi, patch, merge=MaskMerge(label=nuclei, target_image=image))
-```
-
-`get_roi_masked` and `set_roi_masked` do this for you; reach for the objects directly when you want to combine masking with other transforms.
-
-## Keeping label ids unique across regions
-
-Segmenting region by region gives each region its own `1, 2, 3, …`, so writing them into one array collides. `UniqueLabelsTransform` gives each region a disjoint slice of the id space:
-
-```python
-from ngio.transforms import UniqueLabelsTransform
-
-# Region 4's labels 1, 2, 3 are written as 4001, 4002, 4003.
-label.set_roi(roi, patch, transforms=[UniqueLabelsTransform(1000, block_index=4)])
-```
-
-`block_size` has to exceed the largest label any one region can produce, or ids spill into the next region's block. Inside a masked iterator you can leave `block_index` out — the ROI's own label supplies it.
-
-The offset is derived from the block index rather than counted up as regions are processed. That is what makes it work in parallel: there is no shared counter to synchronize, it survives `ProcessMapper`, and it is idempotent — re-running a region after a failure reproduces exactly the ids it wrote before, where a counter would hand out a fresh set and strand the old one.
-
-Being an ordinary transform, it composes with a merge:
-
-```python
-label.set_roi(
-    roi, patch, transforms=[UniqueLabelsTransform(1000, block_index=4)], merge="max"
-)
-```
 
 ## Stitching a tiled segmentation
 
@@ -474,9 +434,13 @@ Not every model produces a mask. An object detector — a YOLO network, a spot f
 
 NMS is configured with `nms=NmsConfig(iou_threshold=..., score_column=...)` on the constructor, exactly as stitching is with `stitch=StitchConfig(...)`; a parallel `mapper=` on `detect` fans the tiles out like any `reduce`.
 
-The detector sees one tile at a time and answers in the tile's own pixels: `(patch) -> list[Roi]`, each box built the way any ROI is — `Roi.from_values(slices={"x": (x0, width), "y": (y0, height)}, name=None, space="pixel", confidence=0.9)`. Boxes pin `x` and `y` (and optionally `z` for 3D boxes); `space="pixel"` is required, and a world-space box is refused — patch-local numbers in a world-labelled Roi would land every box in the wrong place silently. Whatever else the box carries as extra fields — confidence, class — rides along into the table unchanged, but `name` and `label` are refused: the iterator itself assigns them when it renumbers the survivors (put a class label in an extra field, e.g. `class_id`). The iterator does the bookkeeping the detector should not: it anchors each tile's boxes into the reference image's world coordinates, and it resolves the boundary problem.
+The detector sees one tile at a time and answers in the tile's own pixels: `(patch) -> list[Roi]`, each box built the way any ROI is — `Roi.from_values(slices={"x": (x0, width), "y": (y0, height)}, name=None, space="pixel", confidence=0.9)`. Boxes pin `x` and `y` (and optionally `z` for 3D boxes); `space="pixel"` is required, and a world-space box is refused — patch-local numbers in a world-labelled Roi would land every box in the wrong place silently.
 
-The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which `with_halo` is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**, configured by `nms=NmsConfig(...)` exactly as stitching is by `stitch=StitchConfig(...)`: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
+Whatever else the box carries as extra fields — confidence, class — rides along into the table unchanged, but `name` and `label` are refused: the iterator itself assigns them when it renumbers the survivors (put a class label in an extra field, e.g. `class_id`). The iterator does the bookkeeping the detector should not: it anchors each tile's boxes into the reference image's world coordinates, and it resolves the boundary problem.
+
+The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which `with_halo` is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them.
+
+The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**, configured by `nms=NmsConfig(...)`: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
 
 Two contracts worth knowing. Every tile must report the same box dimensionality (all 2D or all 3D, scored or unscored) — mixtures raise. And a 2D detector on a 3D or timelapse image never has its boxes merged across the un-pinned axes: detections from different z-slabs or time points keep their tile's extent along those axes and are deduplicated only within it.
 

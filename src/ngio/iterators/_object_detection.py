@@ -294,6 +294,13 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     produces are resolved by NMS (`NmsConfig`). The product is a
     `RoiTable` of world-anchored boxes, returned by `detect` for the
     caller to store.
+
+    The box contract: each detection is a `Roi` in the *patch's own* pixel
+    coordinates — `Roi.from_values(slices={"x": (x0, w), "y": (y0, h)},
+    name=None, space="pixel", confidence=0.9)`. `x` and `y` required, `z`
+    optional (the same choice on every box); `name`/`label` are refused (the
+    iterator assigns them — put a class label in an extra field); every
+    extra field rides along into the table.
     """
 
     # The halo is this iterator's read margin: there is no write to crop it
@@ -414,20 +421,10 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         `container.add_table(name, table)`.
 
         Args:
-            func: `(patch) -> list[Roi]` with the boxes the detector found,
-                built in the *patch's own* pixel coordinates:
-                `Roi.from_values(slices={"x": (x0, width), "y": (y0,
-                height)}, name=None, space="pixel", confidence=0.9)`.
-                `x` and `y` are required, `z` optional (the same choice on
-                every box); the tile's other axes are inherited from the
-                tile, and the iterator anchors each box into the reference
-                image's world coordinates. `space="pixel"` is required — a
-                world-space Roi is refused, and so are `name` and `label`,
-                which the iterator itself assigns (move a class label to an
-                extra field, e.g. `class_id=3`). Every extra field — class,
-                confidence, whatever the detector reports — rides along into
-                the table. Under a parallel mapper the function runs on
-                worker threads or processes and must be safe there.
+            func: `(patch) -> list[Roi]`, boxes in the *patch's own* pixel
+                coordinates — see the class docstring for the box contract.
+                Under a parallel mapper it runs on worker threads or
+                processes and must be safe there.
             mapper: How the per-tile work is scheduled; `None` is serial.
 
         Returns:

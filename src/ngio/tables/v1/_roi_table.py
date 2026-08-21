@@ -342,8 +342,8 @@ class GenericRoiTableV1(AbstractBaseTable):
         """Return the table.
 
         Rebuilt from the ROIs only when `add()` has changed them since the
-        last build — the rebuild iterates every ROI into a fresh DataFrame,
-        which used to run on *every* access.
+        last build: the rebuild iterates every ROI into a fresh DataFrame,
+        too costly to run per access.
         """
         if self._rois is None:
             return super().table_data
