@@ -202,6 +202,23 @@ class Image(AbstractImage):
             channel_label=channel_label, wavelength_id=wavelength_id
         )
 
+    def resolve_channel_selection(
+        self, channel_selection: ChannelSlicingInputType = None
+    ) -> dict[str, int | list[int]]:
+        """Resolve a channel selection against this image's channel metadata.
+
+        Accepts everything the `get_*` methods accept as `channel_selection` —
+        an index, a channel label, a `ChannelSelectionModel`, or a sequence of
+        those — and returns the slicing entry it resolves to (`{"c": index}`
+        or `{"c": [indices]}`; `{}` for `None`), ready to use as slicing
+        kwargs. Resolution touches only metadata, so this is also the way to
+        validate a selection before loading any data.
+
+        Raises:
+            NgioValueError: If a referenced channel does not exist.
+        """
+        return _parse_channel_selection(self, channel_selection)
+
     def get_as_numpy(
         self,
         channel_selection: ChannelSlicingInputType = None,
@@ -1075,7 +1092,7 @@ def _parse_str_or_model(
 
 def _parse_channel_selection(
     image: Image, channel_selection: ChannelSlicingInputType
-) -> dict[str, SlicingInputType]:
+) -> dict[str, int | list[int]]:
     """Parse the channel selection input into a list of channel indices."""
     if channel_selection is None:
         return {}

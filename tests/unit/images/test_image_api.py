@@ -123,3 +123,28 @@ def test_channel_selection_ambiguous_with_c_kwarg():
     image = _make_container().get_image()
     with pytest.raises(NgioValueError, match="ambiguous"):
         image.get_array(channel_selection=0, c=0)
+
+
+def test_resolve_channel_selection():
+    """The public resolver mirrors what the `get_*` methods accept.
+
+    Resolution touches only metadata — this is the supported way to validate
+    a selection (e.g. a task's `skip_if_missing`) before loading any data.
+    """
+    image = _make_container().get_image()
+
+    assert image.resolve_channel_selection(None) == {}
+    assert image.resolve_channel_selection(1) == {"c": 1}
+    assert image.resolve_channel_selection("GFP") == {"c": 1}
+    assert image.resolve_channel_selection(["DAPI", "GFP"]) == {"c": [0, 1]}
+    assert image.resolve_channel_selection(
+        [
+            ChannelSelectionModel(mode="wavelength_id", identifier="A02_C02"),
+            ChannelSelectionModel(mode="index", identifier="0"),
+        ]
+    ) == {"c": [1, 0]}
+
+    with pytest.raises(NgioValueError):
+        image.resolve_channel_selection("not_a_channel")
+    with pytest.raises(NgioValueError):
+        image.resolve_channel_selection(["DAPI", 7])
