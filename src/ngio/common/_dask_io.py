@@ -7,7 +7,7 @@ import dask
 import dask.array as da
 import numpy as np
 import zarr
-from dask.array.core import PerformanceWarning
+from dask.array.core import PerformanceWarning, normalize_chunks
 from dask.utils import parse_bytes
 
 from ngio.config import get_config
@@ -82,6 +82,38 @@ def block_budget(zarr_array: zarr.Array) -> int:
     return max(budget, write_unit_bytes(zarr_array))
 
 
+def _require_write_unit_alignment(zarr_array: zarr.Array) -> None:
+    """Refuse a whole-array write whose block grid would double-write a unit.
+
+    Replicates the grid `da.to_zarr` rechunks to (`normalize_chunks` under the
+    active `array.chunk-size` budget, so call this inside the budget scope)
+    and requires every *interior* block boundary to land on a write-unit
+    boundary — the condition that gives each chunk or shard exactly one
+    writer under `lock=False`. `block_budget`'s floor makes this hold today;
+    the check is the tripwire if a dask upgrade ever changes the grid, since
+    the write would otherwise lose updates silently.
+    """
+    unit = write_unit(zarr_array)
+    grid = normalize_chunks(
+        "auto",
+        shape=zarr_array.shape,
+        dtype=zarr_array.dtype,
+        previous_chunks=unit,
+    )
+    for axis, (sizes, step) in enumerate(zip(grid, unit, strict=True)):
+        boundary = 0
+        for size in sizes[:-1]:
+            boundary += size
+            if boundary % step:
+                raise NgioValueError(
+                    f"Refusing a parallel dask write: along axis {axis} the "
+                    f"block grid {sizes} splits a write unit (size {step}) "
+                    "between two writers, which can silently lose updates. "
+                    "This indicates a dask chunk-normalization change; please "
+                    "report it to ngio."
+                )
+
+
 def store_dask(
     patch: da.Array,
     zarr_array: zarr.Array,
@@ -130,16 +162,22 @@ def store_dask(
     budget = block_budget(zarr_array)
 
     with dask.config.set({"array.chunk-size": budget}), warnings.catch_warnings():
-        # What remains after the guard is dask reporting that the *region* does
-        # not cover whole units -- a ROI narrower than a chunk, say. That read-
-        # modify-write is real and unavoidable, but it is not a hazard: the
-        # region is cut on the array's own block grid, so each boundary unit has
-        # exactly one writer (`test_dask_write_race.py` pins that). The warning's
-        # own remedy does not apply either, since no `array.chunk-size` makes a
-        # sub-chunk ROI cover a whole chunk. Silencing an unactionable warning
-        # per write, not the condition: `filterwarnings("error")` downstream
-        # would otherwise make ordinary ROI writes raise. Matched on the
-        # message, so dask's other `PerformanceWarning`s still surface.
+        if region is None:
+            _require_write_unit_alignment(zarr_array)
+        # Dask's rechunk warning is muted because it is wrong in both
+        # directions here. With a region, it reports that the region does not
+        # cover whole units — a ROI narrower than a chunk, say. That
+        # read-modify-write is real and unavoidable, but it is not a hazard:
+        # the region is cut on the array's own block grid, so each boundary
+        # unit has exactly one writer, and no `array.chunk-size` makes a
+        # sub-chunk ROI cover a whole chunk.
+        # Whole-array: it fires on a single whole-axis block whose
+        # extent is not a unit multiple, which has no interior boundary and
+        # is single-writer-safe; the genuine hazard it exists for is caught
+        # precisely, and loudly, by `_require_write_unit_alignment` above.
+        # Silencing per write, not the condition: `filterwarnings("error")`
+        # downstream would otherwise make ordinary writes raise. Matched on
+        # the message, so dask's other `PerformanceWarning`s still surface.
         warnings.filterwarnings(
             "ignore",
             message="The input Dask array will be rechunked",

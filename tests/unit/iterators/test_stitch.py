@@ -518,6 +518,34 @@ def test_stitch_warns_on_tiles_split_along_an_unhaloed_axis():
         iterator.map(lambda patch: np.zeros_like(patch, dtype="uint32"))
 
 
+def test_compact_warns_when_it_renumbers_untouched_objects():
+    """`compact=True` walks the whole label; renumbering foreign ids warns."""
+    from ngio.utils import NgioUserWarning
+
+    data = _one_object_across_the_seam()
+    _, image, label = _setup(data)
+    # An object the run never touches: the iteration covers only the left
+    # column of tiles, so this id survives to the compaction pass.
+    label.zarr_array[50:60, 40:50] = 7
+
+    iterator = (
+        SegmentationIterator(
+            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+        )
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+    left_tiles = []
+    for roi in iterator.rois:
+        x_slice = roi.get("x")
+        assert x_slice is not None
+        if x_slice.start == 0:
+            left_tiles.append(roi)
+    left_only = iterator._new_from_rois(left_tiles)
+    with pytest.warns(NgioUserWarning, match="never touched"):
+        left_only.map(_connected_components)
+
+
 def test_stitch_refuses_duplicate_tile_names():
     from ngio import Roi
 

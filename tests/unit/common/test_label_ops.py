@@ -107,7 +107,7 @@ def test_relabel_sequential_produces_dense_ids():
     data[0:2, 6:8] = 77
 
     array = _array(data)
-    assert relabel_sequential(array) == 3
+    assert len(relabel_sequential(array)) == 3
     assert sorted({int(v) for v in np.unique(np.asarray(array[...])) if v}) == [1, 2, 3]
 
 
@@ -132,7 +132,7 @@ def test_relabel_sequential_applies_canonical_first():
     data[0:2, 6:8] = 300
 
     array = _array(data)
-    assert relabel_sequential(array, {200: 100}) == 2
+    assert len(relabel_sequential(array, {200: 100})) == 2
     written = np.asarray(array[...])
     assert written[0, 0] == written[7, 7], "the union should have merged these"
     assert written[0, 7] != written[0, 0]
@@ -165,3 +165,33 @@ def test_offset_refuses_id_spill_into_the_next_block():
 
     # The largest id that still fits is fine.
     check_offset_fits(np.array([[99]], dtype="uint32"), offset=100, block_size=100)
+
+
+def test_chunk_selections_walk_the_write_unit_on_a_sharded_array():
+    """On a sharded label the walk must be per shard, not per inner chunk.
+
+    Writes are atomic per shard object; walking inner chunks would turn each
+    write into a full-shard read-modify-write.
+    """
+    sharded = zarr.create_array(
+        store={}, shape=(8, 8), dtype="uint32", chunks=(2, 2), shards=(4, 4)
+    )
+    selections = list(chunk_selections(sharded))
+    assert len(selections) == 4
+    assert selections[0] == (slice(0, 4), slice(0, 4))
+
+    unsharded = zarr.create_array(store={}, shape=(8, 8), dtype="uint32", chunks=(4, 4))
+    assert list(chunk_selections(unsharded)) == selections
+
+
+def test_relabel_sequential_on_a_sharded_label():
+    data = np.zeros((8, 8), dtype="uint32")
+    data[0:2, 0:2] = 5000
+    data[6:8, 6:8] = 9000
+
+    array = zarr.create_array(
+        store={}, shape=(8, 8), dtype="uint32", chunks=(2, 2), shards=(4, 4)
+    )
+    array[...] = data
+    assert len(relabel_sequential(array)) == 2
+    assert sorted({int(v) for v in np.unique(np.asarray(array[...])) if v}) == [1, 2]

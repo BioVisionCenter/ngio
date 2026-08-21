@@ -366,18 +366,25 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
 
         A failed standalone run cannot be resolved, so the stitch scratch
         arrays are deleted rather than left as a stray `_ngio_stitch` group
-        beside the resolution levels. A *partition slice* never cleans up:
-        the scratch holds the banks every other job wrote, and one failed
-        job must not destroy them — re-running that job is idempotent (its
-        banks rewrite, the id offsets are derived, not counted). The
-        already-written tiles stay in both cases.
+        beside the resolution levels. Cleanup happens only when this run
+        *created* the scratch: a partition slice, a resumed run, or the
+        gather step opened a prepared root that holds the banks every other
+        job wrote, and one failure must not destroy them — re-running is
+        idempotent (banks rewrite, the id offsets are derived, not counted).
+        The already-written tiles stay in every case.
         """
-        if self._stitch is None or self._partition is not None:
+        if self._stitch is None:
+            return super().map(func, mapper=mapper)
+        # Build the plan (and let its validation warnings and errors fire)
+        # before any tile runs: lazily it would surface mid-run, from a
+        # worker, after some tiles have already written.
+        self._stitching_plan()
+        if self._partition is not None:
             return super().map(func, mapper=mapper)
         try:
             return super().map(func, mapper=mapper)
         except BaseException:
-            if self._stitch_plan is not None:
+            if self._stitch_plan is not None and self._stitch_plan.created_banks:
                 self._stitch_plan.cleanup()
                 self._stitch_plan = None
             raise

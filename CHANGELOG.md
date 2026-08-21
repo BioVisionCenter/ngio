@@ -33,7 +33,14 @@ The design rationale that used to live in this file now lives in the docs — se
 - **Writing through a chain of two or more transforms now inverts the chain** — it applied the inverses in forward order, silently wrong for any user chain on a write path.
 - **A merge can no longer broadcast a wrong-shaped patch or hand zarr a promoted dtype** (a float patch under `merge="max"` used to wrap-cast, `-1.0` becoming `65535`); integer `"sum"` still wraps within the dtype — numpy addition, documented.
 - **The zoom transform's edge cases are pinned**: negative starts clamp like the read, empty selections zoom to empty patches, and a scaled list selection raises instead of silently stretching non-adjacent pixels.
-- Stale table names are skipped by typed listings instead of *creating* a group for the missing table; shards clip to whole chunk multiples instead of producing a geometry zarr rejects; `mode="coarsen"` asked to upsample raises a named error instead of a bare divide-by-zero; a dropped channel selection is no longer validated before the removal that exempted it.
+- `cache=False` re-probes: a container's remembered "no tables" answer and a table's memoised type could outlive writes made through another handle; both now honour the cache flag.
+- `normalize_anndata` dropped `.raw` while normalizing `obs`; it is carried through again (the result still shares its other components with the input rather than copying them).
+- A failed `map` on a stitched iterator cleaned up the scratch even when it had only *opened* a prepared root (a resumed run, or the gather step) — one failure could delete every job's banked predictions. Cleanup now runs only when the failing run created the scratch itself.
+- The write-conflict graph keyed output arrays by handle identity, so two `zarr.Array` handles onto one stored array were never compared — a latent lost update under parallel mappers. It now keys on the stored array (store + path).
+- A whole-array dask write now verifies its block grid gives each write unit exactly one writer, raising loudly instead of leaning on a silenced dask warning.
+- `relabel_sequential` and the stitch compaction walk sharded labels per shard, not per inner chunk (each inner-chunk write was a full-shard read-modify-write).
+- A `BatchedMapper` reduction on a ragged batch raises: the result is computed on padded patches, so the padding had already leaked into the values.
+- Stale table names are skipped by typed listings instead of *creating* a group for the missing table; shards clip to whole chunk multiples instead of producing a geometry zarr rejects; `mode="coarsen"` asked to upsample raises a named error instead of a bare divide-by-zero; a dropped channel selection is no longer validated before the removal that exempted it; a zero-sized axis reports itself instead of blaming the tail policy; stitch plan warnings fire at the start of `map`, pointing at the caller, not mid-run from a worker.
 
 ### Behaviour changes
 
@@ -44,6 +51,8 @@ The design rationale that used to live in this file now lives in the docs — se
 - **`cache=True` actually caches**: metadata is held for the object's lifetime (outside writes need `refresh()`), `image.dimensions` is fixed per object, and caching now composes with the atomic plate/well operations (the lock refreshes on entry and release). `cache=False` is unchanged and remains the default.
 - `max_workers=0` raises instead of running silently serial; `by_grid(tail="drop")` raises when it would drop every tile; a writing `map` no longer holds every written patch in memory until it returns.
 - ngio no longer wraps a plain local store in `NgioStore` when the retry policy is a no-op (the wrapper cost `zarrs` for nothing), and a codec pipeline that silently fell back now warns once per store type.
+- `measure` returns an empty `FeatureTable` when zero objects are found — the same contract as `detect` — instead of raising.
+- `stitch(compact=True)` warns when the final renumbering reaches ids outside the iterated ROIs: the compaction walks the whole label, so external references keyed by those ids (feature tables, masking ROI tables) go stale.
 
 ### Deprecated
 

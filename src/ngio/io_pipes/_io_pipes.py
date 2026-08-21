@@ -37,10 +37,17 @@ def _prepare_transforms(
     inverts freely and needs no ordering rules. Anything that also depends on
     the destination's contents is a merge and belongs in the pipe's `merge=`
     slot; that is the one thing worth catching here, because a merge policy
-    would otherwise fail with a confusing "not a transform" message.
+    would otherwise fail with a confusing "not a transform" message. Both
+    protocols are `runtime_checkable`, so `isinstance` only probes attribute
+    names — an object exposing `on_get`/`on_set` *and* `reconcile` is taken
+    at its placement here and treated as a transform.
     """
     if transforms:
-        policies = [t for t in transforms if isinstance(t, MergePolicy)]
+        policies = [
+            t
+            for t in transforms
+            if isinstance(t, MergePolicy) and not isinstance(t, TransformProtocol)
+        ]
         if policies:
             names = ", ".join(type(t).__name__ for t in policies)
             raise NgioValueError(

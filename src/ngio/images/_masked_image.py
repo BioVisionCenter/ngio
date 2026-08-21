@@ -47,10 +47,14 @@ def _build_mask_transform(
     *,
     masked_image: "MaskedImage | MaskedLabel",
     axes_order: Sequence[str] | None,
-    transforms: Sequence[TransformProtocol] | None = None,
     allow_rescaling: bool,
 ) -> BaseMaskTransform:
-    """The read-side mask: outside-mask pixels come back as the fill value."""
+    """The read-side mask: outside-mask pixels come back as the fill value.
+
+    The caller's data transforms do not belong here — they apply to the image
+    patch (the callers splice them into the getter chain themselves), while
+    anything passed to `BaseMaskTransform` would run on the *label* read.
+    """
     return BaseMaskTransform(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
 
 
@@ -204,7 +208,6 @@ class MaskedImage(Image):
         mask_transform = _build_mask_transform(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
         masked_getter = NumpyGetter(
@@ -237,7 +240,6 @@ class MaskedImage(Image):
         mask_transform = _build_mask_transform(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
         masked_getter = DaskGetter(
@@ -467,7 +469,6 @@ class MaskedLabel(Label):
         mask_transform = _build_mask_transform(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
         masked_getter = NumpyGetter(
@@ -495,7 +496,6 @@ class MaskedLabel(Label):
         mask_transform = _build_mask_transform(
             masked_image=self,
             axes_order=axes_order,
-            transforms=transforms,
             allow_rescaling=allow_rescaling,
         )
         masked_getter = DaskGetter(

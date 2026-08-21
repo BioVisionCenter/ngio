@@ -20,6 +20,7 @@ from ngio.iterators._mappers import (
     BasicMapper,
     IterUnit,
     MapperProtocol,
+    _is_same_zarr_array,
     compute_write_footprint,
     write_conflict_components,
 )
@@ -46,16 +47,6 @@ NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
 R = TypeVar("R")
 T = TypeVar("T")
-
-
-def _is_same_zarr_array(left, right) -> bool:
-    """Whether two zarr array handles point at the same stored array."""
-    if left is right:
-        return True
-    try:
-        return left.store == right.store and left.path == right.path
-    except (AttributeError, TypeError):
-        return False
 
 
 class JobArgs(TypedDict):

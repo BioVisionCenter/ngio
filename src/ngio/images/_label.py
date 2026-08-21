@@ -135,7 +135,7 @@ class Label(AbstractImage):
         Returns:
             How many distinct objects the label now holds.
         """
-        count = relabel_sequential(self.zarr_array)
+        count = len(relabel_sequential(self.zarr_array))
         self.consolidate(mode=consolidation_mode)
         return count
 

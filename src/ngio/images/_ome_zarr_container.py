@@ -213,11 +213,13 @@ class OmeZarrContainer:
         if self._tables_container is not None:
             return self._tables_container
 
-        # "This image has no /tables" is worth remembering too. Only the
-        # read-only probe may be remembered: a `create_mode=True` caller is
-        # asking for the group to be made, so it has to try again even though
-        # an earlier read-only probe found nothing.
-        if self._tables_absent and not create_mode:
+        # "This image has no /tables" is worth remembering too, but only under
+        # `cache=True` — with caching off, another writer may add tables at any
+        # time and every call has to re-probe. Only the read-only probe may be
+        # remembered: a `create_mode=True` caller is asking for the group to be
+        # made, so it has to try again even though an earlier read-only probe
+        # found nothing.
+        if self._tables_absent and not create_mode and self._group_handler.use_cache:
             return None
 
         _tables_container = _try_get_table_container(

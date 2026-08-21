@@ -138,10 +138,11 @@ def _default_feature_coalesce(
     # a float index fails the table's integer-index validation).
     frames = [frame for frame in frames if len(frame)]
     if not frames:
-        raise NgioValueError(
-            "Every ROI returned zero rows: there is nothing to build a table "
-            "from. Check that the label actually contains objects inside the "
-            "iterated ROIs."
+        # Zero objects is a legitimate outcome, not an error — the same
+        # contract as `detect`. No rows also means no feature columns.
+        empty = pd.DataFrame({"label": pd.Series([], dtype="int64")})
+        return FeatureTable(
+            table_data=empty.set_index("label"), reference_label=reference_label
         )
     joined = pd.concat(frames)
     if "label" in joined.columns:
@@ -303,6 +304,8 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
 
         Returns:
             The joined table — a `FeatureTable` under the default `coalesce`.
+            A run that finds zero objects returns an empty table, as `detect`
+            does.
         """
         if self._partition is not None:
             raise NgioValueError(
@@ -328,13 +331,14 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         The per-job step of a distributed run (see `prepare_jobs`): the
         measurements are stored **before** any join, tagged with their global
         ROI index, so `merge_partials` can rebuild the full per-ROI result
-        list and run the ONE global coalesce — bit-identical to a serial
-        `measure`, custom `coalesce` included. Only callable on a
-        `for_job` slice; re-running a job overwrites its own partial.
+        list and run the ONE global coalesce. The final table matches a
+        serial `measure` row for row. Only callable on a `for_job` slice;
+        re-running a job overwrites its own partial.
 
-        Frames returned as dicts are normalized to DataFrames and a `label`
-        index to a `label` column — a custom `coalesce` at merge time sees
-        that normalized form.
+        A custom `coalesce` at merge time sees a *normalized* result list,
+        not the function's raw returns: dicts become DataFrames, a `label`
+        index becomes a `label` column, and a ROI whose function returned no
+        rows arrives as an empty, column-less DataFrame.
         """
         if self._partition is None:
             raise NgioValueError(
@@ -388,8 +392,9 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         of the prepared plan produced a matching partial — a half-finished
         run errors instead of returning a silently incomplete table —
         rebuilds the per-ROI result list in global ROI order, and runs the
-        single (default or custom) `coalesce`, exactly as a serial
-        `measure` would. On success the partials group is removed.
+        single (default or custom) `coalesce`. The result list is the
+        normalized form described in `measure_to_partial`, not the
+        function's raw returns. On success the partials group is removed.
         Nothing is registered: the returned table is yours to store with
         `add_table`.
         """

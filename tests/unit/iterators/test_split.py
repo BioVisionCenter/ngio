@@ -258,6 +258,36 @@ def test_stitched_jobs_match_serial_stitched(tmp_path: Path):
     assert "_ngio_stitch" not in list(label._group_handler.group.keys())
 
 
+def _boom(patch):
+    raise RuntimeError("worker died")
+
+
+def test_failed_gather_map_keeps_the_jobs_banks(tmp_path: Path):
+    """A failed unrestricted map on a prepared plan must not delete the scratch.
+
+    The unrestricted iterator *opens* a matching prepared root (a resumed run
+    or the gather step) rather than creating it; the banks in it are every
+    job's work, and one failure must not destroy them. Only a run that
+    created its own scratch may clean it up on failure.
+    """
+    ome_zarr = _stitched_setup(tmp_path / "stitch_fail.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    for args in args_list:
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+
+    with pytest.raises(RuntimeError, match="worker died"):
+        _stitched_iterator(ome_zarr).map(_boom)
+
+    label = ome_zarr.get_label("seg")
+    assert "_ngio_stitch" in list(label._group_handler.group.keys())
+
+    # The banks survived, so the gather still resolves and cleans up.
+    _stitched_iterator(ome_zarr).finalize()
+    label = ome_zarr.get_label("seg")
+    assert "_ngio_stitch" not in list(label._group_handler.group.keys())
+
+
 def _overlapping_stitched_iterator(ome_zarr):
     return (
         SegmentationIterator(

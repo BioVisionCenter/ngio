@@ -115,6 +115,13 @@ def _axis_intervals(
             "re-balance."
         )
 
+    if dim < 1:
+        # `range(0, 0, stride)` is empty under every tail policy; without
+        # this the error below would blame `tail='drop'` for a 0-sized axis.
+        raise NgioValueError(
+            f"Cannot tile along '{axis_name}': the axis has size {dim}."
+        )
+
     intervals: list[tuple[int, int]] = []
     for start in range(0, dim, stride):
         if start + size <= dim:

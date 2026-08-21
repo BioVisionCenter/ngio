@@ -407,3 +407,32 @@ def test_rename_axes():
     assert label.axes == ("y", "XX")
     ome_zarr.set_axes_names(axes_names=["c", "y", "x"])
     assert ome_zarr.get_image().axes == ("c", "y", "x")
+
+
+def test_uncached_container_sees_tables_added_by_another_handle(tmp_path: Path):
+    """The "no /tables" answer may only be remembered under `cache=True`."""
+    store = tmp_path / "ome_zarr.zarr"
+    create_empty_ome_zarr(store, shape=(3, 20, 30), pixelsize=0.5)
+
+    reader = open_ome_zarr_container(store, cache=False)
+    assert reader.list_tables() == []
+
+    writer = open_ome_zarr_container(store)
+    writer.add_table("t", GenericTable(table_data=pd.DataFrame({"a": [1]})))
+
+    assert reader.list_tables() == ["t"]
+
+
+def test_cached_container_holds_the_no_tables_answer(tmp_path: Path):
+    store = tmp_path / "ome_zarr.zarr"
+    create_empty_ome_zarr(store, shape=(3, 20, 30), pixelsize=0.5)
+
+    reader = open_ome_zarr_container(store, cache=True)
+    assert reader.list_tables() == []
+
+    writer = open_ome_zarr_container(store)
+    writer.add_table("t", GenericTable(table_data=pd.DataFrame({"a": [1]})))
+
+    assert reader.list_tables() == []
+    reader.refresh()
+    assert reader.list_tables() == ["t"]

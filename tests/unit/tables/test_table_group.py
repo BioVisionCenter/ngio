@@ -57,6 +57,26 @@ def test_a_stale_table_name_does_not_break_typed_listing(tmp_path: Path):
         table_group.get("stale")
 
 
+def test_uncached_typed_listing_sees_a_type_change(tmp_path: Path):
+    """Under `cache=False` the type memo must not outlive the table."""
+    from ngio.tables import GenericTable
+
+    store = tmp_path / "test.zarr"
+    reader = open_tables_container(store, cache=False, mode="a")
+    writer = open_tables_container(store, mode="r+")
+
+    table = FeatureTable(
+        table_data=DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
+    )
+    writer.add(name="t", table=table)
+    assert reader.list(filter_types="feature_table") == ["t"]
+
+    writer.delete("t")
+    writer.add(name="t", table=GenericTable(table_data=DataFrame({"a": [1.0]})))
+    assert reader.list(filter_types="feature_table") == []
+    assert reader.list(filter_types="generic_table") == ["t"]
+
+
 def test_add_explicit_backend_overrides(tmp_path: Path):
     """An explicit backend argument still converts the table."""
     src_group = open_tables_container(tmp_path / "src.zarr", mode="a")

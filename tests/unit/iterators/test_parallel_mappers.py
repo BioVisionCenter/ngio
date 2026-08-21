@@ -168,6 +168,42 @@ def test_plan_waves_partition_is_conflict_free_and_deterministic():
     assert len(readonly) == 1
 
 
+def test_waves_conflict_across_distinct_handles_of_one_array():
+    """Two `zarr.Array` handles onto one stored array are one array.
+
+    `get_label` builds a fresh handle per call; keying the conflict graph on
+    handle identity would let two units targeting the same write unit share a
+    wave — a silent lost update. The graph must key on the stored array
+    (store + path).
+    """
+    ome_zarr, base = _colliding_iterator(MemoryStore())
+    units_a = list(base.by_chunks()._numpy_units_generator())
+    other = SegmentationIterator(
+        ome_zarr.get_image(),
+        ome_zarr.get_label("coarse"),
+        channel_selection=0,
+        axes_order="yx",
+    )
+    units_b = list(other.by_chunks()._numpy_units_generator())
+
+    first = units_a[0]
+    assert first.setter is not None
+    partner = next(
+        unit
+        for unit in units_b
+        if unit.index != first.index
+        and unit.setter is not None
+        and unit.write_footprint is not None
+        and first.write_footprint is not None
+        and chunk_rects_intersect(first.write_footprint, unit.write_footprint)
+    )
+    assert partner.setter is not None
+    assert first.setter.zarr_array is not partner.setter.zarr_array
+
+    waves = plan_waves([first, partner])
+    assert len(waves) == 2
+
+
 def test_process_mapper_runs_waves_across_one_pool(tmp_path: Path):
     serial_zarr, serial_base = _colliding_iterator(tmp_path / "serial.zarr")
     serial_base.by_chunks().map_as_numpy(_threshold)

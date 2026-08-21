@@ -54,6 +54,7 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     open_group_wrapper,
+    stacklevel_of_first_caller,
 )
 
 _SCRATCH_GROUP = "_ngio_stitch"
@@ -73,6 +74,11 @@ class StitchConfig:
             split, which is fixable downstream, rather than merging two that
             are not.
         compact: Renumber the surviving ids to a dense `1..N` at the end.
+            The renumbering walks the **whole** label, so objects outside the
+            iterated ROIs get new ids too — anything keyed by the old ids
+            (feature tables, masking ROI tables) is invalidated. A run that
+            renumbers such pre-existing objects warns. Use `compact=False`
+            and reconcile ids yourself to keep external references valid.
         scratch_store: Where to keep the per-tile banks while the map runs.
             `None` puts them in a transient group inside the output label,
             which works under every mapper. A `MemoryStore` avoids touching
@@ -385,7 +391,7 @@ class StitchPlan:
                     "tile, so nothing was split. Ids are still offset per tile"
                     + (" and compacted at the end." if config.compact else "."),
                     NgioUserWarning,
-                    stacklevel=2,
+                    stacklevel=stacklevel_of_first_caller(),
                 )
             else:
                 core_pairs = [
@@ -405,7 +411,7 @@ class StitchPlan:
                     "merged. Ids are still offset per tile"
                     + (" and compacted at the end." if config.compact else "."),
                     NgioUserWarning,
-                    stacklevel=2,
+                    stacklevel=stacklevel_of_first_caller(),
                 )
 
         unhaloed = [
@@ -417,7 +423,7 @@ class StitchPlan:
                 "halo: seams along it will not be stitched. Add the axis to "
                 "`with_halo(...)` to stitch across it.",
                 NgioUserWarning,
-                stacklevel=2,
+                stacklevel=stacklevel_of_first_caller(),
             )
 
         self._scratch_factory = scratch_factory
@@ -536,10 +542,37 @@ class StitchPlan:
         if self._config.compact:
             # One pass: canonicalize and renumber together. Collecting the ids
             # first would mean reading the whole label twice.
-            relabel_sequential(label_array, mapping)
+            dense = relabel_sequential(label_array, mapping)
+            # Ids this run wrote all carry a tile's offset, so anything outside
+            # the offset range pre-existed the run — and just got a new id.
+            # (An original id that happens to fall inside the range is missed;
+            # the common case, small ids in an existing label, is caught.)
+            block = self._config.block_size
+            top = (len(self._works) + 1) * block
+            foreign = sum(1 for root in dense if not block < root < top)
+            if foreign:
+                warnings.warn(
+                    f"compact=True renumbered {foreign} object id(s) this run "
+                    "never touched: the renumbering walks the whole label, so "
+                    "anything keyed by the old ids (feature tables, masking "
+                    "ROI tables) is now stale. Use `compact=False` to keep "
+                    "ids outside the iterated ROIs unchanged.",
+                    NgioUserWarning,
+                    stacklevel=stacklevel_of_first_caller(),
+                )
         else:
             _apply_relabel(label_array, mapping)
         self.cleanup()
+
+    @property
+    def created_banks(self) -> bool:
+        """Whether this run created the scratch root (vs opened a prepared one).
+
+        The predicate for a failure-path cleanup: a run that only *opened* the
+        scratch — a job, a resumed run, the gather step — must never delete it,
+        because it holds the banks every other job wrote.
+        """
+        return self._banks is not None and self._banks.created
 
     def cleanup(self) -> None:
         """Delete the scratch group ngio created."""

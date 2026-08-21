@@ -281,10 +281,11 @@ class TablesContainer:
 
         The type lives only in each table's own attributes — the `/tables`
         group records names — so learning it costs one group open per table.
-        That result is memoised, because a table's type does not change without
-        going through `add`/`delete` here. Names are still re-read every call,
-        so a table added by someone else is picked up; only the type of a name
-        already seen is held.
+        Under `cache=True` that result is memoised: a table's type does not
+        change without going through `add`/`delete` here, and those drop the
+        memo. Under `cache=False` every call re-reads each type, so a table
+        overwritten with a different type by another handle is picked up.
+        Names are re-read every call in both modes.
 
         Args:
             names: Restrict to these tables. Defaults to every table listed.
@@ -292,14 +293,17 @@ class TablesContainer:
         if names is None:
             names = self._get_tables_list()
 
+        use_memo = self._group_handler.use_cache
         for name in names:
-            if name not in self._types_memo:
+            if not use_memo or name not in self._types_memo:
                 try:
                     handler = self._get_table_group_handler(name)
                 except NgioFileNotFoundError:
                     # A stale name in the `tables` attribute with no group
-                    # behind it. Not memoised: it stays invisible to typed
-                    # listings but keeps raising on a direct `get`.
+                    # behind it. Not memoised (and any earlier memo is
+                    # dropped): it stays invisible to typed listings but
+                    # keeps raising on a direct `get`.
+                    self._types_memo.pop(name, None)
                     continue
                 self._types_memo[name] = _get_meta(handler).type
         return {

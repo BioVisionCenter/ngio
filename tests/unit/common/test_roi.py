@@ -678,3 +678,53 @@ def test_anchor_requires_pinned_local_bounds():
 
     with pytest.raises(NgioValueError, match="pin start and length"):
         tile.anchor(open_box, pixel_size=ps)
+
+
+def test_anchor_origin_agrees_with_canonical_slicing():
+    """`anchor`'s patch origin must match the origin the getter actually reads.
+
+    `Roi.anchor` is pure geometry, so it cannot apply the canonical path's
+    upper clamp — but for every region that yields a non-empty patch the two
+    must agree, fractional and negative starts included. This is the guard
+    against a second rounding implementation drifting.
+    """
+    import numpy as np
+    from zarr.storage import MemoryStore
+
+    from ngio import create_ome_zarr_from_array
+    from ngio.io_pipes._io_pipe_ops import setup_io_pipe
+
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=np.zeros((64, 64), dtype="uint8"),
+        pixelsize=0.65,
+        axes_names="yx",
+        levels=1,
+    )
+    image = ome_zarr.get_image()
+    ps = image.pixel_size
+
+    regions = [
+        {"y": (0.0, 20.8), "x": (0.0, 20.8)},  # whole tiles
+        {"y": (13.0, 13.0), "x": (6.5, 6.5)},  # fractional pixel starts
+        {"y": (-2.0, 20.0), "x": (0.31, 7.7)},  # clipped at 0, sub-pixel start
+        {"y": (40.0, 60.0), "x": (33.3, 33.3)},  # stops past the array edge
+    ]
+    for slices in regions:
+        region = Roi.from_values(name="tile", slices=slices, space="world")
+        ctx = setup_io_pipe(
+            zarr_array=image.zarr_array,
+            dimensions=image.dimensions,
+            roi=region,
+        )
+        zero_box = Roi.from_values(
+            slices={"y": (0, 1), "x": (0, 1)}, name=None, space="pixel"
+        )
+        anchored = region.anchor(zero_box, pixel_size=ps).to_pixel(pixel_size=ps)
+        for axis in ("y", "x"):
+            selection = ctx.slicing.get(axis, normalize=True)
+            assert isinstance(selection, slice)
+            read_origin = 0 if selection.start is None else int(selection.start)
+            box_slice = anchored.get(axis)
+            assert box_slice is not None and box_slice.start is not None
+            assert int(box_slice.start) == read_origin, (slices, axis)

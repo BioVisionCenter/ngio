@@ -126,27 +126,28 @@ def relabel(array: np.ndarray, mapping: dict[int, int]) -> np.ndarray:
 
 
 def chunk_selections(array: zarr.Array) -> Iterator[tuple[slice, ...]]:
-    """Yield one index tuple per chunk, in a fixed order.
+    """Yield one index tuple per write unit, in a fixed order.
 
-    Fixed order matters twice over: it keeps a pass over a large label bounded
-    to one chunk at a time, and it makes `relabel_sequential` deterministic.
+    The unit is the shard when the array is sharded, the chunk otherwise:
+    writes are atomic per shard object, so walking inner chunks would turn
+    each write into a full-shard read-modify-write. Fixed order matters twice
+    over: it keeps a pass over a large label bounded to one unit at a time,
+    and it makes `relabel_sequential` deterministic.
     """
+    unit = array.shards or array.chunks
     ranges = [
-        range(0, size, chunk)
-        for size, chunk in zip(array.shape, array.chunks, strict=True)
+        range(0, size, step) for size, step in zip(array.shape, unit, strict=True)
     ]
     for corner in itertools.product(*ranges):
         yield tuple(
-            slice(start, min(start + chunk, size))
-            for start, chunk, size in zip(
-                corner, array.chunks, array.shape, strict=True
-            )
+            slice(start, min(start + step, size))
+            for start, step, size in zip(corner, unit, array.shape, strict=True)
         )
 
 
 def relabel_sequential(
     array: zarr.Array, canonical: dict[int, int] | None = None
-) -> int:
+) -> dict[int, int]:
     """Rewrite the ids to a dense `1..N` in place, in a single pass.
 
     Numbers are handed out in **first-encounter order** over the chunk grid,
@@ -156,8 +157,8 @@ def relabel_sequential(
     unique and gapless either way — only which object gets `1` differs, and it
     follows the array rather than whatever offsets happened to be assigned.
 
-    Deterministic for a given chunking; a differently chunked copy of the same
-    label numbers its objects in a different order.
+    Deterministic for a given write-unit grid; a differently chunked (or
+    sharded) copy of the same label numbers its objects in a different order.
 
     Args:
         array: The label array, rewritten in place.
@@ -165,7 +166,8 @@ def relabel_sequential(
             stitch resolved. Ids it does not mention are kept as they are.
 
     Returns:
-        How many distinct objects were numbered.
+        The root (post-`canonical`) id of each object encountered, mapped to
+        its dense id; its length is how many distinct objects were numbered.
     """
     dense: dict[int, int] = {}
     for selection in chunk_selections(array):
@@ -182,4 +184,4 @@ def relabel_sequential(
         remapped = relabel(block, mapping)
         if not np.array_equal(remapped, block):
             array[selection] = remapped
-    return len(dense)
+    return dense

@@ -165,16 +165,15 @@ def test_measure_custom_coalesce():
     assert table.dataframe["total_objects"].tolist() == [2]
 
 
-def test_measure_all_empty_raises():
-    from ngio.utils import NgioValueError
-
+def test_measure_all_empty_returns_empty_table():
+    """Zero objects is a legitimate outcome — same contract as `detect`."""
     _, iterator = _build_container_and_iterator()
 
     def nothing(image, label, roi):
         return {"label": [], "mean": []}
 
-    with pytest.raises(NgioValueError, match="zero rows"):
-        iterator.measure(nothing)
+    table = iterator.measure(nothing)
+    assert len(table.dataframe) == 0
 
 
 def test_measure_requires_a_label_key():

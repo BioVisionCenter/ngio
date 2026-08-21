@@ -146,6 +146,19 @@ def test_reduce_with_per_item_reduction():
     np.testing.assert_allclose(batched, basic)
 
 
+def test_reduce_refuses_a_shape_changing_func_on_a_ragged_batch():
+    """A reduction over padded patches is silently polluted by the padding."""
+    ome_zarr = _build_ome_zarr()
+    # 6 over 16: the border tiles clip to 4, so batches are ragged and padded.
+    iterator, _label = _build_segmentation_iterator(ome_zarr, size_x=6, size_y=6)
+
+    with pytest.raises(NgioValueError, match="ragged batch"):
+        iterator.reduce(
+            lambda batch: batch.reshape(len(batch), -1).mean(axis=1),
+            mapper=BatchedMapper(batch_size=4),
+        )
+
+
 def test_reduce_trims_shape_preserving_results():
     ome_zarr = _build_ome_zarr()
     iterator, _label = _build_segmentation_iterator(ome_zarr, size_x=6, size_y=6)

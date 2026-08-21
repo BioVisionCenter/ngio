@@ -489,10 +489,14 @@ class Roi(BaseModel):
 
         The local starts are counted from the region's first patch pixel —
         `floor(max(0, start))` of this ROI's pixel coordinates, the origin
-        the read actually used. Axes `local` does not pin inherit this
-        region's slices, so a 2D box found in one z-slab or time frame keeps
-        the slab's extent. `name`, `label` and any extra fields come from
-        `local`.
+        the read actually used. The canonical slicing path additionally
+        clamps the origin to the array's extent, which a bare ROI cannot
+        know; the two agree whenever the region yields a non-empty patch
+        (a region starting past the array edge reads nothing, so there is
+        no patch to find offsets in). Axes `local`
+        does not pin inherit this region's slices, so a 2D box found in one
+        z-slab or time frame keeps the slab's extent. `name`, `label` and
+        any extra fields come from `local`.
 
         Args:
             local: A pixel-space ROI (`space="pixel"`) with both bounds

@@ -270,13 +270,16 @@ def normalize_anndata(
 ) -> AnnData:
     """Validate the AnnData object.
 
+    When `obs` needs normalizing, the result is a new AnnData whose other
+    components (`X`, `var`, `uns`, `raw`, ...) are shared with the input, not
+    copied — mutating them through the result mutates the input.
+
     Args:
-        anndata (AnnData): The AnnData object to validate.
-        index_key (str | None): The column name to use as the index of the DataFrame.
-            Default is None.
+        anndata: The AnnData object to validate.
+        index_key: The column name to use as the index of the DataFrame.
 
     Returns:
-        AnnData: Normalized AnnData object.
+        Normalized AnnData object.
     """
     if index_key is None:
         return anndata
@@ -290,8 +293,7 @@ def normalize_anndata(
 
     # Only `obs` changes, so build a new AnnData around the same `X` (and the
     # other components) instead of deep-copying the whole object — the copy
-    # duplicated the full matrix in memory to swap one frame. The components
-    # are shared, not copied; nothing downstream mutates them.
+    # duplicated the full matrix in memory to swap one frame.
     return AnnData(
         X=anndata.X,
         obs=obs,
@@ -304,6 +306,9 @@ def normalize_anndata(
         layers=dict(anndata.layers),
         obsp=dict(anndata.obsp),
         varp=dict(anndata.varp),
+        # The stub types `raw` as a Mapping, but the constructor explicitly
+        # accepts another AnnData's `Raw` and rebinds it.
+        raw=anndata.raw,  # ty: ignore[invalid-argument-type]
     )
 
 

@@ -41,6 +41,22 @@ T = TypeVar("T")
 R = TypeVar("R")
 
 
+def _is_same_zarr_array(left, right) -> bool:
+    """Whether two zarr array handles point at the same stored array.
+
+    Unknowable — a store whose comparison raises — counts as *same*: every
+    caller uses "same" as the conservative answer. `with_halo` refuses
+    in-place iteration, the conflict graph adds an edge (over-serializing
+    instead of allowing a lost update).
+    """
+    if left is right:
+        return True
+    try:
+        return bool(left.store == right.store and left.path == right.path)
+    except (AttributeError, TypeError):
+        return True
+
+
 def _validate_max_workers(max_workers: MaxWorkers) -> None:
     """Refuse a pool size that cannot mean anything.
 
@@ -265,10 +281,23 @@ class BatchedMapper:
             )
 
         # Slice each item back to its patch's pre-padding shape — but only
-        # when `func` preserved the item shape; anything else (a per-item
-        # reduction) passes through, and a writing unit's setter still
-        # rejects a wrong shape loudly.
+        # when `func` preserved the item shape. On a ragged batch any other
+        # output shape is refused: it was computed on padded input, so the
+        # padding has already leaked into the values, and there is no
+        # padding to slice back off a shape-changing result. On a uniform
+        # batch nothing was padded, so any output shape passes through (a
+        # writing unit's setter still rejects a wrong shape loudly).
         trim = tuple(out.shape[1:]) == batch_shape
+        ragged = any(patch.shape != batch_shape for patch in patches)
+        if ragged and not trim:
+            raise NgioValueError(
+                f"The batched func returned items of shape "
+                f"{tuple(out.shape[1:])} for a ragged batch padded to "
+                f"{batch_shape}: the result was computed on padded patches, "
+                "and a shape-changing result cannot have the padding sliced "
+                "back off. Tile uniformly, or return one item per patch in "
+                "the padded shape."
+            )
         indexed: list[tuple[int, np.ndarray]] = []
         for unit, patch, item in zip(batch, patches, out, strict=True):
             if trim and patch.shape != batch_shape:
@@ -401,15 +430,23 @@ def _write_conflict_edges(
     the graph too, exactly like footprints on a shared array.
     """
     adjacency: dict[int, set[int]] = {index: set() for index in footprints}
-    by_array: dict[int, list[tuple[int, ChunkRect]]] = {}
+    # Grouped by *stored* array (store + path), not handle identity: two
+    # `zarr.Array` objects onto the same array (e.g. from two `get_label`
+    # calls) must land in one group, or their footprints would never be
+    # compared. Stores are unhashable, so match against a representative.
+    by_array: list[tuple[Any, list[tuple[int, ChunkRect]]]] = []
     for unit in units:
         if unit.setter is None or unit.index not in footprints:
             continue
-        by_array.setdefault(id(unit.setter.zarr_array), []).append(
-            (unit.index, footprints[unit.index])
-        )
+        entry = (unit.index, footprints[unit.index])
+        for representative, group in by_array:
+            if _is_same_zarr_array(unit.setter.zarr_array, representative):
+                group.append(entry)
+                break
+        else:
+            by_array.append((unit.setter.zarr_array, [entry]))
 
-    for group in by_array.values():
+    for _, group in by_array:
         _sweep_adjacency(group, adjacency)
     for group in _collect_extra_claims(units).values():
         _sweep_adjacency(group, adjacency)

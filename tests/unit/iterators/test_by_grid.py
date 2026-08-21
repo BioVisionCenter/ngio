@@ -69,6 +69,14 @@ def test_tail_shift_deduplicates_collapsed_starts():
     assert _axis_intervals("x", 64, 32, 32, "shift") == [(0, 32), (32, 32)]
 
 
+def test_a_zero_sized_axis_is_not_blamed_on_the_tail_policy():
+    from ngio.utils import NgioValueError
+
+    for tail in ("clip", "drop", "shift", "balance"):
+        with pytest.raises(NgioValueError, match="size 0"):
+            _axis_intervals("x", 0, 32, 32, tail)
+
+
 def test_tail_drop_discards_the_partial_tile():
     tiles = _iterator().by_grid(size_x=32, tail="drop")
     assert _x_intervals(tiles) == [(0, 32), (32, 32), (64, 32)]
