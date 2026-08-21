@@ -4,7 +4,9 @@ from ngio.common._dimensions import Dimensions
 from ngio.common._masking_roi import compute_masking_roi
 from ngio.common._pyramid import (
     ChunksLike,
+    ConsolidationMode,
     ImagePyramidBuilder,
+    RegionsLike,
     ShardsLike,
     consolidate_pyramid,
     on_disk_zoom,
@@ -14,9 +16,11 @@ from ngio.common._zoom import InterpolationOrder, dask_zoom, numpy_zoom
 
 __all__ = [
     "ChunksLike",
+    "ConsolidationMode",
     "Dimensions",
     "ImagePyramidBuilder",
     "InterpolationOrder",
+    "RegionsLike",
     "Roi",
     "RoiSlice",
     "ShardsLike",

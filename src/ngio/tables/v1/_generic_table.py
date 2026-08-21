@@ -41,9 +41,11 @@ class GenericTable(AbstractBaseTable):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "GenericTable":
         return cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=BackendMeta,
+            attrs=attrs,
         )

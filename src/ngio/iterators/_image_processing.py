@@ -4,16 +4,17 @@ import dask.array as da
 import numpy as np
 
 from ngio.common import Roi
+from ngio.common._pyramid import ConsolidationMode
 from ngio.images import Image
 from ngio.images._image import (
     ChannelSlicingInputType,
     add_channel_selection_to_slicing_dict,
 )
 from ngio.io_pipes import (
-    DaskRoiGetter,
-    DaskRoiSetter,
-    NumpyRoiGetter,
-    NumpyRoiSetter,
+    DaskGetter,
+    DaskSetter,
+    NumpyGetter,
+    NumpySetter,
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
@@ -21,44 +22,50 @@ from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 
 
 class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
-    """Base class for iterators over ROIs."""
+    """Apply an image-to-image function region by region.
+
+    Reads each region from the input image, hands the patch to `map`'s
+    function, and writes the result to the output image — a filter, a
+    projection, a restoration model. Compose with `by_write_units()`
+    for collision-free parallel writes and `with_halo` for seamless tiles.
+    """
 
     def __init__(
         self,
         input_image: Image,
         output_image: Image,
-        input_channel_selection: ChannelSlicingInputType = None,
+        *,
+        channel_selection: ChannelSlicingInputType = None,
         output_channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
+        consolidation_mode: ConsolidationMode | None = None,
     ) -> None:
-        """Initialize the iterator with a ROI table and input/output images.
+        """Process `input_image` region by region into `output_image`.
 
         Args:
-            input_image (Image): The input image to be used as input for the
-                segmentation.
-            output_image (Image): The image where the ROIs will be written.
-            input_channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the input image.
-            output_channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the output image.
-            axes_order (Sequence[str] | None): Optional axes order for the
-                segmentation.
-            input_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the input image.
-            output_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the output label.
+            input_image: The image to read.
+            output_image: The image the results are written to.
+            channel_selection: Restrict the input reads to these channels.
+            output_channel_selection: Restrict the output writes to these
+                channels.
+            axes_order: Axes order of the patches handed to the function.
+            input_transforms: Transforms applied to each input patch.
+            output_transforms: Transforms applied to each patch before the
+                write.
+            consolidation_mode: How to build the output pyramid after
+                iteration, see `Image.consolidate`.
         """
         self._input = input_image
         self._output = output_image
         self._ref_image = input_image
         self._rois = input_image.build_image_roi_table(name=None).rois()
+        self._consolidation_mode = consolidation_mode
 
-        # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input,
-            channel_selection=input_channel_selection,
+            channel_selection=channel_selection,
             slicing_dict={},
         )
         self._output_slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -66,7 +73,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             channel_selection=output_channel_selection,
             slicing_dict={},
         )
-        self._input_channel_selection = input_channel_selection
+        self._channel_selection = channel_selection
         self._output_channel_selection = output_channel_selection
         self._axes_order = axes_order
         self._input_transforms = input_transforms
@@ -79,52 +86,68 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         return {
             "input_image": self._input,
             "output_image": self._output,
-            "input_channel_selection": self._input_channel_selection,
+            "channel_selection": self._channel_selection,
             "output_channel_selection": self._output_channel_selection,
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
+            "consolidation_mode": self._consolidation_mode,
         }
 
+    @property
+    def output_image(self) -> Image:
+        """The image this iterator writes to."""
+        return self._output
+
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
-        return NumpyRoiGetter(
+        return NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
-            roi=roi,
+            roi=self._read_roi(roi),
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[np.ndarray]:
-        return NumpyRoiSetter(
-            zarr_array=self._output.zarr_array,
-            dimensions=self._output.dimensions,
-            roi=roi,
-            axes_order=self._axes_order,
-            transforms=self._output_transforms,
-            slicing_dict=self._output_slicing_kwargs,
+        return self._wrap_setter(
+            NumpySetter(
+                zarr_array=self._output.zarr_array,
+                dimensions=self._output.dimensions,
+                roi=roi,
+                axes_order=self._axes_order,
+                transforms=self._output_transforms,
+                slicing_dict=self._output_slicing_kwargs,
+            ),
+            roi,
         )
 
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[da.Array]:
-        return DaskRoiGetter(
+        return DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
-            roi=roi,
+            roi=self._read_roi(roi),
             axes_order=self._axes_order,
             transforms=self._input_transforms,
             slicing_dict=self._input_slicing_kwargs,
         )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
-        return DaskRoiSetter(
-            zarr_array=self._output.zarr_array,
-            dimensions=self._output.dimensions,
-            roi=roi,
-            axes_order=self._axes_order,
-            transforms=self._output_transforms,
-            slicing_dict=self._output_slicing_kwargs,
+        return self._wrap_setter(
+            DaskSetter(
+                zarr_array=self._output.zarr_array,
+                dimensions=self._output.dimensions,
+                roi=roi,
+                axes_order=self._axes_order,
+                transforms=self._output_transforms,
+                slicing_dict=self._output_slicing_kwargs,
+            ),
+            roi,
         )
 
-    def post_consolidate(self):
-        self._output.consolidate()
+    def finalize(self):
+        """Consolidate the output pyramid, only under the written regions."""
+        self._require_unrestricted_finalize()
+        self._output.consolidate(
+            mode=self._consolidation_mode, regions=self._touched_write_regions()
+        )

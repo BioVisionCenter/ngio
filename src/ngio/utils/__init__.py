@@ -18,7 +18,15 @@ from ngio.utils._errors import (
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
 from ngio.utils._retry import retry_io
 from ngio.utils._store import NgioStore
-from ngio.utils._warnings import NgioDeprecationWarning, NgioUserWarning
+
+# `stacklevel_of_first_caller` (ngio.utils._warnings) and `apply_zarr_config`
+# (ngio.utils._zarr_utils) are internal helpers; ngio's own modules import
+# them from their private homes.
+from ngio.utils._warnings import (
+    NgioDeprecationWarning,
+    NgioFutureWarning,
+    NgioUserWarning,
+)
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     NgioCache,
@@ -37,6 +45,7 @@ __all__ = [
     "NgioError",
     "NgioFileExistsError",
     "NgioFileNotFoundError",
+    "NgioFutureWarning",
     "NgioKeyError",
     "NgioStore",
     "NgioSupportedStore",

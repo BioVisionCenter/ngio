@@ -107,7 +107,7 @@ class AnnDataBackend(AbstractTableBackend):
         # Make sure to use the correct zarr format
         _update_anndata_global_settings(self._group_handler.zarr_format)
         store = NgioStore.ensure(self._group_handler.store)
-        path = self._group_handler.group.path
+        path = self._group_handler.path
         if store.store_type == "local":
             self._write_to_local_store(
                 store,

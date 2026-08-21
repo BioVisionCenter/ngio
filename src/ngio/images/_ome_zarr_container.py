@@ -7,7 +7,7 @@ from typing import Any, Literal
 import numpy as np
 from zarr.core.array import CompressorLike
 
-from ngio.common._pyramid import ChunksLike, ShardsLike
+from ngio.common._pyramid import ChunksLike, ConsolidationMode, ShardsLike
 from ngio.images._create_utils import init_image_like
 from ngio.images._image import Image, ImagesContainer
 from ngio.images._label import Label, LabelsContainer
@@ -47,7 +47,7 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
-    deprecated_alias,
+    deprecated,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -103,7 +103,6 @@ class OmeZarrContainer:
     _labels_container: LabelsContainer | None
     _tables_container: TablesContainer | None
 
-    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
@@ -132,23 +131,51 @@ class OmeZarrContainer:
         )
         self._labels_container = label_container
         self._tables_container = table_container
+        # Set when a read-only probe found no `/tables`; see
+        # `_get_tables_container`.
+        self._tables_absent = False
 
     def __repr__(self) -> str:
         """Return a string representation of the image."""
-        num_labels = len(self.list_labels())
-        num_tables = len(self.list_tables())
+        # Bound once: each listing costs an attrs read, and a REPL shows this
+        # constantly.
+        labels = self.list_labels()
+        tables = self.list_tables()
 
         base_str = f"OmeZarrContainer(levels={self.levels}"
-        if num_labels > 0 and num_labels < 3:
-            base_str += f", labels={self.list_labels()}"
-        elif num_labels >= 3:
-            base_str += f", #labels={num_labels}"
-        if num_tables > 0 and num_tables < 3:
-            base_str += f", tables={self.list_tables()}"
-        elif num_tables >= 3:
-            base_str += f", #tables={num_tables}"
+        if len(labels) > 0 and len(labels) < 3:
+            base_str += f", labels={labels}"
+        elif len(labels) >= 3:
+            base_str += f", #labels={len(labels)}"
+        if len(tables) > 0 and len(tables) < 3:
+            base_str += f", tables={tables}"
+        elif len(tables) >= 3:
+            base_str += f", #tables={len(tables)}"
         base_str += ")"
         return base_str
+
+    def refresh(self) -> None:
+        """Re-read every piece of metadata this container is holding.
+
+        The answer to "someone else wrote to this container and I want to see
+        it".
+
+        Not a no-op under `cache=False`: the decoded metadata memo and each
+        image's `dimensions` are held regardless of that flag, because both are
+        derived from a `zarr.Array` handle that is itself fixed at construction.
+        `cache=False` only means the raw attributes are re-read; this drops the
+        derived values too.
+        """
+        self._group_handler.clean_cache()
+        self._images_container._meta_handler.invalidate()
+        # Live `Label` objects hold their own meta handlers; reach them
+        # before dropping the container that knows about them.
+        if self._labels_container is not None:
+            self._labels_container.invalidate()
+        # Rebuilt on next access against the refreshed handler.
+        self._labels_container = None
+        self._tables_container = None
+        self._tables_absent = False
 
     @property
     def images_container(self) -> ImagesContainer:
@@ -186,10 +213,20 @@ class OmeZarrContainer:
         if self._tables_container is not None:
             return self._tables_container
 
+        # "This image has no /tables" is worth remembering too, but only under
+        # `cache=True` — with caching off, another writer may add tables at any
+        # time and every call has to re-probe. Only the read-only probe may be
+        # remembered: a `create_mode=True` caller is asking for the group to be
+        # made, so it has to try again even though an earlier read-only probe
+        # found nothing.
+        if self._tables_absent and not create_mode and self._group_handler.use_cache:
+            return None
+
         _tables_container = _try_get_table_container(
             self._group_handler, create_mode=create_mode
         )
         self._tables_container = _tables_container
+        self._tables_absent = _tables_container is None
         return self._tables_container
 
     @property
@@ -354,26 +391,54 @@ class OmeZarrContainer:
             percentiles=percentiles
         )
 
+    def set_space_unit(
+        self, unit: SpaceUnits = DefaultSpaceUnit, *, set_labels: bool = True
+    ) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+            set_labels: Whether to set the unit for the labels as well.
+        """
+        if set_labels:
+            for label_name in self.list_labels():
+                self.get_label(label_name).set_space_unit(unit)
+        self._images_container.set_space_unit(unit)
+
+    def set_time_unit(
+        self, unit: TimeUnits = DefaultTimeUnit, *, set_labels: bool = True
+    ) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+            set_labels: Whether to set the unit for the labels as well.
+        """
+        if set_labels:
+            for label_name in self.list_labels():
+                self.get_label(label_name).set_time_unit(unit)
+        self._images_container.set_time_unit(unit)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
         set_labels: bool = True,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit`.
 
         Args:
             space_unit: The unit of space.
             time_unit: The unit of time.
             set_labels: Whether to set the units for the labels as well.
         """
-        if set_labels:
-            for label_name in self.list_labels():
-                label = self.get_label(label_name)
-                label.set_axes_units(space_unit=space_unit, time_unit=time_unit)
-        self._images_container.set_axes_units(
-            space_unit=space_unit, time_unit=time_unit
-        )
+        self.set_space_unit(space_unit, set_labels=set_labels)
+        self.set_time_unit(time_unit, set_labels=set_labels)
 
     def set_axes_names(
         self,
@@ -636,9 +701,15 @@ class OmeZarrContainer:
         if table_container is None:
             return []
 
-        roi = table_container.list(filter_types="roi_table")
-        masking_roi = table_container.list(filter_types="masking_roi_table")
-        return roi + masking_roi
+        # One pass, not one per type: each `list(filter_types=...)` opens every
+        # table to read its type, so asking twice read every document twice to
+        # sort names the first pass had already sorted.
+        types = table_container.table_types()
+        return [
+            name
+            for name, table_type in types.items()
+            if table_type in ("roi_table", "masking_roi_table")
+        ]
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.
@@ -1168,6 +1239,7 @@ def create_ome_zarr_from_array(
     compressors: CompressorLike = "auto",
     extra_array_kwargs: Mapping[str, Any] | None = None,
     overwrite: bool = False,
+    consolidation_mode: ConsolidationMode | None = None,
 ) -> OmeZarrContainer:
     """Create an OME-Zarr image from a numpy array.
 
@@ -1207,6 +1279,8 @@ def create_ome_zarr_from_array(
         extra_array_kwargs (Mapping[str, Any] | None): Extra arguments to pass to
             the zarr array creation. Defaults to None.
         overwrite (bool): Whether to overwrite an existing image. Defaults to False.
+        consolidation_mode: How to build the pyramid levels, see
+            `Image.consolidate`. Defaults to `None`.
     """
     if len(percentiles) != 2:
         raise NgioValueError(
@@ -1236,8 +1310,19 @@ def create_ome_zarr_from_array(
         extra_array_kwargs=extra_array_kwargs,
         overwrite=overwrite,
     )
-    image = ome_zarr.get_image()
+    # Populate through a cached view. Writing the array, building the pyramid
+    # and computing the channel windows re-read the same few documents a dozen
+    # times over, and this function is the only writer for the whole sequence —
+    # the same reason `create_empty_plate` and `create_empty_well` build with
+    # `cache=True`. The caller still gets an uncached container.
+    working = open_ome_zarr_container(store=store, mode="r+", cache=True)
+    image = working.get_image()
     image.set_array(array)
-    image.consolidate()
-    ome_zarr.set_channel_windows_with_percentiles(percentiles=percentiles)
+    image.consolidate(mode=consolidation_mode)
+    working.set_channel_windows_with_percentiles(percentiles=percentiles)
+
+    # `ome_zarr` was opened before any of the writes above. It is uncached, so
+    # it re-reads and would see them anyway; this is a guard against that
+    # ceasing to be true, and it costs no store reads.
+    ome_zarr.refresh()
     return ome_zarr

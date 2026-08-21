@@ -1,6 +1,5 @@
 """Edge-case coverage tests for `ngio.hcs._plate`."""
 
-import asyncio
 from pathlib import Path
 
 import pandas as pd
@@ -126,13 +125,7 @@ def test_concatenate_image_tables_as(cardiomyocyte_small_mip_path_readonly: Path
     )
     assert isinstance(table, FeatureTable)
 
-    async_table = asyncio.run(
-        plate.concatenate_image_tables_as_async(
-            name="regionprops_DAPI", table_cls=FeatureTable
-        )
-    )
-    assert isinstance(async_table, FeatureTable)
-    assert set(table.dataframe.columns) == set(async_table.dataframe.columns)
+    assert "label" in table.dataframe.reset_index().columns
 
 
 def test_get_well_returns_cached_instance(tmp_path: Path):
@@ -142,3 +135,99 @@ def test_get_well_returns_cached_instance(tmp_path: Path):
     well_1 = plate.get_well(row="A", column=1)
     well_2 = plate.get_well(row="A", column=1)
     assert well_1 is well_2
+
+
+@pytest.mark.parametrize("max_workers", [None, 1, 4, "auto"])
+def test_plate_fan_out_agrees_with_serial(tmp_path: Path, max_workers):
+    """Reading the wells concurrently must return exactly the serial answer.
+
+    The fan-out is round-trip bound, so on a remote store it is worth several
+    times its serial cost — but only if the results are identical and ordered
+    the same way, since callers index into them by position.
+    """
+    from ngio.ome_zarr_meta import ImageInWellPath
+
+    images = [
+        ImageInWellPath(row=row, column=f"{col + 1:02d}", path="0")
+        for row in ("A", "B", "C")
+        for col in range(4)
+    ]
+    plate = create_empty_plate(
+        tmp_path / "fanout.zarr", name="plate", images=images, overwrite=True
+    )
+
+    assert plate.images_paths(max_workers=max_workers) == plate.images_paths()
+    assert list(plate.get_wells(max_workers=max_workers)) == list(plate.get_wells())
+    assert len(plate.images_paths(max_workers=max_workers)) == len(images)
+
+
+def test_concurrent_gets_return_the_identical_object(
+    cardiomyocyte_tiny_path_readonly: Path,
+):
+    """The cache must hand every racing thread the same well and image.
+
+    `get_well_images` relies on sharing `_images_cache` with `get_images`,
+    and the fan-out builds cache entries from worker threads — so a
+    check-then-act insert would quietly hand two threads two objects.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    plate = open_ome_zarr_plate(cardiomyocyte_tiny_path_readonly, cache=True, mode="r")
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        wells = list(pool.map(lambda _: plate._get_well("B/03"), range(32)))
+        imgs = list(pool.map(lambda _: plate._get_image("B/03/0"), range(32)))
+
+    assert all(w is wells[0] for w in wells)
+    assert all(i is imgs[0] for i in imgs)
+
+
+def test_a_well_at_a_different_version_than_its_plate_still_decodes(tmp_path: Path):
+    """The version the plate hands down is a fast path, not a constraint.
+
+    A well rewritten at another NGFF version than its plate used to decode via
+    the registry walk; handing the resolved version down must not turn that
+    tolerance into a raise.
+    """
+    import zarr
+
+    from ngio.ome_zarr_meta import ImageInWellPath
+
+    images = [ImageInWellPath(row="A", column="01", path="0")]
+    store = tmp_path / "mixed.zarr"
+    create_empty_plate(store, name="plate", images=images, overwrite=True)
+
+    # Rewrite the 0.4 well document as 0.5 behind ngio's back.
+    well = zarr.open_group(str(store / "A" / "01"), mode="r+")
+    well.attrs.clear()
+    well.attrs.update({"ome": {"version": "0.5", "well": {"images": [{"path": "0"}]}}})
+
+    plate = open_ome_zarr_plate(store, mode="r")
+    assert plate.images_paths() == ["A/01/0"]
+
+
+def test_a_malformed_well_still_raises_just_later(tmp_path: Path):
+    """Well validation is deferred, not dropped.
+
+    `WellMetaHandler` used to read and decode in its constructor purely to
+    validate, which a plate walking 384 wells paid 384 times for documents it
+    was about to read again. With the version handed down there is nothing left
+    to resolve, so the check moved to first use — but it must still happen.
+    """
+    import zarr
+
+    from ngio.ome_zarr_meta import ImageInWellPath
+    from ngio.utils import NgioValidationError
+
+    images = [ImageInWellPath(row="A", column="01", path="0")]
+    store = tmp_path / "broken.zarr"
+    create_empty_plate(store, name="plate", images=images, overwrite=True)
+
+    # Corrupt the well document behind ngio's back.
+    well = zarr.open_group(str(store / "A" / "01"), mode="r+")
+    well.attrs.clear()
+    well.attrs.update({"well": {"images": "not-a-list"}})
+
+    plate = open_ome_zarr_plate(store, mode="r")
+    with pytest.raises(NgioValidationError):
+        plate.images_paths()

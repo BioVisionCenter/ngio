@@ -613,3 +613,118 @@ def test_roi_from_values_validates_fields():
 
     with pytest.raises(ValidationError):
         Roi.from_values(name="r", slices={"x": (0, 1)})
+
+
+def test_anchor_anchors_a_local_box():
+    """Tile ROI + patch-local pixel box = absolute world ROI."""
+    ps = PixelSize(x=0.5, y=0.5, z=1.0)
+    # A tile whose patch starts at pixel (y=64, x=32).
+    tile = Roi.from_values(
+        name="tile", slices={"y": (64 * 0.5, 32 * 0.5), "x": (32 * 0.5, 32 * 0.5)}
+    )
+    box = Roi.from_values(
+        slices={"y": (4, 10), "x": (6, 8)},
+        name="hit",
+        space="pixel",
+        confidence=0.9,
+    )
+
+    absolute = tile.anchor(box, pixel_size=ps)
+
+    assert absolute.space == "world"
+    assert (absolute["y"].start, absolute["y"].length) == ((64 + 4) * 0.5, 10 * 0.5)
+    assert (absolute["x"].start, absolute["x"].length) == ((32 + 6) * 0.5, 8 * 0.5)
+    assert absolute.name == "hit"
+    assert absolute.model_extra is not None
+    assert absolute.model_extra["confidence"] == 0.9
+
+
+def test_anchor_inherits_the_axes_the_box_does_not_pin():
+    """A 2D box found in one z-slab keeps the slab's extent."""
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(
+        name="tile", slices={"z": (3, 1), "y": (0, 32), "x": (0, 32)}
+    )
+    box = Roi.from_values(slices={"y": (1, 2), "x": (3, 4)}, name=None, space="pixel")
+
+    absolute = tile.anchor(box, pixel_size=ps)
+
+    assert (absolute["z"].start, absolute["z"].length) == (3.0, 1.0)
+
+
+def test_anchor_refuses_ambiguous_frames():
+    """The space fields are what make a frame mix-up loud instead of silent."""
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(name="tile", slices={"y": (0, 32), "x": (0, 32)})
+    world_box = Roi.from_values(slices={"y": (1, 2), "x": (3, 4)}, name=None)
+
+    with pytest.raises(NgioValueError, match="already absolute"):
+        tile.anchor(world_box, pixel_size=ps)
+
+    pixel_tile = tile.to_pixel(pixel_size=ps)
+    pixel_box = Roi.from_values(
+        slices={"y": (1, 2), "x": (3, 4)}, name=None, space="pixel"
+    )
+    with pytest.raises(NgioValueError, match="world-space region"):
+        pixel_tile.anchor(pixel_box, pixel_size=ps)
+
+
+def test_anchor_requires_pinned_local_bounds():
+    ps = PixelSize(x=1.0, y=1.0, z=1.0)
+    tile = Roi.from_values(name="tile", slices={"y": (0, 32), "x": (0, 32)})
+    open_box = Roi.from_values(
+        slices={"y": (1, 2), "x": slice(3, None)}, name=None, space="pixel"
+    )
+
+    with pytest.raises(NgioValueError, match="pin start and length"):
+        tile.anchor(open_box, pixel_size=ps)
+
+
+def test_anchor_origin_agrees_with_canonical_slicing():
+    """`anchor`'s patch origin must match the origin the getter actually reads.
+
+    `Roi.anchor` is pure geometry, so it cannot apply the canonical path's
+    upper clamp — but for every region that yields a non-empty patch the two
+    must agree, fractional and negative starts included. This is the guard
+    against a second rounding implementation drifting.
+    """
+    import numpy as np
+    from zarr.storage import MemoryStore
+
+    from ngio import create_ome_zarr_from_array
+    from ngio.io_pipes._io_pipe_ops import setup_io_pipe
+
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=np.zeros((64, 64), dtype="uint8"),
+        pixelsize=0.65,
+        axes_names="yx",
+        levels=1,
+    )
+    image = ome_zarr.get_image()
+    ps = image.pixel_size
+
+    regions = [
+        {"y": (0.0, 20.8), "x": (0.0, 20.8)},  # whole tiles
+        {"y": (13.0, 13.0), "x": (6.5, 6.5)},  # fractional pixel starts
+        {"y": (-2.0, 20.0), "x": (0.31, 7.7)},  # clipped at 0, sub-pixel start
+        {"y": (40.0, 60.0), "x": (33.3, 33.3)},  # stops past the array edge
+    ]
+    for slices in regions:
+        region = Roi.from_values(name="tile", slices=slices, space="world")
+        ctx = setup_io_pipe(
+            zarr_array=image.zarr_array,
+            dimensions=image.dimensions,
+            roi=region,
+        )
+        zero_box = Roi.from_values(
+            slices={"y": (0, 1), "x": (0, 1)}, name=None, space="pixel"
+        )
+        anchored = region.anchor(zero_box, pixel_size=ps).to_pixel(pixel_size=ps)
+        for axis in ("y", "x"):
+            selection = ctx.slicing.get(axis, normalize=True)
+            assert isinstance(selection, slice)
+            read_origin = 0 if selection.start is None else int(selection.start)
+            box_slice = anchored.get(axis)
+            assert box_slice is not None and box_slice.start is not None
+            assert int(box_slice.start) == read_origin, (slices, axis)

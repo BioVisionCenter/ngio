@@ -67,10 +67,10 @@ def test_axes_setup_property():
     assert ome_zarr.axes_setup == ome_zarr.images_container.axes_setup
 
 
-def test_set_axes_units_updates_labels():
+def test_set_space_unit_updates_labels():
     ome_zarr = _make_container()
     _add_label(ome_zarr, "lbl1")
-    ome_zarr.set_axes_units(space_unit="micrometer", set_labels=True)
+    ome_zarr.set_space_unit("micrometer", set_labels=True)
     assert ome_zarr.space_unit == "micrometer"
     assert ome_zarr.get_label("lbl1").space_unit == "micrometer"
 

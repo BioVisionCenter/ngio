@@ -82,7 +82,7 @@ blurred_image.set_array(patch=blurred_image_data, axes_order=["c", "z", "y", "x"
 
 # `set_array` wrote to one resolution level only, so the rest of the pyramid is
 # still empty. `consolidate` rebuilds the other levels from it.
-blurred_image.consolidate()
+blurred_image.consolidate(mode="auto")
 # --8<-- [end:apply_blur]
 
 # --8<-- [start:plot_blur]
@@ -121,12 +121,14 @@ print(blurred_image_dask)
 # --8<-- [end:dask_blur]
 
 # --8<-- [start:iterators]
+from ngio import ThreadedMapper
 from ngio.iterators import ImageProcessingIterator
 
 iterator = ImageProcessingIterator(
     input_image=image,
     output_image=blurred_image,
     axes_order=["c", "z", "y", "x"],
+    consolidation_mode="auto",
 )
 
 # A freshly built iterator covers the entire image in one region.
@@ -145,10 +147,16 @@ iterator = iterator.by_zyx()
 # Optionally assert the regions do not overlap each other...
 iterator.require_no_regions_overlap()
 # ...nor share chunks, which is what makes parallel writes safe.
-iterator.require_no_chunks_overlap()
+iterator.require_no_write_units_overlap()
 
-# Map the blur across every region
-iterator.map_as_numpy(lambda x: gaussian_blur(x, sigma=sigma))
+# A blur at a region edge has no neighbours to average with, which is exactly
+# the seam artifact the dask version above warns about. `with_halo` fixes it:
+# each region reads a margin of context, and the border is cropped before the
+# write, so the write footprints (and the parallel safety) are unchanged.
+iterator = iterator.with_halo(x=16, y=16)
+
+# Map the blur across every region, fanning out on a thread pool.
+iterator.map(lambda x: gaussian_blur(x, sigma=sigma), mapper=ThreadedMapper("auto"))
 
 # No need to consolidate: the iterator does it once every region is processed
 # --8<-- [end:iterators]

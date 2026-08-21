@@ -9,8 +9,8 @@ import numpy as np
 import zarr
 from pydantic import BaseModel, ConfigDict
 
+from ngio.common._dask_io import store_dask
 from ngio.common._dimensions import Dimensions
-from ngio.common._locks import DASK_STORE_LOCK
 from ngio.io_pipes._ops_slices_utils import compute_slice_chunks
 from ngio.ome_zarr_meta.ngio_specs import Axis
 from ngio.utils import NgioUserWarning, NgioValueError
@@ -175,6 +175,14 @@ def get_slice_as_numpy(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> np.nd
 
 def get_slice_as_dask(zarr_array: zarr.Array, slicing_ops: SlicingOps) -> da.Array:
     """Get a slice of a zarr array as a dask array."""
+    # Deliberately NOT shard-aware (`chunks=shards or chunks`), unlike the
+    # pyramid source reads in `common/_pyramid._read_source_dask`. This path
+    # serves arbitrary ROIs, where the common case is a ROI *smaller* than a
+    # shard — a shard-sized block grid would then fetch the whole shard to
+    # serve a fraction of it, while the inner-chunk grid lets zarr's partial
+    # shard reads fetch only what the ROI covers. Coarser blocks only win
+    # when the read spans whole shards, which is the pyramid's case, not
+    # this one.
     da_array = da.from_zarr(zarr_array)
     slicing_tuple = slicing_ops.normalized_slicing_tuple
     return da_array[slicing_tuple]
@@ -253,23 +261,19 @@ def set_slice_as_dask(
     patch, slice_tuple = handle_int_set_as_dask(patch, slice_tuple)
     if ax is None:
         # Base case, no tuple in the slicing tuple
-        # da.store instead of da.to_zarr: see ngio.common._pyramid for the
-        # dask>=2025.11 PerformanceWarning regression that to_zarr triggers
-        # when the input chunks aren't a multiple of the target's chunks.
-        # The shared lock serialises the flushes: a region write whose blocks
-        # only partially cover a chunk (or, for a sharded target, a shard)
-        # makes zarr read-modify-write it, and two of them racing on the same
-        # key lose an update.
-        da.store(patch, zarr_array, regions=slice_tuple, lock=DASK_STORE_LOCK)  # type: ignore
+        store_dask(patch, zarr_array, region=slice_tuple)
         return
 
-    # Complex case, we have exactly one tuple in the slicing tuple
+    # Complex case, we have exactly one tuple in the slicing tuple.
+    # One write per index, in sequence: they cannot race each other. Two indices
+    # landing in the same shard do read-modify-write it twice, which is correct
+    # but not optimal — the fancy-index path is already the slow one.
     assert first_tuple is not None
     for i, idx in enumerate(first_tuple):
         _sub_slice = (*slice_tuple[:ax], slice(idx, idx + 1), *slice_tuple[ax + 1 :])
         sub_patch = da.take(patch, indices=i, axis=ax)
         sub_patch = da.expand_dims(sub_patch, axis=ax)
-        da.store(sub_patch, zarr_array, regions=_sub_slice, lock=DASK_STORE_LOCK)  # type: ignore
+        store_dask(sub_patch, zarr_array, region=_sub_slice)
 
 
 ##############################################################
@@ -380,6 +384,11 @@ def _clean_slicing_dict(
     for axis_name, slice_ in slicing_dict.items():
         axis = dimensions.axes_handler.get_axis(axis_name)
         if axis is None:
+            if remove_channel_selection and axis_name == "c":
+                # The caller asked for the channel selection to be dropped;
+                # validating it against the virtual-axes rules first would
+                # reject the very entry the flag exists to discard.
+                continue
             # Virtual axes should be allowed to be selected
             # Common use case is still allowing channel_selection
             # When the zarr has not channel axis.

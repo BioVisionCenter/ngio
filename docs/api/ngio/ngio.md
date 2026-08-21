@@ -5,6 +5,8 @@
       members:
         - AxesSetup
         - ChannelSelectionModel
+        - ConsolidationConfig
+        - DaskConfig
         - DefaultNgffVersion
         - Dimensions
         - ImageInWellPath
@@ -15,6 +17,8 @@
         - RetryConfig
         - Roi
         - RoiSlice
+        - S3FSConfig
         - StoreOrGroup
+        - ZarrConfig
         - create_synthetic_ome_zarr
         - get_config

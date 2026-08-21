@@ -1,7 +1,7 @@
 """Deprecated alias for `ngio.iterators`.
 
 The iterators are no longer experimental. Import them from `ngio.iterators`
-(or from `ngio` directly). This module will be removed in ngio 1.1.
+(or from `ngio` directly). This module will be removed in `ngio=1.2`.
 """
 
 import warnings
@@ -32,7 +32,7 @@ def __getattr__(name: str) -> Any:
 
     warnings.warn(
         f"'ngio.experimental.iterators.{name}' is deprecated and will be removed "
-        f"in ngio=1.1. Please use 'ngio.iterators.{name}' instead.",
+        f"in ngio=1.2. Please use 'ngio.iterators.{name}' instead.",
         NgioDeprecationWarning,
         stacklevel=2,
     )

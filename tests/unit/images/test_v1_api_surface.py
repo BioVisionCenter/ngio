@@ -1,6 +1,5 @@
 """Regression tests for the API decisions frozen by ngio 1.0."""
 
-import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -38,10 +37,32 @@ def test_derive_image_dtype_can_still_be_overridden(float_container, tmp_path):
     assert derived.get_image().dtype == "uint8"
 
 
-def test_derive_image_inherits_compressors_and_separator(float_container, tmp_path):
-    source = float_container.get_image().zarr_array
-    derived = float_container.derive_image(store=tmp_path / "derived_c.zarr")
-    assert derived.get_image().zarr_array.compressors == source.compressors
+def test_derive_image_inherits_compressors_and_separator(tmp_path):
+    """A non-default codec and separator must actually propagate.
+
+    Asserted against explicit non-default values — comparing a derived
+    default against a source default proves nothing.
+    """
+    from numcodecs import Blosc
+
+    from ngio import create_empty_ome_zarr
+    from ngio.utils._zarr_utils import find_dimension_separator
+
+    source_container = create_empty_ome_zarr(
+        store=tmp_path / "source_c.zarr",
+        shape=(32, 32),
+        pixelsize=0.5,
+        compressors=Blosc(cname="zstd", clevel=7),
+        dimension_separator=".",
+    )
+    derived = source_container.derive_image(store=tmp_path / "derived_c.zarr")
+    arr = derived.get_image().zarr_array
+    (codec,) = [c for c in arr.compressors if "losc" in type(c).__name__]
+    assert (getattr(codec, "cname", None), getattr(codec, "clevel", None)) == (
+        "zstd",
+        7,
+    )
+    assert find_dimension_separator(arr) == "."
 
 
 def test_derive_label_from_image_is_uint32(float_container):
@@ -111,50 +132,33 @@ def test_validate_arrays_is_forwarded(tmp_path, monkeypatch):
     assert len(opened) == 3
 
 
-def test_validate_paths_alias_warns(tmp_path):
-    from ngio.images import ImagesContainer
-    from ngio.utils import ZarrGroupHandler
+def test_v1_promised_removals_are_gone():
+    """The surfaces v1.0.0 deprecated 'until 1.1' no longer exist."""
+    import inspect
 
-    store = tmp_path / "alias.zarr"
-    create_empty_ome_zarr(store=store, shape=(32, 32), pixelsize=0.5)
-    handler = ZarrGroupHandler(store=store, mode="r+")
-    with pytest.warns(NgioDeprecationWarning, match="validate_paths"):
-        ImagesContainer(handler, axes_setup=None, validate_paths=False)
-
-
-def test_set_axes_unit_alias_warns(float_container):
-    with pytest.warns(NgioDeprecationWarning, match="set_axes_units"):
-        float_container.get_image().set_axes_unit(space_unit="millimeter")
-    assert float_container.get_image().space_unit == "millimeter"
-
-
-def test_levels_paths_alias_warns():
+    import ngio.images
     from ngio.common._pyramid import ImagePyramidBuilder
+    from ngio.images import ImagesContainer
 
-    with pytest.warns(NgioDeprecationWarning, match="level_paths"):
-        builder = ImagePyramidBuilder.from_shapes(
-            shapes=[(32, 32), (16, 16)],
-            base_scale=(1.0, 1.0),
-            axes=("y", "x"),
-            levels_paths=["a", "b"],
-        )
-    assert [level.path for level in builder.levels] == ["a", "b"]
+    assert not hasattr(ngio.images, "conctatenate_tables")
+    assert not hasattr(ngio.images, "list_image_tables_async")
+    assert not hasattr(ngio.images, "concatenate_image_tables_async")
+    assert not hasattr(ngio.images, "concatenate_image_tables_as_async")
+    assert not hasattr(ImagesContainer, "set_axes_unit")
+    assert (
+        "levels_paths"
+        not in inspect.signature(ImagePyramidBuilder.from_shapes).parameters
+    )
+    assert (
+        "validate_paths" not in inspect.signature(ImagesContainer.__init__).parameters
+    )
 
 
-def test_conctatenate_tables_typo_alias_warns(tmp_path):
-    import pandas as pd
-
-    from ngio.images import TableWithExtras, concatenate_tables, conctatenate_tables
-    from ngio.tables import FeatureTable
-
-    def make():
-        data = pd.DataFrame({"x": [1, 2], "label": [1, 2]})
-        return [TableWithExtras(table=FeatureTable(table_data=data), extras={"a": "b"})]
-
-    expected = concatenate_tables(make()).dataframe
-    with pytest.warns(NgioDeprecationWarning, match="concatenate_tables"):
-        got = conctatenate_tables(make()).dataframe
-    assert got.equals(expected)
+def test_set_axes_units_is_deprecated(float_container):
+    """The batch form points at the split methods; both units are still set."""
+    with pytest.warns(NgioDeprecationWarning, match="set_space_unit"):
+        float_container.get_image().set_axes_units(space_unit="millimeter")
+    assert float_container.get_image().space_unit == "millimeter"
 
 
 class TestMaskedLabelPixelSize:
@@ -220,15 +224,13 @@ class TestMaxWorkers:
         serial = plate.get_wells()
         assert list(plate.get_wells(max_workers=max_workers)) == list(serial)
 
-    def test_async_methods_are_deprecated(self, plate):
-        with pytest.warns(NgioDeprecationWarning, match="get_images"):
-            coro = plate.get_images_async()
-        assert list(asyncio.run(coro)) == list(plate.get_images())
-
-        with pytest.warns(NgioDeprecationWarning, match="get_wells"):
-            coro = plate.get_wells_async()
-        assert list(asyncio.run(coro)) == list(plate.get_wells())
-
-        with pytest.warns(NgioDeprecationWarning, match="images_paths"):
-            coro = plate.images_paths_async()
-        assert asyncio.run(coro) == plate.images_paths()
+    def test_async_methods_are_removed(self, plate):
+        for name in (
+            "get_images_async",
+            "get_wells_async",
+            "images_paths_async",
+            "list_image_tables_async",
+            "concatenate_image_tables_async",
+            "concatenate_image_tables_as_async",
+        ):
+            assert not hasattr(plate, name)

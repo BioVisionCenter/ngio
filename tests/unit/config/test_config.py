@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from ngio.config import (
     ConstantBackoff,
+    DaskConfig,
     ExponentialBackoff,
     LinearBackoff,
     NgioConfig,
@@ -176,3 +177,86 @@ def test_get_config_lazy_load_respects_env_var(monkeypatch, tmp_path):
         assert get_config() is get_config()
     finally:
         _reset_config()
+
+
+def test_dask_config_defaults():
+    assert DaskConfig().write_block_max_bytes == 8 * 2**20
+
+
+def test_ngio_config_default_dask():
+    assert NgioConfig().dask == DaskConfig()
+
+
+def test_dask_config_from_json(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text('{"dask": {"write_block_max_bytes": 4194304}}')
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.dask.write_block_max_bytes == 4 * 2**20
+
+
+def test_dask_config_none_disables_the_cap(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text('{"dask": {"write_block_max_bytes": null}}')
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.dask.write_block_max_bytes is None
+
+
+def test_dask_config_rejects_a_negative_cap():
+    with pytest.raises(ValidationError):
+        DaskConfig(write_block_max_bytes=-1)
+
+
+def test_zarr_config_defaults_touch_nothing():
+    """All-`None` defaults must leave zarr's configuration byte-identical."""
+    import zarr
+
+    from ngio.config import ZarrConfig
+    from ngio.utils._zarr_utils import apply_zarr_config
+
+    assert ZarrConfig().async_concurrency is None
+    assert ZarrConfig().threading_max_workers is None
+
+    before = zarr.config.config
+    apply_zarr_config(NgioConfig())
+    assert zarr.config.config == before
+
+
+def test_zarr_config_lands_under_the_right_donfig_keys():
+    import zarr
+
+    from ngio.config import ZarrConfig
+    from ngio.utils._zarr_utils import apply_zarr_config
+
+    config = NgioConfig(zarr=ZarrConfig(async_concurrency=33))
+    saved = {
+        "async.concurrency": zarr.config.get("async.concurrency"),
+        "threading.max_workers": zarr.config.get("threading.max_workers"),
+    }
+    try:
+        apply_zarr_config(config)
+        assert zarr.config.get("async.concurrency") == 33
+        # Not configured: untouched.
+        saved_workers = saved["threading.max_workers"]
+        assert zarr.config.get("threading.max_workers") == saved_workers
+    finally:
+        zarr.config.set(saved)
+
+
+def test_zarr_config_rejects_non_positive_values():
+    from ngio.config import ZarrConfig
+
+    with pytest.raises(ValidationError):
+        ZarrConfig(async_concurrency=0)
+    with pytest.raises(ValidationError):
+        ZarrConfig(threading_max_workers=0)
+
+
+def test_zarr_config_from_json(monkeypatch, tmp_path):
+    path = tmp_path / "cfg.json"
+    path.write_text('{"zarr": {"async_concurrency": 64}}')
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    config = NgioConfig.model_validate(_load_config_data())
+    assert config.zarr.async_concurrency == 64
+    assert config.zarr.threading_max_workers is None

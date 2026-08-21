@@ -1,7 +1,8 @@
 """Base class for handling OME-NGFF metadata in Zarr groups."""
 
 from collections.abc import Callable
-from typing import TypeVar
+from copy import deepcopy
+from typing import Generic, TypeVar
 
 from pydantic import ValidationError
 
@@ -155,14 +156,18 @@ def get_ngio_meta(
     group_handler: ZarrGroupHandler,
     meta_type: type[_meta_type],
     version: str | None = None,
+    attrs: dict | None = None,
     **kwargs,
 ) -> _meta_type:
     """Retrieve the NGIO metadata from the Zarr group.
 
     Args:
-        group_handler (ZarrGroupHandler): The Zarr group handler.
-        meta_type (type[_meta_type]): The type of NGIO metadata to retrieve.
-        version (str | None): Optional NGFF version to use for decoding.
+        group_handler: The Zarr group handler.
+        meta_type: The type of NGIO metadata to retrieve.
+        version: Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of reading
+            them again. Callers that need the raw attributes anyway pass them
+            here so the group is read once rather than twice.
         **kwargs: Additional arguments to pass to the decoder.
 
     Returns:
@@ -173,11 +178,18 @@ def get_ngio_meta(
         decoder = registry.get(version)
         if decoder is None:
             raise NgioValueError(f"Unsupported NGFF version: {version}")
-        versions_to_try = {version: decoder}
+        # The supplied version is a fast path, not a constraint. A document
+        # can legitimately differ from the version handed down — a well
+        # rewritten at another NGFF version than its plate — so on a failed
+        # decode the rest of the registry is still tried.
+        versions_to_try = {version: decoder} | {
+            v: d for v, d in registry.items() if v != version
+        }
     else:
         versions_to_try = registry
 
-    attrs = group_handler.load_attrs()
+    if attrs is None:
+        attrs = group_handler.load_attrs()
     all_errors = []
     for version, decoder in versions_to_try.items():
         try:
@@ -196,6 +208,63 @@ def get_ngio_meta(
     raise NgioValidationError(error_message)
 
 
+class _MetaMemo(Generic[_meta_type]):
+    """Skips the pydantic decode when the raw attributes have not moved.
+
+    Decoding is roughly 20x the cost of copying the result (~700us against
+    ~37us on a four-level image), and the handlers decode on *every* metadata
+    access, so anything reading `.dimensions` in a loop pays it per iteration.
+
+    The memo is keyed on the raw attributes, not on time or on a dirty flag:
+    `get_meta` still reads the group every call, so a change made by anyone --
+    this process or another — invalidates it on its own. That keeps the
+    freshness ngio has always had, and only removes repeated work.
+
+    `get` hands out a deep copy and keeps the original. The decoded models are
+    mutable and `image.meta` is public, so the usual pattern
+
+        meta = image.meta
+        meta.set_channels_meta(...)
+        image._meta_handler.update_meta(meta)
+
+    would otherwise edit the memo in place — and a caller who mutates without
+    writing back would leave it holding something that is not on disk.
+
+    `generation` moves whenever the decoded value does. It gives objects that
+    derive something from the metadata a free way to notice — reading an int
+    costs nothing, where re-deriving costs a store round-trip. See
+    `AbstractImage.dimensions`.
+    """
+
+    __slots__ = ("_snapshot", "generation")
+
+    def __init__(self) -> None:
+        # (attrs, meta), stored as one tuple so a concurrent reader sees
+        # either the old pair or the new pair, never new attrs with old meta.
+        # Plate fan-out threads share one handler, so this is load-bearing.
+        self._snapshot: tuple[dict, _meta_type] | None = None
+        self.generation: int = 0
+
+    def get(self, attrs: dict, decode: Callable[[], _meta_type]) -> _meta_type:
+        """Return the metadata for `attrs`, decoding only on a miss."""
+        snapshot = self._snapshot
+        if snapshot is not None and snapshot[0] == attrs:
+            return deepcopy(snapshot[1])
+        meta = decode()
+        # `attrs` is not copied: `load_attrs` hands out a private dict, and
+        # the memo only ever compares it, never returns it.
+        self._snapshot = (attrs, meta)
+        # Not atomic; a lost increment between racing threads is harmless as
+        # long as the counter moves, which a single racer already guarantees.
+        self.generation += 1
+        return deepcopy(meta)
+
+    def clear(self) -> None:
+        """Drop the memo, so the next `get` decodes again."""
+        self._snapshot = None
+        self.generation += 1
+
+
 ##################################################
 #
 # Concrete implementations for NGIO metadata types
@@ -207,12 +276,15 @@ def get_ngio_image_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
     axes_setup: AxesSetup | None = None,
+    attrs: dict | None = None,
 ) -> NgioImageMeta:
     """Retrieve the NGIO image metadata from the Zarr group.
 
     Args:
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of
+            reading them again.
         axes_setup (AxesSetup | None): Optional axes setup for validation.
 
     Returns:
@@ -224,6 +296,7 @@ def get_ngio_image_meta(
         meta_type=NgioImageMeta,
         version=version,
         axes_setup=axes_setup,
+        attrs=attrs,
     )
 
 
@@ -254,17 +327,41 @@ class ImageMetaHandler:
         self._group_handler = group_handler
         self._version = version
         self._axes_setup = axes_setup
+        self._memo: _MetaMemo[NgioImageMeta] = _MetaMemo()
         # Validate metadata
         meta = self.get_meta()
         # Store the resolved version
         self._version = meta.version
 
+    def invalidate(self) -> None:
+        """Drop the decoded metadata, so the next read decodes again.
+
+        Moves `generation`, so anything caching a derived value against it --
+        `AbstractImage.dimensions` — is dropped with it. This is what
+        `OmeZarrContainer.refresh()` reaches for.
+        """
+        self._memo.clear()
+
+    @property
+    def generation(self) -> int:
+        """Moves whenever the decoded metadata does.
+
+        Free to read. Lets a derived value be cached and invalidated without
+        anyone having to call back into this handler on every access.
+        """
+        return self._memo.generation
+
     def get_meta(self) -> NgioImageMeta:
         """Retrieve the NGIO image metadata."""
-        return get_ngio_image_meta(
-            group_handler=self._group_handler,
-            version=self._version,
-            axes_setup=self._axes_setup,
+        attrs = self._group_handler.load_attrs()
+        return self._memo.get(
+            attrs,
+            lambda: get_ngio_image_meta(
+                group_handler=self._group_handler,
+                version=self._version,
+                axes_setup=self._axes_setup,
+                attrs=attrs,
+            ),
         )
 
     def update_meta(self, ngio_meta: NgioImageMeta) -> None:
@@ -273,18 +370,22 @@ class ImageMetaHandler:
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
+        self._memo.clear()
 
 
 def get_ngio_label_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
     axes_setup: AxesSetup | None = None,
+    attrs: dict | None = None,
 ) -> NgioLabelMeta:
     """Retrieve the NGIO label metadata from the Zarr group.
 
     Args:
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of
+            reading them again.
         axes_setup (AxesSetup | None): Optional axes setup for validation.
 
     Returns:
@@ -295,6 +396,7 @@ def get_ngio_label_meta(
         meta_type=NgioLabelMeta,
         version=version,
         axes_setup=axes_setup,
+        attrs=attrs,
     )
 
 
@@ -325,18 +427,42 @@ class LabelMetaHandler:
         self._group_handler = group_handler
         self._version = version
         self._axes_setup = axes_setup
+        self._memo: _MetaMemo[NgioLabelMeta] = _MetaMemo()
 
         # Validate metadata
         meta = self.get_meta()
         # Store the resolved version
         self._version = meta.version
 
+    def invalidate(self) -> None:
+        """Drop the decoded metadata, so the next read decodes again.
+
+        Moves `generation`, so anything caching a derived value against it --
+        `AbstractImage.dimensions` — is dropped with it. This is what
+        `OmeZarrContainer.refresh()` reaches for.
+        """
+        self._memo.clear()
+
+    @property
+    def generation(self) -> int:
+        """Moves whenever the decoded metadata does.
+
+        Free to read. Lets a derived value be cached and invalidated without
+        anyone having to call back into this handler on every access.
+        """
+        return self._memo.generation
+
     def get_meta(self) -> NgioLabelMeta:
         """Retrieve the NGIO label metadata."""
-        return get_ngio_label_meta(
-            group_handler=self._group_handler,
-            version=self._version,
-            axes_setup=self._axes_setup,
+        attrs = self._group_handler.load_attrs()
+        return self._memo.get(
+            attrs,
+            lambda: get_ngio_label_meta(
+                group_handler=self._group_handler,
+                version=self._version,
+                axes_setup=self._axes_setup,
+                attrs=attrs,
+            ),
         )
 
     def update_meta(self, ngio_meta: NgioLabelMeta) -> None:
@@ -345,17 +471,21 @@ class LabelMetaHandler:
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
+        self._memo.clear()
 
 
 def get_ngio_plate_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
+    attrs: dict | None = None,
 ) -> NgioPlateMeta:
     """Retrieve the NGIO plate metadata from the Zarr group.
 
     Args:
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of
+            reading them again.
 
     Returns:
         NgioPlateMeta: The NGIO plate metadata.
@@ -364,6 +494,7 @@ def get_ngio_plate_meta(
         group_handler=group_handler,
         meta_type=NgioPlateMeta,
         version=version,
+        attrs=attrs,
     )
 
 
@@ -388,21 +519,39 @@ class PlateMetaHandler:
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
-        version: str | None = None,
+        version: NgffVersions | None = None,
     ):
         self._group_handler = group_handler
         self._version = version
+        self._memo: _MetaMemo[NgioPlateMeta] = _MetaMemo()
 
         # Validate metadata
-        _ = self.get_meta()
-        # Store the resolved version
-        # self._version = meta.version
+        meta = self.get_meta()
+        # Store the resolved version, so later reads go straight to the right
+        # decoder instead of re-walking the (0.4-first) registry and paying a
+        # full failed validation on every v0.5 document.
+        self._version = meta.version
+
+    @property
+    def version(self) -> NgffVersions | None:
+        """The NGFF version resolved when this handler was built.
+
+        Free to read, unlike `get_meta().version`, which costs a full metadata
+        reload. Callers that only need the version to hand to another handler
+        should use this.
+        """
+        return self._version
 
     def get_meta(self) -> NgioPlateMeta:
         """Retrieve the NGIO plate metadata."""
-        return get_ngio_plate_meta(
-            group_handler=self._group_handler,
-            version=self._version,
+        attrs = self._group_handler.load_attrs()
+        return self._memo.get(
+            attrs,
+            lambda: get_ngio_plate_meta(
+                group_handler=self._group_handler,
+                version=self._version,
+                attrs=attrs,
+            ),
         )
 
     def update_meta(self, ngio_meta: NgioPlateMeta) -> None:
@@ -411,17 +560,21 @@ class PlateMetaHandler:
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
+        self._memo.clear()
 
 
 def get_ngio_well_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
+    attrs: dict | None = None,
 ) -> NgioWellMeta:
     """Retrieve the NGIO well metadata from the Zarr group.
 
     Args:
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of
+            reading them again.
 
     Returns:
         NgioWellMeta: The NGIO well metadata.
@@ -430,6 +583,7 @@ def get_ngio_well_meta(
         group_handler=group_handler,
         meta_type=NgioWellMeta,
         version=version,
+        attrs=attrs,
     )
 
 
@@ -458,17 +612,29 @@ class WellMetaHandler:
     ):
         self._group_handler = group_handler
         self._version = version
+        self._memo: _MetaMemo[NgioWellMeta] = _MetaMemo()
 
-        # Validate metadata
-        _ = self.get_meta()
-        # Store the resolved version
-        # self._version = meta.version
+        if version is None:
+            # Read once to resolve the version, and store it so later reads go
+            # straight to the right decoder instead of re-walking the
+            # (0.4-first) registry and paying a full failed validation on every
+            # 0.5 document.
+            self._version = self.get_meta().version
+        # With a version in hand there is nothing left to resolve, so this read
+        # would only be validating early. A plate opening 384 wells pays it 384
+        # times for documents it is about to read again anyway, so the check is
+        # left to first use — where it raises exactly the same error.
 
     def get_meta(self) -> NgioWellMeta:
         """Retrieve the NGIO well metadata."""
-        return get_ngio_well_meta(
-            group_handler=self._group_handler,
-            version=self._version,
+        attrs = self._group_handler.load_attrs()
+        return self._memo.get(
+            attrs,
+            lambda: get_ngio_well_meta(
+                group_handler=self._group_handler,
+                version=self._version,
+                attrs=attrs,
+            ),
         )
 
     def update_meta(self, ngio_meta: NgioWellMeta) -> None:
@@ -477,17 +643,21 @@ class WellMetaHandler:
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
+        self._memo.clear()
 
 
 def get_ngio_labels_group_meta(
     group_handler: ZarrGroupHandler,
     version: str | None = None,
+    attrs: dict | None = None,
 ) -> NgioLabelsGroupMeta:
     """Retrieve the NGIO labels group metadata from the Zarr group.
 
     Args:
         group_handler (ZarrGroupHandler): The Zarr group handler.
         version (str | None): Optional NGFF version to use for decoding.
+        attrs: Already-loaded group attributes, to decode instead of
+            reading them again.
 
     Returns:
         NgioLabelsGroupMeta: The NGIO labels group metadata.
@@ -496,6 +666,7 @@ def get_ngio_labels_group_meta(
         group_handler=group_handler,
         meta_type=NgioLabelsGroupMeta,
         version=version,
+        attrs=attrs,
     )
 
 
@@ -524,15 +695,21 @@ class LabelsGroupMetaHandler:
     ):
         self._group_handler = group_handler
         self._version = version
+        self._memo: _MetaMemo[NgioLabelsGroupMeta] = _MetaMemo()
 
         meta = self.get_meta()
         self._version = meta.version
 
     def get_meta(self) -> NgioLabelsGroupMeta:
         """Retrieve the NGIO labels group metadata."""
-        return get_ngio_labels_group_meta(
-            group_handler=self._group_handler,
-            version=self._version,
+        attrs = self._group_handler.load_attrs()
+        return self._memo.get(
+            attrs,
+            lambda: get_ngio_labels_group_meta(
+                group_handler=self._group_handler,
+                version=self._version,
+                attrs=attrs,
+            ),
         )
 
     def update_meta(self, ngio_meta: NgioLabelsGroupMeta) -> None:
@@ -541,3 +718,4 @@ class LabelsGroupMetaHandler:
             group_handler=self._group_handler,
             ngio_meta=ngio_meta,
         )
+        self._memo.clear()

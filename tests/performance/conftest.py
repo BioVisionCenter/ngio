@@ -77,16 +77,41 @@ def _build_image(target, **overrides):
     )
 
 
-def _build_plate(target):
+def _build_image_no_tables(target):
+    # No `/tables` group at all, which `_build_image` always creates. Answering
+    # "this image has no tables" used to be the most expensive listing there
+    # is, because the failed probe was never remembered.
+    create_empty_ome_zarr(
+        target,
+        shape=(1, 4, 64, 64),
+        axes_names=["c", "z", "y", "x"],
+        levels=2,
+        pixelsize=(0.5, 0.5),
+        dtype="uint16",
+        overwrite=True,
+    )
+
+
+def _build_plate(target, ngff_version="0.4"):
     # Images are registered in plate metadata but no arrays are created: that
     # is enough for the enumeration paths, which is what costs, and it is the
     # only form that builds identically on a MemoryStore.
+    #
+    # 0.4 is `DefaultNgffVersion`, and it is also the version the decoder
+    # registry tries first — so a 0.4 plate never pays a failed validation and
+    # cannot see a regression in the version memo. `plate_v05` exists for that.
     images = [
         ImageInWellPath(row=row, column=f"{col + 1:02d}", path="0")
         for row in ("A", "B", "C", "D")
         for col in range(6)
     ]
-    create_empty_plate(target, name="bench_plate", images=images, overwrite=True)
+    create_empty_plate(
+        target,
+        name="bench_plate",
+        images=images,
+        ngff_version=ngff_version,
+        overwrite=True,
+    )
 
 
 def _feature_frame(rows: int, columns: int):
@@ -111,6 +136,20 @@ def _build_tables(target):
             backend=backend,
             overwrite=True,
         )
+
+
+def _build_tables_parquet(target):
+    # Its own fixture rather than a third table in `_build_tables`: the listing
+    # scenarios there walk every table, so adding one would move their baselines
+    # for a reason that has nothing to do with what they gate.
+    _build_image(target)
+    container = open_ome_zarr_container(target, mode="r+")
+    container.add_table(
+        name="features_parquet",
+        table=FeatureTable(table_data=_feature_frame(rows=100, columns=4)),
+        backend="experimental_parquet_v1",
+        overwrite=True,
+    )
 
 
 def _build_plate_tables(target):
@@ -148,12 +187,46 @@ def _build_plate_tables(target):
         )
 
 
+#: Six images in *one* well. Every other plate fixture puts one image per well,
+#: which cannot show a cost that grows with the image count inside a well.
+_MULTI_IMAGE_PATHS = tuple(str(i) for i in range(6))
+
+
+def _build_plate_multi_image(target):
+    plate = create_empty_plate(
+        target,
+        name="bench_plate_multi_image",
+        images=[
+            ImageInWellPath(row="A", column="01", path=path)
+            for path in _MULTI_IMAGE_PATHS
+        ],
+        overwrite=True,
+    )
+    # Real containers, unlike `_build_plate`: `get_well_images` opens each one.
+    for path in _MULTI_IMAGE_PATHS:
+        create_empty_ome_zarr(
+            store=plate.get_image_store(row="A", column="01", image_path=path),
+            shape=(1, 1, 64, 64),
+            axes_names=["c", "z", "y", "x"],
+            channels_meta=["Channel 1"],
+            levels=1,
+            pixelsize=(0.65, 0.65),
+            chunks=(1, 1, 64, 64),
+            compressors=None,
+            overwrite=True,
+        )
+
+
 _BUILDERS = {
     "image": lambda t: _build_image(t, ngff_version="0.5"),
     "image_v04": lambda t: _build_image(t, ngff_version="0.4"),
+    "image_no_tables": _build_image_no_tables,
     "plate": _build_plate,
+    "plate_v05": lambda t: _build_plate(t, ngff_version="0.5"),
+    "plate_multi_image": _build_plate_multi_image,
     "plate_tables": _build_plate_tables,
     "tables": _build_tables,
+    "tables_parquet": _build_tables_parquet,
 }
 
 
@@ -265,6 +338,19 @@ def baseline(request, store_kind):
     yield holder
 
     if updating:
+        # `save_baseline` writes only what this run collected, so a partial
+        # selection (`-k`, `--lf`, `--deselect`) would silently drop every
+        # unrun scenario from the committed file. Refuse instead.
+        from tests.performance.scenarios import SCENARIOS
+
+        missing = sorted(set(SCENARIOS) - set(collected))
+        if missing:
+            pytest.fail(
+                f"--update-baseline collected {len(collected)} of "
+                f"{len(SCENARIOS)} scenarios (missing e.g. {missing[:3]}); "
+                "writing this would drop the rest from the baseline. Rerun "
+                "without -k/--lf/--deselect."
+            )
         # No ngio version here: `hatch-vcs` stamps it when the editable install
         # is built, not when the baseline is generated, so it lags the commit
         # being recorded and churns on a dirty tree. `git log -p` on the

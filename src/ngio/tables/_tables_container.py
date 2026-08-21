@@ -1,5 +1,6 @@
 """Module for handling the /tables group in an OME-NGFF file."""
 
+from collections.abc import Sequence
 from typing import Literal, Protocol, Self, TypeVar
 
 import anndata as ad
@@ -21,6 +22,7 @@ from ngio.tables.v1 import (
 from ngio.tables.v1._roi_table import GenericRoiTableV1
 from ngio.utils import (
     AccessModeLiteral,
+    NgioFileNotFoundError,
     NgioValidationError,
     NgioValueError,
     StoreOrGroup,
@@ -104,6 +106,7 @@ class Table(Protocol):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> Self:
         """Create a new table from a Zarr group handler."""
         ...
@@ -150,11 +153,15 @@ class TableMeta(BackendMeta):
         return f"{self.type}_v{self.table_version}"
 
 
-def _get_meta(handler: ZarrGroupHandler) -> TableMeta:
-    """Get the metadata from the handler."""
-    attrs = handler.load_attrs()
-    meta = TableMeta(**attrs)
-    return meta
+def _get_meta(handler: ZarrGroupHandler, attrs: dict | None = None) -> TableMeta:
+    """Get the metadata from the handler.
+
+    `attrs` are already-loaded group attributes, decoded instead of reading
+    the document again.
+    """
+    if attrs is None:
+        attrs = handler.load_attrs()
+    return TableMeta(**attrs)
 
 
 class ImplementedTables:
@@ -180,8 +187,13 @@ class ImplementedTables:
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
         strict: bool = True,
+        attrs: dict | None = None,
     ) -> Table:
-        """Try to get a handler for the given store based on the metadata version."""
+        """Try to get a handler for the given store based on the metadata version.
+
+        `attrs` are the group attributes `meta` was decoded from, forwarded so
+        the concrete table does not read the same document again.
+        """
         if strict:
             default = None
         else:
@@ -192,7 +204,7 @@ class ImplementedTables:
             raise NgioValueError(
                 f"Table handler for {meta.unique_name()} not implemented."
             )
-        table = table_cls.from_handler(handler=handler, backend=backend)
+        table = table_cls.from_handler(handler=handler, backend=backend, attrs=attrs)
         return table
 
     def _add_implementation(
@@ -231,6 +243,8 @@ class TablesContainer:
     def __init__(self, group_handler: ZarrGroupHandler) -> None:
         """Initialize the TablesContainer."""
         self._group_handler = group_handler
+        # name -> table type; see `table_types`.
+        self._types_memo: dict[str, str] = {}
 
         # Validate the group
         # Either contains a tables attribute or is empty
@@ -255,8 +269,46 @@ class TablesContainer:
 
     def _get_table_group_handler(self, name: str) -> ZarrGroupHandler:
         """Get the group handler for a table."""
-        handler = self._group_handler.get_handler(path=name)
+        # `create_mode=False`: `get_handler` defaults to creating, so a stale
+        # name left in the `tables` attribute would make a *read* create an
+        # empty group in `r+`, or raise "cannot create in read only mode" in
+        # `r`. An unfiltered `list()` returns such a name harmlessly.
+        handler = self._group_handler.get_handler(path=name, create_mode=False)
         return handler
+
+    def table_types(self, names: Sequence[str] | None = None) -> dict[str, str]:
+        """Return the table type of each table, keyed by name.
+
+        The type lives only in each table's own attributes — the `/tables`
+        group records names — so learning it costs one group open per table.
+        Under `cache=True` that result is memoised: a table's type does not
+        change without going through `add`/`delete` here, and those drop the
+        memo. Under `cache=False` every call re-reads each type, so a table
+        overwritten with a different type by another handle is picked up.
+        Names are re-read every call in both modes.
+
+        Args:
+            names: Restrict to these tables. Defaults to every table listed.
+        """
+        if names is None:
+            names = self._get_tables_list()
+
+        use_memo = self._group_handler.use_cache
+        for name in names:
+            if not use_memo or name not in self._types_memo:
+                try:
+                    handler = self._get_table_group_handler(name)
+                except NgioFileNotFoundError:
+                    # A stale name in the `tables` attribute with no group
+                    # behind it. Not memoised (and any earlier memo is
+                    # dropped): it stays invisible to typed listings but
+                    # keeps raising on a direct `get`.
+                    self._types_memo.pop(name, None)
+                    continue
+                self._types_memo[name] = _get_meta(handler).type
+        return {
+            name: self._types_memo[name] for name in names if name in self._types_memo
+        }
 
     def list(self, filter_types: TypedTable | str | None = None) -> list[str]:
         """List all tables in the group.
@@ -271,13 +323,11 @@ class TablesContainer:
         if filter_types is None:
             return tables
 
-        filtered_tables = []
-        for table_name in tables:
-            tb_handler = self._get_table_group_handler(table_name)
-            table_type = _get_meta(tb_handler).type
-            if table_type == filter_types:
-                filtered_tables.append(table_name)
-        return filtered_tables
+        return [
+            name
+            for name, table_type in self.table_types(tables).items()
+            if table_type == filter_types
+        ]
 
     def get(
         self,
@@ -300,12 +350,16 @@ class TablesContainer:
 
         table_handler = self._get_table_group_handler(name)
 
-        meta = _get_meta(table_handler)
+        # Read once: `TableMeta` picks the class and the concrete model is
+        # built by the class — both consume this same document.
+        attrs = table_handler.load_attrs()
+        meta = _get_meta(table_handler, attrs=attrs)
         return ImplementedTables().get_table(
             meta=meta,
             handler=table_handler,
             backend=backend,
             strict=strict,
+            attrs=attrs,
         )
 
     def get_as(
@@ -352,6 +406,7 @@ class TablesContainer:
 
         self._group_handler.delete_group(name)
         existing_tables.remove(name)
+        self._types_memo.pop(name, None)
         self._group_handler.write_attrs({"tables": existing_tables})
 
     def add(
@@ -388,6 +443,9 @@ class TablesContainer:
             backend=backend,
         )
         table.consolidate()
+        # The type is written by `consolidate`, and `overwrite=True` can change
+        # it, so drop any memoised value rather than trusting it.
+        self._types_memo.pop(name, None)
         if name not in existing_tables:
             existing_tables.append(name)
             self._group_handler.write_attrs({"tables": existing_tables})
@@ -427,9 +485,11 @@ def open_table(
         cache=cache,
         mode=mode,
     )
-    meta = _get_meta(handler)
+    # Read once, decode once: the same document picks the class and builds it.
+    attrs = handler.load_attrs()
+    meta = _get_meta(handler, attrs=attrs)
     return ImplementedTables().get_table(
-        meta=meta, handler=handler, backend=backend, strict=False
+        meta=meta, handler=handler, backend=backend, strict=False, attrs=attrs
     )
 
 

@@ -35,12 +35,12 @@ print(hcs_zarr)
 print(f"Rows: {hcs_zarr.rows}, Columns: {hcs_zarr.columns}")
 
 # Get all the images in the plate
-print(hcs_zarr.get_images())
+print(hcs_zarr.get_images(max_workers="auto"))
 # --8<-- [end:open_plate]
 
 # --8<-- [start:concatenate_tables]
 # Aggregate all table across all images
-table = hcs_zarr.concatenate_image_tables(name="nuclei")
+table = hcs_zarr.concatenate_image_tables(name="nuclei", max_workers="auto")
 print(table_html(table.dataframe.head()))
 # --8<-- [end:concatenate_tables]
 

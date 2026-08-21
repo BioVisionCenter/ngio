@@ -14,17 +14,58 @@ from ngio.images._image import (
 )
 from ngio.images._label import Label
 from ngio.io_pipes import (
-    DaskGetterMasked,
-    DaskSetterMasked,
-    NumpyGetterMasked,
-    NumpySetterMasked,
+    DaskGetter,
+    DaskSetter,
+    MergeInput,
+    NumpyGetter,
+    NumpySetter,
     TransformProtocol,
 )
+from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
     ZarrGroupHandler,
 )
+
+
+def _mask_kwargs(
+    masked_image: "MaskedImage | MaskedLabel",
+    axes_order: Sequence[str] | None,
+    allow_rescaling: bool,
+) -> dict:
+    return {
+        "label_zarr_array": masked_image._label.zarr_array,
+        "label_dimensions": masked_image._label.dimensions,
+        "axes_order": axes_order,
+        "allow_rescaling": allow_rescaling,
+        "target_dimensions": masked_image.dimensions,
+    }
+
+
+def _build_mask_transform(
+    *,
+    masked_image: "MaskedImage | MaskedLabel",
+    axes_order: Sequence[str] | None,
+    allow_rescaling: bool,
+) -> BaseMaskTransform:
+    """The read-side mask: outside-mask pixels come back as the fill value.
+
+    The caller's data transforms do not belong here — they apply to the image
+    patch (the callers splice them into the getter chain themselves), while
+    anything passed to `BaseMaskTransform` would run on the *label* read.
+    """
+    return BaseMaskTransform(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
+
+
+def _build_mask_merge(
+    *,
+    masked_image: "MaskedImage | MaskedLabel",
+    axes_order: Sequence[str] | None,
+    allow_rescaling: bool,
+) -> BaseMaskMerge:
+    """The write-side mask: keep the on-disk pixels outside the mask."""
+    return BaseMaskMerge(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
 
 
 class MaskedImage(Image):
@@ -131,6 +172,7 @@ class MaskedImage(Image):
         channel_selection: ChannelSlicingInputType | None = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
@@ -142,6 +184,7 @@ class MaskedImage(Image):
             channel_selection=channel_selection,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **slicing_kwargs,
         )
 
@@ -162,16 +205,18 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = NumpyGetterMasked(
+        mask_transform = _build_mask_transform(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
+        masked_getter = NumpyGetter(
             roi=roi,
             zarr_array=self.zarr_array,
-            label_zarr_array=self._label.zarr_array,
             dimensions=self.dimensions,
-            label_dimensions=self._label.dimensions,
             axes_order=axes_order,
-            transforms=transforms,
+            transforms=[*(transforms or []), mask_transform],
             slicing_dict=slicing_kwargs,
-            allow_rescaling=allow_rescaling,
         )
         return masked_getter()
 
@@ -192,16 +237,18 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = DaskGetterMasked(
+        mask_transform = _build_mask_transform(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
+        masked_getter = DaskGetter(
             roi=roi,
             zarr_array=self.zarr_array,
-            label_zarr_array=self._label.zarr_array,
             dimensions=self.dimensions,
-            label_dimensions=self._label.dimensions,
             axes_order=axes_order,
-            transforms=transforms,
+            transforms=[*(transforms or []), mask_transform],
             slicing_dict=slicing_kwargs,
-            allow_rescaling=allow_rescaling,
         )
         return masked_getter()
 
@@ -259,32 +306,35 @@ class MaskedImage(Image):
 
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
+        mask_merge = _build_mask_merge(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
         if isinstance(patch, da.Array):
-            path_setter = DaskSetterMasked(
+            path_setter = DaskSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
-                label_zarr_array=self._label.zarr_array,
                 dimensions=self.dimensions,
-                label_dimensions=self._label.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
-                allow_rescaling=allow_rescaling,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         elif isinstance(patch, np.ndarray):
-            path_setter = NumpySetterMasked(
+            path_setter = NumpySetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
-                label_zarr_array=self._label.zarr_array,
                 dimensions=self.dimensions,
-                label_dimensions=self._label.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
-                allow_rescaling=allow_rescaling,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -389,6 +439,7 @@ class MaskedLabel(Label):
         zoom_factor: float = 1.0,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
         """Set the array for a given ROI."""
@@ -399,6 +450,7 @@ class MaskedLabel(Label):
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **slicing_kwargs,
         )
 
@@ -414,16 +466,18 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a NumPy array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = NumpyGetterMasked(
+        mask_transform = _build_mask_transform(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
+        masked_getter = NumpyGetter(
             roi=roi,
             zarr_array=self.zarr_array,
-            label_zarr_array=self._label.zarr_array,
             dimensions=self.dimensions,
-            label_dimensions=self._label.dimensions,
             axes_order=axes_order,
-            transforms=transforms,
+            transforms=[*(transforms or []), mask_transform],
             slicing_dict=slicing_kwargs,
-            allow_rescaling=allow_rescaling,
         )
         return masked_getter()
 
@@ -439,16 +493,18 @@ class MaskedLabel(Label):
         """Return the masked array for a given label as a Dask array."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
-        masked_getter = DaskGetterMasked(
+        mask_transform = _build_mask_transform(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
+        masked_getter = DaskGetter(
             roi=roi,
             zarr_array=self.zarr_array,
-            label_zarr_array=self._label.zarr_array,
             dimensions=self.dimensions,
-            label_dimensions=self._label.dimensions,
             axes_order=axes_order,
-            transforms=transforms,
+            transforms=[*(transforms or []), mask_transform],
             slicing_dict=slicing_kwargs,
-            allow_rescaling=allow_rescaling,
         )
         return masked_getter()
 
@@ -498,32 +554,35 @@ class MaskedLabel(Label):
         """Set the masked array for a given label."""
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
+        mask_merge = _build_mask_merge(
+            masked_image=self,
+            axes_order=axes_order,
+            allow_rescaling=allow_rescaling,
+        )
         if isinstance(patch, da.Array):
-            path_setter = DaskSetterMasked(
+            path_setter = DaskSetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
-                label_zarr_array=self._label.zarr_array,
                 dimensions=self.dimensions,
-                label_dimensions=self._label.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
-                allow_rescaling=allow_rescaling,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         elif isinstance(patch, np.ndarray):
-            path_setter = NumpySetterMasked(
+            path_setter = NumpySetter(
                 roi=roi,
                 zarr_array=self.zarr_array,
-                label_zarr_array=self._label.zarr_array,
                 dimensions=self.dimensions,
-                label_dimensions=self._label.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=mask_merge,
                 slicing_dict=slicing_kwargs,
-                allow_rescaling=allow_rescaling,
             )
             path_setter(patch)
+            self._record_write(path_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "

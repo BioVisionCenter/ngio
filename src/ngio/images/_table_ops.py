@@ -3,16 +3,22 @@
 import asyncio
 from collections import Counter
 from collections.abc import Awaitable, Callable, Sequence
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Literal, TypeVar
 
 import pandas as pd
 import polars as pl
 
+# Re-exported for backwards compatibility: this machinery grew up here and
+# `MaxWorkers` is referenced as `images._table_ops.MaxWorkers` elsewhere.
+from ngio.common._concurrency import (
+    MaxWorkers,
+    _map_workers,
+    _resolve_max_workers,
+    _warn_default_will_change,
+)
 from ngio.images._ome_zarr_container import OmeZarrContainer
 from ngio.tables import Table, TableType
-from ngio.utils import deprecated
 
 _T = TypeVar("_T")
 _R = TypeVar("_R")
@@ -26,32 +32,18 @@ class TableWithExtras:
     extras: dict[str, str] = field(default_factory=dict)
 
 
-def _map_workers(
-    func: Callable[[_T], _R],
-    items: Sequence[_T],
-    max_workers: int | None,
-) -> list[_R]:
-    """Apply `func` to every item, on a thread pool when `max_workers` > 1.
-
-    Results keep the order of `items`. With `max_workers=None` (the default)
-    the work runs serially in the calling thread.
-    """
-    if max_workers is None or max_workers <= 1 or len(items) <= 1:
-        return [func(item) for item in items]
-
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        return list(pool.map(func, items))
-
-
 async def _gather_bounded(
     coro_factories: Sequence[Callable[[], Awaitable[_R]]],
-    max_workers: int | None,
+    max_workers: MaxWorkers,
 ) -> list[_R]:
     """Await every coroutine, at most `max_workers` of them at a time.
 
     With `max_workers=None` the fan-out is left to asyncio's default thread
     executor, which is itself capped at `min(32, cpu_count + 4)`.
     """
+    if max_workers is None:
+        _warn_default_will_change(len(coro_factories))
+    max_workers = _resolve_max_workers(max_workers)
     if max_workers is None or max_workers <= 0:
         return list(await asyncio.gather(*(factory() for factory in coro_factories)))
 
@@ -199,7 +191,6 @@ def concatenate_tables(
     )
 
 
-conctatenate_tables = deprecated(replacement="concatenate_tables()")(concatenate_tables)
 """Deprecated misspelling of `concatenate_tables`."""
 
 
@@ -222,9 +213,9 @@ def _load_image_table(
     mode: Literal["eager", "lazy"] = "eager",
     strict: bool = True,
 ) -> TableWithExtras | None:
-    """Load `name` from `image` and materialize it according to `mode`.
+    """Load `name` from `image` and materialise it according to `mode`.
 
-    The materialization is what makes this worth running on a worker thread:
+    The materialisation is what makes this worth running on a worker thread:
     it forces the IO here instead of leaving it to the concatenation step.
     """
     if not strict and name not in image.list_tables():
@@ -246,7 +237,7 @@ def _concatenate_image_tables(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table."""
     _check_images_and_extras(images=images, extras=extras)
@@ -276,7 +267,7 @@ def concatenate_image_tables(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table.
 
@@ -314,7 +305,7 @@ def concatenate_image_tables_as(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> TableType:
     """Concatenate tables from different images into a single table.
 
@@ -357,7 +348,7 @@ async def _concatenate_image_tables_async(
     index_key: str | None = None,
     strict: bool = True,
     mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> Table:
     """Concatenate tables from different images into a single table."""
     _check_images_and_extras(images=images, extras=extras)
@@ -383,92 +374,6 @@ async def _concatenate_image_tables_async(
         index_key=index_key,
         table_cls=table_cls,
     )
-
-
-@deprecated(replacement="concatenate_image_tables(max_workers=...)")
-async def concatenate_image_tables_async(
-    images: Sequence[OmeZarrContainer],
-    extras: Sequence[dict[str, str]],
-    name: str,
-    index_key: str | None = None,
-    strict: bool = True,
-    mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
-) -> Table:
-    """Concatenate tables from different images into a single table.
-
-    Deprecated: use `concatenate_image_tables(max_workers=...)`.
-
-    Args:
-        images: A collection of images.
-        extras: A collection of extras dictionaries for each image.
-            this will be added as columns to the table, and will be
-            concatenated with the table index to create a new index.
-        name: The name of the table to concatenate.
-        index_key: The key to use for the index of the concatenated table.
-        strict: If True, raise an error if the table is not found in the image.
-        mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-            if 'eager', the table will be loaded into memory.
-            if 'lazy', the table will be loaded as a lazy frame.
-        max_workers: How many images to read at a time. `None` leaves the
-            fan-out to asyncio's default thread executor.
-    """
-    return await _concatenate_image_tables_async(
-        images=images,
-        extras=extras,
-        name=name,
-        table_cls=None,
-        index_key=index_key,
-        strict=strict,
-        mode=mode,
-        max_workers=max_workers,
-    )
-
-
-@deprecated(replacement="concatenate_image_tables_as(max_workers=...)")
-async def concatenate_image_tables_as_async(
-    images: Sequence[OmeZarrContainer],
-    extras: Sequence[dict[str, str]],
-    name: str,
-    table_cls: type[TableType],
-    index_key: str | None = None,
-    strict: bool = True,
-    mode: Literal["eager", "lazy"] = "eager",
-    max_workers: int | None = None,
-) -> TableType:
-    """Concatenate tables from different images into a single table.
-
-    Deprecated: use `concatenate_image_tables_as(max_workers=...)`.
-
-    Args:
-        images: A collection of images.
-        extras: A collection of extras dictionaries for each image.
-            this will be added as columns to the table, and will be
-            concatenated with the table index to create a new index.
-        name: The name of the table to concatenate.
-        table_cls: The output will be casted to this class, if the new table_cls is
-            compatible with the table_cls of the input tables.
-        index_key: The key to use for the index of the concatenated table.
-        strict: If True, raise an error if the table is not found in the image.
-        mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-            if 'eager', the table will be loaded into memory.
-            if 'lazy', the table will be loaded as a lazy frame.
-        max_workers: How many images to read at a time. `None` leaves the
-            fan-out to asyncio's default thread executor.
-    """
-    table = await _concatenate_image_tables_async(
-        images=images,
-        extras=extras,
-        name=name,
-        table_cls=table_cls,
-        index_key=index_key,
-        strict=strict,
-        mode=mode,
-        max_workers=max_workers,
-    )
-    if not isinstance(table, table_cls):
-        raise ValueError(f"Table is not of type {table_cls}. Got {type(table)}")
-    return table
 
 
 def _tables_names_coalesce(
@@ -499,7 +404,7 @@ def list_image_tables(
     images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> list[str]:
     """List all table names in the images.
 
@@ -526,7 +431,7 @@ async def _list_image_tables_async(
     images: Sequence[OmeZarrContainer],
     filter_types: str | None = None,
     mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
+    max_workers: MaxWorkers = None,
 ) -> list[str]:
     """List all table names in the images, reading them off the event loop."""
     factories = [
@@ -541,31 +446,4 @@ async def _list_image_tables_async(
     return _tables_names_coalesce(
         tables_names=tables_names,
         mode=mode,
-    )
-
-
-@deprecated(replacement="list_image_tables(max_workers=...)")
-async def list_image_tables_async(
-    images: Sequence[OmeZarrContainer],
-    filter_types: str | None = None,
-    mode: Literal["common", "all"] = "common",
-    max_workers: int | None = None,
-) -> list[str]:
-    """List all image tables in the images asynchronously.
-
-    Deprecated: use `list_image_tables(max_workers=...)`.
-
-    Args:
-        images: A collection of images.
-        filter_types: The type of tables to filter. If None, return all tables.
-        mode: Whether to return only tables common to every image (`"common"`)
-            or the union across them (`"all"`).
-        max_workers: How many images to read concurrently. `None` (the default)
-            leaves the fan-out to asyncio's default thread executor.
-    """
-    return await _list_image_tables_async(
-        images=images,
-        filter_types=filter_types,
-        mode=mode,
-        max_workers=max_workers,
     )

@@ -15,7 +15,14 @@ _DEFAULT_CONFIG_PATH = Path.home() / ".ngio" / "ngio_config.json"
 
 
 class S3FSConfig(BaseModel):
-    custom_retry_markers: list[str] = Field(default_factory=list)
+    """Tuning for s3fs-backed stores."""
+
+    custom_retry_markers: list[str] = Field(
+        default_factory=list,
+        description="Extra error-message markers s3fs treats as retryable, "
+        "applied through its custom error handler (see "
+        "`ngio.utils.refresh_s3fs_config`).",
+    )
 
 
 class _BackoffBase(BaseModel):
@@ -119,11 +126,74 @@ class RetryConfig(BaseModel):
         return self
 
 
+class ConsolidationConfig(BaseModel):
+    """Bounds for the fast paths of `consolidate`; see the configuration guide."""
+
+    numpy_max_bytes: int = Field(
+        default=256 * 2**20,
+        ge=0,
+        description="Above this source-level size, `mode='auto'` never builds "
+        "the pyramid in memory. `0` disables the in-memory path entirely.",
+    )
+    partial_max_coverage: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Once `consolidate(regions=...)`'s merged regions cover "
+        "more than this fraction of the source level, the whole pyramid is "
+        "rebuilt instead — region bookkeeping stops paying for itself.",
+    )
+    model_config = ConfigDict(validate_assignment=True)
+
+
+class DaskConfig(BaseModel):
+    """Bounds for the dask write path; see the configuration guide."""
+
+    write_block_max_bytes: int | None = Field(
+        default=8 * 2**20,
+        ge=0,
+        description="Caps how much data one dask write block assembles in "
+        "memory. A ceiling only: it never undercuts one write unit, nor a "
+        "lower `array.chunk-size` set directly. `None` defers to dask.",
+    )
+    model_config = ConfigDict(validate_assignment=True)
+
+
+class ZarrConfig(BaseModel):
+    """Knobs forwarded into zarr's own runtime configuration.
+
+    Both default to `None`, which leaves zarr exactly as found; see the
+    configuration guide for when each takes effect.
+    """
+
+    async_concurrency: int | None = Field(
+        default=None,
+        ge=1,
+        description="Store requests zarr keeps in flight per operation — the "
+        "knob that matters on remote stores (zarr's own default is 10).",
+    )
+    threading_max_workers: int | None = Field(
+        default=None,
+        ge=1,
+        description="Size of zarr's decode thread executor. Snapshotted by "
+        "zarr at the first operation, so it only works from the config file.",
+    )
+    model_config = ConfigDict(validate_assignment=True)
+
+
 class NgioConfig(BaseModel):
-    """Global configuration for ngio."""
+    """Global configuration for ngio, one section per subsystem.
+
+    Sections: `s3fs` (S3 credentials/endpoint), `io_retry` (transient-error
+    retries), `consolidation`, `dask`, and `zarr`. Loaded from the config
+    file at import; see the configuration guide.
+    """
 
     s3fs: S3FSConfig | None = None
     io_retry: RetryConfig = Field(default_factory=RetryConfig)
+    consolidation: ConsolidationConfig = Field(default_factory=ConsolidationConfig)
+    dask: DaskConfig = Field(default_factory=DaskConfig)
+    zarr: ZarrConfig = Field(default_factory=ZarrConfig)
     model_config = ConfigDict(validate_assignment=True)
 
 

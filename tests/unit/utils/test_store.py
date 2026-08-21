@@ -551,17 +551,48 @@ class TestRetryEndToEnd:
         with pytest.raises(OSError, match="flaky"):
             ZarrGroupHandler(store=flaky, mode="a")
 
-    def test_user_group_is_rewrapped(self, tmp_path):
+    def test_user_local_group_is_left_unwrapped(self, tmp_path):
+        """A pass-through wrapper is not worth what it costs the codec pipeline.
+
+        zarr silently falls back to `BatchedCodecPipeline` for any store its
+        configured pipeline does not recognise, and `NgioStore` is one of those
+        — so wrapping a plain local store forfeits `zarrs` while, under the
+        default policy, adding nothing.
+        """
         from ngio.utils import ZarrGroupHandler
 
         group = zarr.open_group(store=tmp_path / "user.zarr", mode="a")
-        assert not isinstance(group.store, NgioStore)
         handler = ZarrGroupHandler(store=group, mode="a")
+
+        assert not isinstance(handler.group.store, NgioStore)
+        # Adopted, not reopened: reopening costs a full metadata read.
+        assert handler.group.store is group.store
+        # The services are still there, over the bare store.
+        assert isinstance(handler.store, NgioStore)
+        assert handler.store._store is group.store
+
+    def test_user_group_is_wrapped_when_retries_are_configured(
+        self, tmp_path, monkeypatch
+    ):
+        from ngio.config import get_config
+        from ngio.utils import ZarrGroupHandler
+
+        monkeypatch.setattr(get_config(), "io_retry", _RETRY)
+        group = zarr.open_group(store=tmp_path / "user.zarr", mode="a")
+        handler = ZarrGroupHandler(store=group, mode="a")
+
         assert isinstance(handler.group.store, NgioStore)
         # and it is not double wrapped when passed around again
         handler2 = ZarrGroupHandler(store=handler.group, mode="a")
         assert isinstance(handler2.group.store, NgioStore)
         assert not isinstance(handler2.group.store._store, NgioStore)
+
+    def test_non_local_store_is_always_wrapped(self):
+        """zarrs rejects every store but a plain LocalStore, so only it bypasses."""
+        from ngio.utils import ZarrGroupHandler
+
+        handler = ZarrGroupHandler(store=MemoryStore(), mode="a")
+        assert isinstance(handler.group.store, NgioStore)
 
 
 class TestMakeStoreCompat:

@@ -44,7 +44,7 @@ print(ome_zarr_plate.well_images_paths(row="B", column=3))
 # --8<-- [end:well_images_paths]
 
 # --8<-- [start:get_images]
-print(ome_zarr_plate.get_images())
+print(ome_zarr_plate.get_images(max_workers="auto"))
 # --8<-- [end:get_images]
 
 # --8<-- [start:get_well_images]

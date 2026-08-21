@@ -6,8 +6,17 @@ from typing import Any, Literal
 from zarr.core.array import CompressorLike
 
 from ngio.common import compute_masking_roi
-from ngio.common._pyramid import ChunksLike, ShardsLike
-from ngio.images._abstract_image import AbstractImage, abstract_derive
+from ngio.common._label_ops import relabel_sequential
+from ngio.common._pyramid import (
+    ChunksLike,
+    ConsolidationMode,
+    ShardsLike,
+)
+from ngio.images._abstract_image import (
+    AbstractImage,
+    ConsolidationRegions,
+    abstract_derive,
+)
 from ngio.images._image import Image
 from ngio.ome_zarr_meta import (
     LabelMetaHandler,
@@ -85,13 +94,50 @@ class Label(AbstractImage):
 
     def consolidate(
         self,
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
-        """Consolidate the label on disk."""
+        """Consolidate the label on disk.
+
+        Args:
+            mode: How to build each level, see `ConsolidationMode`.
+            regions: Where this level changed — `Roi`s or on-disk index
+                tuples — to rebuild only what derives from it. See
+                `Image.consolidate`.
+        """
         self._consolidate(
             order="nearest",
             mode=mode,
+            regions=regions,
         )
+
+    def relabel_sequential(
+        self,
+        consolidation_mode: ConsolidationMode | None = None,
+    ) -> int:
+        """Renumber the objects to a dense `1..N`, in place.
+
+        Useful after any process that leaves gaps in the ids — a segmentation
+        written region by region, a filtering step that dropped objects, or a
+        stitch run with `compact=False`.
+
+        Numbers are handed out in first-encounter order over the chunk grid
+        rather than by sorting the existing ids, which is what lets this be a
+        single pass over the label instead of one pass to collect and another to
+        write. Which object ends up as `1` therefore follows the array, and
+        depends on the chunking.
+
+        Args:
+            consolidation_mode: How to rebuild the pyramid afterwards, see
+                `consolidate`. Every level derives from level 0, so they would
+                otherwise disagree with the renumbered ids.
+
+        Returns:
+            How many distinct objects the label now holds.
+        """
+        count = len(relabel_sequential(self.zarr_array))
+        self.consolidate(mode=consolidation_mode)
+        return count
 
 
 class LabelsContainer:
@@ -106,6 +152,11 @@ class LabelsContainer:
         """Initialize the LabelGroupHandler."""
         self._group_handler = group_handler
         self._axes_setup = axes_setup or AxesSetup()
+        # One handler per label, shared by every `Label` handed out for that
+        # name — both to decode each document once, and so that
+        # `OmeZarrContainer.refresh()` can reach live `Label` objects
+        # through `invalidate()`.
+        self._label_meta_handlers: dict[str, LabelMetaHandler] = {}
         # If the group is empty, initialize the metadata
         try:
             self._meta_handler = LabelsGroupMetaHandler(group_handler)
@@ -165,7 +216,16 @@ class LabelsContainer:
             )
 
         group_handler = self._group_handler.get_handler(name)
-        label_meta_handler = LabelMetaHandler(group_handler, axes_setup=self.axes_setup)
+        label_meta_handler = self._label_meta_handlers.get(name)
+        if label_meta_handler is None:
+            label_meta_handler = LabelMetaHandler(
+                group_handler, axes_setup=self.axes_setup
+            )
+            # `setdefault`: concurrent getters of one label must share the
+            # winner, or a later `invalidate()` would miss the losers.
+            label_meta_handler = self._label_meta_handlers.setdefault(
+                name, label_meta_handler
+            )
         path = (
             label_meta_handler.get_meta()
             .get_dataset(path=path, pixel_size=pixel_size, strict=strict)
@@ -176,6 +236,15 @@ class LabelsContainer:
             path=path,
             meta_handler=label_meta_handler,
         )
+
+    def invalidate(self) -> None:
+        """Drop the decoded metadata of every label handed out so far.
+
+        Moves each handler's `generation`, so live `Label` objects re-derive
+        `dimensions` on their next access instead of serving a snapshot.
+        """
+        for handler in self._label_meta_handlers.values():
+            handler.invalidate()
 
     def delete(self, name: str, missing_ok: bool = False) -> None:
         """Delete a label from the group.
@@ -196,6 +265,7 @@ class LabelsContainer:
             )
 
         self._group_handler.delete_group(name)
+        self._label_meta_handlers.pop(name, None)
         existing_labels.remove(name)
         update_meta = NgioLabelsGroupMeta(
             labels=existing_labels, version=self.meta.version

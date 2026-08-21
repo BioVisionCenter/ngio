@@ -63,9 +63,11 @@ class ConditionTableV1(AbstractBaseTable):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "ConditionTableV1":
         return cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=ConditionTableMeta,
+            attrs=attrs,
         )

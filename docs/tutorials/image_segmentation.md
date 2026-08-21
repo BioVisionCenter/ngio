@@ -30,7 +30,11 @@ Start with a function that segments an image, using `skimage` to do the work.
 
 ## Step 3: segment the image
 
-Rather than segmenting the image all at once, iterate over its FOVs and segment them one by one.
+Rather than segmenting the image all at once, map the function over its FOVs. Two
+problems come free with tiling — every FOV numbers its objects from 1, and an object
+crossing a FOV boundary comes out as two objects — and `stitch=True` solves both: each
+FOV's ids land in a block of their own during the map, the halo overlap is used to merge
+split objects afterwards, and the surviving ids are renumbered to a dense `1..N`.
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:segment"
@@ -57,7 +61,9 @@ another segmentation.
 ```
 
 Note that the next step rebinds `image` to the *masked* image, so the plot below shows
-the masked image rather than the original one.
+the masked image rather than the original one. Masks are not a tile grid, so there is no
+`stitch` here; ids stay unique across masks with `UniqueLabelsTransform`, where each
+ROI's own label picks the id block.
 
 ```python exec="true" source="material-block" session="image_segmentation"
 --8<-- "docs/snippets/tutorials/image_segmentation.py:masked_segment"
@@ -70,6 +76,7 @@ the masked image rather than the original one.
 ## Next steps
 
 - [Feature extraction](feature_extraction.md) — measure the objects you just segmented.
+- [Iterators](../getting_started/6_iterators.md) — halos, stitching and parallel mappers in full.
 - [Masked images and labels](../getting_started/4_masked_images.md) — read data object-by-object.
 
 ## Beyond the tutorials

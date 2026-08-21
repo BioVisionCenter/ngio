@@ -215,9 +215,11 @@ You can update the axes names and units:
     ```
 
 === "Axes units"
-    Set the space and time units:
+    Set the space and time units, each on its own (setting one leaves the
+    other untouched; both also apply to the labels unless `set_labels=False`):
     ```python
-    ome_zarr_container.set_axes_units(space_unit="micrometer", time_unit="second")
+    ome_zarr_container.set_space_unit("micrometer")
+    ome_zarr_container.set_time_unit("second")
     ```
 
 ### Image name
@@ -295,6 +297,45 @@ new_ome_zarr_image = create_empty_ome_zarr(
 
 This will create an empty OME-Zarr image with the specified shape and pixel sizes.
 
+### Chunks, shards, and compression
+
+Both creation functions accept the array geometry and codec directly; the settings
+apply to **every** pyramid level, clipped per level so a deep level never exceeds
+its own shape:
+
+```python
+from zarr.codecs import BloscCodec
+
+sharded = create_empty_ome_zarr(
+    store="sharded_ome.zarr",
+    shape=(16, 2048, 2048),
+    pixelsize=0.65,
+    ngff_version="0.5",
+    chunks=(1, 256, 256),
+    shards=(4, 2048, 2048),
+    compressors=BloscCodec(cname="zstd", clevel=5),
+)
+```
+
+A few rules, all enforced before anything is written:
+
+- Sharding needs OME-Zarr 0.5 (zarr format 3); on `ngff_version="0.4"` pass
+  `shards=None`, or `shards="auto"`, which means no sharding there.
+- An explicit shard shape needs an explicit chunk shape — with `chunks="auto"`
+  zarr would infer chunks the shard is not a multiple of.
+- On 0.4 the codec is a `numcodecs` object (`numcodecs.Blosc(...)`); on 0.5 a
+  zarr v3 codec (`zarr.codecs.BloscCodec(...)`). The two are not interchangeable.
+
+`derive_image` / `derive_label` inherit `chunks`, `shards`, `compressors`,
+`dtype`, and the dimension separator from the reference image unless you pass a
+value explicitly. When deriving *across* formats (`ngff_version=` differs from
+the reference), inheriting codecs or shards cannot work, so ngio asks you to be
+explicit: `compressors="auto"` selects the target format's default, and
+`shards="auto"` derives unsharded onto a 0.4 target.
+
+Anything beyond these (`fill_value`, `filters`, `serializer`, ...) goes through
+`extra_array_kwargs`, which is forwarded to `zarr.create_array` as-is.
+
 ## Opening remote OME-Zarr containers
 
 You can use `ngio` to open remote OME-Zarr containers.
@@ -327,6 +368,27 @@ from ngio.utils import fractal_fsspec_store
 store = fractal_fsspec_store(url="https://fractal_url...", fractal_token="**your_secret_token**")
 ome_zarr_container = open_ome_zarr_container(store)
 ```
+
+## Caching and freshness
+
+`open_ome_zarr_container(store, cache=...)` decides how long metadata is
+trusted:
+
+- **`cache=False` (the default)** re-reads the raw metadata from the store on
+  every access, so writes made through *another* handle — another process, a
+  Fractal task, a second container object — are picked up as they happen.
+- **`cache=True`** holds all metadata for the object's lifetime: after the
+  first read, listing tables or reading pixel sizes costs no store requests.
+  The trade is staleness — the object will not see outside writes until you
+  ask.
+
+`refresh()` is the escape hatch for both modes: it re-reads everything the
+container holds. It is not a no-op even under `cache=False` — a few derived
+values (an image's decoded metadata and its `dimensions`) are memoized per
+object regardless of the flag, and `refresh()` drops those too.
+
+Writes made through the *same* container are always visible to it,
+whatever the mode.
 
 ## Next steps
 

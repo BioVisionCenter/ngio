@@ -73,13 +73,28 @@ INDEX_COLUMNS = [
     "label",
 ]
 
-OPTIONAL_COLUMNS = ORIGIN_COLUMNS + TRANSLATION_COLUMNS + PLATE_COLUMNS + INDEX_COLUMNS
+# Written by `ObjectDetectionIterator.detect`: the default NMS score column.
+DETECTION_COLUMNS = [
+    "confidence",
+]
+
+OPTIONAL_COLUMNS = (
+    ORIGIN_COLUMNS
+    + TRANSLATION_COLUMNS
+    + PLATE_COLUMNS
+    + INDEX_COLUMNS
+    + DETECTION_COLUMNS
+)
 
 
 def _check_optional_columns(col_name: str) -> None:
-    """Check if the column name is in the optional columns."""
+    """Warn, once per call, about a column outside the ROI table specification."""
     if col_name not in OPTIONAL_COLUMNS + TIME_COLUMNS:
-        logger.warning(f"Column {col_name} is not in the optional columns.")
+        logger.warning(
+            f"Column '{col_name}' is not part of the ROI table specification. "
+            "ngio round-trips it as a Roi extra field, but other readers may "
+            "ignore it."
+        )
 
 
 def _dataframe_to_rois(
@@ -97,6 +112,9 @@ def _dataframe_to_rois(
     extra_columns = set(dataframe.columns).difference(
         set(required_columns + TIME_COLUMNS)
     )
+    # `label` is consumed explicitly below (it is a Roi field, not an extra);
+    # leaving it here would pass it to `Roi.from_values` twice.
+    extra_columns.discard("label")
 
     for col in extra_columns:
         _check_optional_columns(col)
@@ -151,11 +169,14 @@ def _rois_to_dataframe(
     Only the values are read; `Roi.name` is optional, so the keys may be `None`.
     """
     data = []
+    # Checked once per distinct column after the loop, not once per ROI — a
+    # detection table's `class_id` should warn once, not once per object.
+    extra_columns: set[str] = set()
     for roi in rois.values():
         # This normalization is necessary for backward compatibility
         if roi.space != "world":
             raise NotImplementedError(
-                "Only ROIs in world coordinates can be serialized."
+                "Only ROIs in world coordinates can be serialised."
             )
 
         z_slice = roi.get("z")
@@ -192,9 +213,12 @@ def _rois_to_dataframe(
 
         extra = roi.model_extra or {}
         for col in extra:
-            _check_optional_columns(col)
+            extra_columns.add(col)
             row[col] = extra[col]
         data.append(row)
+
+    for col in sorted(extra_columns):
+        _check_optional_columns(col)
 
     dataframe = pd.DataFrame(data)
     if dataframe.empty:
@@ -220,7 +244,7 @@ class RoiDictWrapper:
                 name = f"{name}_{uuid4().hex[:8]}"
                 if roi.name is not None:
                     # keep the roi's own name in sync so the rename
-                    # survives serialization
+                    # survives serialisation
                     roi = roi.model_copy(update={"name": name})
             self._rois_by_name[name] = roi
             if roi.label is not None:
@@ -307,6 +331,9 @@ class GenericRoiTableV1(AbstractBaseTable):
         table = None
 
         self._rois: RoiDictWrapper | None = None
+        # True whenever `_rois` has changed since `_table_data` was last built
+        # from it; see `table_data`.
+        self._rois_dirty = False
         if rois is not None:
             self._rois = RoiDictWrapper(rois)
             table = self._rois.to_dataframe(index_key=meta.index_key)
@@ -333,12 +360,18 @@ class GenericRoiTableV1(AbstractBaseTable):
 
     @property
     def table_data(self) -> TabularData:
-        """Return the table."""
+        """Return the table.
+
+        Rebuilt from the ROIs only when `add()` has changed them since the
+        last build: the rebuild iterates every ROI into a fresh DataFrame,
+        too costly to run per access.
+        """
         if self._rois is None:
             return super().table_data
 
-        if len(self.rois()) > 0:
+        if self._rois_dirty:
             self._table_data = self._rois.to_dataframe(index_key=self.meta.index_key)
+            self._rois_dirty = False
         return super().table_data
 
     def set_table_data(
@@ -359,6 +392,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             )
             self._table_data = table_data
             self._rois = rois
+            self._rois_dirty = False
             return None
 
         if self._table_data is not None and not refresh:
@@ -368,6 +402,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             # No backend and no in-memory data: this is an empty ROI table.
             self._rois = RoiDictWrapper([])
             self._table_data = self._rois.to_dataframe(index_key=self.index_key)
+            self._rois_dirty = False
             return None
 
         table_data, rois = _table_to_rois(
@@ -378,6 +413,7 @@ class GenericRoiTableV1(AbstractBaseTable):
         )
         self._table_data = table_data
         self._rois = rois
+        self._rois_dirty = False
 
     def _check_rois(self) -> None:
         """Load the ROIs from the table.
@@ -416,6 +452,7 @@ class GenericRoiTableV1(AbstractBaseTable):
             self._rois = RoiDictWrapper([])
 
         self._rois.add_rois(roi, overwrite=overwrite)
+        self._rois_dirty = True
 
     def get(self, roi_name: str) -> Roi:
         """Get an ROI from the table."""
@@ -478,11 +515,13 @@ class RoiTableV1(GenericRoiTableV1):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "RoiTableV1":
         table = cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=RoiTableV1Meta,
+            attrs=attrs,
         )
         return table
 
@@ -554,11 +593,13 @@ class MaskingRoiTableV1(GenericRoiTableV1):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> "MaskingRoiTableV1":
         table = cls._from_handler(
             handler=handler,
             backend=backend,
             meta_model=MaskingRoiTableV1Meta,
+            attrs=attrs,
         )
         return table
 

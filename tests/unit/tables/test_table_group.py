@@ -8,7 +8,7 @@ from ngio.tables._tables_container import (
     TablesContainer,
     open_tables_container,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioFileNotFoundError, NgioValueError
 
 
 def test_table_container(tmp_path: Path):
@@ -32,6 +32,49 @@ def test_table_container(tmp_path: Path):
     expected = DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
     expected = expected.set_index("label")
     assert table.dataframe.equals(expected)
+
+
+def test_a_stale_table_name_does_not_break_typed_listing(tmp_path: Path):
+    """A name in the `tables` attribute with no group behind it is tolerated.
+
+    Another writer (or a crashed one) can leave a dangling entry. A typed
+    listing must still return the tables that do exist; only a direct `get`
+    of the stale name reports the problem.
+    """
+    table_group = open_tables_container(tmp_path / "test.zarr", mode="a")
+    table = FeatureTable(
+        table_data=DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
+    )
+    table_group.add(name="feat_table", table=table)
+
+    # Dangle a name behind the container's back.
+    handler = table_group._group_handler
+    handler.write_attrs({"tables": ["feat_table", "stale"]})
+
+    assert table_group.list() == ["feat_table", "stale"]
+    assert table_group.list(filter_types="feature_table") == ["feat_table"]
+    with pytest.raises(NgioFileNotFoundError):
+        table_group.get("stale")
+
+
+def test_uncached_typed_listing_sees_a_type_change(tmp_path: Path):
+    """Under `cache=False` the type memo must not outlive the table."""
+    from ngio.tables import GenericTable
+
+    store = tmp_path / "test.zarr"
+    reader = open_tables_container(store, cache=False, mode="a")
+    writer = open_tables_container(store, mode="r+")
+
+    table = FeatureTable(
+        table_data=DataFrame({"label": [1, 2, 3], "a": [1.0, 1.3, 0.0]})
+    )
+    writer.add(name="t", table=table)
+    assert reader.list(filter_types="feature_table") == ["t"]
+
+    writer.delete("t")
+    writer.add(name="t", table=GenericTable(table_data=DataFrame({"a": [1.0]})))
+    assert reader.list(filter_types="feature_table") == []
+    assert reader.list(filter_types="generic_table") == ["t"]
 
 
 def test_add_explicit_backend_overrides(tmp_path: Path):

@@ -1,8 +1,8 @@
 """A module for handling the Plate Sequence in an OME-Zarr file."""
 
-import asyncio
 import logging
 from collections.abc import Sequence
+from contextlib import AbstractContextManager, nullcontext
 from typing import Literal
 
 from ngio.images import (
@@ -12,9 +12,7 @@ from ngio.images import (
     list_image_tables,
 )
 from ngio.images._table_ops import (
-    _concatenate_image_tables_async,
-    _gather_bounded,
-    _list_image_tables_async,
+    MaxWorkers,
     _map_workers,
 )
 from ngio.ome_zarr_meta import (
@@ -48,7 +46,6 @@ from ngio.utils import (
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
-    deprecated,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -65,30 +62,40 @@ def _try_get_table_container(
         return None
 
 
-# Mock lock class that does nothing
-class MockLock:
-    """A mock lock class that does nothing."""
+def _atomic_scope(
+    group_handler: ZarrGroupHandler, atomic: bool
+) -> AbstractContextManager:
+    """Hold the group's lock for the block when `atomic`, otherwise do nothing.
 
-    def __enter__(self):
-        """Enter the lock."""
-        pass
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        """Exit the lock."""
-        pass
+    `ZarrGroupHandler.locked` also refreshes cached metadata on entry and exit,
+    which is what lets these read-modify-writes run with `cache=True`: the value
+    read inside the lock is never one cached before the lock was taken.
+    """
+    if atomic:
+        return group_handler.locked()
+    return nullcontext()
 
 
 class OmeZarrWell:
     """A class to handle the Well Sequence in an OME-Zarr file."""
 
-    def __init__(self, group_handler: ZarrGroupHandler) -> None:
+    def __init__(
+        self,
+        group_handler: ZarrGroupHandler,
+        version: NgffVersions | None = None,
+    ) -> None:
         """Initialize the LabelGroupHandler.
 
         Args:
             group_handler: The Zarr group handler that contains the Well.
+            version: The NGFF version of the well, when the caller already
+                knows it. The decoder registry is 0.4-first and falls through on
+                a failed validation, so a 0.5 well costs one wasted pydantic
+                decode per handler unless it is told. A plate knows its own
+                version and its wells share it.
         """
         self._group_handler = group_handler
-        self._meta_handler = WellMetaHandler(group_handler)
+        self._meta_handler = WellMetaHandler(group_handler, version=version)
 
     def __repr__(self) -> str:
         """Return a string representation of the well."""
@@ -161,12 +168,7 @@ class OmeZarrWell:
         """Add an image to an ome-zarr well."""
         image_path = path_in_well_validation(path=image_path)
 
-        if atomic:
-            well_lock = self._group_handler.lock
-        else:
-            well_lock = MockLock()
-
-        with well_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta.add_image(
                 path=image_path, acquisition=acquisition_id, strict=strict
             )
@@ -195,8 +197,8 @@ class OmeZarrWell:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the well was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         return self._add_image(
             image_path=image_path,
@@ -278,6 +280,21 @@ class OmeZarrPlate:
         """Return a string representation of the plate."""
         return f"Plate([rows x columns] ({len(self.rows)} x {len(self.columns)}))"
 
+    def refresh(self) -> None:
+        """Re-read metadata that `cache=True` holds for the object's lifetime.
+
+        The answer to "another worker wrote to this plate and I want to see it".
+        A no-op when the plate was opened with `cache=False`, where nothing is
+        held. The atomic operations refresh themselves, so this is only needed
+        for plain reads.
+        """
+        self._group_handler.clean_cache()
+        self._wells_cache.clear()
+        self._images_cache.clear()
+        # Rebuilt on next access against the refreshed handler — it carries a
+        # per-table type memo that would otherwise survive the refresh.
+        self._tables_container = None
+
     @property
     def meta_handler(self):
         """Return the metadata handler."""
@@ -314,37 +331,39 @@ class OmeZarrPlate:
 
     def _image_path(self, row: str, column: int | str, path: str) -> str:
         """Return the image path in the plate."""
-        well = self.get_well(row, column)
+        # One `_well_path` — i.e. one plate-metadata read — shared by the
+        # well lookup and the path below.
+        well_path = self._well_path(row=row, column=column)
+        well = self._get_well(well_path=well_path)
         if path not in well.paths():
             raise ValueError(f"Image {path} does not exist in well {row}{column}")
-        return f"{self._well_path(row, column)}/{path}"
+        return f"{well_path}/{path}"
 
     def wells_paths(self) -> list[str]:
         """Return the wells paths in the plate."""
         return self.meta.wells_paths
 
-    @deprecated(replacement="images_paths()")
-    async def images_paths_async(self, acquisition: int | None = None) -> list[str]:
-        """Return the images paths in the plate asynchronously.
-
-        Deprecated: use `images_paths()`. Well metadata is read from the plate's
-        own attributes, so there was never any IO here to parallelise.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-        """
-        return self.images_paths(acquisition=acquisition)
-
-    def images_paths(self, acquisition: int | None = None) -> list[str]:
+    def images_paths(
+        self, acquisition: int | None = None, max_workers: MaxWorkers = None
+    ) -> list[str]:
         """Return the images paths in the plate.
 
         If acquisition is None, return all images paths in the plate.
         Else, return the images paths in the plate for the given acquisition.
 
+        Image paths live in each well's own metadata, not the plate's, so this
+        reads one document per well and there is no shortcut. What there is, on
+        a remote store, is concurrency: those reads are round-trip bound and
+        independent.
+
         Args:
-            acquisition (int | None): The acquisition id to filter the images.
+            acquisition: The acquisition id to filter the images.
+            max_workers: How many wells to read concurrently. `None` (the
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep reading serially, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
-        wells = self.get_wells()
+        wells = self.get_wells(max_workers=max_workers)
         images = []
         for well_path, well in wells.items():
             for img_path in well.paths(acquisition):
@@ -364,11 +383,15 @@ class OmeZarrPlate:
             column (int | str): The column of the well.
             acquisition (int | None): The acquisition id to filter the images.
         """
-        images = []
-        well = self.get_well(row=row, column=column)
-        for path in well.paths(acquisition):
-            images.append(self._image_path(row=row, column=column, path=path))
-        return images
+        # Resolved once, not once per image: a per-image `_image_path` call
+        # re-opens the well and re-reads the plate document, so the cost would
+        # grow with the square of the well's image
+        # count, to re-derive a prefix already in hand. The membership check
+        # `_image_path` performs is vacuous here: these paths come from
+        # `well.paths()` itself.
+        well_path = self._well_path(row=row, column=column)
+        well = self._get_well(well_path=well_path)
+        return [f"{well_path}/{path}" for path in well.paths(acquisition)]
 
     def get_image_acquisition_id(
         self, row: str, column: int | str, image_path: str
@@ -401,9 +424,13 @@ class OmeZarrPlate:
             return cached_well
 
         group_handler = self._group_handler.get_handler(well_path)
-        well = OmeZarrWell(group_handler)
-        self._wells_cache.set(well_path, well)
-        return well
+        # `_meta_handler.version`, not `self.meta.version`: the latter is a full
+        # metadata reload, once per well, which costs more reads than the decode
+        # it saves. The handler resolved the version when it was built.
+        well = OmeZarrWell(group_handler, version=self._meta_handler.version)
+        # `setdefault`, not `set`: two fan-out threads may build the same well
+        # concurrently, and both must hand back the one that won.
+        return self._wells_cache.setdefault(well_path, well)
 
     def get_well(self, row: str, column: int | str) -> OmeZarrWell:
         """Get a well from the plate.
@@ -418,32 +445,14 @@ class OmeZarrPlate:
         well_path = self._well_path(row=row, column=column)
         return self._get_well(well_path=well_path)
 
-    @deprecated(replacement="get_wells(max_workers=...)")
-    async def get_wells_async(
-        self, max_workers: int | None = None
-    ) -> dict[str, OmeZarrWell]:
-        """Get all wells in the plate asynchronously.
-
-        Deprecated: use `get_wells(max_workers=...)`.
-
-        Args:
-            max_workers: How many wells to open at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-
-        Returns:
-            A dictionary of wells, keyed by well path.
-        """
-        paths = self.wells_paths()
-        factories = [(lambda p=p: asyncio.to_thread(self._get_well, p)) for p in paths]
-        wells = await _gather_bounded(factories, max_workers=max_workers)
-        return dict(zip(paths, wells, strict=True))
-
-    def get_wells(self, max_workers: int | None = None) -> dict[str, OmeZarrWell]:
+    def get_wells(self, max_workers: MaxWorkers = None) -> dict[str, OmeZarrWell]:
         """Get all wells in the plate.
 
         Args:
             max_workers: How many wells to open concurrently. `None` (the
-                default) opens them one at a time in the calling thread.
+                default) opens them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
 
         Returns:
             A dictionary of wells, keyed by well path.
@@ -463,39 +472,20 @@ class OmeZarrPlate:
             return cached_image
         img_group_handler = self._group_handler.get_handler(image_path)
         image = OmeZarrContainer(img_group_handler)
-        self._images_cache.set(image_path, image)
-        return image
-
-    @deprecated(replacement="get_images(max_workers=...)")
-    async def get_images_async(
-        self, acquisition: int | None = None, max_workers: int | None = None
-    ) -> dict[str, OmeZarrContainer]:
-        """Get all images in the plate asynchronously.
-
-        Deprecated: use `get_images(max_workers=...)`.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-            max_workers: How many images to open at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-
-        Returns:
-            A dictionary of images, keyed by image path.
-        """
-        paths = self.images_paths(acquisition=acquisition)
-        factories = [(lambda p=p: asyncio.to_thread(self._get_image, p)) for p in paths]
-        images = await _gather_bounded(factories, max_workers=max_workers)
-        return dict(zip(paths, images, strict=True))
+        # See `_get_well` for why this is `setdefault`.
+        return self._images_cache.setdefault(image_path, image)
 
     def get_images(
-        self, acquisition: int | None = None, max_workers: int | None = None
+        self, acquisition: int | None = None, max_workers: MaxWorkers = None
     ) -> dict[str, OmeZarrContainer]:
         """Get all images in the plate.
 
         Args:
             acquisition: The acquisition id to filter the images.
             max_workers: How many images to open concurrently. `None` (the
-                default) opens them one at a time in the calling thread.
+                default) opens them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
 
         Returns:
             A dictionary of images, keyed by image path.
@@ -543,13 +533,16 @@ class OmeZarrPlate:
             column: The column of the well.
             acquisition: The acquisition id to filter the images.
         """
-        images = {}
-        for image_paths in self.well_images_paths(
-            row=row, column=column, acquisition=acquisition
-        ):
-            group_handler = self._group_handler.get_handler(image_paths)
-            images[image_paths] = OmeZarrContainer(group_handler)
-        return images
+        # `_get_image`, not a fresh container per call: this duplicated it minus
+        # the `_images_cache` lookup, so under `cache=True` it rebuilt the same
+        # container every time and handed back a different object than
+        # `get_images` did for the same path.
+        return {
+            image_path: self._get_image(image_path)
+            for image_path in self.well_images_paths(
+                row=row, column=column, acquisition=acquisition
+            )
+        }
 
     def _add_image(
         self,
@@ -564,16 +557,11 @@ class OmeZarrPlate:
         if image_path is not None:
             image_path = path_in_well_validation(path=image_path)
 
-        if atomic:
-            plate_lock = self._group_handler.lock
-        else:
-            plate_lock = MockLock()
-
         # Lock ordering: the well lock is taken only after the plate lock is
         # released, never nested inside it. `_remove_image` nests the other way
         # (well, then plate via `_remove_well`), so acquiring them plate-first
         # while still holding the plate lock would close a deadlock cycle.
-        with plate_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta
             meta = meta.add_well(row=row, column=column)
             if acquisition_id is not None:
@@ -591,12 +579,7 @@ class OmeZarrPlate:
             well_path = meta.get_well_path(row=row, column=column)
             group_handler = self._group_handler.get_handler(well_path)
 
-        if atomic:
-            well_lock = group_handler.lock
-        else:
-            well_lock = MockLock()
-
-        with well_lock:
+        with _atomic_scope(group_handler, atomic):
             attrs = group_handler.load_attrs()
             if len(attrs) == 0:
                 # Initialize the well metadata
@@ -644,8 +627,8 @@ class OmeZarrPlate:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         if image_path is None:
             raise ValueError(
@@ -749,12 +732,7 @@ class OmeZarrPlate:
         atomic: bool = False,
     ):
         """Remove a well from an ome-zarr plate."""
-        if atomic:
-            plate_lock = self._group_handler.lock
-        else:
-            plate_lock = MockLock()
-
-        with plate_lock:
+        with _atomic_scope(self._group_handler, atomic):
             meta = self.meta
             meta = meta.remove_well(row, column)
             self.meta_handler.update_meta(meta)
@@ -770,14 +748,9 @@ class OmeZarrPlate:
         """Remove an image from an ome-zarr plate."""
         well = self.get_well(row, column)
 
-        if atomic:
-            well_lock = well.meta_handler._group_handler.lock
-        else:
-            well_lock = MockLock()
-
         # Well, then plate: this is the only place the two nest, and it is the
         # ordering the rest of the class must not invert. See `_add_image`.
-        with well_lock:
+        with _atomic_scope(well.meta_handler._group_handler, atomic):
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
             well.meta_handler.update_meta(well_meta)
@@ -805,8 +778,8 @@ class OmeZarrPlate:
             concurrent ones can still lose an update. Run those on Linux/macOS.
 
         Raises:
-            NgioValueError: If the store is not local, or if the plate was
-                opened with caching enabled — neither supports the lock.
+            NgioValueError: If the store is not local. The lock is an OS
+                file lock, so there is nothing to take on a remote store.
         """
         return self._remove_image(
             row=row,
@@ -894,9 +867,15 @@ class OmeZarrPlate:
         if tables_container is None:
             return []
 
-        roi = tables_container.list(filter_types="roi_table")
-        masking_roi = tables_container.list(filter_types="masking_roi_table")
-        return roi + masking_roi
+        # One pass, not one per type: each `list(filter_types=...)` opens every
+        # table to read its type, so asking twice read every document twice to
+        # sort names the first pass had already sorted.
+        types = tables_container.table_types()
+        return [
+            name
+            for name, table_type in types.items()
+            if table_type in ("roi_table", "masking_roi_table")
+        ]
 
     def get_roi_table(self, name: str) -> RoiTable:
         """Get a ROI table from the image.
@@ -1028,7 +1007,7 @@ class OmeZarrPlate:
         acquisition: int | None = None,
         filter_types: str | None = None,
         mode: Literal["common", "all"] = "common",
-        max_workers: int | None = None,
+        max_workers: MaxWorkers = None,
     ) -> list[str]:
         """List all image tables in the plate.
 
@@ -1039,41 +1018,14 @@ class OmeZarrPlate:
             mode: Whether to return only tables common to every image
                 (`"common"`) or the union across them (`"all"`).
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = tuple(
             self.get_images(acquisition=acquisition, max_workers=max_workers).values()
         )
         return list_image_tables(
-            images=images,
-            filter_types=filter_types,
-            mode=mode,
-            max_workers=max_workers,
-        )
-
-    @deprecated(replacement="list_image_tables(max_workers=...)")
-    async def list_image_tables_async(
-        self,
-        acquisition: int | None = None,
-        filter_types: str | None = None,
-        mode: Literal["common", "all"] = "common",
-        max_workers: int | None = None,
-    ) -> list[str]:
-        """List all image tables in the plate asynchronously.
-
-        Deprecated: use `list_image_tables(max_workers=...)`.
-
-        Args:
-            acquisition: The acquisition id to filter the images.
-            filter_types: The type of tables to filter. If None, return all
-                tables.
-            mode: Whether to return only tables common to every image
-                (`"common"`) or the union across them (`"all"`).
-            max_workers: How many images to read at a time. `None` leaves the
-                fan-out to asyncio's default thread executor.
-        """
-        images = tuple(self.get_images(acquisition=acquisition).values())
-        return await _list_image_tables_async(
             images=images,
             filter_types=filter_types,
             mode=mode,
@@ -1087,7 +1039,7 @@ class OmeZarrPlate:
         strict: bool = True,
         index_key: str | None = None,
         mode: Literal["eager", "lazy"] = "eager",
-        max_workers: int | None = None,
+        max_workers: MaxWorkers = None,
     ) -> Table:
         """Concatenate tables from all images in the plate.
 
@@ -1102,7 +1054,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition, max_workers=max_workers)
         extras = _build_extras(tuple(images.keys()))
@@ -1124,7 +1078,7 @@ class OmeZarrPlate:
         index_key: str | None = None,
         strict: bool = True,
         mode: Literal["eager", "lazy"] = "eager",
-        max_workers: int | None = None,
+        max_workers: MaxWorkers = None,
     ) -> TableType:
         """Concatenate tables from all images in the plate as a specific type.
 
@@ -1140,7 +1094,9 @@ class OmeZarrPlate:
                 if 'eager', the table will be loaded into memory.
                 if 'lazy', the table will be loaded as a lazy frame.
             max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
+                default) reads them one at a time; that default becomes
+                `"auto"` in ngio=1.2. Pass `1` to keep it serial, or
+                `"auto"` for a pool sized for round-trip-bound work.
         """
         images = self.get_images(acquisition=acquisition, max_workers=max_workers)
         extras = _build_extras(tuple(images.keys()))
@@ -1154,91 +1110,6 @@ class OmeZarrPlate:
             mode=mode,
             max_workers=max_workers,
         )
-
-    @deprecated(replacement="concatenate_image_tables(max_workers=...)")
-    async def concatenate_image_tables_async(
-        self,
-        name: str,
-        acquisition: int | None = None,
-        index_key: str | None = None,
-        strict: bool = True,
-        mode: Literal["eager", "lazy"] = "eager",
-        max_workers: int | None = None,
-    ) -> Table:
-        """Concatenate tables from all images in the plate asynchronously.
-
-        Deprecated: use `concatenate_image_tables(max_workers=...)`.
-
-        Args:
-            name: The name of the table to concatenate.
-            index_key: The key to use for the index of the concatenated table.
-            acquisition: The acquisition id to filter the images.
-            index_key: If a string is provided, a new index column will be created
-                new_index_pattern = {row}_{column}_{path_in_well}_{label}
-            strict: If True, raise an error if the table is not found in the image.
-            mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-                if 'eager', the table will be loaded into memory.
-                if 'lazy', the table will be loaded as a lazy frame.
-            max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
-        """
-        images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(tuple(images.keys()))
-        return await _concatenate_image_tables_async(
-            images=tuple(images.values()),
-            extras=extras,
-            name=name,
-            table_cls=None,
-            index_key=index_key,
-            strict=strict,
-            mode=mode,
-            max_workers=max_workers,
-        )
-
-    @deprecated(replacement="concatenate_image_tables_as(max_workers=...)")
-    async def concatenate_image_tables_as_async(
-        self,
-        name: str,
-        table_cls: type[TableType],
-        acquisition: int | None = None,
-        index_key: str | None = None,
-        strict: bool = True,
-        mode: Literal["eager", "lazy"] = "eager",
-        max_workers: int | None = None,
-    ) -> TableType:
-        """Concatenate tables from all images in the plate as a specific type.
-
-        Deprecated: use `concatenate_image_tables_as(max_workers=...)`.
-
-        Args:
-            name: The name of the table to concatenate.
-            table_cls: The type of the table to concatenate.
-            index_key: The key to use for the index of the concatenated table.
-            acquisition: The acquisition id to filter the images.
-            index_key: If a string is provided, a new index column will be created
-                new_index_pattern = {row}_{column}_{path_in_well}_{label}
-            strict: If True, raise an error if the table is not found in the image.
-            mode: The mode to use for concatenation. Can be 'eager' or 'lazy'.
-                if 'eager', the table will be loaded into memory.
-                if 'lazy', the table will be loaded as a lazy frame.
-            max_workers: How many images to read concurrently. `None` (the
-                default) reads them one at a time in the calling thread.
-        """
-        images = self.get_images(acquisition=acquisition)
-        extras = _build_extras(tuple(images.keys()))
-        table = await _concatenate_image_tables_async(
-            images=tuple(images.values()),
-            extras=extras,
-            name=name,
-            table_cls=table_cls,
-            index_key=index_key,
-            strict=strict,
-            mode=mode,
-            max_workers=max_workers,
-        )
-        if not isinstance(table, table_cls):
-            raise NgioValueError(f"Table is not of type {table_cls}. Got {type(table)}")
-        return table
 
 
 def open_ome_zarr_plate(
@@ -1301,7 +1172,13 @@ def create_empty_plate(
         cache (bool): Whether to use a cache for the zarr group metadata.
         overwrite (bool): Whether to overwrite the existing plate.
     """
+    # Built in one pass rather than by looping `add_image`. That loop re-read
+    # the plate document, rewrote it whole, and rewrote the well document, once
+    # per image — so the bytes written grew with the square of the plate. Here
+    # the plate document is written once and each well document once, whatever
+    # the field count.
     plate_meta = NgioPlateMeta.default_init(
+        images=images,
         name=name,
         ngff_version=ngff_version,
     )
@@ -1312,15 +1189,22 @@ def create_empty_plate(
     )
 
     if images is not None:
-        plate = OmeZarrPlate(group_handler)
+        images_by_well: dict[str, list[ImageInWellPath]] = {}
         for image in images:
-            plate.add_image(
-                row=image.row,
-                column=image.column,
-                image_path=image.path,
-                acquisition_id=image.acquisition_id,
-                acquisition_name=image.acquisition_name,
-            )
+            well_path = plate_meta.get_well_path(row=image.row, column=image.column)
+            images_by_well.setdefault(well_path, []).append(image)
+
+        for well_path, well_images in images_by_well.items():
+            well_meta = NgioWellMeta.default_init(ngff_version=ngff_version)
+            for image in well_images:
+                well_meta = well_meta.add_image(
+                    path=path_in_well_validation(path=image.path),
+                    acquisition=image.acquisition_id,
+                    strict=False,
+                )
+            well_handler = group_handler.get_handler(well_path, create_mode=True)
+            update_ngio_well_meta(well_handler, well_meta)
+
     return open_ome_zarr_plate(
         store=store,
         cache=cache,

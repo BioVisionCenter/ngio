@@ -14,9 +14,18 @@ from ngio.common import (
     InterpolationOrder,
     Roi,
 )
-from ngio.common._pyramid import ChunksLike, ShardsLike
-from ngio.images._abstract_image import AbstractImage, abstract_derive
+from ngio.common._pyramid import (
+    ChunksLike,
+    ConsolidationMode,
+    ShardsLike,
+)
+from ngio.images._abstract_image import (
+    AbstractImage,
+    ConsolidationRegions,
+    abstract_derive,
+)
 from ngio.io_pipes import (
+    MergeInput,
     SlicingInputType,
     TransformProtocol,
 )
@@ -40,7 +49,6 @@ from ngio.utils import (
     StoreOrGroup,
     ZarrGroupHandler,
     deprecated,
-    deprecated_alias,
 )
 
 logger = logging.getLogger(f"ngio:{__name__}")
@@ -134,6 +142,8 @@ class Image(AbstractImage):
         super().__init__(
             group_handler=group_handler, path=path, meta_handler=meta_handler
         )
+        # (meta generation, channels meta); same idea as `_dataset_cache`.
+        self._channels_meta_cache: tuple[int, ChannelsMeta] | None = None
 
     @property
     def meta_handler(self) -> ImageMetaHandler:
@@ -150,8 +160,24 @@ class Image(AbstractImage):
 
     @property
     def channels_meta(self) -> ChannelsMeta:
-        """Return the channels metadata."""
-        return _check_channel_meta(self.meta, self.dimensions)
+        """Return the channels metadata.
+
+        Cached against the meta handler's generation, like `dimensions`: this
+        sits on the hot path of every `get_*`/`set_*` with a
+        `channel_selection`, where re-deriving cost a full metadata reload per
+        call. The channel setters go through `update_meta`, which moves the
+        generation, so a write through this image re-derives it.
+        """
+        generation = self.meta_handler.generation
+        cached = self._channels_meta_cache
+        if cached is not None and cached[0] == generation:
+            return cached[1]
+
+        channels_meta = _check_channel_meta(self.meta, self.dimensions)
+        # Re-read rather than reuse `generation`: `self.meta` above may have
+        # decoded fresh attributes and moved it.
+        self._channels_meta_cache = (self.meta_handler.generation, channels_meta)
+        return channels_meta
 
     @property
     def channel_labels(self) -> list[str]:
@@ -356,6 +382,7 @@ class Image(AbstractImage):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array.
@@ -366,13 +393,19 @@ class Image(AbstractImage):
                 If None, all channels are set.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
+            merge: How to combine the patch with what is already there —
+                a rule name, a callable, or a policy. `None` overwrites.
             **slicing_kwargs: The slices to set the array.
         """
         _slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
         self._set_array(
-            patch=patch, axes_order=axes_order, transforms=transforms, **_slicing_kwargs
+            patch=patch,
+            axes_order=axes_order,
+            transforms=transforms,
+            merge=merge,
+            **_slicing_kwargs,
         )
 
     def set_roi(
@@ -382,6 +415,7 @@ class Image(AbstractImage):
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array for a region of interest.
@@ -392,6 +426,8 @@ class Image(AbstractImage):
             channel_selection: Select a what subset of channels to return.
             axes_order: The order of the axes to set the array.
             transforms: The transforms to apply to the array.
+            merge: How to combine the patch with what is already there —
+                a rule name, a callable, or a policy. `None` overwrites.
             **slicing_kwargs: The slices to set the array.
         """
         _slicing_kwargs = add_channel_selection_to_slicing_dict(
@@ -402,22 +438,37 @@ class Image(AbstractImage):
             patch=patch,
             axes_order=axes_order,
             transforms=transforms,
+            merge=merge,
             **_slicing_kwargs,
         )
 
     def consolidate(
         self,
         order: InterpolationOrder = "linear",
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
-        """Consolidate the label on disk."""
-        self._consolidate(order=order, mode=mode)
+        """Consolidate the image on disk.
+
+        Args:
+            order: The interpolation order.
+            mode: How to build each level, see `ConsolidationMode`.
+            regions: Where this level changed — typically the `Roi`s that were
+                written (`set_roi`'s own argument fits directly); raw on-disk
+                index tuples, as a setter pipe's
+                `slicing_ops.normalized_slicing_tuple` produces, also work.
+                Only the pyramid regions derived from them are rebuilt,
+                identically to a full rebuild; outside the exact envelope
+                (integral downsamples, `order` not `"cubic"`, coverage below
+                `ConsolidationConfig.partial_max_coverage`) the whole pyramid
+                is rebuilt instead, silently. `None` rebuilds everything.
+        """
+        self._consolidate(order=order, mode=mode, regions=regions)
 
 
 class ImagesContainer:
     """A class to handle the /images group in an OME-NGFF file."""
 
-    @deprecated_alias(validate_paths="validate_arrays")
     def __init__(
         self,
         group_handler: ZarrGroupHandler,
@@ -623,9 +674,10 @@ class ImagesContainer:
         else:
             min_max_ = list(min_max)
         channels = []
-        for se, mm, ch in zip(
-            starts_ends, min_max_, self.channels_meta.channels, strict=True
-        ):
+        # `current_channels`, not `self.channels_meta.channels`: that property
+        # opens the image and reloads its metadata, and it is the same value
+        # already bound above.
+        for se, mm, ch in zip(starts_ends, min_max_, current_channels, strict=True):
             updates = {"start": se[0], "end": se[1]}
             if mm is not None:
                 updates.update({"min": mm[0], "max": mm[1]})
@@ -656,27 +708,40 @@ class ImagesContainer:
         starts_ends = compute_image_percentile(ref_image, percentiles=percentiles)
         self.set_channel_windows(starts_ends=starts_ends)
 
+    def set_space_unit(self, unit: SpaceUnits = DefaultSpaceUnit) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+        """
+        self.get().set_space_unit(unit)
+
+    def set_time_unit(self, unit: TimeUnits = DefaultTimeUnit) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+        """
+        self.get().set_time_unit(unit)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit`.
 
         Args:
             space_unit: The space unit of the image.
             time_unit: The time unit of the image.
         """
-        self.get().set_axes_units(space_unit=space_unit, time_unit=time_unit)
-
-    @deprecated(replacement="set_axes_units()")
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Deprecated alias for `set_axes_units`."""
-        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
+        self.get().set_space_unit(space_unit)
+        self.get().set_time_unit(time_unit)
 
     def set_axes_names(
         self,
@@ -971,27 +1036,32 @@ def derive_image_container(
 
 
 def _parse_str_or_model(
-    image: Image, channel_selection: int | str | ChannelSelectionModel
+    channels_meta: ChannelsMeta, channel_selection: int | str | ChannelSelectionModel
 ) -> int:
-    """Parse a string or ChannelSelectionModel to an integer channel index."""
+    """Parse a string or ChannelSelectionModel to an integer channel index.
+
+    Takes the channels metadata rather than the image: reading it off the image
+    is a full metadata reload, and this runs once per selected channel.
+    """
     if isinstance(channel_selection, int):
+        num_channels = len(channels_meta.channel_labels)
         if channel_selection < 0:
             raise NgioValueError("Channel index must be a non-negative integer.")
-        if channel_selection >= image.num_channels:
+        if channel_selection >= num_channels:
             raise NgioValueError(
                 "Channel index must be less than the number "
-                f"of channels ({image.num_channels})."
+                f"of channels ({num_channels})."
             )
         return channel_selection
     elif isinstance(channel_selection, str):
-        return image.get_channel_idx(channel_label=channel_selection)
+        return channels_meta.get_channel_idx(channel_label=channel_selection)
     elif isinstance(channel_selection, ChannelSelectionModel):
         if channel_selection.mode == "label":
-            return image.get_channel_idx(
+            return channels_meta.get_channel_idx(
                 channel_label=str(channel_selection.identifier)
             )
         elif channel_selection.mode == "wavelength_id":
-            return image.get_channel_idx(
+            return channels_meta.get_channel_idx(
                 wavelength_id=str(channel_selection.identifier)
             )
         elif channel_selection.mode == "index":
@@ -1009,11 +1079,15 @@ def _parse_channel_selection(
     """Parse the channel selection input into a list of channel indices."""
     if channel_selection is None:
         return {}
+    # Read once, then reuse: each `channels_meta` access is a full metadata
+    # reload, so selecting four channels by label would otherwise cost four
+    # of them before a pixel was touched.
+    channels_meta = image.channels_meta
     if isinstance(channel_selection, int | str | ChannelSelectionModel):
-        channel_index = _parse_str_or_model(image, channel_selection)
+        channel_index = _parse_str_or_model(channels_meta, channel_selection)
         return {"c": channel_index}
     elif isinstance(channel_selection, Sequence):
-        _sequence = [_parse_str_or_model(image, cs) for cs in channel_selection]
+        _sequence = [_parse_str_or_model(channels_meta, cs) for cs in channel_selection]
         return {"c": _sequence}
     raise NgioValueError(
         f"Invalid channel selection type {type(channel_selection)}. "

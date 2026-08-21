@@ -52,7 +52,7 @@ dependencies = [
     "pydantic>=2.11.5",       # required by ome-zarr-models
     "pandas>=2.2.2",          # first 2.2.x supporting numpy 2 on py3.11
     "aiohttp>=3.9",
-    "dask[array]>=2024.1",
+    "dask[array]>=2025.12",  # 2025.11.0 raises to_zarr's rechunk PerformanceWarning
     # "xarray", still not used
     "ome-zarr-models>=1.4",   # `ValidTransform` was added in 1.4
     "pooch>=1.8",
@@ -195,6 +195,14 @@ filterwarnings = [
     # break the Windows jobs. The `warns_on_windows` tests assert the warning
     # explicitly via pytest.warns, which overrides this filter.
     "ignore:ngio's file lock is not exclusive on Windows",
+    # Announces a coming default under a caller who did not pick one: today
+    # `max_workers` on every plate-wide fan-out, and `mode` on every pyramid
+    # consolidation small enough for the in-memory path. Global rather than
+    # per-test: the suite exercises those paths from dozens of places and ngio's
+    # own tests are not the audience for the notice. `test_max_workers_default.py`
+    # and `test_pyramid.py::test_consolidate_warns_*` assert them explicitly via
+    # pytest.warns, which overrides this filter.
+    "ignore::ngio.utils._warnings.NgioFutureWarning",
 ]
 addopts = [
     "-vv",

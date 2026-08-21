@@ -35,11 +35,24 @@ class NgioCache(Generic[T]):
             return default
         return self._cache.get(key, default)
 
-    def set(self, key: str, value: T, overwrite: bool = True) -> None:
+    def set(self, key: str, value: T) -> None:
         if not self._use_cache:
             self._cache_sanity_check()
             return
         self._cache[key] = value
+
+    def setdefault(self, key: str, value: T) -> T:
+        """Insert `value` if the key is absent, and return the cached winner.
+
+        A single atomic dict operation, so concurrent builders of the same
+        key end up sharing one object instead of each keeping their own —
+        which is what keeps "repeated gets return the identical object" true
+        under a threaded fan-out.
+        """
+        if not self._use_cache:
+            self._cache_sanity_check()
+            return value
+        return self._cache.setdefault(key, value)
 
     def clear(self) -> None:
         if not self._use_cache:

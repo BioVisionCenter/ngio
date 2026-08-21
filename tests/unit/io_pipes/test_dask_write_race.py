@@ -1,11 +1,16 @@
 """Deterministic repro for the `da.store` chunk write race.
 
-A region write whose start is not chunk-aligned makes two dask blocks
-read-modify-write the same zarr chunk. `GatedStore` below holds the first
-reader of the contested chunk until the second one arrives, so the lost update
-happens on every run instead of depending on scheduling luck. With the store
-flushes serialised the second reader cannot arrive while the first holds the
-chunk, so the gate simply times out and the write is correct.
+A region write whose start is not chunk-aligned puts two dask blocks inside the
+same zarr chunk, and `da.store` gives each its own read-modify-write of it — so
+one update is lost, on a schedule nobody controls. `GatedStore` below holds the
+first reader of the contested chunk until a second one arrives, which turns that
+race from luck into a certainty.
+
+ngio writes through `da.to_zarr`, which rechunks the patch onto the target's
+write-unit grid before storing, so the contention this fixture constructs cannot
+exist: the chunk has exactly one writer. The gate therefore never gets its second
+arrival and times out, and *that is the pass condition*. A second arrival means
+two blocks are read-modify-writing one chunk again — the alignment regressed.
 """
 
 import asyncio
@@ -26,7 +31,9 @@ from ngio.io_pipes._ops_slices import (
 )
 
 # Long enough that a genuinely concurrent second reader always arrives inside
-# it, short enough not to slow the suite down when nothing does.
+# it, short enough not to slow the suite down when nothing does. Paid in full on
+# every run now that the aligned write never produces one — one second, for a
+# test that fails the moment the write path stops aligning.
 _GATE_TIMEOUT_S = 1.0
 
 # The single chunk both blocks partially cover, in zarr v3 default chunk key
@@ -63,7 +70,8 @@ class GatedStore(zarr.storage.WrapperStore):
 def slicing_ops() -> SlicingOps:
     # Chunk 0 spans [0, 16) and chunk 1 spans [16, 32). Writing [4, 20) with
     # 8-element dask blocks puts block 0 at [4, 12) and block 1 at [12, 20):
-    # both partially cover chunk 0.
+    # both partially cover chunk 0. That is the *input* blocking; an aligned
+    # write path merges the two before touching the store.
     return SlicingOps(
         on_disk_axes=("x",),
         on_disk_shape=(64,),
@@ -95,7 +103,9 @@ def test_misaligned_dask_write_matches_numpy(slicing_ops: SlicingOps) -> None:
         )
     gated.armed = False
 
-    # Locked or not, the contested chunk is read once per block. Fewer means
-    # the chunk key drifted and the gate never fired, making the test vacuous.
-    assert gated.arrivals >= 2
+    # Exactly one reader: the single block that owns the chunk after the
+    # alignment rechunk. Two or more means the chunk is being read-modify-written
+    # by concurrent blocks again. Zero means the chunk key drifted and the gate
+    # never fired, which would make the equality below vacuous.
+    assert gated.arrivals == 1
     np.testing.assert_array_equal(array[:], reference[:])

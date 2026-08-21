@@ -250,9 +250,18 @@ class AbstractBaseTable(ABC):
         handler: ZarrGroupHandler,
         meta_model: builtins.type[BackendMeta],
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> Self:
-        """Create a new ROI table from a Zarr group handler."""
-        meta = meta_model(**handler.load_attrs())
+        """Create a new ROI table from a Zarr group handler.
+
+        `attrs` lets a caller that has already read the group hand them over
+        rather than making this read the same document a second time — which
+        `TablesContainer.get` did, once to learn the table type and once here
+        to build the concrete metadata model.
+        """
+        if attrs is None:
+            attrs = handler.load_attrs()
+        meta = meta_model(**attrs)
         table = cls(meta=meta)
         table.set_backend(handler=handler, backend=backend)
         return table

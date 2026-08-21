@@ -1,9 +1,11 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
+import threading
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
-from typing import Any, Literal
+from collections.abc import Generator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import Any, Literal, TypeAlias
 
 import dask.array as da
 import numpy as np
@@ -16,8 +18,11 @@ from ngio.common import (
     Roi,
     consolidate_pyramid,
 )
+from ngio.common._dask_io import RegionType
 from ngio.common._pyramid import (
     ChunksLike,
+    ConsolidationMode,
+    RegionsLike,
     ShardsLike,
     compute_scales_from_shapes,
     compute_shapes_from_scaling_factors,
@@ -29,12 +34,9 @@ from ngio.images._create_utils import (
 )
 from ngio.io_pipes import (
     DaskGetter,
-    DaskRoiGetter,
-    DaskRoiSetter,
     DaskSetter,
+    MergeInput,
     NumpyGetter,
-    NumpyRoiGetter,
-    NumpyRoiSetter,
     NumpySetter,
     SlicingInputType,
     TransformProtocol,
@@ -49,13 +51,13 @@ from ngio.ome_zarr_meta import (
 )
 from ngio.ome_zarr_meta.ngio_specs import (
     Channel,
+    DefaultSpaceUnit,
+    DefaultTimeUnit,
     NgffVersions,
     NgioLabelMeta,
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import (
     AxesSetup,
-    DefaultSpaceUnit,
-    DefaultTimeUnit,
     SpaceUnits,
     TimeUnits,
 )
@@ -70,6 +72,12 @@ from ngio.utils import (
 from ngio.utils._zarr_utils import find_dimension_separator
 
 logger = logging.getLogger(f"ngio:{__name__}")
+
+#: Regions for `consolidate(regions=...)` at the image level: `Roi`s — the
+#: form the rest of the high-level API speaks — or raw on-disk index tuples
+#: (what a setter pipe's `slicing_ops.normalized_slicing_tuple` produces), or
+#: a mix. Rois are resolved against this image's dimensions and pixel size.
+ConsolidationRegions: TypeAlias = Sequence[Roi | tuple[RegionType, ...]]
 
 
 class AbstractImage(ABC):
@@ -101,6 +109,15 @@ class AbstractImage(ABC):
         except NgioFileExistsError as e:
             raise NgioFileExistsError(f"Could not find the dataset at {path}.") from e
 
+        # (meta generation, dataset, dimensions); see
+        # `_resolve_dataset_and_dimensions`.
+        self._dataset_cache: tuple[int, Dataset, Dimensions] | None = None
+
+        # Active `track_writes` recorders; empty outside any context, so the
+        # per-write cost is one attribute check.
+        self._write_trackers: list[list[tuple[RegionType, ...]]] = []
+        self._tracker_lock = threading.Lock()
+
     def __repr__(self) -> str:
         """Return a string representation of the image."""
         return f"Image(path={self.path}, {self.dimensions})"
@@ -125,16 +142,47 @@ class AbstractImage(ABC):
     @property
     def dataset(self) -> Dataset:
         """Return the dataset of the image."""
-        return self.meta_handler.get_meta().get_dataset(path=self.path)
+        return self._resolve_dataset_and_dimensions()[0]
 
     @property
     def dimensions(self) -> Dimensions:
         """Return the dimensions of the image."""
-        return Dimensions(
+        return self._resolve_dataset_and_dimensions()[1]
+
+    def _resolve_dataset_and_dimensions(self) -> tuple[Dataset, Dimensions]:
+        """Return the dataset and dimensions, deriving them at most once.
+
+        Both are fixed for the lifetime of this object, so they are derived on
+        first use and kept. That is not a new assumption: `self._zarr_array` is
+        fetched once in `__init__` and never refreshed, so `shape` and `chunks`
+        are already a construction-time snapshot — re-reading the dataset on
+        every access froze half the inputs and not the other half.
+
+        Rebuilding cost a full metadata reload, and this is the hottest
+        property in the library: every `get_*`/`set_*` reads it, iterators read
+        it once per ROI, and masked ones twice — image and label.
+
+        A write through this object moves the meta handler's `generation`, so
+        the pair is re-derived on the next access. A write by *another* process
+        is not seen until the container is reopened or `refresh()` is called,
+        which is exactly the guarantee `zarr_array` already carried.
+        """
+        generation = self.meta_handler.generation
+        cached = self._dataset_cache
+        if cached is not None and cached[0] == generation:
+            return cached[1], cached[2]
+
+        dataset = self.meta_handler.get_meta().get_dataset(path=self.path)
+        dimensions = Dimensions(
             shape=self.zarr_array.shape,
             chunks=self.zarr_array.chunks,
-            dataset=self.dataset,
+            dataset=dataset,
         )
+        # Re-read rather than reuse `generation`: `get_meta` above may have
+        # decoded fresh attributes and moved it, and caching against the older
+        # value would make the next access a miss.
+        self._dataset_cache = (self.meta_handler.generation, dataset, dimensions)
+        return dataset, dimensions
 
     @property
     def pixel_size(self) -> PixelSize:
@@ -175,6 +223,15 @@ class AbstractImage(ABC):
     def chunks(self) -> tuple[int, ...]:
         """Return the chunks of the image."""
         return self.zarr_array.chunks
+
+    @property
+    def write_granularity(self) -> tuple[int, ...]:
+        """Return the atomic write unit of the on-disk array.
+
+        The shard shape when the array is sharded (writes are read-modify-writes
+        of whole shard objects), otherwise the chunk shape.
+        """
+        return self.zarr_array.shards or self.zarr_array.chunks
 
     @property
     def is_3d(self) -> bool:
@@ -220,12 +277,38 @@ class AbstractImage(ABC):
         """Return True if the image has the given axis."""
         return self.axes_handler.has_axis(axis)
 
+    def set_space_unit(self, unit: SpaceUnits = DefaultSpaceUnit) -> None:
+        """Set the unit of the spatial axes; the time unit is untouched.
+
+        Args:
+            unit: The space unit to set.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(space_unit=unit)
+        self._meta_handler.update_meta(meta)
+
+    def set_time_unit(self, unit: TimeUnits = DefaultTimeUnit) -> None:
+        """Set the unit of the time axis; the space unit is untouched.
+
+        Args:
+            unit: The time unit to set.
+        """
+        meta = self._meta_handler.get_meta()
+        meta = meta.to_units(time_unit=unit)
+        self._meta_handler.update_meta(meta)
+
+    @deprecated(replacement="set_space_unit() / set_time_unit()")
     def set_axes_units(
         self,
         space_unit: SpaceUnits = DefaultSpaceUnit,
         time_unit: TimeUnits = DefaultTimeUnit,
     ) -> None:
-        """Set the space and time units of the image axes.
+        """Set BOTH the space and the time units of the image axes.
+
+        Note that both units are set on every call: an *omitted* parameter is
+        set to its default, not left unchanged. To change one unit without
+        touching the other, use `set_space_unit` / `set_time_unit` — which is
+        also why this method is deprecated in their favour.
 
         Args:
             space_unit: The space unit of the image.
@@ -234,15 +317,6 @@ class AbstractImage(ABC):
         meta = self._meta_handler.get_meta()
         meta = meta.to_units(space_unit=space_unit, time_unit=time_unit)
         self._meta_handler.update_meta(meta)
-
-    @deprecated(replacement="set_axes_units()")
-    def set_axes_unit(
-        self,
-        space_unit: SpaceUnits = DefaultSpaceUnit,
-        time_unit: TimeUnits = DefaultTimeUnit,
-    ) -> None:
-        """Deprecated alias for `set_axes_units`."""
-        self.set_axes_units(space_unit=space_unit, time_unit=time_unit)
 
     def set_axes_names(self, axes_names: Sequence[str]) -> None:
         """Set the axes names of the label.
@@ -313,7 +387,7 @@ class AbstractImage(ABC):
         Returns:
             The array of the region of interest.
         """
-        numpy_roi_getter = NumpyRoiGetter(
+        numpy_roi_getter = NumpyGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -360,7 +434,7 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.
         """
-        roi_dask_getter = DaskRoiGetter(
+        roi_dask_getter = DaskGetter(
             zarr_array=self.zarr_array,
             dimensions=self.dimensions,
             roi=roi,
@@ -436,11 +510,55 @@ class AbstractImage(ABC):
                 f"Unsupported mode: {mode}. Supported modes are: numpy, dask."
             )
 
+    @contextmanager
+    def track_writes(self) -> Generator[list[tuple[RegionType, ...]]]:
+        """Record the region of every `set_*` write made through this handle.
+
+        Only the `set_*` methods are recorded — `set_array`, `set_roi`, and
+        their masked variants. Yields a list that accumulates one on-disk
+        index tuple per completed write, ready to hand to
+        `consolidate(regions=...)` so the pyramid rebuild covers exactly what
+        was written:
+
+        ```python
+        with image.track_writes() as regions:
+            image.set_roi(roi, patch)
+            image.set_array(other, y=slice(0, 64))
+        image.consolidate(regions=regions)
+        ```
+
+        Tracking is scoped to the context and to *this* handle in *this*
+        process: writes through setter pipes built directly on the zarr
+        array, through another handle to the same image, or in worker
+        processes (`ProcessMapper`) are not seen — iterators track their own
+        writes through their ROI list instead. Threads sharing this handle
+        all record, and a write that raises records nothing. Nested contexts
+        each keep their own list.
+        """
+        regions: list[tuple[RegionType, ...]] = []
+        with self._tracker_lock:
+            self._write_trackers.append(regions)
+        try:
+            yield regions
+        finally:
+            with self._tracker_lock:
+                self._write_trackers.remove(regions)
+
+    def _record_write(self, setter: NumpySetter | DaskSetter) -> None:
+        """Append a completed write's region to every active tracker."""
+        if not self._write_trackers:
+            return
+        region = setter.slicing_ops.normalized_slicing_tuple
+        with self._tracker_lock:
+            for tracker in self._write_trackers:
+                tracker.append(region)
+
     def _set_array(
         self,
         patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set a slice of the image.
@@ -449,6 +567,8 @@ class AbstractImage(ABC):
             patch: The patch to set.
             axes_order: The order of the axes to set the patch.
             transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
             **slicing_kwargs: The slices to set the patch.
 
         """
@@ -458,9 +578,11 @@ class AbstractImage(ABC):
                 dimensions=self.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             numpy_setter(patch)
+            self._record_write(numpy_setter)
 
         elif isinstance(patch, da.Array):
             dask_setter = DaskSetter(
@@ -468,9 +590,11 @@ class AbstractImage(ABC):
                 dimensions=self.dimensions,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             dask_setter(patch)
+            self._record_write(dask_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -484,6 +608,7 @@ class AbstractImage(ABC):
         patch: np.ndarray | da.Array,
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set a slice of the image.
@@ -493,30 +618,36 @@ class AbstractImage(ABC):
             patch: The patch to set.
             axes_order: The order of the axes to set the patch.
             transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
             **slicing_kwargs: The slices to set the patch.
 
         """
         if isinstance(patch, np.ndarray):
-            roi_numpy_setter = NumpyRoiSetter(
+            roi_numpy_setter = NumpySetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             roi_numpy_setter(patch)
+            self._record_write(roi_numpy_setter)
 
         elif isinstance(patch, da.Array):
-            roi_dask_setter = DaskRoiSetter(
+            roi_dask_setter = DaskSetter(
                 zarr_array=self.zarr_array,
                 dimensions=self.dimensions,
                 roi=roi,
                 axes_order=axes_order,
                 transforms=transforms,
+                merge=merge,
                 slicing_dict=slicing_kwargs,
             )
             roi_dask_setter(patch)
+            self._record_write(roi_dask_setter)
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -527,15 +658,18 @@ class AbstractImage(ABC):
     def _consolidate(
         self,
         order: InterpolationOrder = "linear",
-        mode: Literal["dask", "numpy", "coarsen"] = "dask",
+        mode: ConsolidationMode | None = None,
+        regions: ConsolidationRegions | None = None,
     ) -> None:
         """Consolidate the image on disk.
 
         Args:
             order: The order of the consolidation.
             mode: The mode of the consolidation.
+            regions: Where this level changed, to rebuild only what derives
+                from it. See `consolidate_pyramid`.
         """
-        consolidate_image(image=self, order=order, mode=mode)
+        consolidate_image(image=self, order=order, mode=mode, regions=regions)
 
     def roi(self, name: str | None = "image") -> Roi:
         """Return the ROI covering the entire image."""
@@ -654,10 +788,36 @@ class AbstractImage(ABC):
         return self.dimensions.check_if_rescalable(other.dimensions)
 
 
+def _resolve_consolidation_regions(
+    image: AbstractImage, regions: ConsolidationRegions
+) -> RegionsLike:
+    """Resolve `Roi`s to on-disk index tuples; tuples pass through.
+
+    A `Roi` is resolved through the same pipe machinery every ROI read and
+    write goes through (world-to-pixel conversion, clamping, on-disk axis
+    order included), so `consolidate(regions=rois)` names exactly the pixels
+    `set_roi(roi, ...)` wrote. Building a getter is pure metadata — no IO.
+    """
+    resolved = []
+    for region in regions:
+        if isinstance(region, Roi):
+            getter = NumpyGetter(
+                zarr_array=image.zarr_array,
+                dimensions=image.dimensions,
+                roi=region,
+                slicing_dict={},
+            )
+            resolved.append(getter.slicing_ops.normalized_slicing_tuple)
+        else:
+            resolved.append(region)
+    return resolved
+
+
 def consolidate_image(
     image: AbstractImage,
     order: InterpolationOrder = "linear",
-    mode: Literal["dask", "numpy", "coarsen"] = "dask",
+    mode: ConsolidationMode | None = None,
+    regions: ConsolidationRegions | None = None,
 ) -> None:
     """Consolidate the image on disk."""
     target_paths = image.meta_handler.get_meta().paths
@@ -667,7 +827,13 @@ def consolidate_image(
         if path != image.path
     ]
     consolidate_pyramid(
-        source=image.zarr_array, targets=targets, order=order, mode=mode
+        source=image.zarr_array,
+        targets=targets,
+        order=order,
+        mode=mode,
+        regions=(
+            None if regions is None else _resolve_consolidation_regions(image, regions)
+        ),
     )
 
 
@@ -1046,6 +1212,32 @@ def abstract_derive(
     if dimension_separator is None:
         dimension_separator = find_dimension_separator(ref_image.zarr_array)
 
+    if ngff_version is None:
+        ngff_version = ref_meta.version
+
+    # Inheriting concrete codecs or shards across zarr formats can only fail:
+    # numcodecs and v3 codec objects are never interchangeable, and v2 cannot
+    # shard. `None` means "inherit" here, so the escape hatch is `"auto"`
+    # (the target format's default; for shards on a v2 target, no sharding).
+    ref_format = ref_image.zarr_array.metadata.zarr_format
+    target_format = 2 if ngff_version == "0.4" else 3
+    if target_format != ref_format:
+        if compressors is None:
+            raise NgioValueError(
+                f"Cannot inherit compressors across zarr formats (the "
+                f"reference is zarr v{ref_format}, "
+                f"ngff_version={ngff_version!r} writes zarr "
+                f"v{target_format}): the codec objects are not "
+                'interchangeable. Pass compressors explicitly — "auto" '
+                "selects the target format's default."
+            )
+        if shards is None and ref_image.zarr_array.shards is not None:
+            raise NgioValueError(
+                "Cannot inherit sharding onto an OME-Zarr 0.4 (zarr v2) "
+                'target: v2 cannot shard. Pass shards="auto" to derive '
+                'unsharded, or keep ngff_version="0.5".'
+            )
+
     if compressors is None:
         compressors = ref_image.zarr_array.compressors  # type: ignore
 
@@ -1063,9 +1255,6 @@ def abstract_derive(
         shards=shards,
         translation=translation,
     )
-
-    if ngff_version is None:
-        ngff_version = ref_meta.version
 
     shapes, axes, chunks, shards, translation, scales = _apply_channel_policy(
         ref_image=ref_image,

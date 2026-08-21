@@ -4559,7 +4559,7 @@ packages:
   requires_dist:
   - aiohttp>=3.9
   - anndata>=0.12.5,<0.14.0
-  - dask[array]>=2024.1
+  - dask[array]>=2025.12
   - filelock>=3.12
   - fsspec>=2025.3
   - numpy>=2.0

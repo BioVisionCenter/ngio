@@ -11,36 +11,23 @@ from ngio import (
     open_ome_zarr_container,
 )
 from ngio.images._image import ChannelSelectionModel
-from ngio.io_pipes._ops_axes import AxesOps
-from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.io_pipes import TransformContext
 from ngio.ome_zarr_meta import ChannelsMeta
 from ngio.tables import GenericTable
 from ngio.utils import NgioValueError, fractal_fsspec_store
 
 
 class IdentityTransform:
-    def get_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the scaling transformation to a numpy array."""
+    def on_get(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the transformation after reading."""
         return array
 
-    def get_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the scaling transformation to a dask array."""
-        return array
-
-    def set_as_numpy_transform(
-        self, array: np.ndarray, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> np.ndarray:
-        """Apply the inverse scaling transformation to a numpy array."""
-        return array
-
-    def set_as_dask_transform(
-        self, array: da.Array, slicing_ops: SlicingOps, axes_ops: AxesOps
-    ) -> da.Array:
-        """Apply the inverse scaling transformation to a dask array."""
+    def on_set(
+        self, array: np.ndarray | da.Array, ctx: TransformContext
+    ) -> np.ndarray | da.Array:
+        """Apply the inverse transformation before writing."""
         return array
 
 
@@ -80,7 +67,7 @@ def test_ome_zarr_tables(cardiomyocyte_tiny_path: Path):
     assert ome_zarr.get_channel_idx("DAPI") == 0
     assert ome_zarr.get_channel_idx(wavelength_id="A01_C01") == 0
     assert ome_zarr.num_channels == 1
-    ome_zarr.set_axes_units(space_unit="micrometer")
+    ome_zarr.set_space_unit("micrometer")
 
     assert ome_zarr.list_tables() == ["FOV_ROI_table", "well_ROI_table"], (
         ome_zarr.list_tables()
@@ -132,7 +119,8 @@ def test_create_ome_zarr_container(tmp_path: Path, array_mode: str):
     assert ome_zarr.space_unit == "micrometer"
     assert ome_zarr.time_unit is None
 
-    ome_zarr.set_axes_units(space_unit="yoctometer", time_unit="yoctosecond")
+    ome_zarr.set_space_unit("yoctometer")
+    ome_zarr.set_time_unit("yoctosecond")
     assert ome_zarr.space_unit == "yoctometer"
     assert ome_zarr.time_unit is None
 
@@ -419,3 +407,32 @@ def test_rename_axes():
     assert label.axes == ("y", "XX")
     ome_zarr.set_axes_names(axes_names=["c", "y", "x"])
     assert ome_zarr.get_image().axes == ("c", "y", "x")
+
+
+def test_uncached_container_sees_tables_added_by_another_handle(tmp_path: Path):
+    """The "no /tables" answer may only be remembered under `cache=True`."""
+    store = tmp_path / "ome_zarr.zarr"
+    create_empty_ome_zarr(store, shape=(3, 20, 30), pixelsize=0.5)
+
+    reader = open_ome_zarr_container(store, cache=False)
+    assert reader.list_tables() == []
+
+    writer = open_ome_zarr_container(store)
+    writer.add_table("t", GenericTable(table_data=pd.DataFrame({"a": [1]})))
+
+    assert reader.list_tables() == ["t"]
+
+
+def test_cached_container_holds_the_no_tables_answer(tmp_path: Path):
+    store = tmp_path / "ome_zarr.zarr"
+    create_empty_ome_zarr(store, shape=(3, 20, 30), pixelsize=0.5)
+
+    reader = open_ome_zarr_container(store, cache=True)
+    assert reader.list_tables() == []
+
+    writer = open_ome_zarr_container(store)
+    writer.add_table("t", GenericTable(table_data=pd.DataFrame({"a": [1]})))
+
+    assert reader.list_tables() == []
+    reader.refresh()
+    assert reader.list_tables() == ["t"]

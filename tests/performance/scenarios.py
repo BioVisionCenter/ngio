@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Any, NamedTuple
 
+import dask.array as da
 import numpy as np
 
 from ngio import (
@@ -27,6 +28,7 @@ from ngio import (
     open_ome_zarr_container,
     open_ome_zarr_plate,
 )
+from ngio.iterators import ThreadedMapper
 
 #: The well grid of the `create_plate` scenario. Stated here rather than shared
 #: with the plate fixture: a scenario owns the shape of what it measures, the
@@ -49,12 +51,93 @@ def _container(ctx, fixture, **kwargs):
     return open_ome_zarr_container(ctx.store(fixture), mode="r", **kwargs)
 
 
-def _image(ctx, fixture, path="1"):
-    return open_image(ctx.store(fixture), path=path, mode="r")
+def _image(ctx, fixture, path="1", **kwargs):
+    return open_image(ctx.store(fixture), path=path, mode="r", **kwargs)
 
 
-def _plate(ctx, fixture="plate"):
-    return open_ome_zarr_plate(ctx.store(fixture), mode="r")
+def _plate(ctx, fixture="plate", **kwargs):
+    return open_ome_zarr_plate(ctx.store(fixture), mode="r", **kwargs)
+
+
+#: The geometry of the dask-write scenarios. Owned here rather than shared with
+#: the image fixture, which is unsharded and must stay that way: these scenarios
+#: exist because a *sharded* target is the only shape that can see a partial
+#: write unit, and the sharded/unsharded pair is only a clean A/B if nothing
+#: else differs between them. Both run on NGFF 0.5 -- sharding needs zarr v3.
+#:
+#: 128 chunks in 2 shards, so a patch blocked at the chunk shape puts 64 blocks
+#: in each shard: 64 chances to read-modify-write it, against the 1 write the
+#: shard actually needs.
+_WRITE_SHAPE = (1, 8, 256, 256)
+_WRITE_CHUNKS = (1, 1, 64, 64)
+_WRITE_SHARDS = (1, 4, 256, 256)
+
+
+def _write_target(ctx, name, shards=None, levels=1):
+    """An empty image, ready to be written into.
+
+    Built per scenario in `setup` like `_consolidation_target`, so the
+    measurement covers only the write and repeated runs cannot accumulate state.
+    """
+    container = create_empty_ome_zarr(
+        store=ctx.scratch(name),
+        shape=_WRITE_SHAPE,
+        axes_names=["c", "z", "y", "x"],
+        channels_meta=["Channel 1"],
+        levels=levels,
+        pixelsize=(0.65, 0.65),
+        chunks=_WRITE_CHUNKS,
+        shards=shards,
+        ngff_version="0.5",
+        compressors=None,
+        overwrite=True,
+    )
+    return container.get_image(path="0")
+
+
+def _write_patch(shape=_WRITE_SHAPE):
+    # Blocked at the *chunk* shape, which is what a caller who rechunked to
+    # `array.chunks` -- or who never thought about it -- ends up with.
+    return da.from_array(np.ones(shape, dtype=np.uint16), chunks=_WRITE_CHUNKS)
+
+
+def _iterator_target(ctx):
+    """A written image plus a derived output label, tiled into 4 chunk ROIs.
+
+    Built per scenario in `setup`, like `_write_target`: the measurement covers
+    only the mapping pass, and repeated runs cannot accumulate state.
+    """
+    from ngio.iterators import SegmentationIterator
+
+    container = create_empty_ome_zarr(
+        store=ctx.scratch("iterator_map"),
+        shape=(128, 128),
+        axes_names=["y", "x"],
+        levels=3,
+        pixelsize=(0.65, 0.65),
+        chunks=(64, 64),
+        compressors=None,
+        overwrite=True,
+    )
+    image = container.get_image(path="0")
+    image.set_array(patch=np.ones((128, 128), dtype=np.uint16))
+    label = container.derive_label("out")
+    # `consolidation_mode` pinned so the tally is stable when the `mode=None`
+    # default changes in 1.2.
+    iterator = SegmentationIterator(image, label, consolidation_mode="dask").by_chunks()
+    return iterator
+
+
+def _sharded_consolidation_target(ctx):
+    """A written sharded pyramid, ready to consolidate.
+
+    The level-0 write is numpy on purpose: it happens in `setup`, and going
+    through dask here would put the write path's own amplification into a
+    scenario meant to measure the consolidation's.
+    """
+    image = _write_target(ctx, "consolidate_sharded", shards=_WRITE_SHARDS, levels=3)
+    image.set_array(patch=np.ones(_WRITE_SHAPE, dtype=np.uint16))
+    return image
 
 
 def _consolidation_target(ctx, mode):
@@ -79,11 +162,46 @@ def _consolidation_target(ctx, mode):
     return image
 
 
+def _partial_consolidation_target(ctx):
+    """A consolidated pyramid with one rewritten quadrant.
+
+    Chunks are 64px rather than `_consolidation_target`'s 128: with one chunk
+    per level-1 plane, snapping the quadrant to the write unit covers the
+    whole level and the region path (correctly) degenerates into the full
+    rebuild -- the counts would pin nothing. At 64px the levels hold real
+    chunk grids, so only the quadrant's column of each level is touched.
+
+    The initial full consolidate and the quadrant rewrite happen here in
+    `setup`, so the measurement covers only the region-scoped rebuild.
+    """
+    container = create_empty_ome_zarr(
+        store=ctx.scratch("consolidate_partial_dask"),
+        shape=(1, 4, 256, 256),
+        axes_names=["c", "z", "y", "x"],
+        channels_meta=["Channel 1"],
+        levels=3,
+        pixelsize=(0.65, 0.65),
+        chunks=(1, 1, 64, 64),
+        compressors=None,
+        overwrite=True,
+    )
+    image = container.get_image(path="0")
+    image.set_array(patch=np.ones((1, 4, 256, 256), dtype=np.uint16))
+    image.consolidate(mode="dask")
+    image.set_array(
+        patch=np.full((1, 4, 128, 128), 2, dtype=np.uint16),
+        y=slice(0, 128),
+        x=slice(0, 128),
+    )
+    return image
+
+
 SCENARIOS: dict[str, Scenario] = {
     # --- open and metadata ------------------------------------------------
-    # `cache=True` should cost strictly fewer reads than `cache=False`. It
-    # currently costs the same, because `ZarrGroupHandler.load_attrs` reopens
-    # the group unconditionally; the equality of these two is that bug.
+    # `cache=True` must cost strictly fewer reads than `cache=False`. These two
+    # were byte-for-byte identical until `load_attrs` started honouring the
+    # cache instead of reopening the group unconditionally; their *inequality*
+    # is what holds that fix.
     "open_container": Scenario(None, lambda ctx: _container(ctx, "image", cache=False)),
     "open_container_cached": Scenario(
         None, lambda ctx: _container(ctx, "image", cache=True)
@@ -93,10 +211,16 @@ SCENARIOS: dict[str, Scenario] = {
     "open_container_v04": Scenario(
         None, lambda ctx: _container(ctx, "image_v04", cache=False)
     ),
-    # Pure metadata access. Counts should be flat in the number of accesses
-    # once the meta handler caches; today they grow linearly.
+    # Pure metadata access, and the property iterators touch once per ROI --
+    # twice per ROI for a masked one. Uncached it is one full metadata reload
+    # per access and must stay linear; cached it must be flat, and the pair is
+    # what states which of the two is being measured.
     "dimensions_x10": Scenario(
         lambda ctx: _image(ctx, "image"),
+        lambda image: [image.dimensions for _ in range(10)],
+    ),
+    "dimensions_x10_cached": Scenario(
+        lambda ctx: _image(ctx, "image", cache=True),
         lambda image: [image.dimensions for _ in range(10)],
     ),
     # --- reads ------------------------------------------------------------
@@ -108,6 +232,26 @@ SCENARIOS: dict[str, Scenario] = {
         lambda ctx: _rois(ctx),
         lambda state: [state[0].get_roi_as_numpy(roi) for roi in state[1]],
     ),
+    # Selecting channels by label. Resolving a label needs the channel metadata,
+    # and reading that off the image is a full metadata reload -- so this must
+    # cost one read regardless of how many channels are named, not one each.
+    # `channel_selection=None` short-circuits, so only the selecting path is
+    # measured here.
+    "read_channel_selection": Scenario(
+        lambda ctx: _image(ctx, "image"),
+        lambda image: image.get_as_numpy(channel_selection=["Channel 1", "Channel 2"]),
+    ),
+    # The same selection three times on one image. The channel metadata is
+    # cached against the metadata generation, so the metadata cost must be
+    # flat in the call count -- only the chunk reads may scale. A per-ROI
+    # loop with a `channel_selection` is the ordinary shape of this.
+    "read_channel_selection_x3": Scenario(
+        lambda ctx: _image(ctx, "image"),
+        lambda image: [
+            image.get_as_numpy(channel_selection=["Channel 1", "Channel 2"])
+            for _ in range(3)
+        ],
+    ),
     # --- plate ------------------------------------------------------------
     # Plate metadata only; the well count should not appear in the counts.
     "plate_wells_paths": Scenario(_plate, lambda plate: plate.wells_paths()),
@@ -115,6 +259,40 @@ SCENARIOS: dict[str, Scenario] = {
     # Calls get_wells internally, so this costs one group open per well to
     # answer a question the plate metadata alone could answer.
     "plate_images_paths": Scenario(_plate, lambda plate: plate.images_paths()),
+    # The same walk over a 0.5 plate. The decoder registry is 0.4-first, so
+    # every 0.5 document costs a failed pydantic validation before the right
+    # decoder runs; the plate and well handlers memoise the resolved version to
+    # pay that once per handler instead of once per read. `meta.decode_fail`
+    # here is that memo's gate — the 0.4 scenario above cannot see it, since a
+    # 0.4 document hits on the first try and never fails.
+    "plate_images_paths_v05": Scenario(
+        lambda ctx: _plate(ctx, "plate_v05"),
+        lambda plate: plate.images_paths(),
+    ),
+    # The same walk with caching on. `images_paths` reads the plate document
+    # once and then one well document per well; with `cache=False` every one of
+    # those is re-read several times over. The gap between this and the scenario
+    # above is the whole point of the metadata cache, and on a 384-well plate on
+    # S3 it is the difference between seconds and minutes.
+    "plate_images_paths_cached": Scenario(
+        lambda ctx: _plate(ctx, cache=True),
+        lambda plate: plate.images_paths(),
+    ),
+    # Enumerating one well's images. The plate metadata already holds the well
+    # path and the well holds its own image list, so this should cost one of
+    # each -- not one plate read per image, which is what resolving the prefix
+    # per image used to cost. Six images in one well; every other plate fixture
+    # has one, which cannot show the difference.
+    "plate_well_images_paths": Scenario(
+        lambda ctx: _plate(ctx, "plate_multi_image"),
+        lambda plate: plate.well_images_paths(row="A", column="01"),
+    ),
+    # The same walk, then opening each container. Sits on top of the scenario
+    # above, so a regression there lands here too.
+    "plate_get_well_images": Scenario(
+        lambda ctx: _plate(ctx, "plate_multi_image"),
+        lambda plate: plate.get_well_images(row="A", column="01"),
+    ),
     # --- plate-wide table aggregation --------------------------------------
     # Both open every image container inside the counted block, on top of the
     # enumeration `plate_images_paths` already gates. That multiplication is
@@ -129,9 +307,15 @@ SCENARIOS: dict[str, Scenario] = {
         lambda plate: plate.concatenate_image_tables(name="features"),
     ),
     # --- tables -----------------------------------------------------------
-    # csv and parquet are absent on purpose: they go through pyarrow against
-    # the filesystem directly, bypassing the zarr store, so no store counter
-    # can see them.
+    # The pyarrow backends read their *payload* against the filesystem directly,
+    # so no store counter sees those bytes -- but the zarr metadata around the
+    # table is still ordinary store IO, and the group reopens behind it are what
+    # `table_load_parquet` holds. csv is absent as a duplicate of parquet: same
+    # backend, same code path.
+    "table_load_parquet": Scenario(
+        lambda ctx: _container(ctx, "tables_parquet"),
+        lambda c: c.get_table("features_parquet").dataframe,
+    ),
     "table_load_anndata": Scenario(
         lambda ctx: _container(ctx, "tables"),
         lambda c: c.get_table("features_anndata_v1").dataframe,
@@ -143,6 +327,27 @@ SCENARIOS: dict[str, Scenario] = {
     "table_load_roi": Scenario(
         lambda ctx: _container(ctx, "tables"),
         lambda c: c.get_table("well_ROI_table").rois(),
+    ),
+    # Filtering by type is the expensive listing: the type lives in each
+    # table's own attributes, never in the `/tables` group, so it costs one
+    # group open per table. Asking for two types used to walk the whole set
+    # twice; the second call must now be nearly free, and the repeat free.
+    "list_roi_tables": Scenario(
+        lambda ctx: _container(ctx, "tables"),
+        lambda c: c.list_roi_tables(),
+    ),
+    "list_roi_tables_repeated": Scenario(
+        lambda ctx: _container(ctx, "tables"),
+        lambda c: [c.list_roi_tables() for _ in range(3)],
+    ),
+    # An image with no `/tables` at all, opened with the default
+    # `cache=False`: every call re-probes, because another writer may add
+    # tables at any time — so this scales with the number of calls, and each
+    # probe should stay as cheap as one group open. (Under `cache=True` the
+    # "no tables" answer is remembered and repeats are free.)
+    "list_tables_absent_x3": Scenario(
+        lambda ctx: _container(ctx, "image_no_tables"),
+        lambda c: [c.list_tables() for _ in range(3)],
     ),
     # --- writes: creation -------------------------------------------------
     # No pixel data, so the counts are the per-level metadata and empty-array
@@ -189,31 +394,111 @@ SCENARIOS: dict[str, Scenario] = {
             overwrite=True,
         ),
     ),
+    # --- writes: dask ------------------------------------------------------
+    # The write unit of a zarr array is `shards or chunks`, never `chunks`:
+    # zarr can only skip the read-modify-write when a write covers a *whole*
+    # unit. `da.store` issues one `__setitem__` per dask block, so on a sharded
+    # target a block covering one inner chunk makes zarr read, decode, merge,
+    # re-encode and rewrite the entire shard.
+    #
+    # Read the pair. The unsharded control is the one that must not move; the
+    # sharded one is where `get.chunk` and `bytes.read` should be *zero*, and
+    # zero is a guarantee rather than a speedup -- no read-modify-write means no
+    # lost update, on any machine at any worker count. Every other fixture in
+    # this suite is unsharded, so without these the amplification is invisible.
+    "write_dask": Scenario(
+        lambda ctx: (_write_target(ctx, "write_dask"), _write_patch()),
+        lambda state: state[0].set_array(patch=state[1]),
+    ),
+    "write_sharded_dask": Scenario(
+        lambda ctx: (
+            _write_target(ctx, "write_sharded_dask", shards=_WRITE_SHARDS),
+            _write_patch(),
+        ),
+        lambda state: state[0].set_array(patch=state[1]),
+    ),
+    # A region write that covers neither shard wholly, which is the case a
+    # caller writing per-ROI actually hits. Its boundary shards are still
+    # read-modify-written -- that part is inherent to the geometry, not a defect
+    # -- so what this holds is that each of them is read *once*.
+    "write_sharded_roi_dask": Scenario(
+        lambda ctx: (
+            _write_target(ctx, "write_sharded_roi_dask", shards=_WRITE_SHARDS),
+            _write_patch((1, 6, 256, 256)),
+        ),
+        lambda state: state[0].set_array(patch=state[1], z=slice(1, 7)),
+    ),
     # --- writes: pyramid consolidation ------------------------------------
     # The most expensive operation in the library, and every writing iterator
-    # triggers it implicitly via `post_consolidate`.
-    #
-    # NOTE: the "dask" numbers below record a known 2x waste, not correct
-    # behaviour. `_pyramid.py:44` calls `compute_chunk_sizes()` right after an
-    # explicit `rechunk(target.chunks)`, which executes the whole read -> zoom
-    # graph just to learn block shapes it already knows, then `da.store` runs
-    # the same graph again. Removing that line should roughly halve `get.chunk`
-    # and `bytes.read` here, and that halving is the point of gating it.
+    # triggers it implicitly via `finalize`.
+    # `auto` landed on this branch and resolves to numpy on this geometry
+    # (small, dyadic, linear), so its counts must match `consolidate_numpy` --
+    # the resolution itself must not cost a single extra store op.
     **{
         f"consolidate_{mode}": Scenario(
             lambda ctx, mode=mode: _consolidation_target(ctx, mode),
             lambda image, mode=mode: image.consolidate(mode=mode),
         )
-        for mode in ("dask", "numpy", "coarsen")
+        for mode in ("dask", "numpy", "coarsen", "auto")
     },
+    # The dask consolidation onto a *sharded* pyramid. `_pyramid.py` rechunks
+    # the zoomed level to `target.chunks`, which on a sharded array is the
+    # inner chunk shape -- so every block is a partial shard write. Pairs with
+    # `consolidate_dask` the same way `write_sharded_dask` pairs with
+    # `write_dask`: the unsharded one must not move.
+    "consolidate_sharded_dask": Scenario(
+        lambda ctx: _sharded_consolidation_target(ctx),
+        lambda image: image.consolidate(mode="dask"),
+    ),
+    # The region-scoped rebuild after a single-quadrant rewrite -- the
+    # acceptance meter for partial consolidation -- and its control: the same
+    # target, rebuilt fully. The invariant
+    # (`test_partial_consolidation_is_cheaper`) compares the pair, so it holds
+    # whatever this geometry's absolute counts are; comparing against
+    # `consolidate_dask` instead would entangle it with that scenario's
+    # different chunk grid.
+    "consolidate_partial_dask": Scenario(
+        lambda ctx: _partial_consolidation_target(ctx),
+        lambda image: image.consolidate(
+            mode="dask",
+            regions=[(slice(None), slice(None), slice(0, 128), slice(0, 128))],
+        ),
+    ),
+    "consolidate_partial_control": Scenario(
+        lambda ctx: _partial_consolidation_target(ctx),
+        lambda image: image.consolidate(mode="dask"),
+    ),
+    # --- iterators ---------------------------------------------------------
+    # A writing iterator end to end: per-ROI reads and writes, the per-ROI
+    # metadata probes, and `finalize`'s pyramid rebuild. `by_chunks()` tiles
+    # the whole image, so the touched regions cover 100% of level 0 and the
+    # region-scoped consolidation correctly declines (`partial_max_coverage`)
+    # -- these counts pin that a full-coverage iterator costs exactly what it
+    # did before regions existed. The region path's own acceptance meter is
+    # `consolidate_partial_dask`.
+    "iterator_map_numpy": Scenario(
+        _iterator_target,
+        lambda it: it.map_as_numpy(lambda patch: (patch > 0).astype("uint32")),
+    ),
+    # The same map on a thread pool. Op counts are invariant to concurrency
+    # by design -- `test_invariants.py` pins this tally *equal* to the serial
+    # one, which is exactly why the concurrency gate exists as a second
+    # instrument.
+    "iterator_map_parallel": Scenario(
+        _iterator_target,
+        lambda it: it.map_as_numpy(
+            lambda patch: (patch > 0).astype("uint32"),
+            mapper=ThreadedMapper(4),
+        ),
+    ),
 }
 
 
 def _rois(ctx):
-    from ngio.iterators._rois_utils import grid
+    from ngio.iterators._rois_utils import by_grid
 
     image = _image(ctx, "image", path="1")
-    rois = grid(
+    rois = by_grid(
         rois=image.build_image_roi_table().rois(),
         ref_image=image,
         size_y=64,

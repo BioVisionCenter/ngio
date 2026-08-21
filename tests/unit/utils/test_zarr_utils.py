@@ -31,10 +31,12 @@ def test_group_handler_creation(tmp_path: Path, cache: bool):
     store = tmp_path / "test_group_handler_creation.zarr"
     handler = ZarrGroupHandler(store=store, cache=cache, mode="a")
 
-    _store = handler.group.store
-    assert isinstance(_store, NgioStore)
-    assert isinstance(_store._store, LocalStore)
-    assert _store.local_root == store
+    # The group holds the bare store under the default retry policy, so that
+    # zarr can dispatch a store-aware codec pipeline on it; the handler still
+    # exposes the `NgioStore` services over it.
+    assert isinstance(handler.group.store, LocalStore)
+    assert isinstance(handler.store, NgioStore)
+    assert handler.store.local_root == store
     assert handler.use_cache == cache
 
     attrs = handler.load_attrs()
@@ -73,13 +75,36 @@ def test_group_handler_from_group(tmp_path: Path):
     group = zarr.group(store=store, overwrite=True)
 
     handler = ZarrGroupHandler(store=group, cache=True, mode="a")
-    # The group is reopened on an NgioStore wrapping the original store,
-    # so compare path and underlying store rather than group identity.
-    assert isinstance(handler.group.store, NgioStore)
-    assert handler.group.store._store == group.store
+    # A plain local store is already the normalized form under the default
+    # retry policy, so the group is adopted rather than reopened onto a wrapper.
+    assert handler.group.store is group.store
     assert handler.group.path == group.path
+    assert isinstance(handler.store, NgioStore)
+    assert handler.store._store is group.store
+
+
+def test_cache_true_holds_until_refreshed(tmp_path: Path):
+    """`cache=True` means "hold it for my lifetime, I am the only writer".
+
+    A write that goes around the handler is therefore *not* visible until
+    `refresh()`. This is the whole content of the flag, and it used to be
+    invisible: `load_attrs` reopened the group unconditionally, so caching was
+    inert for metadata and an outside write showed up regardless.
+    """
+    store = tmp_path / "cache_semantics.zarr"
+    group = zarr.group(store=store, overwrite=True)
+
+    cached = ZarrGroupHandler(store=group, cache=True, mode="a")
+    uncached = ZarrGroupHandler(store=group, cache=False, mode="a")
+    assert cached.load_attrs() == {}
+
     group.attrs["marker"] = 1
-    assert handler.load_attrs() == {"marker": 1}
+
+    assert uncached.load_attrs() == {"marker": 1}
+    assert cached.load_attrs() == {}
+
+    cached.refresh()
+    assert cached.load_attrs() == {"marker": 1}
 
 
 def test_group_handler_delete(tmp_path: Path):
@@ -103,6 +128,43 @@ def test_group_handler_delete(tmp_path: Path):
         handler.delete_group("to_be_deleted")
     with pytest.raises(NgioValueError):
         handler.delete_self()
+
+
+def test_get_handler_overwrite_bypasses_the_cache(tmp_path: Path):
+    """`overwrite=True` must recreate the group, not serve the cached handler."""
+    store = tmp_path / "test_get_handler_overwrite.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+
+    child = handler.get_handler("scratch")
+    child.write_attrs({"stale": True})
+
+    fresh = handler.get_handler("scratch", overwrite=True)
+    assert fresh.load_attrs() == {}
+    # The replacement is what the cache serves from now on.
+    assert handler.get_handler("scratch") is fresh
+
+
+def test_delete_group_evicts_descendant_handlers(tmp_path: Path):
+    """Deleting a group must not leave nested handlers serving the old state.
+
+    This is the distributed-partials cycle: `prepare → write per-job groups →
+    merge → delete the scratch root`, then run a second cycle in the same
+    process. The second cycle's nested `overwrite=True` handlers must point at
+    the recreated groups.
+    """
+    store = tmp_path / "test_delete_group_evicts.zarr"
+    handler = ZarrGroupHandler(store=store, cache=True, mode="a")
+
+    for cycle in range(2):
+        root = handler.get_handler("scratch", overwrite=True)
+        job = handler.get_handler("scratch/job_0", overwrite=True)
+        job.write_attrs({"cycle": cycle})
+        read_back = handler.get_handler("scratch/job_0", create_mode=False)
+        assert read_back.load_attrs() == {"cycle": cycle}
+        assert not root.group.read_only
+        handler.delete_group("scratch")
+        with pytest.raises(NgioFileNotFoundError):
+            handler.get_group("scratch/job_0")
 
 
 def test_group_handler_read(tmp_path: Path):
@@ -155,14 +217,22 @@ def test_open_fail(tmp_path: Path):
         open_group_wrapper(store=read_only_group, mode="w")
 
 
-def _append_under_lock(args: tuple[str, int]) -> int:
+def _append_under_lock(args: tuple[str, int, bool]) -> int:
     """Append one item to a shared attrs list, in a worker process.
 
     Module level and picklable by reference, which is what `spawn` needs.
+    Goes through `locked()` rather than `lock` because that is what refreshes
+    cached metadata around the critical section — with `cache=True` and a bare
+    `lock`, the read below could be served from before the lock was taken and
+    the write would drop the previous holder's item.
     """
-    zarr_store, i = args
-    handler = ZarrGroupHandler(zarr_store, cache=False, mode="a")
-    with handler.lock:
+    zarr_store, i, cache = args
+    handler = ZarrGroupHandler(zarr_store, cache=cache, mode="a")
+    # Prime the cache *before* the lock. Without this the handler is freshly
+    # built and its cache empty, so the read below would go to the store
+    # whatever the policy, and the cached half of this test would prove nothing.
+    handler.load_attrs()
+    with handler.locked():
         attrs = handler.load_attrs()
         attrs["test_list"].append(i)
         handler.write_attrs(attrs, overwrite=False)
@@ -173,17 +243,24 @@ def _append_under_lock(args: tuple[str, int]) -> int:
     sys.platform == "win32",
     reason="the lock is only best-effort on Windows, so no-lost-update cannot hold",
 )
-def test_multiprocessing_safety(tmp_path: Path):
+@pytest.mark.parametrize("cache", [False, True])
+def test_multiprocessing_safety(tmp_path: Path, cache: bool):
     """The lock holds between real processes, which is what it claims.
 
     Runs in separate processes rather than dask's threaded scheduler: this test
     is the one that has to notice a lock which only excludes threads, and until
     now it ran entirely in one interpreter despite its name. `spawn`, not
     `fork` — zarr keeps an IO event loop thread and forking one warns.
+
+    `cache=True` is the interesting half. Caching used to be *refused* whenever
+    a lock was asked for, on the grounds that a cached read-modify-write would
+    silently drop a concurrent update. That is a real hazard, and it is what
+    `locked()` invalidating on entry and exit exists to remove — so this asserts
+    the replacement is at least as strong as the refusal it replaced.
     """
     zarr_store = tmp_path / "test_multiprocessing_safety.zarr"
 
-    handler = ZarrGroupHandler(zarr_store, cache=False, mode="w")
+    handler = ZarrGroupHandler(zarr_store, cache=cache, mode="w")
     handler.write_attrs({"test_list": []}, overwrite=True)
 
     num_items = 40
@@ -192,7 +269,8 @@ def test_multiprocessing_safety(tmp_path: Path):
     ) as pool:
         pids = set(
             pool.map(
-                _append_under_lock, [(str(zarr_store), i) for i in range(num_items)]
+                _append_under_lock,
+                [(str(zarr_store), i, cache) for i in range(num_items)],
             )
         )
 
@@ -200,18 +278,22 @@ def test_multiprocessing_safety(tmp_path: Path):
     assert os.getpid() not in pids
     assert len(pids) > 1
 
+    handler.refresh()
     _, counts = np.unique(handler.load_attrs()["test_list"], return_counts=True)
     assert len(counts) == num_items
     assert np.all(counts == 1)
 
     assert handler.lock_path is not None
 
-    # If cache is used, raise error when creating lock
-    # Since caching creates a temporary local copy
-    # which cannot be locked properly
-    handler = ZarrGroupHandler(zarr_store, cache=True, mode="r")
-    with pytest.raises(NgioValueError):
-        handler._create_lock()
+
+def test_a_cached_handler_can_take_the_lock(tmp_path: Path):
+    """Caching and locking used to be mutually exclusive. They compose now."""
+    handler = ZarrGroupHandler(tmp_path / "cached.zarr", cache=True, mode="a")
+
+    lock_path, lock = handler._create_lock()
+    assert isinstance(lock, BaseFileLock)
+    with handler.locked():
+        assert lock_path.exists()
 
 
 def test_lock_warns_on_windows(tmp_path: Path, monkeypatch):
@@ -232,20 +314,20 @@ def test_lock_warns_on_windows(tmp_path: Path, monkeypatch):
         assert lock_path.exists()
 
 
-def test_windows_warning_does_not_mask_the_validations(tmp_path: Path, monkeypatch):
+def test_windows_warning_does_not_mask_the_validations(monkeypatch):
     """A store that cannot be locked at all still raises, on Windows too.
 
-    The warning sits after both guards deliberately. Emitted first, it would
-    turn into the raised exception under `-W error` — so Windows would report
-    `NgioUserWarning` for a cached or remote store where every other platform
+    The warning sits after the store-type guard deliberately. Emitted first, it
+    would turn into the raised exception under `-W error` — so Windows would
+    report `NgioUserWarning` for a remote store where every other platform
     reports `NgioValueError`.
     """
     monkeypatch.setattr(_retry, "_IS_WINDOWS", True)
-    handler = ZarrGroupHandler(tmp_path / "cached.zarr", cache=True, mode="a")
+    handler = ZarrGroupHandler({}, cache=False, mode="a")
 
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        with pytest.raises(NgioValueError, match="not compatible with caching"):
+        with pytest.raises(NgioValueError, match="needs to be a LocalStore"):
             handler._create_lock()
 
 
@@ -412,3 +494,25 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
     assert "array1" in dest_group
     assert "group1" in dest_group
     assert "sub_array1" in dest_group["group1"]
+
+
+def test_writes_are_visible_through_a_stale_consolidated_metadata(tmp_path: Path):
+    """A store carrying `.zmetadata` must not shadow ngio's own writes.
+
+    zarr leaves consolidated metadata untouched when attributes are written, and
+    ngio has no way to refresh someone else's. Trusting it made ngio read back a
+    snapshot from before its own writes: a group ngio had just created was
+    absent from the very next listing.
+    """
+    store = tmp_path / "consolidated.zarr"
+    group = zarr.create_group(store=store, overwrite=True, zarr_format=2)
+    group.attrs.update({"members": []})
+    zarr.consolidate_metadata(str(store))
+    assert (store / ".zmetadata").exists()
+
+    handler = ZarrGroupHandler(store=store, cache=False, mode="r+")
+    handler.write_attrs({"members": ["added_after_consolidation"]})
+    handler.create_group("child")
+
+    assert handler.load_attrs()["members"] == ["added_after_consolidation"]
+    assert "child" in handler.group

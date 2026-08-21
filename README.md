@@ -41,8 +41,11 @@ Then work through the
 - **Tables and ROIs** — tight integration with [tabular
   data](https://biovisioncenter.github.io/ngio/stable/table_specs/overview/), extensible
   table schemas, and measurements stored alongside the image.
-- **Scalable processing** — iterators for building pipelines that generalise from a single
-  ROI to a full plate, with a pluggable mapping mechanism for parallelisation.
+- **Scalable processing** — five iterators (image processing, segmentation, masked
+  segmentation, feature extraction, object detection) that scale a per-region function
+  from one ROI to a full plate: serial, threaded, multi-process, batched for neural
+  networks, or split across cluster jobs — with halos for seamless tiles and stitching
+  for objects split across tile boundaries.
 - **Remote stores** — stream from S3 and other fsspec-backed sources, with a configurable
   IO retry policy.
 - **Supported OME-Zarr versions** — ngio supports OME-Zarr v0.4 and v0.5, backed by either Zarr v2 or v3 storage. Support for
@@ -51,14 +54,17 @@ Then work through the
 ## Versioning
 
 ngio follows [semantic versioning](https://semver.org/): from 1.0 onwards the public API
-is stable, and breaking changes are reserved for major releases.
+is stable, and breaking changes are reserved for major releases. The one carve-out is
+the structural protocols — `MapperProtocol`, `TransformProtocol`, and `MergePolicy`:
+implementing them pins you to the documented contract, which minor releases may extend
+with *optional* members.
 
 ## Documentation
 
 Full documentation, including guides, tutorials and the API reference, is at
-[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). The worked
-examples are executed when the site is built, so the code and the output you read are what
-actually ran.
+[biovisioncenter.github.io/ngio](https://biovisioncenter.github.io/ngio/). The tutorials'
+worked examples are executed when the site is built, so the code and the output you read
+are what actually ran.
 
 ## Citing ngio
 
