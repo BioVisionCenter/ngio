@@ -272,9 +272,13 @@ class AbstractBaseTable(ABC):
         cls,
         handler: ZarrGroupHandler,
         backend: TableBackend | None = None,
+        attrs: dict | None = None,
     ) -> Self:
         """Create a new ROI table from a Zarr group handler."""
-        pass
+        # Not `pass`: `abstractmethod` only guards instantiation, so a call on
+        # a subclass that forgot to override this would silently return `None`
+        # — `get_as(name, cls)` handed back nothing, with no error anywhere.
+        raise NotImplementedError(f"{cls.__name__} does not implement `from_handler`.")
 
     @classmethod
     def from_table_data(cls, table_data: TabularData, meta: BackendMeta) -> Self:

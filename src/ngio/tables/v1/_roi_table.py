@@ -325,9 +325,13 @@ class GenericRoiTableV1(AbstractBaseTable):
         self,
         *,
         rois: Iterable[Roi] | None = None,
-        meta: BackendMeta,
+        meta: BackendMeta | None = None,
         required_columns: list[str] = REQUIRED_COLUMNS,
     ) -> None:
+        if meta is None:
+            # Same index defaults as `RoiTableV1`: the ROIs are keyed by name,
+            # and serializing them needs a string index column to round-trip.
+            meta = BackendMeta(index_key="FieldIndex", index_type="str")
         table = None
 
         self._rois: RoiDictWrapper | None = None
@@ -464,6 +468,21 @@ class GenericRoiTableV1(AbstractBaseTable):
         if roi is None:
             raise NgioValueError(f"ROI with name {roi_name} not found in the table.")
         return roi
+
+    @classmethod
+    def from_handler(
+        cls,
+        handler: ZarrGroupHandler,
+        backend: TableBackend | None = None,
+        attrs: dict | None = None,
+    ) -> Self:
+        """Create a new ROI table from a Zarr group handler."""
+        return cls._from_handler(
+            handler=handler,
+            backend=backend,
+            meta_model=BackendMeta,
+            attrs=attrs,
+        )
 
     @classmethod
     def from_table_data(cls, table_data: TabularData, meta: BackendMeta) -> Self:

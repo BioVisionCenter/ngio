@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from ngio.common import Roi
-from ngio.tables import RoiTable
-from ngio.tables._tables_container import open_table, write_table
+from ngio.tables import GenericRoiTable, RoiTable
+from ngio.tables._tables_container import open_table, open_table_as, write_table
 from ngio.tables.backends import AnnDataBackend
 from ngio.tables.v1 import RoiTableV1
 from ngio.tables.v1._roi_table import RoiTableV1Meta
@@ -90,3 +90,30 @@ def test_roi_no_index(tmp_path: Path):
     roi_table = RoiTable.from_handler(handler=handler)
     assert isinstance(roi_table, RoiTable)
     assert len(roi_table.rois()) == 2
+
+
+def test_generic_roi_table_is_constructible_and_loadable(tmp_path: Path):
+    """`GenericRoiTable` is a public export: it must construct and load.
+
+    `from_handler` was left abstract with a `pass` body and never overridden,
+    so the class could not be instantiated and — because `abstractmethod` only
+    guards instantiation, not classmethod calls — `open_table_as`/`get_as`
+    silently returned `None` instead of a table.
+    """
+    rois = [
+        Roi.from_values(
+            name="roi1",
+            slices={"x": slice(0, 2), "y": slice(0, 2), "z": slice(0, 1)},
+        ),
+        Roi.from_values(
+            name="roi2",
+            slices={"x": slice(2, 4), "y": slice(2, 4), "z": slice(0, 1)},
+        ),
+    ]
+    table = GenericRoiTable(rois=rois)
+    write_table(store=tmp_path / "generic.zarr", table=table, backend="anndata")
+
+    loaded = open_table_as(store=tmp_path / "generic.zarr", table_cls=GenericRoiTable)
+    assert isinstance(loaded, GenericRoiTable)
+    assert loaded.get("roi1") == table.get("roi1")
+    assert loaded.get("roi2") == table.get("roi2")
