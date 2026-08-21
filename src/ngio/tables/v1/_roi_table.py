@@ -158,7 +158,7 @@ def _rois_to_dataframe(
         # This normalization is necessary for backward compatibility
         if roi.space != "world":
             raise NotImplementedError(
-                "Only ROIs in world coordinates can be serialized."
+                "Only ROIs in world coordinates can be serialised."
             )
 
         z_slice = roi.get("z")
@@ -223,7 +223,7 @@ class RoiDictWrapper:
                 name = f"{name}_{uuid4().hex[:8]}"
                 if roi.name is not None:
                     # keep the roi's own name in sync so the rename
-                    # survives serialization
+                    # survives serialisation
                     roi = roi.model_copy(update={"name": name})
             self._rois_by_name[name] = roi
             if roi.label is not None:

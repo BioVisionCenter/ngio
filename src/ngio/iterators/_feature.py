@@ -66,6 +66,7 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
         )
 
     def get(self) -> tuple[T, T, Roi]:
+        """Return `(image, label, roi)`, releasing the property cache."""
         image, label = self.image, self.label
         self._image_data = None
         self._label_data = None
@@ -73,12 +74,14 @@ class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
 
     @property
     def image(self) -> T:
+        """The image patch; cached until the next `get()`."""
         if self._image_data is None:
             self._image_data = self._image_getter()
         return self._image_data
 
     @property
     def label(self) -> T:
+        """The label patch; cached until the next `get()`."""
         if self._label_data is None:
             self._label_data = self._label_getter()
         return self._label_data
@@ -174,27 +177,21 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         input_transforms: Sequence[TransformProtocol] | None = None,
         label_transforms: Sequence[TransformProtocol] | None = None,
     ) -> None:
-        """Initialize the iterator with a ROI table and input/output images.
+        """Measure `input_image`/`input_label` pairs; nothing is written.
 
         Args:
-            input_image (Image): The input image to be used as input for the
-                segmentation.
-            input_label (Label): The input label with the segmentation masks.
-            channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the segmentation.
-            axes_order (Sequence[str] | None): Optional axes order for the
-                segmentation.
-            input_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the input image.
-            label_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the output label.
+            input_image: The image to measure.
+            input_label: The label whose objects tie the measurements together.
+            channel_selection: Restrict the image reads to these channels.
+            axes_order: Axes order of the patches handed to the function.
+            input_transforms: Transforms applied to each image patch.
+            label_transforms: Transforms applied to each label patch.
         """
         self._input = input_image
         self._input_label = input_label
         self._ref_image = input_image
         self._rois = input_image.build_image_roi_table(name=None).rois()
 
-        # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input, channel_selection=channel_selection, slicing_dict={}
         )
@@ -425,7 +422,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         return table
 
     def iter_as_numpy(self):  # type: ignore[override]
-        """Create an iterator over the pixels of the ROIs."""
+        """Iterate `(image, label, roi)` payloads over the ROIs."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
     def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
@@ -438,7 +435,7 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         removed_in="1.2",
     )
     def iter_as_dask(self):  # type: ignore[override]
-        """Create an iterator over the pixels of the ROIs.
+        """Iterate `(image, label, roi)` payloads as dask arrays.
 
         Deprecated: removed in ngio=1.2.
         """

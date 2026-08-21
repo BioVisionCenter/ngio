@@ -7,7 +7,7 @@ from ngio.common import Roi
 from ngio.images._abstract_image import AbstractImage
 from ngio.utils import NgioValueError
 
-# Per-axis pixels added on each side of a ROI when reading, keyed by axis name.
+#: Per-axis pixels added on each side of a ROI when reading, keyed by axis name.
 HaloMargins = dict[str, tuple[int, int]]
 
 
@@ -84,7 +84,7 @@ def rois_product(rois_a: list[Roi], rois_b: list[Roi]) -> list[Roi]:
 #: How `by_grid` handles the non-whole tile at the end of an axis.
 TailPolicy = Literal["clip", "balance", "shift", "drop"]
 
-#: The tiling axes, in the order the tile names spell them.
+# The tiling axes, in the order the tile names spell them.
 _GRID_AXES = ("t", "z", "y", "x")
 
 

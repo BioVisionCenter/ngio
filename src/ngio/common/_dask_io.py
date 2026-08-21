@@ -53,27 +53,10 @@ def write_unit_bytes(zarr_array: zarr.Array) -> int:
 def block_budget(zarr_array: zarr.Array) -> int:
     """The `array.chunk-size` to build one write block under, in bytes.
 
-    `to_zarr` sizes its blocks with `normalize_chunks("auto", previous_chunks=
-    unit)`, which grows a block in whole multiples of the write unit until it
-    approaches this budget. Bounded on both sides, and the order matters --
-    read it outward from `write_unit_bytes`:
-
-    - **Floor, applied last.** One whole unit must fit. Below that,
-      `normalize_chunks` cannot reach a multiple of the unit and falls back to
-      blocks that *straddle* one -- which `to_zarr` then writes with
-      `lock=False`, i.e. several writers on one shard and a lost update. A
-      256 MiB shard against the 128 MiB default is the case. Because the floor
-      is applied last it cannot be undercut by the ceiling, so the safety
-      property holds at any configured cap.
-    - **Ceiling.** Dask's default is 128 MiB against a unit that is typically a
-      few hundred KiB, so it packs ~1000 units into one resident block for
-      nothing. Peak memory is roughly blocks-in-flight times block size; at the
-      8 MiB default this is a 75% cut on a 4 GB pyramid (565 -> 140 MB) for
-      +0.37% task count and no measurable wall clock. See `DaskConfig`.
-
-    A cap above the unit is therefore inert by construction: a coarse geometry
-    -- a 105 MiB shard, say -- gets exactly one unit per block whatever the cap
-    says, which is already the smallest block that can be written safely.
+    Capped from above by `DaskConfig.write_block_max_bytes` (bounding peak
+    memory), floored — last, so no cap can undercut it — at one whole write
+    unit: below that, `normalize_chunks` cannot reach a unit multiple and
+    `to_zarr`'s `lock=False` write would put several writers on one shard.
     """
     budget = parse_bytes(dask.config.get("array.chunk-size"))
     cap = get_config().dask.write_block_max_bytes

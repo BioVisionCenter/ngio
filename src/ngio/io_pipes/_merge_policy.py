@@ -1,18 +1,12 @@
 """How a patch combines with what is already on disk.
 
-A transform is a function of the patch alone: the read chain applies it, the
-write chain inverts it, and a list of them folds cleanly in either direction. A
-*merge* is a function of the patch **and** the destination's current contents,
-which is a different kind of thing and has no coherent position inside that
-fold. It gets its own slot instead — `merge=` on the write, one per write, run
-after the transform chain has finished.
-
-Running it last also fixes where the merge happens. By that point the patch has
-been through every transform's inverse, so it is in the array's own space; the
-destination is read raw, with no chain replayed over it. Both sides are in the
-same space by construction, which is what makes the comparison meaningful and
-keeps protected pixels byte-identical rather than round-tripped through a
-transform's inverse.
+A merge depends on the patch *and* the destination's contents — unlike a
+transform (see `ngio.transforms` for the split) — so it gets its own slot:
+`merge=` on the write, one per write, run after the transform chain. Running
+it last fixes where it happens: the patch has been through every inverse and
+the destination is read raw, so both sides are in the array's own space —
+which makes the comparison meaningful and keeps protected pixels
+byte-identical rather than round-tripped through a transform's inverse.
 """
 
 from collections.abc import Callable

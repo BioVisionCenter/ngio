@@ -107,22 +107,18 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         consolidation_mode: ConsolidationMode | None = None,
         stitch: StitchConfig | bool = False,
     ) -> None:
-        """Initialize the iterator with a ROI table and input/output images.
+        """Segment `input_image` region by region into `output_label`.
 
         Args:
-            input_image (Image): The input image to be used as input for the
-                segmentation.
-            output_label (Label): The label image where the ROIs will be written.
-            channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the segmentation.
-            axes_order (Sequence[str] | None): Optional axes order for the
-                segmentation.
-            input_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the input image.
-            output_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the output label.
+            input_image: The image to segment.
+            output_label: The label the segmentation is written to.
+            channel_selection: Restrict the image reads to these channels.
+            axes_order: Axes order of the patches handed to the function.
+            input_transforms: Transforms applied to each image patch.
+            output_transforms: Transforms applied to each predicted patch
+                before the write.
             consolidation_mode: How to build the output pyramid after
-                iteration, see `Label.consolidate`. Defaults to `None`.
+                iteration, see `Label.consolidate`.
             stitch: Resolve objects split across region boundaries into one
                 id after the map. Needs a halo (`with_halo`) or overlapping
                 ROIs — the evidence is overlap between neighbouring
@@ -137,7 +133,6 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         self._stitch_plan: StitchPlan | None = None
         _require_no_unique_labels_with_stitch(self._stitch, output_transforms)
 
-        # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input, channel_selection=channel_selection, slicing_dict={}
         )
@@ -390,12 +385,13 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             raise
 
     def finalize(self):
+        """Resolve the stitch (when configured), then consolidate the pyramid."""
         self._require_unrestricted_finalize()
         # The relabel has to precede consolidation: every pyramid level is
         # derived from level 0, so stitching after would leave them disagreeing.
         if self._stitch is not None:
             # The stitch resolve relabels level 0 wherever the union-find
-            # reached, not just under the written ROIs -- only a full rebuild
+            # reached, not just under the written ROIs — only a full rebuild
             # is guaranteed consistent after it.
             self._stitching_plan().resolve()
             self._stitch_plan = None
@@ -441,22 +437,23 @@ class MaskedSegmentationIterator(SegmentationIterator):
         consolidation_mode: ConsolidationMode | None = None,
         stitch: StitchConfig | bool = False,
     ) -> None:
-        """Initialize the iterator with a ROI table and input/output images.
+        """Segment each masked object's box from `input_image` into `output_label`.
+
+        The ROIs come from `input_image`'s masking ROI table: one per object,
+        pixels outside the object masked on read and protected on write.
 
         Args:
-            input_image (MaskedImage): The input image to be used as input for the
-                segmentation.
-            output_label (Label): The label image where the ROIs will be written.
-            channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the segmentation.
-            axes_order (Sequence[str] | None): Optional axes order for the
-                segmentation.
-            input_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the input image.
-            output_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the output label.
+            input_image: The masked image to segment; its masking table
+                supplies the per-object ROIs.
+            output_label: The label the segmentation is written to.
+            channel_selection: Restrict the image reads to these channels.
+            axes_order: Axes order of the patches handed to the function.
+            input_transforms: Transforms applied to each image patch, before
+                the mask fill.
+            output_transforms: Transforms applied to each predicted patch
+                before the write.
             consolidation_mode: How to build the output pyramid after
-                iteration, see `Label.consolidate`. Defaults to `None`.
+                iteration, see `Label.consolidate`.
             stitch: Merge sub-objects split by a tile boundary within one
                 mask into one id after the map — for masked objects tiled
                 with `by_grid` + `with_halo`. `True` uses the `StitchConfig`
@@ -472,7 +469,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
         self._stitch_plan = None
         _require_no_unique_labels_with_stitch(self._stitch, output_transforms)
 
-        # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input, channel_selection=channel_selection, slicing_dict={}
         )

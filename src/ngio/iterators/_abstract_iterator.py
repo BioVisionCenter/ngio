@@ -99,7 +99,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         if self._partition is not None:
             _, job_index, n_jobs = self._partition
             partition = f", partition={job_index}/{n_jobs}"
-        return f"{self.__class__.__name__}(regions={len(self._rois)}{halo}{partition})"
+        return f"{self.__class__.__name__}(rois={len(self._rois)}{halo}{partition})"
 
     @abstractmethod
     def get_init_kwargs(self) -> dict:
@@ -359,7 +359,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def by_yx(self) -> Self:
         """Split each ROI into one 2D plane per remaining coordinate.
 
-        A broadcasting call, not a tiling: every ROI becomes one region per
+        A broadcasting call, not a tiling: every ROI becomes one ROI per
         `(t, z, c)` combination, each covering the full y/x extent — the
         shape for "run this 2D function on every plane".
         """
@@ -369,7 +369,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def by_zyx(self, strict: bool = True) -> Self:
         """Split each ROI into one 3D volume per remaining coordinate.
 
-        A broadcasting call, not a tiling: every ROI becomes one region per
+        A broadcasting call, not a tiling: every ROI becomes one ROI per
         `(t, c)` combination, each covering the full z/y/x extent.
 
         Args:
@@ -470,7 +470,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
 
     @abstractmethod
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[DaskPipeType]:
-        """Build a Dask reader function for the given ROI."""
+        """Build a Dask getter function for the given ROI."""
         raise NotImplementedError
 
     @abstractmethod
@@ -493,13 +493,13 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         Derived from the ROI list on the calling side rather than accumulated
         by the setters: setters run inside `ProcessMapper` children, and
         nothing accumulated there survives the process boundary. The ROI list
-        is the parent's source of truth for what was written -- which is why
+        is the parent's source of truth for what was written — which is why
         writing iterators can hand this to `consolidate(regions=...)` in
         `finalize` and rebuild only the pyramid regions they touched.
 
         Halo and stitch wrappers forward the core write's `slicing_ops`, so
         haloed reads and banked stitch bands do not inflate the regions.
-        Building a setter per ROI is pure metadata -- no pixel IO.
+        Building a setter per ROI is pure metadata — no pixel IO.
         """
         regions = []
         for roi in self.rois:
@@ -579,7 +579,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             DataSetterProtocol[NumpyPipeType] | DataSetterProtocol[DaskPipeType],
         ]
     ]:
-        """Create an iterator over the pixels of the ROIs."""
+        """Pair each ROI's getter with its setter; finalizes on full drain."""
         for getter, setter in zip(getters, setters, strict=True):
             if setter is None:
                 name = self.__class__.__name__
@@ -594,7 +594,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         data_mode: Literal["numpy", "dask"] = "dask",
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
     ) -> Generator:
-        """Create an iterator over the pixels of the ROIs (no deprecation warnings)."""
+        """`iter()` without the deprecation warnings, for internal callers."""
         if data_mode == "numpy":
             getters = self._numpy_getters_generator()
             setters = self._numpy_setters_generator()
@@ -791,7 +791,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def iter_as_numpy(
         self,
     ):
-        """Create an iterator over the pixels of the ROIs."""
+        """Alias for `iter(data_mode="numpy")`."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
 
     @deprecated(
@@ -801,7 +801,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def iter_as_dask(
         self,
     ):
-        """Create an iterator over the pixels of the ROIs.
+        """Alias for `iter(data_mode="dask")`.
 
         Deprecated: removed in ngio=1.2.
         """
@@ -1039,7 +1039,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         *,
         mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels and write it back.
+        """Apply a transformation function to each ROI's patch and write it back.
 
         Args:
             func: The transformation. Under a parallel mapper it runs on
@@ -1098,7 +1098,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         *,
         mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
     ) -> None:
-        """Apply a transformation function to the ROI pixels and write it back.
+        """Apply a transformation function to each ROI's patch and write it back.
 
         Deprecated: removed in ngio=1.2.
 
@@ -1190,15 +1190,13 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             `True` if any ROIs overlap.
         """
         if len(self.rois) < 2:
-            # Less than 2 ROIs cannot overlap
             return False
 
         slicing_tuples = (
             g.slicing_ops.normalized_slicing_tuple
             for g in self._numpy_getters_generator()
         )
-        x = check_if_regions_overlap(slicing_tuples)
-        return x
+        return check_if_regions_overlap(slicing_tuples)
 
     def require_no_regions_overlap(self) -> None:
         """Ensure that the Iterator's ROIs do not overlap."""
@@ -1224,7 +1222,6 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             `True` if any two ROIs share a write unit.
         """
         if len(self.rois) < 2:
-            # Less than 2 ROIs cannot overlap
             return False
 
         footprints = (

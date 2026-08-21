@@ -8,8 +8,8 @@ def stacklevel_of_first_caller() -> int:
     """Return the `stacklevel` that points at the first frame outside ngio.
 
     A fixed level cannot work: the same warning is often reachable through
-    different depths of ngio's own code -- `get_wells()` reaches its fan-out
-    through two frames and `images_paths()` through three -- so any constant
+    different depths of ngio's own code — `get_wells()` reaches its fan-out
+    through two frames and `images_paths()` through three — so any constant
     blames ngio's own source for one of them. That matters twice over: the
     reader is told to edit a file they do not own, and the `warnings` module
     keys its deduplication on the reported location, so every caller would

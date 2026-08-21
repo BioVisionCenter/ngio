@@ -162,7 +162,7 @@ def _check_for_supported_types(series: pd.Series) -> Literal["str", "int", "nume
 
     Missing values (None/NaN) are ignored: a string column that also contains
     missing entries (or is entirely missing) is still classified as "str", since
-    AnnData serializes such columns natively (as a categorical with NaN).
+    AnnData serialises such columns natively (as a categorical with NaN).
 
     Returns:
         Literal["str", "int", "numeric"]: The type category of the series.

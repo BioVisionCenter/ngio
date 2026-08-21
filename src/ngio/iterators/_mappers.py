@@ -46,7 +46,7 @@ def _is_same_zarr_array(left, right) -> bool:
 
     Unknowable — a store whose comparison raises — counts as *same*: every
     caller uses "same" as the conservative answer. `with_halo` refuses
-    in-place iteration, the conflict graph adds an edge (over-serializing
+    in-place iteration, the conflict graph adds an edge (over-serialising
     instead of allowing a lost update).
     """
     if left is right:
@@ -97,7 +97,7 @@ class IterUnit(Generic[T]):
         roi: The ROI this unit covers.
         getter: Reads the ROI's data.
         setter: Writes the transformed data back, or `None` for a read-only
-            unit (a read-only iterator, or any `reduce_as_*` call).
+            unit (a read-only iterator, or any `reduce` call).
     """
 
     index: int
@@ -171,9 +171,9 @@ class BasicMapper(Generic[T, R]):
         for unit in canonical_unit_order(list(units)):
             result = func(unit.getter())
             if unit.setter is not None:
-                # map_as_* is the only writing entry point and its func is
+                # `map` is the only writing entry point and its func is
                 # Callable[[T], T], so T == R whenever setter is not None;
-                # reduce_as_* always builds units with setter=None. The written
+                # `reduce` always builds units with setter=None. The written
                 # patch is not kept: map discards the results, and holding
                 # every patch until the loop ends is the whole output at once.
                 unit.setter(cast("T", result))
@@ -464,7 +464,7 @@ def _write_conflict_edges(
 def plan_waves(
     units: Sequence[IterUnit[T]], *, log: bool = True
 ) -> list[list[IterUnit[T]]]:
-    """Partition units into conflict-free waves by first-fit greedy coloring.
+    """Partition units into conflict-free waves by first-fit greedy colouring.
 
     Two units whose write footprints share a write unit (a chunk, or a shard
     when the output is sharded) of the same output array never share a wave:
@@ -589,7 +589,7 @@ class ThreadedMapper(Generic[T, R]):
     Args:
         max_workers: `"auto"` (the default) sizes the pool for
             round-trip-bound work; an `int` pins it. `None` is accepted and
-            means `"auto"` — asking for this mapper *is* the opt-in.
+            means `"auto"`.
     """
 
     def __init__(self, max_workers: MaxWorkers = "auto") -> None:
@@ -642,7 +642,7 @@ def _run_unit_in_process(func: Callable, unit: IterUnit) -> tuple[int, Any]:
     if unit.setter is not None:
         unit.setter(result)
         # The written pixels stay in the child: shipping them back would
-        # serialize every ROI through IPC for a result `map_as_*` discards.
+        # serialise every ROI through IPC for a result `map` discards.
         return unit.index, None
     return unit.index, result
 
@@ -677,7 +677,7 @@ class ProcessMapper(Generic[T, R]):
     covers IO-bound work and GIL-releasing compute). Each child reads its ROI
     from the store, applies `func`, and writes back — pixels never cross the
     process boundary. For written units the returned result is therefore
-    `None` (which `map_as_*` discards anyway); only `reduce_as_*` results are
+    `None` (which `map` discards anyway); only `reduce` results are
     pickled back to the parent.
 
     Units run in conflict-free waves (see `plan_waves`) — which is the
@@ -687,7 +687,8 @@ class ProcessMapper(Generic[T, R]):
     Constraints:
     - `func` (and any transforms the units carry) must be picklable — a
       module-level function, not a lambda or closure.
-    - In-memory stores are refused; see `_require_process_safe_stores`.
+    - In-memory stores are refused: a `MemoryStore` pickles by value, so a
+      child would write into its own copy and the parent would never see it.
     - The pool uses the `spawn` start method: the parent holds zarr's IO
       event-loop thread, and forking a threaded process is unsafe. Each
       worker pays an interpreter start and `import ngio` (~1 s), amortized

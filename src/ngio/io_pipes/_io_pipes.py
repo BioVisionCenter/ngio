@@ -33,14 +33,12 @@ def _prepare_transforms(
 ) -> Sequence[TransformProtocol] | None:
     """Normalize the chain, refusing anything that is not a transform.
 
-    A transform is a function of the patch alone, so the chain composes and
-    inverts freely and needs no ordering rules. Anything that also depends on
-    the destination's contents is a merge and belongs in the pipe's `merge=`
-    slot; that is the one thing worth catching here, because a merge policy
-    would otherwise fail with a confusing "not a transform" message. Both
-    protocols are `runtime_checkable`, so `isinstance` only probes attribute
-    names — an object exposing `on_get`/`on_set` *and* `reconcile` is taken
-    at its placement here and treated as a transform.
+    A merge policy depends on the destination's contents and belongs in the
+    pipe's `merge=` slot (see `ngio.transforms` for the split); catching it
+    here replaces a confusing "not a transform" failure. Both protocols are
+    `runtime_checkable`, so `isinstance` only probes attribute names — an
+    object exposing `on_get`/`on_set` *and* `reconcile` is taken at its
+    placement here and treated as a transform.
     """
     if transforms:
         policies = [

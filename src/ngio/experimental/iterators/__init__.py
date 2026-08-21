@@ -1,7 +1,7 @@
 """Deprecated alias for `ngio.iterators`.
 
 The iterators are no longer experimental. Import them from `ngio.iterators`
-(or from `ngio` directly). This module will be removed in ngio 1.2.
+(or from `ngio` directly). This module will be removed in `ngio=1.2`.
 """
 
 import warnings

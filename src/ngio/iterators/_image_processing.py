@@ -42,24 +42,20 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         output_transforms: Sequence[TransformProtocol] | None = None,
         consolidation_mode: ConsolidationMode | None = None,
     ) -> None:
-        """Initialize the iterator with a ROI table and input/output images.
+        """Process `input_image` region by region into `output_image`.
 
         Args:
-            input_image (Image): The input image to be used as input for the
-                segmentation.
-            output_image (Image): The image where the ROIs will be written.
-            channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the input image.
-            output_channel_selection (ChannelSlicingInputType): Optional
-                selection of channels to use for the output image.
-            axes_order (Sequence[str] | None): Optional axes order for the
-                segmentation.
-            input_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the input image.
-            output_transforms (Sequence[TransformProtocol] | None): Optional
-                transforms to apply to the output label.
+            input_image: The image to read.
+            output_image: The image the results are written to.
+            channel_selection: Restrict the input reads to these channels.
+            output_channel_selection: Restrict the output writes to these
+                channels.
+            axes_order: Axes order of the patches handed to the function.
+            input_transforms: Transforms applied to each input patch.
+            output_transforms: Transforms applied to each patch before the
+                write.
             consolidation_mode: How to build the output pyramid after
-                iteration, see `Image.consolidate`. Defaults to `None`.
+                iteration, see `Image.consolidate`.
         """
         self._input = input_image
         self._output = output_image
@@ -67,7 +63,6 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         self._rois = input_image.build_image_roi_table(name=None).rois()
         self._consolidation_mode = consolidation_mode
 
-        # Set iteration parameters
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input,
             channel_selection=channel_selection,
@@ -151,6 +146,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
         )
 
     def finalize(self):
+        """Consolidate the output pyramid, only under the written regions."""
         self._require_unrestricted_finalize()
         self._output.consolidate(
             mode=self._consolidation_mode, regions=self._touched_write_regions()

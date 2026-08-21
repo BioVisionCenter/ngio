@@ -73,8 +73,8 @@ from ngio.utils._zarr_utils import find_dimension_separator
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
-#: Regions for `consolidate(regions=...)` at the image level: `Roi`s -- the
-#: form the rest of the high-level API speaks -- or raw on-disk index tuples
+#: Regions for `consolidate(regions=...)` at the image level: `Roi`s — the
+#: form the rest of the high-level API speaks — or raw on-disk index tuples
 #: (what a setter pipe's `slicing_ops.normalized_slicing_tuple` produces), or
 #: a mix. Rois are resolved against this image's dimensions and pixel size.
 ConsolidationRegions: TypeAlias = Sequence[Roi | tuple[RegionType, ...]]
@@ -155,12 +155,12 @@ class AbstractImage(ABC):
         Both are fixed for the lifetime of this object, so they are derived on
         first use and kept. That is not a new assumption: `self._zarr_array` is
         fetched once in `__init__` and never refreshed, so `shape` and `chunks`
-        are already a construction-time snapshot -- re-reading the dataset on
+        are already a construction-time snapshot — re-reading the dataset on
         every access froze half the inputs and not the other half.
 
         Rebuilding cost a full metadata reload, and this is the hottest
         property in the library: every `get_*`/`set_*` reads it, iterators read
-        it once per ROI, and masked ones twice -- image and label.
+        it once per ROI, and masked ones twice — image and label.
 
         A write through this object moves the meta handler's `generation`, so
         the pair is re-derived on the next access. A write by *another* process
@@ -796,7 +796,7 @@ def _resolve_consolidation_regions(
     A `Roi` is resolved through the same pipe machinery every ROI read and
     write goes through (world-to-pixel conversion, clamping, on-disk axis
     order included), so `consolidate(regions=rois)` names exactly the pixels
-    `set_roi(roi, ...)` wrote. Building a getter is pure metadata -- no IO.
+    `set_roi(roi, ...)` wrote. Building a getter is pure metadata — no IO.
     """
     resolved = []
     for region in regions:

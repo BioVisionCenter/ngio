@@ -28,11 +28,11 @@ from ngio.utils._warnings import stacklevel_of_first_caller
 ConsolidationMode: TypeAlias = Literal["dask", "numpy", "coarsen", "auto"]
 
 #: Where the source level changed, for `consolidate(regions=...)`: one on-disk
-#: index tuple per touched region, in the source array's axis order -- exactly
+#: index tuple per touched region, in the source array's axis order — exactly
 #: what a setter's `slicing_ops.normalized_slicing_tuple` produces.
 RegionsLike: TypeAlias = Sequence[tuple[RegionType, ...]]
 
-#: A region as per-axis `[start, stop)` pixel bounds -- the internal canonical
+#: A region as per-axis `[start, stop)` pixel bounds — the internal canonical
 #: form every `RegionsLike` input is normalized to.
 PixelRegion: TypeAlias = tuple[tuple[int, int], ...]
 
@@ -123,7 +123,7 @@ def _zoom_expr(
     level down reads the cast value. An expression handed straight to the next
     level would instead propagate the float, and a mean pyramid built that way
     differs from a stored one in 28% of level 2 and 63% of level 3. Casting here
-    is what the store would have done anyway, just done early -- which also drops
+    is what the store would have done anyway, just done early — which also drops
     the float64 intermediate and makes coarsening markedly lighter.
     """
     if mode == "coarsen":
@@ -173,10 +173,10 @@ def _on_disk_dask_zoom(
 ) -> None:
     # No compute_chunk_sizes() here: it would execute the whole read -> zoom
     # graph purely to re-learn block shapes, throw the pixels away, and leave
-    # the write to run the same graph again -- exactly double the chunk reads.
+    # the write to run the same graph again — exactly double the chunk reads.
     # No rechunk onto the target either: store_dask rechunks onto the target's
     # write unit, which is `shards or chunks`. Rechunking to `target.chunks`
-    # here was worse than doing nothing on a sharded target -- that is the
+    # here was worse than doing nothing on a sharded target — that is the
     # shard's *inner* chunk shape, so every block became a partial shard write.
     store_dask(
         _zoom_expr(
@@ -282,8 +282,8 @@ def _consolidation_plan(
 ) -> list[tuple[int, zarr.Array]]:
     """Order the pyramid as source -> target edges, without touching the store.
 
-    The same greedy nearest-shape walk consolidation has always done -- same
-    `_find_closest_arrays`, same sequence -- it just records the edges instead of
+    The same greedy nearest-shape walk consolidation has always done — same
+    `_find_closest_arrays`, same sequence — it just records the edges instead of
     executing them, so the caller can build one graph spanning all of them. For a
     well-formed pyramid the result is two chains rooted at the source: down to the
     coarsest level, then back up to the finest, each step from its immediate
@@ -319,7 +319,7 @@ def _is_integral_downsample(
     `dask_zoom` snaps its block grid to the scaling ratio, so with a 2-tap kernel
     and an exact integer factor no output sample needs a neighbour from another
     block and the two paths land on the same pixels. Let the ratio slip off an
-    integer -- 2.004, which is what a 501-pixel axis gives -- and they disagree
+    integer — 2.004, which is what a 501-pixel axis gives — and they disagree
     on 99.9% of the level; upsample instead and they disagree on 1.6%.
     """
     return all(
@@ -333,7 +333,7 @@ def _normalize_regions(
 ) -> list[PixelRegion]:
     """Turn caller-facing region tuples into clamped `[start, stop)` bounds.
 
-    An `int` selects one index, a `list[int]` its bounding box -- over-covering
+    An `int` selects one index, a `list[int]` its bounding box — over-covering
     a fancy selection is safe here, since recomputing an untouched pixel just
     rewrites the value it already had. Empty selections drop out.
     """
@@ -428,7 +428,7 @@ def _merge_regions(regions: list[PixelRegion]) -> list[PixelRegion]:
 
     Collapsing a component to its box can create new touches, so passes repeat
     until the count is stable. Boxes over-cover an L-shaped component, which is
-    safe -- the recomputed extra pixels land on the values they already had --
+    safe — the recomputed extra pixels land on the values they already had --
     and the coverage bail-out in `_plan_partial` caps how far that can degrade.
     """
     while len(regions) > 1:
@@ -459,8 +459,8 @@ def _propagate_regions(
 
     The affected target pixels are `[start // f, ceil(stop / f))` per axis;
     snapping outward to the target's write unit (`shards or chunks`) makes
-    every write a whole-unit write with a single writer, and -- because the
-    source window is then `region * f`, an exact multiple -- keeps the
+    every write a whole-unit write with a single writer, and — because the
+    source window is then `region * f`, an exact multiple — keeps the
     blockwise zoom inside the envelope where it matches the whole-array one.
     """
     units = target.shards or target.chunks
@@ -494,7 +494,7 @@ def _plan_partial(
 
     The region path is only taken where it is bytes-identical to a full
     rebuild: every edge an integral downsample and `order` in `{"nearest",
-    "linear"}` -- the same envelope `"auto"` trusts, for the same reason
+    "linear"}` — the same envelope `"auto"` trusts, for the same reason
     (`_is_integral_downsample`). A source coverage above
     `ConsolidationConfig.partial_max_coverage` also declines: past that,
     region bookkeeping costs more than the rebuild it saves.
@@ -595,7 +595,7 @@ def _resolve_auto_mode(
 
     if order == "cubic":
         # A cubic kernel reads four samples per output, so a blockwise zoom with
-        # no halo is wrong at every block boundary -- the paths differ on 10-16%
+        # no halo is wrong at every block boundary — the paths differ on 10-16%
         # of pixels even on a plain power-of-two pyramid.
         return "dask"
 
@@ -611,7 +611,7 @@ def _warn_default_will_change() -> None:
     """Announce the coming default, only where it will actually change something.
 
     Fired from the mode resolution rather than from `Image.consolidate`, because
-    only here is the plan known -- and the warning is worth nothing to someone
+    only here is the plan known — and the warning is worth nothing to someone
     whose pyramid `"auto"` would decline anyway. Deduplication is left to the
     `warnings` module, which suppresses repeats per call site. A once-per-process
     flag would be worse: under `filterwarnings = ["error"]` only the first caller
@@ -621,7 +621,7 @@ def _warn_default_will_change() -> None:
         "Pyramid consolidation still builds every level through dask by "
         f"default. In ngio={_DEFAULT_CHANGES_IN} the default for `mode` changes "
         'from `"dask"` to `"auto"`, which builds a small pyramid in memory '
-        "instead -- 3-5x faster, at a peak of roughly 1.6x the source level. "
+        "instead — 3-5x faster, at a peak of roughly 1.6x the source level. "
         'This image is inside that envelope. Pass `mode="auto"` (called '
         "`consolidation_mode` on creation helpers and iterators) to opt in "
         'now, or `mode="dask"` to keep the current behaviour and silence this.',
@@ -666,7 +666,7 @@ def _consolidate_on_disk(
 
     The task count is the reason this stays serial. A dask graph costs ~2.4 KB
     and one task per chunk, so at 256x256 chunks a 100 GB image is ~820k tasks
-    and ~1.7 GB of graph *before a byte is read* -- and fusing every level into
+    and ~1.7 GB of graph *before a byte is read* — and fusing every level into
     one graph makes that 1.23M tasks and ~3 GB. Dask's own guidance is to stay
     under ~100k tasks, which this crosses at 8 GB either way. Keeping the levels
     separate at least bounds the graph by the largest single level rather than
@@ -689,7 +689,7 @@ def _consolidate_numpy(
         levels[position + 1] = out
 
         # Release levels no later edge reads from. This mode already carries the
-        # most memory of the three -- holding every level to the end would make
+        # most memory of the three — holding every level to the end would make
         # the worst case worse for no reason.
         still_needed = {p for p, _ in plan[position + 1 :]}
         for index in [i for i in levels if i not in still_needed]:
@@ -708,7 +708,7 @@ def consolidate_pyramid(
     Args:
         source: The level to build the others from.
         targets: Every other level in the multiscale, above the source as well as
-            below it -- levels above are upsampled, as they always have been.
+            below it — levels above are upsampled, as they always have been.
         order: The interpolation order.
         mode: `"dask"`, `"numpy"` or `"coarsen"` to pick the path outright, or
             `"auto"` to take the in-memory path wherever it is bit-identical to
@@ -736,7 +736,7 @@ def consolidate_pyramid(
         if not merged:
             # Nothing was touched, so nothing derives from it. Returning
             # before the mode resolution also keeps the `mode=None` future
-            # warning quiet -- same reasoning as the empty-plan case there.
+            # warning quiet — same reasoning as the empty-plan case there.
             return
 
     resolved = _resolve_mode(source, plan, order, mode)

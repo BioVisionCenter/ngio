@@ -453,7 +453,7 @@ class Image(AbstractImage):
         Args:
             order: The interpolation order.
             mode: How to build each level, see `ConsolidationMode`.
-            regions: Where this level changed -- typically the `Roi`s that were
+            regions: Where this level changed — typically the `Roi`s that were
                 written (`set_roi`'s own argument fits directly); raw on-disk
                 index tuples, as a setter pipe's
                 `slicing_ops.normalized_slicing_tuple` produces, also work.

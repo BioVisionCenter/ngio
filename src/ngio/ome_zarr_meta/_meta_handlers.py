@@ -217,7 +217,7 @@ class _MetaMemo(Generic[_meta_type]):
 
     The memo is keyed on the raw attributes, not on time or on a dirty flag:
     `get_meta` still reads the group every call, so a change made by anyone --
-    this process or another -- invalidates it on its own. That keeps the
+    this process or another — invalidates it on its own. That keeps the
     freshness ngio has always had, and only removes repeated work.
 
     `get` hands out a deep copy and keeps the original. The decoded models are
@@ -227,7 +227,7 @@ class _MetaMemo(Generic[_meta_type]):
         meta.set_channels_meta(...)
         image._meta_handler.update_meta(meta)
 
-    would otherwise edit the memo in place -- and a caller who mutates without
+    would otherwise edit the memo in place — and a caller who mutates without
     writing back would leave it holding something that is not on disk.
 
     `generation` moves whenever the decoded value does. It gives objects that
@@ -337,7 +337,7 @@ class ImageMetaHandler:
         """Drop the decoded metadata, so the next read decodes again.
 
         Moves `generation`, so anything caching a derived value against it --
-        `AbstractImage.dimensions` -- is dropped with it. This is what
+        `AbstractImage.dimensions` — is dropped with it. This is what
         `OmeZarrContainer.refresh()` reaches for.
         """
         self._memo.clear()
@@ -438,7 +438,7 @@ class LabelMetaHandler:
         """Drop the decoded metadata, so the next read decodes again.
 
         Moves `generation`, so anything caching a derived value against it --
-        `AbstractImage.dimensions` -- is dropped with it. This is what
+        `AbstractImage.dimensions` — is dropped with it. This is what
         `OmeZarrContainer.refresh()` reaches for.
         """
         self._memo.clear()
@@ -623,7 +623,7 @@ class WellMetaHandler:
         # With a version in hand there is nothing left to resolve, so this read
         # would only be validating early. A plate opening 384 wells pays it 384
         # times for documents it is about to read again anyway, so the check is
-        # left to first use -- where it raises exactly the same error.
+        # left to first use — where it raises exactly the same error.
 
     def get_meta(self) -> NgioWellMeta:
         """Retrieve the NGIO well metadata."""

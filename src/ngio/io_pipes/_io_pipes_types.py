@@ -1,3 +1,5 @@
+"""The read/write halves of an io pipe, as structural protocols."""
+
 from collections.abc import Sequence
 from typing import Protocol, TypeVar
 
@@ -13,6 +15,14 @@ SetterDataType = TypeVar("SetterDataType", contravariant=True)
 
 
 class DataGetterProtocol(Protocol[GetterDataType]):
+    """Read one region: calling it returns the region's transformed patch.
+
+    The properties expose what the read is made of — the target array, the
+    slicing and axes operations, the transform chain, and the ROI — so
+    consumers (the iterators' scheduling, a wrapping setter) can reason
+    about the read without performing it.
+    """
+
     @property
     def zarr_array(self) -> zarr.Array: ...
 
@@ -35,6 +45,12 @@ class DataGetterProtocol(Protocol[GetterDataType]):
 
 
 class DataSetterProtocol(Protocol[SetterDataType]):
+    """Write one region: calling it with a patch writes it back.
+
+    Mirror of `DataGetterProtocol`; the exposed properties are what the
+    write-conflict planning reads its footprints from.
+    """
+
     @property
     def zarr_array(self) -> zarr.Array: ...
 

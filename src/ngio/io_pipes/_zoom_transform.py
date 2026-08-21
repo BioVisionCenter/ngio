@@ -1,29 +1,8 @@
 """Rescaling between two pixel grids, as a transform on the io pipes.
 
-**The shape arithmetic here is delicate — read this before touching it.**
-It has a history of edge-case regressions, and the invariants interlock:
-
-- The forward path (`_compute_zoom_shape`) derives the target shape from the
-  **raw, un-normalized** slice. The raw slice carries the ROI's sub-pixel
-  world bounds (`slice(5.25, 10.5)` on a 4x-coarser grid), and that is what
-  makes the zoomed patch land exactly on the target grid. Normalizing first
-  rounds to *this* array's integer pixels and derives a wrong factor —
-  pinned by `test_zoom_from_dimensions` and
-  `test_zoom_subpixel_origin_matches_target_grid`.
-- The inverse path (`_compute_inverse_zoom_shape`) does the opposite on
-  purpose: it normalizes, because a write must match the integer on-disk
-  region the setter will actually cover.
-- Raw does not mean unclamped. The read clamps at the array's edges, so the
-  target arithmetic clamps the same way: a negative start is cut at 0
-  (`test_zoom_clamps_a_negative_slice_start`) and the stop at the target
-  extent; a slice entirely past the edge yields an empty patch, never a
-  negative extent (`test_zoom_of_an_empty_selection_is_empty`).
-- The forward path has **no** shape validation — the patch is whatever the
-  read produced. Only the inverse carries the ±1 guard, because sub-pixel
-  bounds legitimately round the two paths one pixel apart.
-- Only contiguous selections can be rescaled: a list selection has no
-  geometry a zoom factor applies to, so it is refused on any scaled axis
-  (`test_zoom_refuses_a_noncontiguous_selection`).
+The forward and inverse shape paths deliberately disagree about slice
+normalization — the interlocking invariants live as comments on
+`_compute_zoom_shape` and `_compute_inverse_zoom_shape`.
 """
 
 import math
@@ -98,6 +77,17 @@ class BaseZoomTransform:
         axes: Sequence[str],
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
+        # Derives the target shape from the **raw, un-normalized** slice: the
+        # raw slice carries the ROI's sub-pixel world bounds
+        # (`slice(5.25, 10.5)` on a 4x-coarser grid), which is what makes the
+        # zoomed patch land exactly on the target grid — normalizing first
+        # rounds to *this* array's integer pixels and derives a wrong factor.
+        # Raw does not mean unclamped: like the read, a negative start cuts at
+        # 0 and the stop at the target extent, so a slice entirely past the
+        # edge yields an empty patch, never a negative extent. No shape
+        # validation here — the patch is whatever the read produced. A list
+        # selection has no geometry a zoom factor applies to, so it is refused
+        # on any scaled axis.
         if len(array_shape) != len(axes):
             raise NgioValueError(
                 f"Array has {len(array_shape)} dimensions but the transform "
@@ -138,6 +128,10 @@ class BaseZoomTransform:
         axes: Sequence[str],
         slicing_ops: SlicingOps,
     ) -> tuple[int, ...]:
+        # The opposite of `_compute_zoom_shape` on purpose: this normalizes,
+        # because a write must match the integer on-disk region the setter
+        # will actually cover. Only this path carries the ±1 guard —
+        # sub-pixel bounds legitimately round the two paths one pixel apart.
         if len(array_shape) != len(axes):
             raise NgioValueError(
                 f"Array has {len(array_shape)} dimensions but the transform "
@@ -158,9 +152,8 @@ class BaseZoomTransform:
                 self._normalize_shape(slice_=slice_, scale=1, max_dim=in_dim)
             )
 
-        # Since we are basing the rescaling on the slice, we need to ensure
-        # that the input image we got is roughly the right size.
-        # This is a safeguard against user errors.
+        # The rescaling is based on the slice, so the input patch must be
+        # roughly the size the slice implies.
         expected_shape = self._compute_zoom_shape(
             array_shape=target_shape, axes=axes, slicing_ops=slicing_ops
         )

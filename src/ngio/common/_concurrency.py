@@ -1,10 +1,4 @@
-"""Shared `max_workers` machinery for ngio's thread fan-outs.
-
-Hoisted from `images/_table_ops.py`, where it grew up around the plate-wide
-table operations: the same pool sizing and the same future-default warning now
-also serve the parallel iterator mappers, and a pixel path importing from a
-table module would be inverted.
-"""
+"""Shared `max_workers` machinery for ngio's thread fan-outs."""
 
 import os
 import warnings
@@ -18,9 +12,12 @@ from ngio.utils._warnings import stacklevel_of_first_caller
 _T = TypeVar("_T")
 _R = TypeVar("_R")
 
-#: Accepted by every `max_workers` argument. `None` means "unspecified" and
-#: currently runs serially; `1` is serial deliberately; `"auto"` picks a pool
-#: sized for round-trip-bound work.
+#: Accepted by every `max_workers` argument. `1` is serial deliberately;
+#: `"auto"` picks a pool sized for round-trip-bound work. `None` means
+#: "unspecified", and what that resolves to belongs to the call site: the
+#: plate fan-outs run serially (until the `ngio=1.2` default flip they warn
+#: about), the parallel mappers treat it as `"auto"` — asking for such a
+#: mapper is already the opt-in.
 MaxWorkers = int | Literal["auto"] | None
 
 #: The release in which `max_workers` starts defaulting to `"auto"`.
@@ -40,7 +37,7 @@ def _warn_default_will_change(n_items: int) -> None:
     warnings.warn(
         "Plate-wide operations still read one item at a time by default. In "
         f"ngio={_DEFAULT_CHANGES_IN} the default for `max_workers` changes from "
-        '`None` to `"auto"`, which reads them concurrently -- several times '
+        '`None` to `"auto"`, which reads them concurrently — several times '
         "faster on a remote store, where these calls are round-trip bound. "
         'Pass `max_workers="auto"` to opt in now, or `max_workers=1` to keep '
         "reading serially and silence this.",

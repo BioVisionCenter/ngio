@@ -170,7 +170,6 @@ def _normalize_slice(slc: slice, size: int) -> tuple[int, int]:
     start = min(start, size)
     stop = min(stop, size)
     if start > stop:
-        # empty selection
         return (0, 0)
     return start, stop
 

@@ -1,21 +1,21 @@
 """I/O pipes for reading and writing data from zarr to numpy and dask arrays.
 
-There are 4 pipes: `NumpyGetter`, `NumpySetter`, `DaskGetter`, `DaskSetter` —
-(numpy, dask) x (read, write). Everything else is expressed through their
-arguments:
+There are four pipes: `NumpyGetter`, `NumpySetter`, `DaskGetter`,
+`DaskSetter` — (numpy, dask) x (read, write). Everything else is expressed
+through their arguments:
 
 - Slicing comes from integer indexing and slices (`slicing_dict`), from a
     region of interest in physical coordinates (`roi`), or both — explicit
     `slicing_dict` entries override the ROI-derived ones per axis.
-- Behaviors on the data path are transforms (`transforms`), e.g.
+- Behaviours on the data path are transforms (`transforms`), e.g.
     `ngio.transforms.ZoomTransform` to rescale between pyramid levels and
     `ngio.transforms.MaskTransform` to mask by a label image.
 
 When reading, the order of operations is:
 
 - Step 1: Slice the zarr array to load only the data needed into memory.
-- Step 2: Apply axes operations to reorder, squeeze or expand the axes.
-    To match the user desired axes order.
+- Step 2: Apply axes operations — reorder, squeeze or expand the axes to
+    match the caller's requested axes order.
 - Step 3: Apply the transforms' `on_get` in order.
 
 When writing the order is inverted: the transforms' `on_set` run in reverse
@@ -29,10 +29,9 @@ transform supporting both dispatches on it. The `ctx` is the pipe's
 `slicing`, and `roi` (when there is one) — while `zarr_array` and `axes_ops`
 are pipe plumbing.
 
-A transform is a function of the patch alone, which is why the chain composes
-and inverts with no ordering rules. Combining a patch with what is *already*
-on disk is a different operation and gets its own slot: `merge=` on a setter,
-applied once after the chain, against the array's own contents.
+A transform is a function of the patch alone; combining with what is already
+on disk is a merge and gets its own slot (`merge=` on a setter) — see
+`ngio.transforms` for the split.
 
 The ROI pipe classes (`*RoiGetter`, `*RoiSetter`) and the masked pipe
 classes (`*GetterMasked`, `*SetterMasked`) are deprecated shells over the

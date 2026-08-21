@@ -331,7 +331,7 @@ class OmeZarrPlate:
 
     def _image_path(self, row: str, column: int | str, path: str) -> str:
         """Return the image path in the plate."""
-        # One `_well_path` -- i.e. one plate-metadata read -- shared by the
+        # One `_well_path` — i.e. one plate-metadata read — shared by the
         # well lookup and the path below.
         well_path = self._well_path(row=row, column=column)
         well = self._get_well(well_path=well_path)
@@ -1174,7 +1174,7 @@ def create_empty_plate(
     """
     # Built in one pass rather than by looping `add_image`. That loop re-read
     # the plate document, rewrote it whole, and rewrote the well document, once
-    # per image -- so the bytes written grew with the square of the plate. Here
+    # per image — so the bytes written grew with the square of the plate. Here
     # the plate document is written once and each well document once, whatever
     # the field count.
     plate_meta = NgioPlateMeta.default_init(

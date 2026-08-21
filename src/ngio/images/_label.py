@@ -101,8 +101,8 @@ class Label(AbstractImage):
 
         Args:
             mode: How to build each level, see `ConsolidationMode`.
-            regions: Where this level changed -- `Roi`s or on-disk index
-                tuples -- to rebuild only what derives from it. See
+            regions: Where this level changed — `Roi`s or on-disk index
+                tuples — to rebuild only what derives from it. See
                 `Image.consolidate`.
         """
         self._consolidate(

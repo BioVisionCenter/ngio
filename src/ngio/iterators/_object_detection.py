@@ -109,6 +109,7 @@ class DetectionGetter(DataGetter[tuple[T, Roi]], Generic[T]):
         )
 
     def get(self) -> tuple[T, Roi]:
+        """Return `(patch, roi)` — the ROI locates the tile for anchoring."""
         return self._data_getter(), self.roi
 
 

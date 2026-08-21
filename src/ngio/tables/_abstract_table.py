@@ -255,7 +255,7 @@ class AbstractBaseTable(ABC):
         """Create a new ROI table from a Zarr group handler.
 
         `attrs` lets a caller that has already read the group hand them over
-        rather than making this read the same document a second time -- which
+        rather than making this read the same document a second time — which
         `TablesContainer.get` did, once to learn the table type and once here
         to build the concrete metadata model.
         """

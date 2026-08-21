@@ -203,7 +203,7 @@ class ZarrGroupHandler:
 
         Reads `_group` rather than the `group` property on purpose: the path is
         fixed at construction and `reopen_group` carries it through unchanged,
-        while `group` reopens the group -- a full metadata read -- when caching
+        while `group` reopens the group — a full metadata read — when caching
         is off. `_create_lock` avoids the same trap the same way.
         """
         return self._group.path
@@ -803,7 +803,7 @@ def apply_zarr_config(config: NgioConfig) -> None:
 
     This runs at import of `ngio.utils._zarr_utils` because
     `threading.max_workers` is snapshotted by zarr into a process-global
-    executor at the first zarr operation -- import time is the only moment
+    executor at the first zarr operation — import time is the only moment
     ngio can guarantee is early enough. `async.concurrency` is read by zarr
     on every call, so re-applying after mutating `get_config().zarr` also
     works for that field (as does `zarr.config.set` directly).

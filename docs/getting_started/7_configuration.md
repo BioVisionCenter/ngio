@@ -104,6 +104,8 @@ The in-memory path is 3–5× faster where it applies, and `"auto"` only takes i
 
 An explicit `mode="numpy"` is not bounded by this setting — a caller who asks for the in-memory path gets it, whatever the size.
 
+`consolidation.partial_max_coverage` (default **0.5**) bounds `consolidate(regions=...)`: once the merged touched regions cover more than this fraction of the source level, region bookkeeping stops paying for itself and the whole pyramid is rebuilt instead — always correct, just not selective.
+
 ## Zarr runtime (`zarr`)
 
 Two knobs ngio forwards into zarr's own runtime configuration. Both default to `null`, which leaves zarr exactly as found — the default ngio config changes nothing about how zarr runs.

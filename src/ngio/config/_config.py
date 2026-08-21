@@ -15,7 +15,14 @@ _DEFAULT_CONFIG_PATH = Path.home() / ".ngio" / "ngio_config.json"
 
 
 class S3FSConfig(BaseModel):
-    custom_retry_markers: list[str] = Field(default_factory=list)
+    """Tuning for s3fs-backed stores."""
+
+    custom_retry_markers: list[str] = Field(
+        default_factory=list,
+        description="Extra error-message markers s3fs treats as retryable, "
+        "applied through its custom error handler (see "
+        "`ngio.utils.refresh_s3fs_config`).",
+    )
 
 
 class _BackoffBase(BaseModel):
@@ -120,92 +127,67 @@ class RetryConfig(BaseModel):
 
 
 class ConsolidationConfig(BaseModel):
-    """When `consolidate(mode="auto")` may build a pyramid in memory.
+    """Bounds for the fast paths of `consolidate`; see the configuration guide."""
 
-    `mode="numpy"` holds a whole level at once and is 3-5x faster than the
-    chunked path for it; `mode="dask"` stays chunk-bounded whatever the size.
-    `"auto"` takes the fast one only below `numpy_max_bytes`, measured against
-    the source level rather than the whole pyramid -- the chain never holds more
-    than two adjacent levels, and peak is around 1.6x the source.
-
-    Size is necessary but not sufficient. `"auto"` also declines whenever the
-    two paths would not agree exactly: `dask` zooms per block with no halo, so
-    it matches the whole-array zoom only for an integral-ratio downsample at
-    `order` in `{"nearest", "linear"}`. Outside that envelope a size threshold
-    would silently pick between two different answers.
-
-    `partial_max_coverage` bounds `consolidate(regions=...)`: once the merged
-    touched regions cover more than this fraction of the source level, region
-    bookkeeping stops paying for itself and the whole pyramid is rebuilt
-    instead -- always correct, just not selective.
-
-    Example:
-        ```python
-        ConsolidationConfig(numpy_max_bytes=0)  # never build in memory
-        ```
-    """
-
-    numpy_max_bytes: int = Field(default=256 * 2**20, ge=0)
-    partial_max_coverage: float = Field(default=0.5, ge=0.0, le=1.0)
+    numpy_max_bytes: int = Field(
+        default=256 * 2**20,
+        ge=0,
+        description="Above this source-level size, `mode='auto'` never builds "
+        "the pyramid in memory. `0` disables the in-memory path entirely.",
+    )
+    partial_max_coverage: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Once `consolidate(regions=...)`'s merged regions cover "
+        "more than this fraction of the source level, the whole pyramid is "
+        "rebuilt instead — region bookkeeping stops paying for itself.",
+    )
     model_config = ConfigDict(validate_assignment=True)
 
 
 class DaskConfig(BaseModel):
-    """How large a block ngio lets dask assemble in memory before writing it.
+    """Bounds for the dask write path; see the configuration guide."""
 
-    Every dask write goes through `da.to_zarr`, which glues whole write units
-    (`shards or chunks`, often a few hundred KiB) into blocks sized to dask's
-    own `array.chunk-size` -- 128 MiB by default, packing hundreds of units
-    into one resident block for nothing: the unit grid is what makes the
-    write safe, the block grid is only batching. The default 8 MiB cap cuts
-    peak memory roughly 4x at no wall-clock cost; the benchmark table lives
-    in the configuration guide.
-
-    `None` defers to dask's `array.chunk-size`. The cap is a ceiling only: it
-    never raises a lower `array.chunk-size` you set yourself, and never lowers
-    the budget below one write unit, since a block smaller than a unit would
-    mean two writers on one unit.
-
-    Example:
-        ```python
-        DaskConfig(write_block_max_bytes=None)  # defer to dask
-        ```
-    """
-
-    write_block_max_bytes: int | None = Field(default=8 * 2**20, ge=0)
+    write_block_max_bytes: int | None = Field(
+        default=8 * 2**20,
+        ge=0,
+        description="Caps how much data one dask write block assembles in "
+        "memory. A ceiling only: it never undercuts one write unit, nor a "
+        "lower `array.chunk-size` set directly. `None` defers to dask.",
+    )
     model_config = ConfigDict(validate_assignment=True)
 
 
 class ZarrConfig(BaseModel):
-    """Knobs ngio forwards into zarr's own runtime configuration.
+    """Knobs forwarded into zarr's own runtime configuration.
 
-    Both default to `None`, which leaves zarr's configuration untouched --
-    the default ngio config changes nothing about how zarr runs.
-
-    `async_concurrency` bounds how many store requests zarr keeps in flight
-    for one operation (zarr's own default is 10). This is the knob that
-    matters on a remote store: a read spanning 64 chunks is otherwise fetched
-    in ~7 serialized waves of 10, each paying a full round-trip. zarr reads
-    it on every call, so `zarr.config.set` later also works.
-
-    `threading_max_workers` sizes zarr's thread executor for decode work.
-    zarr snapshots it into a process-global executor at the first zarr
-    operation, which is why ngio applies this section at import time --
-    changing it afterwards has no effect for the life of the process.
-
-    Example:
-        ```python
-        ZarrConfig(async_concurrency=64)  # for high-latency remote stores
-        ```
+    Both default to `None`, which leaves zarr exactly as found; see the
+    configuration guide for when each takes effect.
     """
 
-    async_concurrency: int | None = Field(default=None, ge=1)
-    threading_max_workers: int | None = Field(default=None, ge=1)
+    async_concurrency: int | None = Field(
+        default=None,
+        ge=1,
+        description="Store requests zarr keeps in flight per operation — the "
+        "knob that matters on remote stores (zarr's own default is 10).",
+    )
+    threading_max_workers: int | None = Field(
+        default=None,
+        ge=1,
+        description="Size of zarr's decode thread executor. Snapshotted by "
+        "zarr at the first operation, so it only works from the config file.",
+    )
     model_config = ConfigDict(validate_assignment=True)
 
 
 class NgioConfig(BaseModel):
-    """Global configuration for ngio."""
+    """Global configuration for ngio, one section per subsystem.
+
+    Sections: `s3fs` (S3 credentials/endpoint), `io_retry` (transient-error
+    retries), `consolidation`, `dask`, and `zarr`. Loaded from the config
+    file at import; see the configuration guide.
+    """
 
     s3fs: S3FSConfig | None = None
     io_retry: RetryConfig = Field(default_factory=RetryConfig)
