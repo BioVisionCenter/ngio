@@ -63,13 +63,19 @@ class RoiSlice(BaseModel):
             "from the beginning".
         length: Length of the interval. Must be non-negative. None means
             "to the end".
+
+    Note:
+        Instances are immutable: assigning to a field raises. Build a changed
+        slice with `model_copy(update=...)` or `Roi.update_slice`. In-place
+        mutation used to silently diverge from what a containing ROI table
+        serialized, which is why it now fails loudly.
     """
 
     axis_name: str
     start: float | None = Field(default=None)
     length: float | None = Field(default=None, ge=0)
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     @classmethod
     def _from_slice(
@@ -268,6 +274,13 @@ class Roi(BaseModel):
             Must be non-negative, or None if unlabelled.
         space: Coordinate space of the slice values - either "world" for
             physical units or "pixel" for pixel indices.
+
+    Note:
+        Instances are immutable: assigning to a field raises. Build a changed
+        ROI with `update_slice` or `model_copy(update=...)`, and put it back
+        in a table with `add(roi, overwrite=True)`. In-place mutation used to
+        silently diverge from what a containing ROI table serialized, which
+        is why it now fails loudly.
     """
 
     name: str | None
@@ -275,7 +288,7 @@ class Roi(BaseModel):
     label: int | None = Field(default=None, ge=0)
     space: Literal["world", "pixel"] = "world"
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", frozen=True)
 
     @field_validator("slices")
     @classmethod
