@@ -65,15 +65,13 @@ CI runs the linters and the test matrix automatically.
 
 ## Releasing *(maintainers only)*
 
-First, update the changelog: `CHANGELOG.md` is maintained by hand (`update_changelog_on_bump = false`), so rename its `## [Unreleased]` heading to `## [vX.Y.Z]` and commit that before tagging. Nothing automates it, and the GitHub release notes are generated from commit messages rather than from the changelog.
+First, update the changelog: `CHANGELOG.md` is maintained by hand, so rename its `## [Unreleased]` heading to `## [vX.Y.Z]` and commit that before tagging.
 
-Versions are derived from git tags via `hatch-vcs`. Use the Pixi bump tasks in the `dev` environment:
+Versions are derived from git tags via `hatch-vcs`. Tag by hand and push:
 
 ```bash
-pixi run -e dev bump-patch    # 1.0.0 → 1.0.1
-pixi run -e dev bump-minor    # 1.0.0 → 1.1.0
-pixi run -e dev bump-major    # 1.0.0 → 2.0.0
-pixi run -e dev bump-alpha    # → 1.1.0a1  (pre-release)
+git tag -a v1.2.0 -m "v1.2.0"     # or v1.2.0a1 / v1.2.0b1 for pre-releases
+git push origin v1.2.0
 ```
 
-Append `-- --dry-run` to preview without creating a tag. Once tagged, CI builds and publishes to PyPI automatically.
+Tag names are PEP 440 with a `v` prefix. Pre-releases count up manually (a1 → a2 → b1 → stable). Once the tag is pushed, CI checks it matches the built wheel version, builds, and publishes to PyPI. `deploy-docs` moves the `stable` alias for a plain `vX.Y.Z` tag, or publishes under the pre-release's own name.
