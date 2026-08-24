@@ -4646,6 +4646,7 @@
 <ul>
 <li>The exact operation-count baselines behind the numbers above are committed under <code>tests/performance/</code> and gated in CI.</li>
 <li>Fixed the Windows CI test failures from the <code>v1.1.0a1</code> build: three tests asserted the bare-<code>LocalStore</code> bypass unconditionally, but on Windows <code>NgioStore</code> always wraps local stores (its sharing-violation retry is unconditional). The tests are now platform-aware, and the Windows-wrap decision is covered on every platform via a monkeypatched test.</li>
+<li>Dropped <code>commitizen</code>; releases are now tagged by hand (see <code>CONTRIBUTING.md</code>).</li>
 </ul>
 <h2 id="v101">[v1.0.1]<a class="headerlink" href="#v101" title="Permanent link">&para;</a></h2>
 <p>Concurrency and Windows fixes. No API change — every <code>v1.0.0</code> call keeps working.</p>

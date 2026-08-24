@@ -2420,14 +2420,12 @@
 </ol>
 <p>CI runs the linters and the test matrix automatically.</p>
 <h2 id="releasing-maintainers-only">Releasing <em>(maintainers only)</em><a class="headerlink" href="#releasing-maintainers-only" title="Permanent link">&para;</a></h2>
-<p>First, update the changelog: <code>CHANGELOG.md</code> is maintained by hand (<code>update_changelog_on_bump = false</code>), so rename its <code>## [Unreleased]</code> heading to <code>## [vX.Y.Z]</code> and commit that before tagging. Nothing automates it, and the GitHub release notes are generated from commit messages rather than from the changelog.</p>
-<p>Versions are derived from git tags via <code>hatch-vcs</code>. Use the Pixi bump tasks in the <code>dev</code> environment:</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-patch<span class="w">    </span><span class="c1"># 1.0.0 → 1.0.1</span>
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-minor<span class="w">    </span><span class="c1"># 1.0.0 → 1.1.0</span>
-</span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-major<span class="w">    </span><span class="c1"># 1.0.0 → 2.0.0</span>
-</span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>bump-alpha<span class="w">    </span><span class="c1"># → 1.1.0a1  (pre-release)</span>
+<p>First, update the changelog: <code>CHANGELOG.md</code> is maintained by hand, so rename its <code>## [Unreleased]</code> heading to <code>## [vX.Y.Z]</code> and commit that before tagging.</p>
+<p>Versions are derived from git tags via <code>hatch-vcs</code>. Tag by hand and push:</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>tag<span class="w"> </span>-a<span class="w"> </span>v1.2.0<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;v1.2.0&quot;</span><span class="w">     </span><span class="c1"># or v1.2.0a1 / v1.2.0b1 for pre-releases</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>v1.2.0
 </span></code></pre></div>
-<p>Append <code>-- --dry-run</code> to preview without creating a tag. Once tagged, CI builds and publishes to PyPI automatically.</p>
+<p>Tag names are PEP 440 with a <code>v</code> prefix. Pre-releases count up manually (a1 → a2 → b1 → stable). Once the tag is pushed, CI checks it matches the built wheel version, builds, and publishes to PyPI. <code>deploy-docs</code> moves the <code>stable</code> alias for a plain <code>vX.Y.Z</code> tag, or publishes under the pre-release's own name.</p>
 
 
 
