@@ -97,7 +97,6 @@ dev = [
     "rich",         # https://github.com/Textualize/rich
     "ruff",
     "scikit-image",
-    "commitizen",
 ] # add anything else you like to have in your dev environment here
 
 docs = [
@@ -244,14 +243,6 @@ FO = "FO"
 # Surname
 Comparin = "Comparin"
 
-[tool.commitizen]
-name = "cz_conventional_commits"
-tag_format = "v$version"
-version_scheme = "pep440"
-version_provider = "scm"          # reads current version from git tags; no file to mutate
-update_changelog_on_bump = false  # keep manual CHANGELOG for now
-major_version_zero = false        # 1.x: breaking changes drive the major bump
-
 [tool.check-manifest]
 ignore = [
     ".pre-commit-config.yaml",
@@ -274,15 +265,7 @@ ngio = { path = ".", editable = true }
 [tool.pixi.feature.dev.dependencies]
 python = ">=3.11,<3.12"
 
-[tool.pixi.feature.dev.pypi-dependencies]
-commitizen = ">=4.0"
-
 [tool.pixi.feature.dev.tasks]
-bump-patch = "cz bump --increment PATCH --no-verify"
-bump-minor = "cz bump --increment MINOR --no-verify"
-bump-major = "cz bump --increment MAJOR --no-verify"
-bump-alpha = "cz bump --prerelease alpha --no-verify"
-bump-beta  = "cz bump --prerelease beta --no-verify"
 lint = "prek run --all-files"
 
 [tool.pixi.feature.py11.dependencies]
