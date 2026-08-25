@@ -54,6 +54,25 @@ aggregation — either pass a custom `coalesce`, or drop down to the loop that
 --8<-- "docs/snippets/tutorials/feature_extraction.py:manual_extract"
 ```
 
+## Measuring with a halo
+
+Tiling a large image (`by_grid`, `by_blocks`) cuts objects at the tile
+edges — a border nucleus would be measured on half its pixels. `with_halo`
+fixes that by reading a margin of context around each tile: the function
+receives the grown patches (and the grown `roi`), so a border object is seen
+whole by at least one tile. The price is that *every* tile that sees it
+measures it, so the same `label` appears more than once. Deduplicating is
+your `coalesce`'s job, and every normalized row carries two provenance
+columns for exactly that: `roi_index` (the region's global index) and
+`roi_name`. The default join keeps the duplicates as-is; a custom `coalesce`
+picks one row per object — here the one from the tile that saw the largest
+piece. (`roi_index`, `roi_name`, and `_ngio_index` are reserved: a
+measurement function returning one of them is refused.)
+
+```python exec="true" source="material-block" session="feature_extraction"
+--8<-- "docs/snippets/tutorials/feature_extraction.py:halo_dedup"
+```
+
 ### Sanity check: read the table back
 
 ```python exec="true" session="feature_extraction"

@@ -321,8 +321,8 @@ def test_masked_segmentation_checks_dimensions():
         MaskedSegmentationIterator(masked, mismatched, axes_order="yx")
 
 
-def test_feature_iterator_still_refuses_a_halo():
-    """Only iterators that reconcile the margin themselves may read grown."""
+def test_feature_iterator_accepts_a_readonly_halo():
+    """Features opt into the read margin; the dedup handle is `roi_index`."""
     data = np.zeros((16, 16), dtype="uint8")
     ome_zarr = create_ome_zarr_from_array(
         store=MemoryStore(), array=data, pixelsize=1.0, axes_names="yx", levels=1
@@ -332,8 +332,10 @@ def test_feature_iterator_still_refuses_a_halo():
         input_label=ome_zarr.derive_label("lbl"),
         axes_order="yx",
     )
-    with pytest.raises(NgioValueError, match="read-only"):
-        iterator.with_halo(x=4, y=4)
+    haloed = iterator.with_halo(x=4, y=4)
+    assert haloed.halo == {"x": 4, "y": 4}
+    with pytest.raises(NgioValueError, match=">= 0"):
+        iterator.with_halo(x=-1)
 
 
 def test_incomplete_get_init_kwargs_is_refused():

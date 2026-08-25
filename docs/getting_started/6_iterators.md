@@ -402,7 +402,7 @@ table = iterator.finalize()
 container.add_table("measurements", table)     # storing stays yours
 ```
 
-The result is bit-identical to a serial `measure` / `detect` — including a **custom `coalesce`**, which runs once at the gather (`finalize(coalesce=...)`; a slice's `measure` refuses one) over the reconstructed per-ROI results (dicts normalized to DataFrames, a `label` index to a `label` column). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
+The result is bit-identical to a serial `measure` / `detect` — including a **custom `coalesce`**, which runs once at the gather (`finalize(coalesce=...)`; a slice's `measure` refuses one) over the normalized per-ROI results: dicts become DataFrames, a `label` index becomes a `label` column, and every row is stamped with its `roi_index` (the ROI's global index) and `roi_name`. A serial `measure`'s custom `coalesce` sees the identical normalized list — there is one contract, not two. Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
 
 `finalize` refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — refuses on a `for_job` slice (the gather is global), and refuses when nothing was prepared or banked.
 
@@ -415,6 +415,8 @@ Tiling an image and processing each tile independently leaves artifacts at the j
 ```
 
 `smooth` receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.
+
+Two read-only iterators take a halo too, as a pure read margin — there is no write to crop it from, so the overlap must be reconciled after the fact. Detection reconciles it itself: NMS removes the duplicate boxes. Feature extraction delegates it to you: patches *and* the `roi` argument cover the grown region, a border object is measured by every region that sees it, and the resulting duplicate `label` rows are yours to reconcile in a custom `coalesce` — every row carries `roi_index`/`roi_name` for exactly that (the default `coalesce` keeps the duplicates as-is).
 
 The ROIs themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping *writes* would have to be serialized; overlapping reads cost nothing.
 
@@ -493,7 +495,7 @@ The detector sees one tile at a time and answers in the tile's own pixels; the i
       each z-slab or time point; boxes keep their tile's extent along the
       axes they do not pin.
 
-The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which `with_halo` is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
+The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — on a read-only iterator the halo is a pure read margin, there being no write to crop it from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
 
 ### Anchoring a local box yourself
 
@@ -511,8 +513,8 @@ The `space` fields are what keep this honest: `anchor` refuses a world-space box
 |---|---|---|---|---|---|
 | Writes to | image | label | label (masked) | — | — |
 | Topic verb | `process` [5] | `segment` [5] | `segment` [5] | `measure` | `detect` |
-| `reduce` | ✓ | ✓ | ✓ | ✓ | ⚠ [1] |
-| `with_halo` | ✓ | ✓ | ✓ | ✗ | ✓ [1] |
+| `reduce` | ✓ | ✓ | ✓ | ⚠ [6] | ⚠ [1] |
+| `with_halo` | ✓ | ✓ | ✓ | ✓ [6] | ✓ [1] |
 | `stitch=True` | — | ✓ [2] | ✓ within a mask [2] | — | — |
 | Overlapping ROIs | ✓ [3] | ✓ [3] | ✓ [3] | ✓ | ✓ [1] |
 | `ThreadedMapper` / `ProcessMapper` | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -524,6 +526,7 @@ The `space` fields are what keep this honest: `anchor` refuses a world-space box
 3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright. One configuration to avoid: an *in-place* run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).
 4. `BatchedMapper` stacks plain arrays; these iterators hand `func` tuple payloads.
 5. On the writers the topic verb is the generic `map` under its domain name; both remain available.
+6. The feature halo is a pure read margin: patches and the `roi` argument grow, a border object can be measured by several regions, and the duplicate rows are yours to reconcile in `coalesce` via the stamped `roi_index`/`roi_name` (the default coalesce keeps them, silently). `reduce`/`iter` read the grown regions too. Without a halo, `reduce` is unrestricted.
 
 Restrictions that hold everywhere:
 

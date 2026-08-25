@@ -140,9 +140,15 @@ def test_measure_returns_a_feature_table():
     assert from_frames.dataframe.equals(from_dicts.dataframe)
 
     # The caller stores the table; a round-trip through the container works.
+    # The storage backend regroups columns by dtype, so compare ignoring
+    # column order — this also pins that roi_index/roi_name survive storage.
+    import pandas as pd
+
     ome_zarr.add_table("feats", from_dicts)
     read_back = ome_zarr.get_table("feats")
-    assert read_back.dataframe.equals(from_dicts.dataframe)
+    pd.testing.assert_frame_equal(
+        read_back.dataframe, from_dicts.dataframe, check_like=True
+    )
 
 
 def test_measure_parallel_matches_serial():
@@ -164,7 +170,9 @@ def test_measure_custom_coalesce():
     _, iterator = _build_container_and_iterator()
 
     def totals(results):
-        joined = pd.concat([pd.DataFrame(r) for r in results if r["label"]])
+        # The coalesce receives normalized DataFrames (empty ROIs are
+        # empty frames), never the function's raw dicts.
+        joined = pd.concat([r for r in results if len(r)])
         return GenericTable(pd.DataFrame({"total_objects": [len(joined)]}))
 
     table = iterator.measure(_measure_as_dict, coalesce=totals)
@@ -210,3 +218,127 @@ def test_feature_getter_reads_once_and_releases():
     # unit alive until the whole run returns.
     assert getter._image_data is None
     assert getter._label_data is None
+
+
+# --- provenance columns and the read-only halo -------------------------------
+
+
+def test_measure_default_table_carries_provenance_columns():
+    import pandas as pd
+
+    _, iterator = _build_container_and_iterator()
+
+    table = iterator.measure(_measure_as_dict)
+    assert table is not None
+    frame = table.dataframe
+    assert pd.api.types.is_integer_dtype(frame["roi_index"])
+    names = {iterator.rois[i].get_name() for i in frame["roi_index"]}
+    assert set(frame["roi_name"]) == names
+
+
+def test_measure_normalizes_results_for_a_custom_coalesce():
+    """Every coalesce sees DataFrames with a label column and provenance."""
+    import pandas as pd
+
+    from ngio.tables import GenericTable
+
+    _, iterator = _build_container_and_iterator()
+
+    def label_indexed(image, label, roi):
+        # A label-indexed frame: normalization must reset it to a column.
+        frame = pd.DataFrame(_measure_as_dict(image, label, roi))
+        return frame.set_index("label") if len(frame) else frame
+
+    captured: list = []
+
+    def capture(results):
+        captured.extend(results)
+        return GenericTable(pd.DataFrame({"n": [len(results)]}))
+
+    iterator.measure(label_indexed, coalesce=capture)
+    assert len(captured) == len(iterator.rois)
+    for index, frame in enumerate(captured):
+        assert isinstance(frame, pd.DataFrame)
+        if not len(frame):
+            assert list(frame.columns) == []  # empty ROIs stay column-less
+            continue
+        assert list(frame.columns[-2:]) == ["roi_index", "roi_name"]
+        assert (frame["roi_index"] == index).all()
+        assert (frame["roi_name"] == iterator.rois[index].get_name()).all()
+        assert "label" in frame.columns
+
+
+@pytest.mark.parametrize("reserved", ["_ngio_index", "roi_index", "roi_name"])
+def test_measure_refuses_reserved_columns(reserved):
+    _, iterator = _build_container_and_iterator()
+
+    def shadowing(image, label, roi):
+        return {"label": [1], reserved: [0]}
+
+    with pytest.raises(NgioValueError, match="reserved column"):
+        iterator.measure(shadowing)
+
+
+def test_measure_with_halo_duplicates_then_coalesce_dedups():
+    """A border object is measured by every grown region; roi_index dedups."""
+    import pandas as pd
+
+    from ngio import create_ome_zarr_from_array
+
+    rng = np.random.default_rng(0)
+    array = rng.integers(0, 255, size=(2, 16, 16)).astype("uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=array, pixelsize=1.0, axes_names="cyx", levels=1
+    )
+    label = ome_zarr.derive_label(name="nuclei")
+    label_data = np.zeros((16, 16), dtype="uint32")
+    label_data[2:6, 2:6] = 1
+    label_data[6:10, 6:10] = 3  # straddles the 8-px grid boundary
+    label.set_array(label_data)
+    label.consolidate()
+    iterator = (
+        FeatureExtractorIterator(
+            input_image=ome_zarr.get_image(),
+            input_label=ome_zarr.get_label("nuclei"),
+            channel_selection=0,
+            axes_order="yx",
+        )
+        .by_grid(size_x=8, size_y=8)
+        .with_halo(x=4, y=4)
+    )
+
+    def measure(image, label_patch, roi):
+        ids = [int(v) for v in np.unique(label_patch) if v]
+        return {
+            "label": ids,
+            "pixel_count": [int((label_patch == i).sum()) for i in ids],
+            "mean": [float(image[label_patch == i].mean()) for i in ids],
+        }
+
+    # Default coalesce keeps the duplicates (status quo), silently.
+    table = iterator.measure(measure)
+    assert table is not None
+    counts = table.dataframe.index.value_counts()
+    assert counts.loc[3] > 1, "the border object must be measured repeatedly"
+
+    # The documented recipe: keep, per object, the row from the region that
+    # saw the most of it — roi provenance makes the choice explicit.
+    def dedup(results):
+        from ngio.tables import FeatureTable
+
+        joined = pd.concat([r for r in results if len(r)])
+        joined = (
+            joined.sort_values("pixel_count", ascending=False)
+            .drop_duplicates("label")
+            .set_index("label")
+            .sort_index()
+        )
+        return FeatureTable(table_data=joined, reference_label="nuclei")
+
+    deduped = iterator.measure(measure, coalesce=dedup)
+    assert deduped is not None
+    frame = deduped.dataframe
+    assert frame.index.is_unique
+    assert sorted(frame.index.tolist()) == [1, 3]
+    # With a 4-px halo every 8-px tile sees object 3 whole: 16 pixels.
+    assert frame.loc[3, "pixel_count"] == 16

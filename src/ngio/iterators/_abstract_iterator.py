@@ -85,8 +85,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
     # a mutable class-level `{}` would be one shared across every iterator.
     _halo: Mapping[str, int] = MappingProxyType({})
     # A read-only subclass that opts in declares the halo a pure read margin:
-    # there is no write to crop it from, and the subclass owns reconciling the
-    # overlapping context (the detection iterator's NMS). Off by default so a
+    # there is no write to crop it from, and the overlapping context must be
+    # reconciled — by the subclass itself (the detection iterator's NMS) or
+    # by the caller's join, via stamped provenance (the feature iterator's
+    # `roi_index`/`roi_name` columns in `coalesce`). Off by default so a
     # read-only iterator does not silently measure grown regions.
     _allow_readonly_halo: bool = False
     # Set by `for_job`: (selected unit indices, job_index, n_jobs).
@@ -205,10 +207,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             A new iterator reading with the halo.
 
         Raises:
-            NgioValueError: On a read-only iterator (no write to crop the
-                halo from; the detection iterator opts in and reconciles the
-                overlap with NMS), on an in-place iterator, or for a
-                negative margin.
+            NgioValueError: On a read-only iterator that has not opted in
+                (no write to crop the halo from; detection opts in and
+                reconciles the overlap with NMS, feature extraction opts in
+                and stamps `roi_index`/`roi_name` so your `coalesce` can),
+                on an in-place iterator, or for a negative margin.
 
         Example:
             ```python
@@ -914,7 +917,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         The halo is defined against the write: read grown, crop, write the
         core. A read-only verb has no write to crop, so it would silently
         hand `func` the grown regions. (Read-only iterators that opt into a
-        halo — object detection — reconcile the overlap themselves.)
+        halo — object detection, feature extraction — own reconciling the
+        overlap instead.)
         """
         if self._halo and self.output_image is not None:
             raise NgioValueError(

@@ -641,13 +641,17 @@ def _feature_iterator(ome_zarr):
 
 
 def _global_norm_coalesce(results):
-    """Non-decomposable on purpose: normalizes by the global mean."""
+    """Non-decomposable on purpose: normalizes by the global mean.
+
+    Receives the normalized per-ROI frames (`roi_index`/`roi_name`
+    included), identically on the serial and the distributed path — the
+    frame equality asserted by the parity tests covers those columns too.
+    """
     import pandas as pd
 
     from ngio.tables import FeatureTable
 
-    frames = [pd.DataFrame(r) if isinstance(r, dict) else r for r in results]
-    frames = [frame for frame in frames if len(frame)]
+    frames = [frame for frame in results if len(frame)]
     joined = pd.concat(frames).set_index("label")
     joined["norm"] = joined["mean_intensity"] / joined["mean_intensity"].mean()
     return FeatureTable(table_data=joined, reference_label="objs")
@@ -921,3 +925,43 @@ def test_detection_finalize_refuses_without_prepare(tmp_path: Path):
     ome_zarr = _detection_setup(tmp_path / "det_noprep.zarr")
     with pytest.raises(NgioValueError, match="No partials"):
         _detection_iterator(ome_zarr).finalize()
+
+
+def _haloed_feature_iterator(ome_zarr):
+    return _feature_iterator(ome_zarr).with_halo(y=8, x=8)
+
+
+@pytest.mark.parametrize("custom_coalesce", [False, True])
+def test_feature_merge_matches_serial_with_halo(tmp_path: Path, custom_coalesce: bool):
+    """The read-only halo distributes: grown reads, same one global join."""
+    import pandas as pd
+
+    coalesce = _global_norm_coalesce if custom_coalesce else None
+    serial_oz = _feature_setup(tmp_path / "feat_halo_serial.zarr")
+    serial = _haloed_feature_iterator(serial_oz).measure(_measure, coalesce=coalesce)
+    assert serial is not None
+    # The halo makes border objects appear in several grown regions.
+    assert not serial.dataframe.index.is_unique
+
+    ome_zarr = _feature_setup(tmp_path / "feat_halo_jobs.zarr")
+    args_list = _haloed_feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in reversed(args_list):
+        assert (
+            _haloed_feature_iterator(ome_zarr).for_job(**args).measure(_measure) is None
+        )
+    merged = _haloed_feature_iterator(ome_zarr).finalize(coalesce=coalesce)
+
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+
+
+def test_feature_slice_measure_refuses_reserved_columns(tmp_path: Path):
+    """The provenance guard fires in the banking path too."""
+    ome_zarr = _feature_setup(tmp_path / "feat_reserved.zarr")
+    args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    restricted = _feature_iterator(ome_zarr).for_job(**args_list[0])
+
+    def shadowing(image, label_patch, roi):
+        return {"label": [1], "roi_name": ["boom"]}
+
+    with pytest.raises(NgioValueError, match="reserved column"):
+        restricted.measure(shadowing)

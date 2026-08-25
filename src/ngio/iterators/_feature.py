@@ -37,12 +37,24 @@ T = TypeVar("T", np.ndarray, da.Array)
 
 FeatureFuncResult: TypeAlias = pd.DataFrame | dict[str, list]
 """What a per-ROI feature function may return: a DataFrame, or the cheaper
-dict-of-columns (`{"label": [...], "area": [...]}`) that concatenates
-without building one frame per ROI."""
+dict-of-columns (`{"label": [...], "area": [...]}`) — lighter to build in a
+worker and to ship across a `ProcessMapper` boundary; normalization turns
+either into one DataFrame per ROI before the coalesce."""
+
+#: Provenance columns stamped on every normalized result row: the ROI's
+#: global index and its `Roi.get_name()`. Reserved alongside the partials'
+#: `INDEX_COLUMN`: a function whose result already carries one is refused.
+ROI_INDEX_COLUMN = "roi_index"
+ROI_NAME_COLUMN = "roi_name"
+_RESERVED_RESULT_COLUMNS = (INDEX_COLUMN, ROI_INDEX_COLUMN, ROI_NAME_COLUMN)
 
 
 class FeatureGetter(DataGetter[tuple[T, T, Roi]], Generic[T]):
-    """Pairs an image getter with a label getter over the same ROI."""
+    """Pairs an image getter with a label getter over the same ROI.
+
+    Under a halo both patches and the `roi` this getter reports cover the
+    grown region — the ROI always matches the patch extent.
+    """
 
     def __init__(
         self,
@@ -121,14 +133,61 @@ def _as_feature_frame(result: FeatureFuncResult) -> pd.DataFrame:
     )
 
 
+def _roi_display_name(roi: Roi, index: int) -> str:
+    """The ROI's name for the provenance column.
+
+    `Roi.get_name()` falls back to the full repr for an unnamed, unlabeled
+    ROI (the whole-image default) — too noisy for a table cell, so those
+    fall back to `roi_{index}` instead.
+    """
+    if roi.name is not None:
+        return roi.name
+    if roi.label is not None:
+        return str(roi.label)
+    return f"roi_{index}"
+
+
+def _normalized_frame(
+    result: FeatureFuncResult, *, index: int, roi: Roi
+) -> pd.DataFrame:
+    """One ROI's result in the normalized form every coalesce sees.
+
+    Dicts become DataFrames; a `label` index becomes a `label` column; a
+    zero-row result collapses to the empty, column-less frame; every
+    surviving row is stamped with `roi_index` (the ROI's global index) and
+    `roi_name` (the ROI's name, `roi_{index}` when it has none).
+    """
+    frame = _as_feature_frame(result)
+    for reserved in _RESERVED_RESULT_COLUMNS:
+        if reserved in frame.columns:
+            raise NgioValueError(
+                f"The feature function returned a reserved column "
+                f"{reserved!r}; rename it."
+            )
+    if not len(frame):
+        return pd.DataFrame()
+    if frame.index.name == "label":
+        frame = frame.reset_index()
+    else:
+        frame = frame.reset_index(drop=True)
+    frame = frame.copy()
+    frame[ROI_INDEX_COLUMN] = index
+    frame[ROI_NAME_COLUMN] = _roi_display_name(roi, index)
+    return frame
+
+
 def _default_feature_coalesce(
-    results: list[FeatureFuncResult], reference_label: str | None
+    results: list[pd.DataFrame], reference_label: str | None
 ) -> FeatureTable:
     """Join per-ROI results into one `FeatureTable` indexed by `label`.
 
-    Dicts of columns are concatenated as cheaply as they were produced;
-    DataFrames are concatenated as they are. Either way the rows must carry
-    the object id in a `label` column (or already sit on a `label` index).
+    Receives the normalized per-ROI frames (see `_normalized_frame`) and
+    concatenates them; the rows must carry the object id in a `label`
+    column (or already sit on a `label` index). The stamped
+    `roi_index`/`roi_name` columns ride into the final table. Duplicate
+    label ids (a haloed or overlapping tiling measures border objects more
+    than once) are kept as-is — deduplicating is a custom `coalesce`'s job.
+    The zero-object table keeps its label-only schema.
     """
     if not results:
         raise NgioValueError(
@@ -168,8 +227,17 @@ class FeatureExtractorIterator(
     region. `reduce` collects per-region results; `measure` joins them into
     a single `FeatureTable` for the caller to store. Distributed, a
     `for_job` slice's `measure` banks a partial and `finalize()` runs the
-    one global join.
+    one global join. `with_halo(...)` reads context around each region;
+    the duplicate rows it produces for border objects are reconciled in
+    your `coalesce` via the stamped `roi_index`/`roi_name` columns.
     """
+
+    # The halo is a pure read margin here too: there is no write to crop it
+    # from. Unlike detection, this iterator does not reconcile the overlap
+    # itself — a border object measured by two grown regions yields
+    # duplicate label rows, and the stamped `roi_index`/`roi_name` columns
+    # are the handle a custom `coalesce` uses to reconcile them.
+    _allow_readonly_halo = True
 
     def __init__(
         self,
@@ -219,12 +287,16 @@ class FeatureExtractorIterator(
         }
 
     def build_numpy_getter(self, roi: Roi) -> FeatureGetter[np.ndarray]:
+        # Both getters take the same halo-grown world-space ROI; each
+        # converts at its own image's pixel size, so a coarser label
+        # rescales the margin correctly on its own.
+        read_roi = self._read_roi(roi)
         data_getter = NumpyGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            roi=roi,
+            roi=read_roi,
             slicing_dict=self._input_slicing_kwargs,
         )
         label_getter = NumpyGetter(
@@ -232,18 +304,19 @@ class FeatureExtractorIterator(
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
             transforms=self._label_transforms,
-            roi=roi,
+            roi=read_roi,
             remove_channel_selection=True,
         )
         return FeatureGetter(data_getter, label_getter)
 
     def build_dask_getter(self, roi: Roi) -> FeatureGetter[da.Array]:
+        read_roi = self._read_roi(roi)
         data_getter = DaskGetter(
             zarr_array=self._input.zarr_array,
             dimensions=self._input.dimensions,
             axes_order=self._axes_order,
             transforms=self._input_transforms,
-            roi=roi,
+            roi=read_roi,
             slicing_dict=self._input_slicing_kwargs,
         )
         label_getter = DaskGetter(
@@ -251,7 +324,7 @@ class FeatureExtractorIterator(
             dimensions=self._input_label.dimensions,
             axes_order=self._axes_order,
             transforms=self._label_transforms,
-            roi=roi,
+            roi=read_roi,
             remove_channel_selection=True,
         )
         return FeatureGetter(data_getter, label_getter)
@@ -265,7 +338,7 @@ class FeatureExtractorIterator(
     def finalize(
         self,
         *,
-        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
+        coalesce: Callable[[list[pd.DataFrame]], Table] | None = None,
     ) -> Table:
         """Merge a distributed run's partials into the one final table.
 
@@ -275,7 +348,7 @@ class FeatureExtractorIterator(
         the per-ROI result list in global ROI order, and runs the single
         (default or custom) `coalesce`. The final table matches a serial
         `measure` row for row; the result list is the normalized form
-        described in `measure`, not the function's raw returns. On success
+        described in `measure`, `roi_index`/`roi_name` included. On success
         the partials group is removed. Nothing is registered: the returned
         table is yours to store with `add_table`.
 
@@ -289,10 +362,19 @@ class FeatureExtractorIterator(
         groups: dict[int, pd.DataFrame] = {}
         if merged is not None:
             for index, group in merged.groupby(INDEX_COLUMN, sort=True):
-                groups[int(cast("Any", index))] = group.drop(
-                    columns=[INDEX_COLUMN]
-                ).reset_index(drop=True)
-        results: list[FeatureFuncResult] = [
+                frame = group.drop(columns=[INDEX_COLUMN]).reset_index(drop=True)
+                # The partial round-trip regroups columns by dtype; pin the
+                # provenance columns back to the end, where a serial
+                # normalization puts them.
+                measured = [
+                    column
+                    for column in frame.columns
+                    if column not in (ROI_INDEX_COLUMN, ROI_NAME_COLUMN)
+                ]
+                groups[int(cast("Any", index))] = frame[
+                    [*measured, ROI_INDEX_COLUMN, ROI_NAME_COLUMN]
+                ]
+        results: list[pd.DataFrame] = [
             groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
         ]
         if coalesce is None:
@@ -318,7 +400,7 @@ class FeatureExtractorIterator(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
         *,
-        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
+        coalesce: Callable[[list[pd.DataFrame]], Table] | None = None,
         mapper: MapperProtocol | None = None,
     ) -> Table | None:
         """Measure every ROI and join the results into one table.
@@ -328,27 +410,39 @@ class FeatureExtractorIterator(
         on the calling thread. Nothing is written: the returned table is
         yours to store, e.g. `container.add_table(name, table)`.
 
+        A `coalesce` (default or custom, serial or distributed) always sees
+        the *normalized* result list, not the function's raw returns: one
+        DataFrame per ROI with `label` as a column (a `label` index is
+        reset), every row stamped with `roi_index` (the ROI's global index)
+        and `roi_name` (the ROI's name — `roi_{index}` when it has none, as
+        seen by the job that measured it), and a ROI whose function
+        returned no rows as an empty, column-less DataFrame. The three
+        names `_ngio_index`, `roi_index` and `roi_name` are reserved: a
+        function whose result carries one is refused.
+
+        With `with_halo(...)` each region is read grown — both patches and
+        the `roi` argument cover the grown region — so a border object is
+        measured by every region that sees it. The default `coalesce` keeps
+        the resulting duplicate label rows as-is; reconcile them in a
+        custom `coalesce` via the `roi_index`/`roi_name` columns. `reduce`
+        and `iter` read the grown regions too.
+
         On a `for_job` slice it measures only this job's share and banks the
-        raw records as a partial, returning `None` — the measurements are
-        stored **before** any join, tagged with their global ROI index, so
-        the gather (`finalize()`, once, after all jobs) can rebuild the full
-        per-ROI result list and run the ONE global coalesce. Re-running a
-        job overwrites its own partial. A custom `coalesce` then sees a
-        *normalized* result list, not the function's raw returns: dicts
-        become DataFrames, a `label` index becomes a `label` column, and a
-        ROI whose function returned no rows arrives as an empty,
-        column-less DataFrame.
+        normalized records as a partial, returning `None` — stored
+        **before** any join, so the gather (`finalize()`, once, after all
+        jobs) can rebuild the full per-ROI result list and run the ONE
+        global coalesce. Re-running a job overwrites its own partial.
 
         Args:
             func: `(image, label, roi) -> DataFrame | dict[str, list]` — the
                 measurements for one ROI. Rows must carry the object id in a
                 `label` column (or index). Under a parallel mapper it runs on
                 worker threads or processes and must be safe there.
-            coalesce: Joins the per-ROI results into an ngio table. The
-                default concatenates them into a `FeatureTable` indexed by
-                `label`, referencing the input label. Refused on a `for_job`
-                slice: the join is global, pass it to
-                `finalize(coalesce=...)`.
+            coalesce: Joins the normalized per-ROI frames into an ngio
+                table. The default concatenates them into a `FeatureTable`
+                indexed by `label` (the provenance columns ride along),
+                referencing the input label. Refused on a `for_job` slice:
+                the join is global, pass it to `finalize(coalesce=...)`.
             mapper: How the per-ROI work is scheduled; `None` is serial.
 
         Returns:
@@ -366,11 +460,15 @@ class FeatureExtractorIterator(
             self._bank_partial(func, mapper=mapper)
             return None
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
+        normalized = [
+            _normalized_frame(result, index=index, roi=roi)
+            for index, (roi, result) in enumerate(zip(self.rois, results, strict=True))
+        ]
         if coalesce is None:
             return _default_feature_coalesce(
-                results, reference_label=self._input_label.meta.name
+                normalized, reference_label=self._input_label.meta.name
             )
-        return coalesce(results)
+        return coalesce(normalized)
 
     def _bank_partial(
         self,
@@ -388,19 +486,11 @@ class FeatureExtractorIterator(
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
         frames = []
         for index, result in zip(indices, results, strict=True):
-            frame = _as_feature_frame(result)
-            if INDEX_COLUMN in frame.columns:
-                raise NgioValueError(
-                    f"The feature function returned a reserved column "
-                    f"{INDEX_COLUMN!r}; rename it."
-                )
+            frame = _normalized_frame(result, index=index, roi=self.rois[index])
             if not len(frame):
                 continue
-            if frame.index.name == "label":
-                frame = frame.reset_index()
-            else:
-                frame = frame.reset_index(drop=True)
-            frame = frame.copy()
+            # The internal merge key comes last, so dropping it at the
+            # gather leaves the columns in the same order as a serial run.
             frame[INDEX_COLUMN] = index
             frames.append(frame)
         payload = pd.concat(frames, ignore_index=True) if frames else None
