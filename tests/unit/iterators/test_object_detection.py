@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import NmsConfig, ObjectDetectionIterator, Roi, create_ome_zarr_from_array
+from ngio import GreedyNms, ObjectDetectionIterator, Roi, create_ome_zarr_from_array
 from ngio.common._roi import RoiSlice
 from ngio.iterators import ThreadedMapper
 from ngio.utils import NgioValueError
@@ -69,6 +69,7 @@ def test_seam_duplicates_are_suppressed_into_one_object():
     )
 
     table = iterator.detect(_bright_box_detector)
+    assert table is not None
 
     frame = table.dataframe
     # RoiTable indexes by name; the numeric object id rides in `label`.
@@ -92,7 +93,9 @@ def test_detect_parallel_matches_serial():
     )
 
     serial = iterator.detect(_bright_box_detector)
+    assert serial is not None
     threaded = iterator.detect(_bright_box_detector, mapper=ThreadedMapper(4))
+    assert threaded is not None
     assert threaded.dataframe.equals(serial.dataframe)
 
 
@@ -108,6 +111,7 @@ def test_boxes_land_in_world_coordinates():
     )
 
     table = iterator.detect(_bright_box_detector)
+    assert table is not None
 
     boxes = [
         roi
@@ -134,6 +138,7 @@ def test_halo_is_clipped_at_the_borders():
     )
 
     table = iterator.detect(_bright_box_detector)
+    assert table is not None
 
     roi = table.rois()[0]
     assert (roi["x"].start, roi["x"].length) == (0.0, 6.0)
@@ -157,18 +162,24 @@ def test_iou_threshold_separates_duplicates_from_neighbours():
         _box(2, 2, 10, 10, confidence=0.5),
     ]
 
-    merged = ObjectDetectionIterator(
-        image, axes_order="yx", nms=NmsConfig(iou_threshold=0.4)
-    ).detect(_fixed_boxes_factory(boxes))
+    merged = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(GreedyNms(iou_threshold=0.4))
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert merged is not None
     assert len(merged.rois()) == 1
     survivor = merged.rois()[0]
     assert survivor["x"].start == 0.0, "the higher-confidence box survives"
     assert survivor.model_extra is not None
     assert survivor.model_extra["confidence"] == 0.9
 
-    kept = ObjectDetectionIterator(
-        image, axes_order="yx", nms=NmsConfig(iou_threshold=0.6)
-    ).detect(_fixed_boxes_factory(boxes))
+    kept = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(GreedyNms(iou_threshold=0.6))
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert kept is not None
     assert len(kept.rois()) == 2
 
 
@@ -176,9 +187,12 @@ def test_without_a_score_the_bigger_box_wins():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     boxes = [_box(0, 0, 10, 10), _box(0, 0, 12, 12)]
 
-    table = ObjectDetectionIterator(
-        image, axes_order="yx", nms=NmsConfig(iou_threshold=0.5)
-    ).detect(_fixed_boxes_factory(boxes))
+    table = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(GreedyNms(iou_threshold=0.5))
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert table is not None
     assert len(table.rois()) == 1
     assert table.rois()[0]["x"].length == 12.0
 
@@ -190,6 +204,7 @@ def test_extra_fields_ride_into_the_table():
     table = ObjectDetectionIterator(image, axes_order="yx").detect(
         _fixed_boxes_factory(boxes)
     )
+    assert table is not None
     frame = table.dataframe
     assert frame["confidence"].tolist() == [0.7]
     assert frame["class_name"].tolist() == ["nucleus"]
@@ -203,6 +218,7 @@ def test_time_frames_are_never_merged_across_t():
     iterator = ObjectDetectionIterator(image, axes_order="yx").by_grid(size_t=1)
 
     table = iterator.detect(_bright_box_detector)
+    assert table is not None
 
     rois = table.rois()
     assert len(rois) == 2, "one object per time point, not merged across t"
@@ -213,6 +229,7 @@ def test_time_frames_are_never_merged_across_t():
 def test_nothing_detected_gives_an_empty_table():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     table = ObjectDetectionIterator(image, axes_order="yx").detect(_bright_box_detector)
+    assert table is not None
     assert table.rois() == []
 
 
@@ -225,6 +242,7 @@ def test_detection_table_round_trips_through_the_container():
     )
 
     table = iterator.detect(_bright_box_detector)
+    assert table is not None
     ome_zarr.add_table("detections", table)
 
     read_back = ome_zarr.get_table("detections")
@@ -285,8 +303,8 @@ def test_score_must_be_on_every_box_or_none():
 
 def test_detection_cap_is_enforced():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
-    iterator = ObjectDetectionIterator(
-        image, axes_order="yx", nms=NmsConfig(max_detections_per_tile=2)
+    iterator = ObjectDetectionIterator(image, axes_order="yx").with_nms(
+        GreedyNms(max_detections_per_tile=2)
     )
     many = [_box(0, 0, 1, 1), _box(20, 0, 1, 1), _box(40, 0, 1, 1)]
 
@@ -298,9 +316,9 @@ def test_rejects_bad_construction():
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
 
     with pytest.raises(NgioValueError, match="max_detections_per_tile"):
-        NmsConfig(max_detections_per_tile=0)
+        GreedyNms(max_detections_per_tile=0)
     with pytest.raises(NgioValueError, match="iou_threshold"):
-        NmsConfig(iou_threshold=0.0)
+        GreedyNms(iou_threshold=0.0)
     with pytest.raises(NgioValueError, match="Halo along 'x' must be >= 0"):
         ObjectDetectionIterator(image, axes_order="yx").with_halo(x=-1)
 
@@ -351,3 +369,122 @@ def test_name_and_label_are_refused():
             ObjectDetectionIterator(image, axes_order="yx").detect(
                 _fixed_boxes_factory([box])
             )
+
+
+# --- the NMS protocol --------------------------------------------------------
+
+
+class _KeepAll:
+    """A pass-through suppression: every raw detection survives."""
+
+    score_column = "confidence"
+    max_detections_per_tile = 10_000
+
+    def suppress(self, detections):
+        return list(detections)
+
+
+class _ClassAwareNms:
+    """Suppress only within the same `category` extra field."""
+
+    score_column = "confidence"
+    max_detections_per_tile = 10_000
+
+    def suppress(self, detections):
+        from ngio.iterators import GreedyNms, bbox_iou
+
+        ranked = sorted(detections, key=lambda d: (-d.score, d.tile_index, d.row))
+        kept = []
+        for detection in ranked:
+            assert detection.roi.model_extra is not None
+            category = detection.roi.model_extra.get("category")
+            duplicate = any(
+                other.roi.model_extra is not None
+                and other.roi.model_extra.get("category") == category
+                and other.group == detection.group
+                and bbox_iou(other.bounds, detection.bounds) >= 0.4
+                for other in kept
+            )
+            if not duplicate:
+                kept.append(detection)
+        # GreedyNms imported only to prove both live side by side.
+        assert isinstance(GreedyNms(), object)
+        return kept
+
+
+def test_custom_nms_keep_all_keeps_every_box():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+    boxes = [
+        _box(0, 0, 10, 10, confidence=0.9),
+        _box(2, 2, 10, 10, confidence=0.5),
+    ]
+    table = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(_KeepAll())
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert table is not None
+    assert len(table.rois()) == 2, "the default would have suppressed one"
+
+
+def test_custom_nms_class_aware_suppression():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+    boxes = [
+        _box(0, 0, 10, 10, confidence=0.9, category=1),
+        _box(2, 2, 10, 10, confidence=0.5, category=2),  # overlaps, other class
+        _box(1, 1, 10, 10, confidence=0.4, category=1),  # overlaps, same class
+    ]
+    table = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(_ClassAwareNms())
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert table is not None
+    assert len(table.rois()) == 2, "same-class duplicate suppressed, other kept"
+
+
+def test_custom_score_column_ranks_and_names():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+    boxes = [
+        _box(0, 0, 10, 10, quality=0.2),
+        _box(2, 2, 10, 10, quality=0.8),
+    ]
+    table = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(GreedyNms(iou_threshold=0.4, score_column="quality"))
+        .detect(_fixed_boxes_factory(boxes))
+    )
+    assert table is not None
+    assert len(table.rois()) == 1
+    survivor = table.rois()[0]
+    assert survivor.model_extra is not None
+    assert survivor.model_extra["quality"] == 0.8, "ranked by the declared column"
+
+
+def test_custom_nms_cap_is_enforced():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+
+    class _TinyCap(_KeepAll):
+        max_detections_per_tile = 2
+
+    many = [_box(0, 0, 1, 1), _box(20, 0, 1, 1), _box(40, 0, 1, 1)]
+    iterator = ObjectDetectionIterator(image, axes_order="yx").with_nms(_TinyCap())
+    with pytest.raises(NgioValueError, match="max_detections_per_tile"):
+        iterator.detect(_fixed_boxes_factory(many))
+
+
+def test_with_nms_carries_through_the_chain_and_refuses_on_a_slice():
+    _, image = _image(np.zeros((64, 64), dtype="uint8"))
+    declared = (
+        ObjectDetectionIterator(image, axes_order="yx")
+        .with_nms(GreedyNms(iou_threshold=0.9))
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+    )
+    assert isinstance(declared._nms, GreedyNms)
+    assert declared._nms.iou_threshold == 0.9
+    declared.prepare_jobs(n_jobs=2)
+    restricted = declared.for_job(0, n_jobs=2)
+    assert isinstance(restricted._nms, GreedyNms), "the slice reads the NMS too"
+    with pytest.raises(NgioValueError, match="for_job"):
+        restricted.with_nms(GreedyNms())

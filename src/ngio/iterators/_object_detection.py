@@ -20,7 +20,7 @@ ones.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, Protocol, Self, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -55,8 +55,69 @@ _BBOX_AXES = ("x", "y", "z")
 
 
 @dataclass(frozen=True, kw_only=True)
-class NmsConfig:
-    """How duplicate detections are suppressed.
+class Detection:
+    """One anchored detection, as suppression sees it.
+
+    Constructed by the framework only. A custom suppression returns a
+    subset of the instances it was given — never construct or copy these —
+    so future ngio versions stay free to add fields.
+
+    Attributes:
+        tile_index: Position of the reporting tile in `iterator.rois`.
+        row: The box's position in that tile's returned list.
+            `(tile_index, row)` is the deterministic tie-breaker.
+        score: The ranking value (the `score_column` extra, or box volume
+            when no tile reported one).
+        roi: The absolute world-space ROI, extra fields riding on it (a
+            class id, say) — not yet renumbered.
+        bounds: Reference-image pixel coordinates, `[min, max)` per bbox
+            axis. Treat as read-only.
+        group: Opaque key of the axes the boxes do not pin (t, or z for a
+            2D detector on 3D data). Only detections with equal `group`
+            can be duplicates of each other.
+    """
+
+    tile_index: int
+    row: int
+    score: float
+    roi: Roi
+    bounds: dict[str, tuple[float, float]]
+    group: tuple
+
+
+class NmsProtocol(Protocol):
+    """What the detection iterator needs from its NMS declaration.
+
+    Two properties the framework reads outside suppression, plus the
+    suppression itself. `suppress` runs only at the join (a serial
+    `detect`, or the distributed gather's `finalize`), on the calling
+    thread — no pickling constraints. It must be deterministic — a pure
+    function of the detection list, ties broken deterministically (the
+    default uses `(-score, tile_index, row)`) — or a distributed gather is
+    no longer bit-identical to a serial run.
+
+    Compatibility policy: future ngio versions will only ever add
+    *optional* members, probed with `getattr`.
+    """
+
+    @property
+    def score_column(self) -> str:
+        """Extra field ranking the detections; also names the output column."""
+        ...
+
+    @property
+    def max_detections_per_tile(self) -> int:
+        """Per-tile runaway-detector guard, enforced at collection."""
+        ...
+
+    def suppress(self, detections: Sequence[Detection]) -> list[Detection]:
+        """Return the survivors — a subset of `detections`, any order."""
+        ...
+
+
+@dataclass(frozen=True, kw_only=True)
+class GreedyNms:
+    """Greedy NMS, the default suppression: highest score first.
 
     Attributes:
         iou_threshold: Two boxes overlapping at or above this
@@ -89,6 +150,20 @@ class NmsConfig:
                 "max_detections_per_tile must be > 0, got "
                 f"{self.max_detections_per_tile}."
             )
+
+    def suppress(self, detections: Sequence[Detection]) -> list[Detection]:
+        """Greedy pass: keep by rank, drop what overlaps a kept box."""
+        ranked = sorted(detections, key=lambda d: (-d.score, d.tile_index, d.row))
+        kept: list[Detection] = []
+        for detection in ranked:
+            duplicate = any(
+                other.group == detection.group
+                and bbox_iou(other.bounds, detection.bounds) >= self.iou_threshold
+                for other in kept
+            )
+            if not duplicate:
+                kept.append(detection)
+        return kept
 
 
 class DetectionGetter(DataGetter[tuple[T, Roi]], Generic[T]):
@@ -130,36 +205,7 @@ class _UnpackedDetectionFunc:
         return self._func(patch)
 
 
-class _Detection:
-    """One box, carried from the tile that found it to the final table."""
-
-    __slots__ = ("bounds", "group", "roi", "row", "score", "tile_index")
-
-    def __init__(
-        self,
-        *,
-        tile_index: int,
-        row: int,
-        score: float,
-        roi: Roi,
-        bounds: dict[str, tuple[float, float]],
-        group: tuple,
-    ) -> None:
-        self.tile_index = tile_index
-        self.row = row
-        self.score = score
-        # The absolute, world-space ROI (extras riding on it), not yet
-        # renumbered.
-        self.roi = roi
-        # Reference-image pixel coordinates, `[min, max)` per bbox axis.
-        self.bounds = bounds
-        # Extents along the axes the boxes do not pin (t, or z for a 2D
-        # detector on a 3D image): only detections sharing them can be
-        # duplicates of each other.
-        self.group = group
-
-
-def _bbox_iou(
+def bbox_iou(
     a: dict[str, tuple[float, float]], b: dict[str, tuple[float, float]]
 ) -> float:
     """Intersection-over-union of two boxes over their (shared) axes."""
@@ -286,15 +332,19 @@ def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
     return rois
 
 
-class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
+class ObjectDetectionIterator(
+    AbstractIteratorBuilder[NumpyPipeType, DaskPipeType, RoiTable]
+):
     """Tile an image, detect per tile, return one deduplicated ROI table.
 
     A read-only iterator: nothing is written to the image, and the halo is a
     pure read margin — call `with_halo(...)` so an object cut by a tile edge
     is seen whole by the neighbouring tile; the duplicate detections that
-    produces are resolved by NMS (`NmsConfig`). The product is a
+    produces are resolved by NMS (declared with `with_nms`, the
+    `GreedyNms` defaults otherwise). The product is a
     `RoiTable` of world-anchored boxes, returned by `detect` for the
-    caller to store.
+    caller to store. Distributed, a `for_job` slice's `detect` banks a
+    partial and `finalize()` runs the one global NMS.
 
     The box contract: each detection is a `Roi` in the *patch's own* pixel
     coordinates — `Roi.from_values(slices={"x": (x0, w), "y": (y0, h)},
@@ -307,6 +357,27 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     # The halo is this iterator's read margin: there is no write to crop it
     # from, and NMS is what reconciles the overlapping context.
     _allow_readonly_halo = True
+    # The declared suppression; `GreedyNms` is frozen, so sharing the
+    # default instance across iterators is safe.
+    _nms: NmsProtocol = GreedyNms()
+    _chain_state_attrs: tuple[str, ...] = ("_nms",)
+
+    def with_nms(self, nms: NmsProtocol) -> Self:
+        """Declare how duplicate detections are suppressed.
+
+        The default is `GreedyNms()`. The jobs of a distributed run read
+        `score_column`/`max_detections_per_tile` at banking, so declare the
+        identical NMS on every job and the gather — like the detection
+        function, it is not part of the plan fingerprint. Declare before
+        `for_job`.
+
+        Args:
+            nms: Anything satisfying `NmsProtocol` — `GreedyNms(...)`, or
+                your own suppression.
+        """
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._nms = nms
+        return new_instance
 
     def __init__(
         self,
@@ -315,7 +386,6 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
-        nms: NmsConfig | None = None,
     ) -> None:
         """Initialize the iterator over `input_image`.
 
@@ -325,8 +395,6 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
             axes_order: Optional axes order for the patches handed to the
                 detector.
             input_transforms: Optional transforms applied to each patch.
-            nms: How duplicate detections are suppressed; `None` uses the
-                `NmsConfig` defaults.
         """
         self._input = input_image
         self._ref_image = input_image
@@ -338,7 +406,6 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         self._channel_selection = channel_selection
         self._axes_order = axes_order
         self._input_transforms = input_transforms
-        self._nms = nms if nms is not None else NmsConfig()
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
@@ -347,7 +414,6 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
             "channel_selection": self._channel_selection,
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
-            "nms": self._nms,
         }
 
     def build_numpy_getter(self, roi: Roi) -> DetectionGetter[np.ndarray]:
@@ -380,21 +446,63 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def finalize(self) -> None:
-        """A no-op: nothing is written, so there is nothing to consolidate.
+    def finalize(self) -> RoiTable:
+        """Merge a distributed run's partials into the one final ROI table.
 
-        Unlike the writers' `finalize`, this stays a no-op on a `for_job`
-        slice too — the read-only gather verb is `merge_partials`.
+        The gather step (see `prepare_jobs`): validates that every job of
+        the prepared plan produced a matching partial — a half-finished run
+        errors instead of returning a silently incomplete table — then
+        rebuilds every tile's raw boxes and runs the full serial pipeline
+        once, globally: anchoring, the cross-tile invariant checks, NMS, and
+        the dense `1..N` renumbering. Bit-identical to a serial `detect` by
+        construction (one exception: an extra field a detector sets to `NaN`
+        does not survive the partial round-trip). On success the partials
+        group is removed. Nothing is registered: the returned table is yours
+        to store with `add_table`.
+
+        Raises on a `for_job` slice (the gather is global) and when no
+        partials exist (nothing was prepared or banked).
         """
+        self._require_unrestricted_finalize()
+        handler = self._partials_handler()
+        merged = merge_partial_frames(self, handler, job_verb="detect")
+
+        results: list[list[Roi]] = [[] for _ in self.rois]
+        if merged is not None:
+            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+                results[int(cast("Any", index))] = _frame_to_rois(
+                    group.drop(columns=[INDEX_COLUMN])
+                )
+        detections = self._collect(results)
+        kept = self._nms.suppress(detections)
+        table = RoiTable(rois=self._renumbered(kept))
+        delete_partials_root(handler)
+        return table
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Iterate `(patch, roi)` pairs over the (haloed) tiles."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
-    def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
-        """Iterate `(patch, roi)` payloads in batches of `batch_size`."""
-        self._require_valid_batch_size(batch_size)
-        return self._iter_batched_readonly(batch_size)
+    def iter(  # type: ignore[override]
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] | None = None,
+        iterator_mode: Literal["readwrite", "readonly"] = "readonly",
+        *,
+        batch_size: int | None = None,
+    ):
+        """Iterate `(patch, roi)` pairs over the (haloed) tiles.
+
+        Read-only by default: there is nothing to write. With `batch_size`
+        set, yields payload lists of up to that many items. See
+        `AbstractIteratorBuilder.iter` for the remaining knobs.
+        """
+        return self._iter_impl(
+            lazy=lazy,
+            data_mode=data_mode,
+            iterator_mode=iterator_mode,
+            batch_size=batch_size,
+        )
 
     @deprecated(
         replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
@@ -412,7 +520,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
-    ) -> RoiTable:
+    ) -> RoiTable | None:
         """Run the detector over every tile and return one table of objects.
 
         The per-tile detection fans out exactly like `reduce` — pass a
@@ -420,6 +528,15 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         renumbering) happens once, at the end, on the calling thread. Nothing
         is written: the returned table is yours to store, e.g.
         `container.add_table(name, table)`.
+
+        On a `for_job` slice it detects only over this job's tiles and banks
+        the detector's raw, **pre-NMS** boxes as a partial, returning `None`
+        — greedy NMS is not hierarchical, so a per-job NMS followed by a
+        merge NMS could differ from a serial run. The gather (`finalize()`,
+        once, after all jobs) runs the ONE global NMS and renumbering,
+        bit-identical to a serial `detect`. The tiles' boxes are validated
+        here, so a malformed detector fails in the job rather than at the
+        gather; re-running a job overwrites its own partial.
 
         Args:
             func: `(patch) -> list[Roi]`, boxes in the *patch's own* pixel
@@ -431,19 +548,15 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         Returns:
             A `RoiTable` of the surviving detections, ids `1..N` in
             (tile, row) order, in the reference image's world coordinates.
-            An image with nothing to detect gives an empty table.
+            An image with nothing to detect gives an empty table. On a
+            `for_job` slice: `None` (the partial is banked).
         """
         if self._partition is not None:
-            raise NgioValueError(
-                "detect on a partition slice would run NMS over only this "
-                "job's tiles — and greedy NMS is not hierarchical, so the "
-                "result could differ from a serial run. Use "
-                "`detect_to_partial(func)` per job and `merge_partials()` "
-                "once, after all jobs."
-            )
+            self._bank_partial(func, mapper=mapper)
+            return None
         results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
         detections = self._collect(results)
-        kept = self._suppress(detections)
+        kept = self._nms.suppress(detections)
         return RoiTable(rois=self._renumbered(kept))
 
     def _partials_handler(self):
@@ -456,29 +569,14 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def _validate_job_context(self, n_jobs: int) -> None:
         validate_partials_context(self, self._partials_handler(), n_jobs)
 
-    def detect_to_partial(
+    def _bank_partial(
         self,
         func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
     ) -> None:
-        """Detect over this job's tiles and store the raw boxes as a partial.
-
-        The per-job step of a distributed run (see `prepare_jobs`): the
-        detector's raw, **pre-NMS** output is stored tagged with its global
-        tile index, so `merge_partials` can run the ONE global NMS and
-        renumbering — bit-identical to a serial `detect` (per-job NMS
-        followed by a merge NMS would not be: greedy NMS is not
-        hierarchical). The tiles' boxes are validated here, so a malformed
-        detector fails in the job rather than at the merge. Only callable on
-        a `for_job` slice; re-running a job overwrites its own partial.
-        """
-        if self._partition is None:
-            raise NgioValueError(
-                "detect_to_partial is the per-job step of a distributed run: "
-                "restrict the iterator first (`for_job(**args)`), or use "
-                "detect() for a local run."
-            )
+        """Detect over this job's tiles and store the raw boxes as a partial."""
+        assert self._partition is not None
         _, job_index, n_jobs = self._partition
         handler = self._partials_handler()
         validate_partials_context(self, handler, n_jobs)
@@ -509,52 +607,18 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
             },
         )
 
-    def merge_partials(self) -> RoiTable:
-        """Merge a distributed run's partials into the one final ROI table.
-
-        The consolidate step (see `prepare_jobs`): validates that every job
-        of the prepared plan produced a matching partial — a half-finished
-        run errors instead of returning a silently incomplete table — then
-        rebuilds every tile's raw boxes and runs the full serial pipeline
-        once, globally: anchoring, the cross-tile invariant checks, NMS, and
-        the dense `1..N` renumbering. Bit-identical to a serial `detect` by
-        construction (one exception: an extra field a detector sets to `NaN`
-        does not survive the partial round-trip).
-        On success the partials group is removed. Nothing is
-        registered: the returned table is yours to store with `add_table`.
-        """
-        if self._partition is not None:
-            raise NgioValueError(
-                "merge_partials belongs to the unrestricted iterator: rebuild "
-                "it without `for_job` for the consolidate step."
-            )
-        handler = self._partials_handler()
-        merged = merge_partial_frames(self, handler)
-
-        results: list[list[Roi]] = [[] for _ in self.rois]
-        if merged is not None:
-            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
-                results[int(cast("Any", index))] = _frame_to_rois(
-                    group.drop(columns=[INDEX_COLUMN])
-                )
-        detections = self._collect(results)
-        kept = self._suppress(detections)
-        table = RoiTable(rois=self._renumbered(kept))
-        delete_partials_root(handler)
-        return table
-
     def _collect(
         self,
         results: list[list[Roi]],
         tile_indices: Sequence[int] | None = None,
-    ) -> list[_Detection]:
+    ) -> list[Detection]:
         """Validate and anchor every tile's boxes into reference coordinates.
 
         `tile_indices` maps each result to its global position in `rois`;
         `None` means the results cover every ROI in order (the serial case).
         """
         pixel_size = self._ref_image.pixel_size
-        detections: list[_Detection] = []
+        detections: list[Detection] = []
         bbox_axes: tuple[str, ...] | None = None
         tiles: list[tuple[int, list[Roi]]] = []
         scored = 0
@@ -578,7 +642,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
             if len(result) > self._nms.max_detections_per_tile:
                 raise NgioValueError(
                     f"Tile {tile_name!r} produced {len(result)} detections, "
-                    "more than NmsConfig.max_detections_per_tile "
+                    "more than the declared NMS's max_detections_per_tile "
                     f"({self._nms.max_detections_per_tile}) allows. Raise the "
                     "cap if the count is genuine; a runaway detector should "
                     "fail here rather than flood the table."
@@ -625,7 +689,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                         assert roi_slice.length is not None
                         score *= roi_slice.length
                 detections.append(
-                    _Detection(
+                    Detection(
                         tile_index=tile_index,
                         row=row,
                         score=score,
@@ -653,22 +717,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                 key.append((axis_name, roi_slice.start, roi_slice.length))
         return tuple(key)
 
-    def _suppress(self, detections: list[_Detection]) -> list[_Detection]:
-        """Greedy NMS: highest score first, drop what overlaps a kept box."""
-        # Deterministic under ties and any mapper: (tile, row) breaks them.
-        ranked = sorted(detections, key=lambda d: (-d.score, d.tile_index, d.row))
-        kept: list[_Detection] = []
-        for detection in ranked:
-            duplicate = any(
-                other.group == detection.group
-                and _bbox_iou(other.bounds, detection.bounds) >= self._nms.iou_threshold
-                for other in kept
-            )
-            if not duplicate:
-                kept.append(detection)
-        return kept
-
-    def _renumbered(self, kept: list[_Detection]) -> list[Roi]:
+    def _renumbered(self, kept: list[Detection]) -> list[Roi]:
         """Dense ids `1..N` in (tile, row) order, stamped on the final ROIs."""
         return [
             detection.roi.model_copy(update={"label": label, "name": str(label)})

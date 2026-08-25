@@ -3,9 +3,9 @@
 Read-only iterators (features, detection) end in a *global join* — one
 coalesce, one NMS pass — that independent jobs cannot reproduce piecewise.
 Their distributed form therefore stores each job's **raw pre-join records**
-here, in a scratch group beside the multiscale levels, and the consolidate
-step (`merge_partials`) reconstructs the full record set and runs the single
-global join: bit-for-bit the serial answer, custom joins included.
+here, in a scratch group beside the multiscale levels, and the gather step
+(`finalize()`) reconstructs the full record set and runs the single global
+join: bit-for-bit the serial answer, custom joins included.
 
 The scratch group (`_ngio_partials`) plays the role the stitch scratch plays
 for stitched segmentations: transient per-job evidence, invisible to
@@ -136,6 +136,8 @@ def read_partial(
 def merge_partial_frames(
     iterator: Any,
     handler: ZarrGroupHandler,
+    *,
+    job_verb: str,
 ) -> pd.DataFrame | None:
     """Validate a complete distributed run and return its merged records.
 
@@ -148,7 +150,8 @@ def merge_partial_frames(
 
     Returns the concatenation of every job's records, stably sorted by
     `INDEX_COLUMN` (intra-unit row order preserved), or `None` when every
-    job was empty.
+    job was empty. `job_verb` is the caller's per-job topic verb, used in
+    error messages.
     """
     from ngio.iterators._mappers import write_conflict_components
     from ngio.iterators._split import partition_components
@@ -156,8 +159,9 @@ def merge_partial_frames(
     root_attrs = read_partials_root_attrs(handler)
     if root_attrs is None:
         raise NgioValueError(
-            "No partials to merge: run `prepare_jobs(n_jobs)` and the "
-            "per-job partial step before merging."
+            "No partials to merge: run `prepare_jobs(n_jobs)`, then "
+            f"`for_job(**args).{job_verb}(func)` per job, before "
+            "`finalize()`."
         )
     n_jobs = root_attrs.get("n_jobs")
     if not isinstance(n_jobs, int) or root_attrs.get(

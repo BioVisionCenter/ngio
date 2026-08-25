@@ -4,12 +4,13 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator, Mapping
 from types import MappingProxyType
-from typing import Generic, Literal, Self, TypedDict, TypeVar, overload
+from typing import Generic, Literal, Self, TypeAlias, TypedDict, TypeVar, overload
 
 from ngio.common import Roi
 from ngio.common._pyramid import RegionsLike
 from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.io_pipes._merge_policy import MergeInput
 from ngio.io_pipes._ops_slices_utils import (
     _pairs_stream,
     check_if_regions_overlap,
@@ -45,8 +46,17 @@ from ngio.utils import (
 
 NumpyPipeType = TypeVar("NumpyPipeType")
 DaskPipeType = TypeVar("DaskPipeType")
+# The result of the `finalize` gather: `None` on the writing iterators,
+# the merged table on the read-only ones.
+FinalizeType = TypeVar("FinalizeType")
 R = TypeVar("R")
 T = TypeVar("T")
+
+#: What `on_overlap` accepts: `"last"` keeps the deterministic wave-order
+#: last-writer-wins as an explicit acknowledgment; any `merge=` input
+#: (`"max"`/`"min"`/`"sum"`/`"keep_nonzero"`, a merge function, or a
+#: `MergePolicy`) combines each write with what is on disk instead.
+OverlapPolicy: TypeAlias = Literal["last"] | MergeInput
 
 
 class JobArgs(TypedDict):
@@ -61,7 +71,7 @@ class JobArgs(TypedDict):
     n_jobs: int
 
 
-class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
+class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, FinalizeType]):
     """Base class for building iterators over ROIs.
 
     Constructor naming convention across the concrete iterators: a bare
@@ -82,8 +92,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     # a mutable class-level `{}` would be one shared across every iterator.
     _halo: Mapping[str, int] = MappingProxyType({})
     # A read-only subclass that opts in declares the halo a pure read margin:
-    # there is no write to crop it from, and the subclass owns reconciling the
-    # overlapping context (the detection iterator's NMS). Off by default so a
+    # there is no write to crop it from, and the overlapping context must be
+    # reconciled — by the subclass itself (the detection iterator's NMS) or
+    # by the caller's join, via stamped provenance (the feature iterator's
+    # `roi_index`/`roi_name` columns in `coalesce`). Off by default so a
     # read-only iterator does not silently measure grown regions.
     _allow_readonly_halo: bool = False
     # Set by `for_job`: (selected unit indices, job_index, n_jobs).
@@ -92,6 +104,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     # a partition slice refuses further reshaping instead of silently
     # invalidating them.
     _partition: tuple[frozenset[int], int, int] | None = None
+    #: Attribute names of builder-chain declarations carried through cloning,
+    #: like `_halo` (subclasses list e.g. `_stitch`, `_nms`, `_join`,
+    #: `_on_overlap`). Derived state (a `_stitch_plan`) must NOT be listed.
+    _chain_state_attrs: tuple[str, ...] = ()
 
     def __repr__(self) -> str:
         halo = f", halo={self._halo}" if self._halo else ""
@@ -173,8 +189,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         new_instance = self.__class__(**init_kwargs)
         new_instance._set_rois(rois)
         # Carried here rather than through every concrete `get_init_kwargs`:
-        # the halo is orthogonal to how an iterator was built.
+        # the halo and the chain declarations are orthogonal to how an
+        # iterator was built.
         new_instance._halo = self._halo
+        for attr in self._chain_state_attrs:
+            setattr(new_instance, attr, getattr(self, attr))
         return new_instance
 
     def with_halo(self, x: int = 0, y: int = 0, z: int = 0, t: int = 0) -> Self:
@@ -202,10 +221,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             A new iterator reading with the halo.
 
         Raises:
-            NgioValueError: On a read-only iterator (no write to crop the
-                halo from; the detection iterator opts in and reconciles the
-                overlap with NMS), on an in-place iterator, or for a
-                negative margin.
+            NgioValueError: On a read-only iterator that has not opted in
+                (no write to crop the halo from; detection opts in and
+                reconciles the overlap with NMS, feature extraction opts in
+                and stamps `roi_index`/`roi_name` so your `coalesce` can),
+                on an in-place iterator, or for a negative margin.
 
         Example:
             ```python
@@ -479,11 +499,17 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         raise NotImplementedError
 
     @abstractmethod
-    def finalize(self) -> None:
-        """Run once after every unit completes.
+    def finalize(self) -> FinalizeType:
+        """The one gather step, run once after every unit (or job) completes.
 
         Writing iterators resolve any pending reconciliation (the stitch) and
-        consolidate the output pyramid here; read-only iterators do nothing.
+        consolidate the output pyramid, returning `None`; the serial verbs
+        call it automatically. Read-only iterators merge the partials banked
+        by a distributed run and return the final table — nothing is
+        registered, the table is the caller's to store with `add_table`.
+
+        Raises on a `for_job` slice: the gather is global and belongs to the
+        unrestricted iterator, once, after all jobs.
         """
         raise NotImplementedError
 
@@ -595,6 +621,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
     ) -> Generator:
         """`iter()` without the deprecation warnings, for internal callers."""
+        if iterator_mode == "readwrite":
+            self._validate_write_plan()
         if data_mode == "numpy":
             getters = self._numpy_getters_generator()
             setters = self._numpy_setters_generator()
@@ -631,38 +659,14 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         if batch_size < 1:
             raise NgioValueError(f"batch_size must be >= 1, got {batch_size}.")
 
-    def iter_batched(
-        self, batch_size: int = 8
+    def _iter_batched(
+        self, batch_size: int
     ) -> Generator[
         tuple[list[NumpyPipeType], list[DataSetterProtocol[NumpyPipeType]]],
         None,
         None,
     ]:
-        """Iterate the ROIs in batches: `(patches, writers)` per batch.
-
-        Two aligned lists of up to `batch_size` items — stack the patches
-        yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
-        automatic padding), run the model once, and hand each result to its
-        writer. Batches follow ROI order — unlike the mappers' canonical
-        wave order, so on ROIs with overlapping writes the manual loop is
-        deterministic but not bit-identical to `map`. The run finalizes when
-        the generator is fully drained, exactly like `iter` — on a stitching
-        iterator that finalize is the resolve, so drain the loop to
-        completion.
-
-        Args:
-            batch_size: Maximum items per batch; the last batch may be
-                smaller.
-
-        Example:
-            ```python
-            for patches, writers in iterator.iter_batched(8):
-                outs = model(np.stack(patches))
-                for writer, out in zip(writers, outs):
-                    writer(out)
-            ```
-        """
-        self._require_valid_batch_size(batch_size)
+        """The read-write batching path of `iter(batch_size=...)`."""
         getters = self._numpy_getters_generator()
         setters = self._numpy_setters_generator()
         batch: list = []
@@ -687,6 +691,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[True],
         data_mode: Literal["numpy"],
         iterator_mode: Literal["readwrite"],
+        *,
+        batch_size: None = ...,
     ) -> Generator[
         tuple[DataGetterProtocol[NumpyPipeType], DataSetterProtocol[NumpyPipeType]]
     ]: ...
@@ -697,6 +703,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[True],
         data_mode: Literal["numpy"],
         iterator_mode: Literal["readonly"] = ...,
+        *,
+        batch_size: None = ...,
     ) -> Generator[DataGetterProtocol[NumpyPipeType]]: ...
 
     @overload
@@ -705,6 +713,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[True],
         data_mode: Literal["dask"],
         iterator_mode: Literal["readwrite"],
+        *,
+        batch_size: None = ...,
     ) -> Generator[
         tuple[DataGetterProtocol[DaskPipeType], DataSetterProtocol[DaskPipeType]]
     ]: ...
@@ -715,6 +725,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[True],
         data_mode: Literal["dask"],
         iterator_mode: Literal["readonly"] = ...,
+        *,
+        batch_size: None = ...,
     ) -> Generator[DataGetterProtocol[DaskPipeType]]: ...
 
     @overload
@@ -723,6 +735,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[False],
         data_mode: Literal["numpy"],
         iterator_mode: Literal["readwrite"],
+        *,
+        batch_size: None = ...,
     ) -> Generator[tuple[NumpyPipeType, DataSetterProtocol[NumpyPipeType]]]: ...
 
     @overload
@@ -731,6 +745,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[False],
         data_mode: Literal["numpy"],
         iterator_mode: Literal["readonly"] = ...,
+        *,
+        batch_size: None = ...,
     ) -> Generator[NumpyPipeType]: ...
 
     @overload
@@ -739,6 +755,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[False],
         data_mode: Literal["dask"],
         iterator_mode: Literal["readwrite"],
+        *,
+        batch_size: None = ...,
     ) -> Generator[tuple[DaskPipeType, DataSetterProtocol[DaskPipeType]]]: ...
 
     @overload
@@ -747,25 +765,113 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         lazy: Literal[False],
         data_mode: Literal["dask"],
         iterator_mode: Literal["readonly"] = ...,
+        *,
+        batch_size: None = ...,
     ) -> Generator[DaskPipeType]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False] = ...,
+        data_mode: Literal["numpy"] | None = ...,
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: int,
+    ) -> Generator[
+        tuple[list[NumpyPipeType], list[DataSetterProtocol[NumpyPipeType]]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False] = ...,
+        data_mode: Literal["numpy"] | None = ...,
+        iterator_mode: Literal["readonly"] = ...,
+        *,
+        batch_size: int,
+    ) -> Generator[list[NumpyPipeType]]: ...
 
     def iter(
         self,
         lazy: bool = False,
         data_mode: Literal["numpy", "dask"] | None = None,
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
+        *,
+        batch_size: int | None = None,
     ) -> Generator:
         """Create an iterator over the pixels of the ROIs.
 
         A writing loop finalizes only when fully drained — on a stitching
         iterator that finalize is the resolve, so abandoning the loop
         mid-way leaves block-offset ids on disk (plus the transient scratch)
-        until a re-run or a later `finalize()`.
+        until a re-run or a later `finalize()`. To write now and gather
+        later on purpose, iterate a `for_job(0, 1)` slice and call
+        `finalize()` on the unrestricted iterator when ready.
+
+        With `batch_size` set, a writing loop yields `(patches, writers)` —
+        two aligned lists of up to `batch_size` items, in ROI order — and a
+        read-only loop yields the payload lists alone. Stack the patches
+        yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
+        automatic padding), run the model once, and hand each result to its
+        writer. Batches follow ROI order — unlike the mappers' canonical
+        wave order, so on ROIs with overlapping writes the manual loop is
+        deterministic but not bit-identical to `map`. Batching is numpy-only
+        and eager: combining `batch_size` with `lazy=True` or
+        `data_mode="dask"` raises.
+
+        Args:
+            lazy: Yield getter/setter handles instead of materialized data.
+            data_mode: `"numpy"` or `"dask"` (deprecated, see note).
+            iterator_mode: `"readwrite"` yields `(patch, writer)` pairs,
+                `"readonly"` yields patches alone.
+            batch_size: When set, yield batches of up to this many items;
+                the last batch may be smaller.
+
+        Example:
+            ```python
+            for patches, writers in iterator.iter(data_mode="numpy", batch_size=8):
+                outs = model(np.stack(patches))
+                for writer, out in zip(writers, outs):
+                    writer(out)
+            ```
 
         Note:
             The dask data mode is deprecated and will be removed in ngio=1.2;
             from then on `iter()` yields numpy arrays.
         """
+        return self._iter_impl(
+            lazy=lazy,
+            data_mode=data_mode,
+            iterator_mode=iterator_mode,
+            batch_size=batch_size,
+        )
+
+    def _iter_impl(
+        self,
+        *,
+        lazy: bool,
+        data_mode: Literal["numpy", "dask"] | None,
+        iterator_mode: Literal["readwrite", "readonly"],
+        batch_size: int | None,
+    ) -> Generator:
+        """Shared body of `iter`; the read-only overrides re-enter here."""
+        if batch_size is not None:
+            self._require_valid_batch_size(batch_size)
+            if lazy:
+                raise NgioValueError(
+                    "batch_size does not combine with lazy=True: a batch is "
+                    "a list of materialized patches. Drop `lazy`, or iterate "
+                    "unbatched."
+                )
+            if data_mode == "dask":
+                raise NgioValueError(
+                    "batch_size is numpy-only. Use data_mode='numpy', or "
+                    "BatchedMapper with map() for automatic padded batching."
+                )
+            if iterator_mode == "readonly":
+                return self._iter_batched_readonly(batch_size)
+            self._validate_write_plan()
+            return self._iter_batched(batch_size)
         if data_mode is None:
             warnings.warn(
                 "iter() currently defaults to data_mode='dask'; in ngio=1.2 it "
@@ -774,7 +880,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 "future behaviour now, or data_mode='dask' to keep the current "
                 "behaviour and silence this warning.",
                 NgioFutureWarning,
-                stacklevel=2,
+                stacklevel=3,
             )
             data_mode = "dask"
         elif data_mode == "dask":
@@ -784,7 +890,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 "forward. Use data_mode='numpy', or Image.get_as_dask() for "
                 "lazy whole-region access.",
                 NgioDeprecationWarning,
-                stacklevel=2,
+                stacklevel=3,
             )
         return self._iter(lazy=lazy, data_mode=data_mode, iterator_mode=iterator_mode)
 
@@ -822,13 +928,21 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
                 "Use reduce (or iter) to compute without writing."
             )
 
+    def _validate_write_plan(self) -> None:
+        """Hook run before any pixel is written; the base accepts everything.
+
+        A writing subclass with a strict overlap contract (segmentation)
+        refuses undeclared overlapping write footprints here.
+        """
+
     def _require_no_halo_on_readonly_verbs(self) -> None:
         """Refuse `reduce`/readonly `iter` on a haloed *writing* iterator.
 
         The halo is defined against the write: read grown, crop, write the
         core. A read-only verb has no write to crop, so it would silently
         hand `func` the grown regions. (Read-only iterators that opt into a
-        halo — object detection — reconcile the overlap themselves.)
+        halo — object detection, feature extraction — own reconciling the
+        overlap instead.)
         """
         if self._halo and self.output_image is not None:
             raise NgioValueError(
@@ -842,9 +956,9 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         """Hook refusing job splitting where it could not be correct.
 
         The base allows it everywhere: writers distribute their writes, and
-        the read-only iterators distribute via their partial verbs
-        (`measure_to_partial` / `detect_to_partial`) plus a `merge_partials`
-        gather. Subclasses with an unsupported configuration raise here.
+        the read-only iterators' topic verbs (`measure` / `detect`) bank a
+        partial on a slice, gathered by `finalize()`. Subclasses with an
+        unsupported configuration raise here.
         """
 
     @property
@@ -871,9 +985,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         separate SLURM array tasks, in any order. Every job must build an
         identical iterator (construction is metadata-only and the partition
         derives deterministically from it), apply `for_job` *last* in the
-        builder chain, and its `map` deliberately does not finalize: the
-        gather step is the unrestricted iterator's `finalize()` (writers) or
-        `merge_partials()` (read-only iterators), once, after all jobs.
+        builder chain, and its verbs deliberately do not finalize — a slice's
+        `map`/`process`/`segment` writes only its share, and `measure`/
+        `detect` bank a partial instead of joining. The gather step is the
+        unrestricted iterator's `finalize()`, once, after all jobs.
         Stitched and read-only runs also need `prepare_jobs(n_jobs)` first.
         See the distributed-runs guide in the iterators docs.
 
@@ -955,6 +1070,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         if n_jobs < 1:
             raise NgioValueError(f"n_jobs must be >= 1, got {n_jobs}.")
         self._require_splittable()
+        if self.output_image is not None:
+            self._validate_write_plan()
         units = list(self._numpy_units_generator())
         partition = partition_components(write_conflict_components(units), n_jobs)
         self._prepare_distributed(n_jobs)
@@ -1019,10 +1136,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
     def _require_unrestricted_finalize(self) -> None:
         """Refuse `finalize` on a partition slice: the gather is global.
 
-        Called by the writing iterators' `finalize` implementations. A slice
-        holds one job's share; finalizing from it would resolve the pyramid
-        against a partially-written level 0. Rebuild the iterator without
-        `for_job` and finalize once, after every job completes.
+        Called by every `finalize` implementation. A slice holds one job's
+        share; gathering from it would resolve the pyramid against a
+        partially-written level 0, or join only one job's partials. Rebuild
+        the iterator without `for_job` and finalize once, after every job
+        completes.
         """
         if self._partition is not None:
             _, job_index, n_jobs = self._partition
@@ -1054,6 +1172,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
             mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
         units = list(self._numpy_units_generator())
         self._require_writable_units(units)
+        self._validate_write_plan()
         mapper(func, units)
         # A partition slice runs only its share; the finalize (the one global
         # step) belongs to the unrestricted iterator, once every job is done.
@@ -1110,6 +1229,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType]):
         _mapper = self._require_serial_dask_mapper(mapper)
         units = list(self._dask_units_generator())
         self._require_writable_units(units)
+        self._validate_write_plan()
         _mapper(func, units)
         if self._partition is None:
             self.finalize()

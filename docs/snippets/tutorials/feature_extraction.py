@@ -97,6 +97,7 @@ iterator = FeatureExtractorIterator(
 # Pass `mapper=ThreadedMapper("auto")` to fan the measurements out in parallel;
 # the join always happens once, at the end. Nothing is written yet.
 feat_table = iterator.measure(extract_features)
+assert feat_table is not None  # a serial run always returns the table
 
 # Storing the table is a separate, explicit step.
 ome_zarr.add_table("nuclei_regionprops", feat_table, overwrite=True)
@@ -114,6 +115,32 @@ for image_data, label_data, roi in iterator.iter_as_numpy():
 manual_table = FeatureTable(table_data=pd.concat(feat_frames), reference_label="nuclei")
 ome_zarr.add_table("nuclei_regionprops_manual", manual_table, overwrite=True)
 # --8<-- [end:manual_extract]
+
+# --8<-- [start:halo_dedup]
+from ngio.tables import Table
+
+
+def keep_most_complete(results: list[pd.DataFrame]) -> Table:
+    """One row per object: the measurement from the tile that saw most of it."""
+    joined = pd.concat([frame for frame in results if len(frame)])
+    joined = (
+        joined.sort_values("area", ascending=False)
+        .drop_duplicates("label")
+        .drop(columns=["roi_index", "roi_name"])
+        .set_index("label")
+        .sort_index()
+    )
+    return FeatureTable(table_data=joined, reference_label="nuclei")
+
+
+# Four tiles, each reading 32 px of context past its edges: a border nucleus
+# is measured whole by every tile that sees it, so its label shows up more
+# than once — each row stamped with the `roi_index`/`roi_name` it came from.
+tiled = iterator.by_blocks(num_y=2, num_x=2).with_halo(y=32, x=32)
+tiled_table = tiled.with_join(keep_most_complete).measure(extract_features)
+assert tiled_table is not None
+ome_zarr.add_table("nuclei_regionprops_tiled", tiled_table, overwrite=True)
+# --8<-- [end:halo_dedup]
 
 # --8<-- [start:read_table_back]
 print(table_html(ome_zarr.get_table("nuclei_regionprops").dataframe.head()))

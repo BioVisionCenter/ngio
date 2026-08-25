@@ -175,11 +175,21 @@ the top-level `ngio` namespace):
 </div>
 
 
-* `SegmentationIterator` — segment an image into a label; see the [image segmentation tutorial](../tutorials/image_segmentation.md).
+* `SegmentationIterator` — `segment` an image into a label; see the [image segmentation tutorial](../tutorials/image_segmentation.md).
 * `MaskedSegmentationIterator` — the same, restricted to the objects of a masking ROI table (segment cells only within a tissue region, say); same tutorial.
-* `ImageProcessingIterator` — image in, new image out (a filter, a projection, a restoration model); see the [image processing tutorial](../tutorials/image_processing.md).
+* `ImageProcessingIterator` — `process` an image into a new image (a filter, a projection, a restoration model); see the [image processing tutorial](../tutorials/image_processing.md).
 * `FeatureExtractorIterator` — read-only; `measure` joins per-region measurements into one feature table; see the [feature extraction tutorial](../tutorials/feature_extraction.md).
 * `ObjectDetectionIterator` — read-only; `detect` turns a tile-by-tile detector into one deduplicated ROI table; see [Detecting objects into a ROI table](#detecting-objects-into-a-roi-table).
+
+The verbs come in two layers. Every iterator shares the *generic* layer — `map`
+(apply and write back), `reduce` (collect without writing), the hand-driven
+`iter` loop, and the distributed steps `prepare_jobs`/`for_job`/`finalize` —
+and each iterator adds one *topic verb* that says what the iteration means:
+`segment`, `process`, `measure`, `detect`. On the writers the topic verb is
+`map` under its domain name; on the read-only iterators it also runs the final
+join (the feature join, the detection NMS) and returns the table. All four
+are partition-aware: on a `for_job` slice they do only that job's share, and
+`finalize()` is the one gather, whatever the iterator.
 
 ## Building one
 
@@ -200,7 +210,7 @@ fixes the axes order of the patches the function sees (`"yx"` above),
 `input_transforms`/`output_transforms` apply
 [transforms](../api/ngio/transforms.md) around the function, and the writing
 iterators take `consolidation_mode` (how the output pyramid is rebuilt at the
-end) and, on segmentation, `stitch`. The full signatures live in the
+end). The full signatures live in the
 [API reference](../api/iterators.md).
 
 `product` replaces that single region with the ones a ROI table names — here the
@@ -225,7 +235,8 @@ happens to the leftover — `"clip"` (the default) shrinks the last tile to the 
 (100 px at 32 gives `32, 32, 18, 18` rather than `32, 32, 32, 4`), `"shift"` slides
 the last tile back to stay full-size (it then overlaps its neighbour — fine for
 detection or a merge; a plain parallel write schedules the overlap into a separate
-wave, see below), and `"drop"` discards it.
+wave, see below, and on segmentation the overlap needs a declared resolution —
+`with_stitch(...)` or `on_overlap(...)`), and `"drop"` discards it.
 `by_blocks(num_x=..., num_y=...)` is the complement — you say how many tiles, not how
 big, and the partition is balanced by construction. `by_chunks()` tiles by the *input*
 image's chunk grid, the natural unit of reading; `by_write_units()` tiles by the
@@ -240,7 +251,7 @@ shape for "run this 2D function on every plane"), and `by_zyx(strict=...)` does 
 same per 3D volume. The tutorial snippets use them wherever a 2D or 3D function meets
 a higher-dimensional image.
 
-From here you would call `map` or iterate with `iter_as_numpy` to do the work;
+From here you would call the topic verb (`segment` here) or iterate with `iter_as_numpy` to do the work;
 the [image processing tutorial](../tutorials/image_processing.md) carries this through to
 a written result. (`iter_as_numpy` is `iter(data_mode="numpy")` — a bare
 `iter()` still defaults to dask and warns; numpy becomes the default in
@@ -284,7 +295,7 @@ construction; other tilings just run more waves.
     it too — so for ROIs whose *pixels* genuinely overlap (a `by_grid`
     stride below the size, a `"shift"` tail), which write wins the shared
     pixels is identical under every mapper. The one exception is the
-    hand-driven loops (`iter`, `iter_batched`), which run in ROI order:
+    hand-driven loops (`iter`, batched or not), which run in ROI order:
     deterministic, but not bit-identical to `map` on contested pixels.
     Mask-protected and pixel-disjoint writes are order-independent either
     way, as is an order-independent `merge=` (`"max"`, `"min"`, `"sum"`).
@@ -309,7 +320,7 @@ This is the one mapper that changes the func's contract: it receives a stacked b
 
 Within a batch the reads fan out on a thread pool (`read_workers`), while the writes run serially on the calling thread. Batches are cut over the same canonical (wave) order as every other mapper, so contested pixels land identically — and the serial writes make batched mapping write-safe on any tiling.
 
-Prefer to drive the loop yourself? `iter_batched` yields `(patches, writers)` — two aligned lists of up to `batch_size` items, in ROI order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like `iter`; on the read-only iterators it yields the payload lists alone (`(image, label, roi)` tuples for features, `(patch, roi)` for detection):
+Prefer to drive the loop yourself? `iter(batch_size=...)` yields `(patches, writers)` — two aligned lists of up to `batch_size` items, in ROI order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like the unbatched `iter`; on the read-only iterators it yields the payload lists alone (`(image, label, roi)` tuples for features, `(patch, roi)` for detection):
 
 ```python exec="true" source="material-block" session="iterators"
 --8<-- "docs/snippets/getting_started/iterators.py:iter_batched_demo"
@@ -324,7 +335,7 @@ n_jobs = 4
 job_index = 0  # e.g. int($SLURM_ARRAY_TASK_ID)
 
 iterator = SegmentationIterator(image, label, ...).by_chunks()
-iterator.for_job(job_index, n_jobs=n_jobs).map(func)
+iterator.for_job(job_index, n_jobs=n_jobs).segment(func)
 ```
 
 and, in a dependent job once every array task has finished, the gather step:
@@ -334,13 +345,13 @@ iterator = SegmentationIterator(image, label, ...).by_chunks()  # same construct
 iterator.finalize()
 ```
 
-`for_job` is a builder call like `by_grid` or `with_halo` — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, `map(func, mapper=...)` included. It comes *last* in the chain (reshaping a restricted iterator refuses), and its `map` deliberately does **not** finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date.
+`for_job` is a builder call like `by_grid` or `with_halo` — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, `segment(func, mapper=...)` included. It comes *last* in the chain (reshaping a restricted iterator refuses), and a slice's `segment` (or `map`) deliberately does **not** finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date. (That also makes `for_job(0, 1)` the sanctioned way to *defer* a finalize on purpose: one job that writes everything, gathered whenever you choose.)
 
 Each job builds the identical iterator — construction is metadata-only and deterministic, so this is cheap — and derives the same partition on its own; there is nothing to hand from one job to another. Partitions never share a write unit, so the jobs need no locks and no coordination, in any order and any overlap in time; regions whose footprints conflict simply travel in the same partition, where the ordinary wave planning handles them.
 
 Effective parallelism therefore equals the number of independent groups, which follows the **output's** chunking. Inspect it before submitting: `[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]`. One fat list plus empties means the output chunking (or a tiling like `by_zyx`, which splits along t only) is the constraint, not the cluster — a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and [`write_conflict_components`][ngio.iterators.write_conflict_components] makes the grouping auditable.
 
-The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). Read-only iterators refuse to partition — their gathers (feature coalescing, detection NMS) are global joins.
+The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). The read-only iterators partition too — on a slice `measure`/`detect` bank a *partial* instead of joining, and `finalize()` runs the one global join (see [below](#distributed-measurement-and-detection)).
 
 ### The three-phase recipe: `prepare_jobs`
 
@@ -354,7 +365,7 @@ args_list = iterator.prepare_jobs(n_jobs=4)
 
 # parallel task, once per entry
 iterator = SegmentationIterator(image, label, ...).by_chunks()
-iterator.for_job(**args).map(func)
+iterator.for_job(**args).segment(func)
 
 # consolidate task, after all parallel tasks
 iterator = SegmentationIterator(image, label, ...).by_chunks()
@@ -365,17 +376,17 @@ For a plain writing iterator `prepare_jobs` is optional — the two-step recipe 
 
 ### Distributed stitching
 
-With `prepare_jobs` in the recipe, `stitch=True` distributes too. The init step creates only the scratch *root*; each job creates and writes its own tiles' bank arrays; the consolidate task's `finalize()` verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:
+With `prepare_jobs` in the recipe, `with_stitch(...)` distributes too. The init step creates only the scratch *root*; each job creates and writes its own tiles' bank arrays; the consolidate task's `finalize()` verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:
 
 - **Banking claims nothing shared**, so a stitched iterator splits into jobs exactly as the plain map would (overlapping tiles share label chunks, so a contiguous overlapping layout travels as one job).
 - **A failed job never destroys the others' banks** — re-run just that job (banking is idempotent) and gather as planned.
-- **Every step validates a plan fingerprint** stamped at init: change the tiling, halo, stitch config, or `n_jobs` between phases and the run fails loudly.
+- **Every step validates a plan fingerprint** stamped at init: change the tiling, halo, stitch config, or `n_jobs` between phases and the run fails loudly. A custom seam matcher (like a custom NMS, a declared join, or the function itself) cannot be fingerprinted — declare the identical chain in every phase.
 
 The consolidate task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.
 
 ### Distributed measurement and detection
 
-The read-only iterators end in a *global join* — one feature coalesce, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their distributed form therefore stores each job's **raw pre-join records** as a *partial*, and the consolidate step runs the single global join:
+The read-only iterators end in a *global join* — one feature join, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their topic verbs are partition-aware: on a `for_job` slice, `measure`/`detect` store the job's **raw pre-join records** as a *partial* and return `None`, and the consolidate task's `finalize()` runs the single global join and returns the table — the same three-phase recipe as the writers, verb for verb:
 
 ```python
 # init task
@@ -384,18 +395,17 @@ args_list = iterator.prepare_jobs(n_jobs=4)
 
 # parallel task, once per entry of args_list
 iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
-iterator.for_job(**args).measure_to_partial(measure)      # features
-# iterator.for_job(**args).detect_to_partial(detector)   # detection
+iterator.for_job(**args).measure(measure)      # features (detection: .detect(detector))
 
 # consolidate task, after all parallel tasks
 iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
-table = iterator.merge_partials()
-container.add_table("measurements", table)               # storing stays yours
+table = iterator.finalize()
+container.add_table("measurements", table)     # storing stays yours
 ```
 
-The result is bit-identical to a serial `measure` / `detect` — including a **custom `coalesce`**, which runs once at merge time over the reconstructed per-ROI results (dicts normalized to DataFrames, a `label` index to a `label` column). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
+The result is bit-identical to a serial `measure` / `detect` — including a **declared join** (`with_join(...)` on the chain), which runs once at the gather over the normalized per-ROI results: dicts become DataFrames, a `label` index becomes a `label` column, and every row is stamped with its `roi_index` (the ROI's global index) and `roi_name`. A serial `measure`'s declared join sees the identical normalized list — there is one contract, not two — and declaring it on a `for_job` slice is inert (the slice banks regardless; the gather runs it). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
 
-The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (`measure`, `detect`) refuse on a `for_job` slice, pointing at their partial counterparts.
+`finalize` refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — refuses on a `for_job` slice (the gather is global), and refuses when nothing was prepared or banked.
 
 ## Halos: context without seams
 
@@ -407,13 +417,39 @@ Tiling an image and processing each tile independently leaves artifacts at the j
 
 `smooth` receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.
 
+Two read-only iterators take a halo too, as a pure read margin — there is no write to crop it from, so the overlap must be reconciled after the fact. Detection reconciles it itself: NMS removes the duplicate boxes. Feature extraction delegates it to you: patches *and* the `roi` argument cover the grown region, a border object is measured by every region that sees it, and the resulting duplicate `label` rows are yours to reconcile in a declared join (`with_join`) — every row carries `roi_index`/`roi_name` for exactly that (the default join keeps the duplicates as-is).
+
 The ROIs themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping *writes* would have to be serialized; overlapping reads cost nothing.
 
 Read the same trick backwards and it is a "trim": if you want each tile's outer margin discarded rather than written, that is exactly a halo of that width.
 
+## Overlap and reconciliation
+
+Every iterator has exactly one *reconciliation declaration* — the chain call
+that says how per-region results become one consistent answer — and each is
+backed by a swappable protocol, so a custom implementation drops in without
+touching internals:
+
+| Iterator | Declaration | Required? | Behind it |
+|---|---|---|---|
+| `ImageProcessing` | `on_overlap(policy)` | optional — undeclared overlap keeps the deterministic wave-order last-writer-wins | the write path's `merge=` policies (`"max"`, `"sum"`, a callable, …) |
+| `Segmentation` | `with_stitch(config)` *or* `on_overlap(policy)` | **required when write footprints overlap** — undeclared overlapping label writes refuse loudly | `SeamMatcherProtocol` (`StitchConfig(seam_matcher=...)`, `IouSeamMatcher` default) |
+| `MaskedSegmentation` | `with_stitch(config)` (within a mask) | never — mask-protected writes cannot contest, `on_overlap` is refused | same |
+| `FeatureExtractor` | `with_join(join)` | optional — the default join keeps duplicate rows, provenance columns attached | `JoinProtocol` (`ConcatJoin` default) |
+| `ObjectDetection` | `with_nms(nms)` | optional — `GreedyNms()` by default | `NmsProtocol` (`GreedyNms` default) |
+
+The segmentation rule is the one hard requirement, and it is deliberate:
+last-writer-wins on two overlapping *label* writes produces torn objects —
+deterministic, but almost never the intent — so the writing verbs refuse until
+you say what should happen. The check is pixel-exact on the write footprints:
+a halo never triggers it (the margin is cropped before the write), and tiles
+that merely share a chunk without sharing pixels pass. `on_overlap("last")`
+declares exactly the old behavior; any merge rule combines with what is on
+disk instead.
+
 ## Stitching a tiled segmentation
 
-Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. `stitch=True` fixes both:
+Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. `with_stitch()` fixes both:
 
 ```python exec="true" source="material-block" session="iterators"
 --8<-- "docs/snippets/getting_started/iterators.py:stitch_demo"
@@ -423,7 +459,7 @@ Any ROI list stitches: a regular grid with a halo, an overlapping-FOV microscope
 
 During the map each tile banks its grown prediction into transient per-tile scratch arrays, removed once the stitch resolves. Where two tiles wrote the same *output* pixels and their objects did not match, the later write wins — deterministically, because every mapper runs in the same wave order.
 
-`MaskedSegmentationIterator` takes `stitch=True` too, for tiling *within* a mask: a huge masked object tiled with `by_grid` + `with_halo` gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no `UniqueLabelsTransform` is needed (combining it with `stitch` raises).
+`MaskedSegmentationIterator` takes `with_stitch()` too, for tiling *within* a mask: a huge masked object tiled with `by_grid` + `with_halo` gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no `UniqueLabelsTransform` is needed (combining it with `stitch` raises).
 
 Tune it with `StitchConfig`:
 
@@ -431,7 +467,9 @@ Tune it with `StitchConfig`:
 from ngio.iterators import StitchConfig
 
 iterator = SegmentationIterator(
-    image, label, stitch=StitchConfig(iou_threshold=0.5, block_size=50_000)
+    image, label
+).with_stitch(
+    StitchConfig(iou_threshold=0.5, block_size=50_000)
 )
 ```
 
@@ -465,7 +503,7 @@ Not every model produces a mask. An object detector — a YOLO network, a spot f
 --8<-- "docs/snippets/getting_started/iterators.py:detect_demo"
 ```
 
-NMS is configured with `nms=NmsConfig(iou_threshold=..., score_column=...)` on the constructor, exactly as stitching is with `stitch=StitchConfig(...)`; a parallel `mapper=` on `detect` fans the tiles out like any `reduce`.
+NMS is declared with `with_nms(GreedyNms(iou_threshold=..., score_column=...))`, exactly as stitching is with `with_stitch(StitchConfig(...))` — and both defaults are swappable protocols: any object with `score_column`, `max_detections_per_tile`, and a deterministic `suppress(detections)` satisfies `NmsProtocol` (soft-NMS, class-aware suppression), and a `StitchConfig(seam_matcher=...)` replaces the IoU criterion with your own `(patch_a, patch_b) -> [(id_a, id_b), ...]` pair decision. A parallel `mapper=` on `detect` fans the tiles out like any `reduce`.
 
 The detector sees one tile at a time and answers in the tile's own pixels; the iterator does the bookkeeping the detector should not — anchoring each tile's boxes into the reference image's world coordinates, and resolving the boundary problem.
 
@@ -484,7 +522,7 @@ The detector sees one tile at a time and answers in the tile's own pixels; the i
       each z-slab or time point; boxes keep their tile's extent along the
       axes they do not pin.
 
-The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which `with_halo` is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
+The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — on a read-only iterator the halo is a pure read margin, there being no write to crop it from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
 
 ### Anchoring a local box yourself
 
@@ -501,23 +539,25 @@ The `space` fields are what keep this honest: `anchor` refuses a world-space box
 | | `ImageProcessing` | `Segmentation` | `MaskedSegmentation` | `FeatureExtractor` | `ObjectDetection` |
 |---|---|---|---|---|---|
 | Writes to | image | label | label (masked) | — | — |
-| Terminal verb | `map` | `map` | `map` | `measure` | `detect` |
-| `reduce` | ✓ | ✓ | ✓ | ✓ | ⚠ [1] |
-| `with_halo` | ✓ | ✓ | ✓ | ✗ | ✓ [1] |
-| `stitch=True` | — | ✓ [2] | ✓ within a mask [2] | — | — |
+| Topic verb | `process` [5] | `segment` [5] | `segment` [5] | `measure` | `detect` |
+| `reduce` | ✓ | ✓ | ✓ | ⚠ [6] | ⚠ [1] |
+| `with_halo` | ✓ | ✓ | ✓ | ✓ [6] | ✓ [1] |
+| `with_stitch` | — | ✓ [2] | ✓ within a mask [2] | — | — |
 | Overlapping ROIs | ✓ [3] | ✓ [3] | ✓ [3] | ✓ | ✓ [1] |
 | `ThreadedMapper` / `ProcessMapper` | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `BatchedMapper` | ✓ | ✓ | ✓ | ✗ [4] | ✗ [4] |
-| Distributed finishing verb | `finalize` | `finalize` | `finalize` | `merge_partials` | `merge_partials` |
+| Distributed gather | `finalize` | `finalize` | `finalize` | `finalize` → table | `finalize` → table |
 
 1. Detection reconciles overlap itself: the halo is a pure read margin and NMS removes the duplicate boxes — but only through `detect`. `reduce` returns raw per-tile boxes.
 2. Stitching takes any ROI list. On the masked iterator it merges sub-objects split by a tile boundary *within one mask*; tiles of different masks are never compared, and ids come out unique across every object — no `UniqueLabelsTransform` needed (combining it with `stitch` raises).
 3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright. One configuration to avoid: an *in-place* run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).
 4. `BatchedMapper` stacks plain arrays; these iterators hand `func` tuple payloads.
+5. On the writers the topic verb is the generic `map` under its domain name; both remain available.
+6. The feature halo is a pure read margin: patches and the `roi` argument grow, a border object can be measured by several regions, and the duplicate rows are yours to reconcile in a declared join (`with_join`) via the stamped `roi_index`/`roi_name` (the default join keeps them, silently). `reduce`/`iter` read the grown regions too. Without a halo, `reduce` is unrestricted.
 
 Restrictions that hold everywhere:
 
-- `stitch` needs a halo or overlapping ROIs, and stays on the numpy path.
+- `with_stitch` needs a halo or overlapping ROIs, stays on the numpy path, and cannot combine with `on_overlap` (the stitch owns the contested pixels).
 - A haloed *writer* refuses `reduce` and read-only `iter`; an in-place run (same array in and out) refuses a halo.
 - `by_write_units` on the read-only iterators falls back to the input's chunks.
 - The deprecated dask verbs run serially, and `ProcessMapper` refuses in-memory stores.

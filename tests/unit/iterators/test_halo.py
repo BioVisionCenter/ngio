@@ -185,14 +185,25 @@ def test_halo_rejects_negative_margins():
         iterator.with_halo(x=-1)
 
 
-def test_halo_refused_on_a_read_only_iterator():
+def test_feature_halo_grows_both_patches_in_step():
+    """The feature halo is a read margin: image and label grow identically."""
     ome_zarr, _ = _container()
     label = ome_zarr.derive_label("lbl")
     label.set_array(np.ones((64, 64), dtype=label.zarr_array.dtype))
-    iterator = FeatureExtractorIterator(ome_zarr.get_image(), label)
+    iterator = FeatureExtractorIterator(
+        ome_zarr.get_image(), label, axes_order="yx"
+    ).by_grid(size_x=32, size_y=32)
+    haloed = iterator.with_halo(x=4, y=4)
 
-    with pytest.raises(NgioValueError, match="read-only"):
-        iterator.with_halo(x=4)
+    core, _, _ = iterator.build_numpy_getter(iterator.rois[0]).get()
+    image_patch, label_patch, roi = haloed.build_numpy_getter(haloed.rois[0]).get()
+    # An interior-corner tile grows only into the image: +4 px on one side.
+    assert image_patch.shape == (core.shape[0] + 4, core.shape[1] + 4)
+    assert label_patch.shape == image_patch.shape
+    # The reported roi covers the grown patch, not the core tile.
+    x_slice = roi.get("x")
+    assert x_slice is not None
+    assert x_slice.length == core.shape[1] + 4
 
 
 def test_zero_halo_is_a_no_op():

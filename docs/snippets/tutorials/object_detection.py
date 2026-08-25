@@ -78,15 +78,17 @@ print(ome_zarr)
 # --8<-- [end:create]
 
 # --8<-- [start:detect]
-from ngio import NmsConfig, ObjectDetectionIterator, ThreadedMapper
+from ngio import GreedyNms, ObjectDetectionIterator, ThreadedMapper
 
 iterator = (
-    ObjectDetectionIterator(image, nms=NmsConfig(iou_threshold=0.4))
+    ObjectDetectionIterator(image)
+    .with_nms(GreedyNms(iou_threshold=0.4))
     .by_grid(size_x=128, size_y=128)
     .with_halo(x=16, y=16)
 )
 
 detections = iterator.detect(find_nuclei, mapper=ThreadedMapper("auto"))
+assert detections is not None  # a serial run always returns the table
 ome_zarr.add_table("nuclei_detections", detections, overwrite=True)
 print(f"Detected {len(detections.rois())} nuclei")
 # --8<-- [end:detect]

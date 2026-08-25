@@ -7,7 +7,7 @@ from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
 from ngio.iterators import SegmentationIterator, ThreadedMapper
-from ngio.iterators._stitch import StitchConfig
+from ngio.iterators._stitch import IouSeamMatcher, StitchConfig
 from ngio.utils import NgioValueError
 
 
@@ -52,8 +52,12 @@ def _setup(image_data: np.ndarray, tile: int = 32):
 def _run_with(image_data, func, stitch, *, halo=4, tile=32, mapper=None):
     ome_zarr, image, label = _setup(image_data, tile=tile)
     iterator = SegmentationIterator(
-        image, label, axes_order="yx", consolidation_mode="dask", stitch=stitch
+        image, label, axes_order="yx", consolidation_mode="dask"
     ).by_grid(size_y=tile, size_x=tile)
+    if stitch:
+        config = None if stitch is True else stitch
+        iterator = iterator.with_stitch(config)
+
     if halo:
         iterator = iterator.with_halo(y=halo, x=halo)
     iterator.map(func, mapper=mapper)
@@ -210,9 +214,8 @@ def test_stitching_is_parallel_safe():
 def test_scratch_arrays_are_removed():
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -240,8 +243,8 @@ def test_a_supplied_scratch_store_keeps_the_label_clean():
             label,
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=StitchConfig(scratch_store=MemoryStore()),
         )
+        .with_stitch(StitchConfig(scratch_store=MemoryStore()))
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -261,8 +264,8 @@ def test_memory_scratch_refuses_to_cross_a_process_boundary():
             label,
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=StitchConfig(scratch_store=MemoryStore()),
         )
+        .with_stitch(StitchConfig(scratch_store=MemoryStore()))
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -274,9 +277,11 @@ def test_memory_scratch_refuses_to_cross_a_process_boundary():
 
 def test_stitching_requires_a_halo():
     _, image, label = _setup(_one_object_across_the_seam())
-    iterator = SegmentationIterator(
-        image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-    ).by_grid(size_y=32, size_x=32)
+    iterator = (
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
+        .by_grid(size_y=32, size_x=32)
+    )
 
     with pytest.raises(NgioValueError, match="needs a halo"):
         iterator.map(_connected_components)
@@ -312,9 +317,8 @@ def test_stitch_with_non_integer_pixel_origins():
         Roi.from_values(slices={"y": (0.0, extent), "x": (9.8, 11.6)}, name="b"),
     ]
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .product(rois)
         .with_halo(y=4, x=4)
     )
@@ -347,18 +351,16 @@ def test_second_finalize_raises_and_leaves_no_scratch():
     """Finalize is not idempotent, but it must fail clean, not create state."""
     ome_zarr, image, label = _setup(_one_object_across_the_seam())
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
     iterator.map(_connected_components)  # maps and finalizes
 
     fresh = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -372,9 +374,8 @@ def test_plan_pickle_drops_geometry():
     """Workers only bank: the pickled plan must not ship works/pairs/output."""
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -397,9 +398,8 @@ def test_stitch_handles_a_ragged_roi_list():
         Roi.from_values(slices={"y": (32, 32), "x": (32, 32)}, name="d"),
     ]
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .product(ragged)
         .with_halo(y=4, x=4)
     )
@@ -417,9 +417,13 @@ def test_stitch_handles_overlapping_tiles():
 
     for halo in (4, 0):
         ome_zarr, image, label = _setup(data)
-        iterator = SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        ).by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
+        iterator = (
+            SegmentationIterator(
+                image, label, axes_order="yx", consolidation_mode="dask"
+            )
+            .with_stitch()
+            .by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
+        )
         if halo:
             iterator = iterator.with_halo(y=halo, x=halo)
         iterator.map(_connected_components)
@@ -437,8 +441,9 @@ def test_overlapping_tiles_parallel_matches_serial():
         ome_zarr, image, label = _setup(data)
         (
             SegmentationIterator(
-                image, label, axes_order="yx", consolidation_mode="dask", stitch=True
+                image, label, axes_order="yx", consolidation_mode="dask"
             )
+            .with_stitch()
             .by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
             .with_halo(y=4, x=4)
             .map(_connected_components, mapper=mapper)
@@ -479,9 +484,8 @@ def test_stitch_refuses_the_dask_path():
     """The dask setters do not offset ids or bank bands; raising beats corrupting."""
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -507,9 +511,8 @@ def test_stitch_warns_on_tiles_split_along_an_unhaloed_axis():
     image = ome_zarr.get_image()
     label = ome_zarr.derive_label("seg")
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="zyx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="zyx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_z=1, size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -529,9 +532,8 @@ def test_compact_warns_when_it_renumbers_untouched_objects():
     label.zarr_array[50:60, 40:50] = 7
 
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -551,8 +553,8 @@ def test_stitch_refuses_duplicate_tile_names():
 
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = SegmentationIterator(
-        image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-    )
+        image, label, axes_order="yx", consolidation_mode="dask"
+    ).with_stitch()
     iterator._set_rois(
         [
             Roi.from_values(name="dup", slices={"y": (0, 64), "x": (0, 32)}),
@@ -569,9 +571,8 @@ def test_failed_map_removes_the_scratch():
     """A failed run cannot be resolved; the scratch must not linger."""
     _, image, label = _setup(_one_object_across_the_seam())
     iterator = (
-        SegmentationIterator(
-            image, label, axes_order="yx", consolidation_mode="dask", stitch=True
-        )
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )
@@ -583,3 +584,58 @@ def test_failed_map_removes_the_scratch():
         iterator.map(exploding)
 
     assert "_ngio_stitch" not in list(label._group_handler.group.keys())
+
+
+# --- the seam-matcher protocol ----------------------------------------------
+
+
+def _never_match(patch_a, patch_b):
+    return []
+
+
+class _AlwaysMatchSharedIds:
+    """Pairs every id in A with every overlapping-pixel id in B."""
+
+    def __call__(self, patch_a, patch_b):
+        shared = (patch_a > 0) & (patch_b > 0)
+        pairs = set()
+        for mine, theirs in zip(patch_a[shared], patch_b[shared], strict=True):
+            pairs.add((int(mine), int(theirs)))
+        return sorted(pairs)
+
+
+def test_custom_seam_matcher_decides_the_merge():
+    data = _one_object_across_the_seam()
+
+    split = _run(data, stitch=StitchConfig(seam_matcher=_never_match))
+    assert len(_object_ids(split)) == 2, "a never-matching matcher leaves the seam"
+
+    merged = _run(data, stitch=StitchConfig(seam_matcher=_AlwaysMatchSharedIds()))
+    assert _object_ids(merged) == {1}
+
+
+def test_explicit_iou_matcher_is_bit_identical_to_the_default():
+    data = _one_object_across_the_seam()
+    default = _run(data, stitch=True)
+    explicit = _run(data, stitch=StitchConfig(seam_matcher=IouSeamMatcher(0.3)))
+    np.testing.assert_array_equal(default, explicit)
+
+
+def test_seam_matcher_invalid_pairs_refuse():
+    data = _one_object_across_the_seam()
+
+    def pairs_background(patch_a, patch_b):
+        return [(0, 1)]
+
+    def pairs_foreign(patch_a, patch_b):
+        return [(999_999, 1_000_001)]
+
+    with pytest.raises(NgioValueError, match="background"):
+        _run(data, stitch=StitchConfig(seam_matcher=pairs_background))
+    with pytest.raises(NgioValueError, match="absent from its patch"):
+        _run(data, stitch=StitchConfig(seam_matcher=pairs_foreign))
+
+
+def test_iou_matcher_validates_its_threshold():
+    with pytest.raises(NgioValueError, match="iou_threshold"):
+        IouSeamMatcher(0.0)

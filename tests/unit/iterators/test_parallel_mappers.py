@@ -335,14 +335,18 @@ def test_serial_map_matches_parallel_on_overlapping_writes():
         return np.full_like(patch, int(patch.mean()) or 1)
 
     serial_zarr, serial_base = _colliding_iterator(MemoryStore())
-    serial_it = serial_base.by_grid(size_y=24, size_x=24, tail="shift")
+    # Overlapping segmentation writes need a declared resolution; "last" is
+    # exactly the wave-order behavior this test pins.
+    serial_it = serial_base.by_grid(size_y=24, size_x=24, tail="shift").on_overlap(
+        "last"
+    )
     assert serial_it.check_if_regions_overlap()
     serial_it.map_as_numpy(_fill_mean)
 
     threaded_zarr, threaded_base = _colliding_iterator(MemoryStore())
-    threaded_base.by_grid(size_y=24, size_x=24, tail="shift").map_as_numpy(
-        _fill_mean, mapper=ThreadedMapper(4)
-    )
+    threaded_base.by_grid(size_y=24, size_x=24, tail="shift").on_overlap(
+        "last"
+    ).map_as_numpy(_fill_mean, mapper=ThreadedMapper(4))
 
     np.testing.assert_array_equal(
         serial_zarr.get_label("coarse").get_as_numpy(),
@@ -420,6 +424,7 @@ def test_measure_across_processes(tmp_path: Path):
     from_processes = iterator.measure(
         _measure_labels, mapper=ProcessMapper(max_workers=2)
     )
+    assert serial is not None and from_processes is not None
     assert from_processes.dataframe.equals(serial.dataframe)
 
 
@@ -468,4 +473,5 @@ def test_detect_across_processes(tmp_path: Path):
     from_processes = iterator.detect(
         _detect_bright, mapper=ProcessMapper(max_workers=2)
     )
+    assert serial is not None and from_processes is not None
     assert from_processes.dataframe.equals(serial.dataframe)
