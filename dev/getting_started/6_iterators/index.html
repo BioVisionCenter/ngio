@@ -857,6 +857,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#overlap-and-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overlap and reconciliation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stitching-a-tiled-segmentation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2383,6 +2394,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#overlap-and-reconciliation" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Overlap and reconciliation
+      </span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#stitching-a-tiled-segmentation" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2714,12 +2736,21 @@ the top-level <code>ngio</code> namespace):</p>
 </div>
 
 <ul>
-<li><code>SegmentationIterator</code> — segment an image into a label; see the <a href="../../tutorials/image_segmentation/">image segmentation tutorial</a>.</li>
+<li><code>SegmentationIterator</code> — <code>segment</code> an image into a label; see the <a href="../../tutorials/image_segmentation/">image segmentation tutorial</a>.</li>
 <li><code>MaskedSegmentationIterator</code> — the same, restricted to the objects of a <abbr title="A ROI table indexed by label id, mapping each segmented object to its bounding region">masking ROI</abbr> table (segment cells only within a tissue region, say); same tutorial.</li>
-<li><code>ImageProcessingIterator</code> — image in, new image out (a filter, a projection, a restoration model); see the <a href="../../tutorials/image_processing/">image processing tutorial</a>.</li>
+<li><code>ImageProcessingIterator</code> — <code>process</code> an image into a new image (a filter, a projection, a restoration model); see the <a href="../../tutorials/image_processing/">image processing tutorial</a>.</li>
 <li><code>FeatureExtractorIterator</code> — read-only; <code>measure</code> joins per-region measurements into one feature table; see the <a href="../../tutorials/feature_extraction/">feature extraction tutorial</a>.</li>
 <li><code>ObjectDetectionIterator</code> — read-only; <code>detect</code> turns a tile-by-tile detector into one deduplicated <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table; see <a href="#detecting-objects-into-a-roi-table">Detecting objects into a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table</a>.</li>
 </ul>
+<p>The verbs come in two layers. Every iterator shares the <em>generic</em> layer — <code>map</code>
+(apply and write back), <code>reduce</code> (collect without writing), the hand-driven
+<code>iter</code> loop, and the distributed steps <code>prepare_jobs</code>/<code>for_job</code>/<code>finalize</code> —
+and each iterator adds one <em>topic verb</em> that says what the iteration means:
+<code>segment</code>, <code>process</code>, <code>measure</code>, <code>detect</code>. On the writers the topic verb is
+<code>map</code> under its domain name; on the read-only iterators it also runs the final
+join (the feature join, the detection NMS) and returns the table. All four
+are partition-aware: on a <code>for_job</code> slice they do only that job's share, and
+<code>finalize()</code> is the one gather, whatever the iterator.</p>
 <h2 id="building-one">Building one<a class="headerlink" href="#building-one" title="Permanent link">&para;</a></h2>
 <p>Every iterator is constructed from the images it reads and writes, then narrowed. A fresh
 iterator covers the whole image as a single region:</p>
@@ -2757,7 +2788,7 @@ fixes the axes order of the patches the function sees (<code>"yx"</code> above),
 <code>input_transforms</code>/<code>output_transforms</code> apply
 <a href="../../api/ngio/transforms/">transforms</a> around the function, and the writing
 iterators take <code>consolidation_mode</code> (how the output pyramid is rebuilt at the
-end) and, on segmentation, <code>stitch</code>. The full signatures live in the
+end). The full signatures live in the
 <a href="../../api/iterators/">API reference</a>.</p>
 <p><code>product</code> replaces that single region with the ones a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table names — here the
 microscope fields of view:</p>
@@ -2792,7 +2823,8 @@ happens to the leftover — <code>"clip"</code> (the default) shrinks the last t
 (100 px at 32 gives <code>32, 32, 18, 18</code> rather than <code>32, 32, 32, 4</code>), <code>"shift"</code> slides
 the last tile back to stay full-size (it then overlaps its neighbour — fine for
 detection or a merge; a plain parallel write schedules the overlap into a separate
-wave, see below), and <code>"drop"</code> discards it.
+wave, see below, and on segmentation the overlap needs a declared resolution —
+<code>with_stitch(...)</code> or <code>on_overlap(...)</code>), and <code>"drop"</code> discards it.
 <code>by_blocks(num_x=..., num_y=...)</code> is the complement — you say how many tiles, not how
 big, and the partition is balanced by construction. <code>by_chunks()</code> tiles by the <em>input</em>
 image's chunk grid, the natural unit of reading; <code>by_write_units()</code> tiles by the
@@ -2805,7 +2837,7 @@ plane per remaining coordinate (every <code>t</code>/<code>z</code>/<code>c</cod
 shape for "run this 2D function on every plane"), and <code>by_zyx(strict=...)</code> does the
 same per 3D volume. The tutorial snippets use them wherever a 2D or 3D function meets
 a higher-dimensional image.</p>
-<p>From here you would call <code>map</code> or iterate with <code>iter_as_numpy</code> to do the work;
+<p>From here you would call the topic verb (<code>segment</code> here) or iterate with <code>iter_as_numpy</code> to do the work;
 the <a href="../../tutorials/image_processing/">image processing tutorial</a> carries this through to
 a written result. (<code>iter_as_numpy</code> is <code>iter(data_mode="numpy")</code> — a bare
 <code>iter()</code> still defaults to dask and warns; numpy becomes the default in
@@ -2877,7 +2909,7 @@ boxes themselves do not overlap.</p>
 it too — so for <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> whose <em>pixels</em> genuinely overlap (a <code>by_grid</code>
 stride below the size, a <code>"shift"</code> tail), which write wins the shared
 pixels is identical under every mapper. The one exception is the
-hand-driven loops (<code>iter</code>, <code>iter_batched</code>), which run in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order:
+hand-driven loops (<code>iter</code>, batched or not), which run in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order:
 deterministic, but not bit-identical to <code>map</code> on contested pixels.
 Mask-protected and pixel-disjoint writes are order-independent either
 way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"min"</code>, <code>"sum"</code>).</p>
@@ -2920,13 +2952,13 @@ way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"
 </div>
 <p>This is the one mapper that changes the func's contract: it receives a stacked batch with a leading batch axis and must return an array with the same leading axis. Everything else composes as usual — tilings are ragged in general (border tiles clip, halos shrink at image edges, masked regions are arbitrary), so each batch is padded up to its per-axis maximum before stacking (<code>pad_mode</code>/<code>pad_values</code> choose how) and every output is sliced back to its region's true shape before the write; a halo is trimmed after that, exactly as under any other mapper; and <code>for_job</code> partitions batch their own share.</p>
 <p>Within a batch the reads fan out on a thread pool (<code>read_workers</code>), while the writes run serially on the calling thread. Batches are cut over the same canonical (wave) order as every other mapper, so contested pixels land identically — and the serial writes make batched mapping write-safe on any tiling.</p>
-<p>Prefer to drive the loop yourself? <code>iter_batched</code> yields <code>(patches, writers)</code> — two aligned lists of up to <code>batch_size</code> items, in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like <code>iter</code>; on the read-only iterators it yields the payload lists alone (<code>(image, label, roi)</code> tuples for features, <code>(patch, roi)</code> for detection):</p>
+<p>Prefer to drive the loop yourself? <code>iter(batch_size=...)</code> yields <code>(patches, writers)</code> — two aligned lists of up to <code>batch_size</code> items, in <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> order — and leaves the stacking (and any ragged-tile policy) to you. The run finalizes when the loop completes, exactly like the unbatched <code>iter</code>; on the read-only iterators it yields the payload lists alone (<code>(image, label, roi)</code> tuples for features, <code>(patch, roi)</code> for detection):</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">manual</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_image</span><span class="p">(</span><span class="n">store</span><span class="o">=</span><span class="n">MemoryStore</span><span class="p">())</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">loop_iterator</span> <span class="o">=</span> <span class="n">ImageProcessingIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">manual</span><span class="o">.</span><span class="n">get_image</span><span class="p">())</span>
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># Uniform 32px tiles, so stacking the batch is a plain np.stack.</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">loop_iterator</span> <span class="o">=</span> <span class="n">loop_iterator</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">for</span> <span class="n">patches</span><span class="p">,</span> <span class="n">writers</span> <span class="ow">in</span> <span class="n">loop_iterator</span><span class="o">.</span><span class="n">iter_batched</span><span class="p">(</span><span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">for</span> <span class="n">patches</span><span class="p">,</span> <span class="n">writers</span> <span class="ow">in</span> <span class="n">loop_iterator</span><span class="o">.</span><span class="n">iter</span><span class="p">(</span><span class="n">data_mode</span><span class="o">=</span><span class="s2">&quot;numpy&quot;</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>    <span class="n">outs</span> <span class="o">=</span> <span class="n">fake_model</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">stack</span><span class="p">(</span><span class="n">patches</span><span class="p">))</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>    <span class="k">for</span> <span class="n">writer</span><span class="p">,</span> <span class="n">out</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">writers</span><span class="p">,</span> <span class="n">outs</span><span class="p">,</span> <span class="n">strict</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 </span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>        <span class="n">writer</span><span class="p">(</span><span class="n">out</span><span class="p">)</span>
@@ -2944,16 +2976,16 @@ way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">job_index</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># e.g. int($SLURM_ARRAY_TASK_ID)</span>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">n_jobs</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=</span><span class="n">n_jobs</span><span class="p">)</span><span class="o">.</span><span class="n">segment</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
 </span></code></pre></div>
 <p>and, in a dependent job once every array task has finished, the gather step:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>  <span class="c1"># same construction</span>
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">iterator</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div>
-<p><code>for_job</code> is a builder call like <code>by_grid</code> or <code>with_halo</code> — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, <code>map(func, mapper=...)</code> included. It comes <em>last</em> in the chain (reshaping a restricted iterator refuses), and its <code>map</code> deliberately does <strong>not</strong> finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date.</p>
+<p><code>for_job</code> is a builder call like <code>by_grid</code> or <code>with_halo</code> — it returns a new iterator restricted to that partition's regions, and everything else reads as usual, <code>segment(func, mapper=...)</code> included. It comes <em>last</em> in the chain (reshaping a restricted iterator refuses), and a slice's <code>segment</code> (or <code>map</code>) deliberately does <strong>not</strong> finalize: the pyramid resolve is the one global step, and it belongs to the single gather job — which, thanks to region-scoped consolidation, rebuilds only what the jobs wrote. Until the gather runs, only the iterated level is up to date. (That also makes <code>for_job(0, 1)</code> the sanctioned way to <em>defer</em> a finalize on purpose: one job that writes everything, gathered whenever you choose.)</p>
 <p>Each job builds the identical iterator — construction is metadata-only and deterministic, so this is cheap — and derives the same partition on its own; there is nothing to hand from one job to another. Partitions never share a write unit, so the jobs need no locks and no coordination, in any order and any overlap in time; regions whose footprints conflict simply travel in the same partition, where the ordinary wave planning handles them.</p>
 <p>Effective parallelism therefore equals the number of independent groups, which follows the <strong>output's</strong> chunking. Inspect it before submitting: <code>[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]</code>. One fat list plus empties means the output chunking (or a tiling like <code>by_zyx</code>, which splits along t only) is the constraint, not the cluster — a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and <a class="autorefs autorefs-internal" title="&lt;code class=&quot;doc-symbol doc-symbol-heading doc-symbol-function&quot;&gt;&lt;/code&gt;            &lt;span class=&quot;doc doc-object-name doc-function-name&quot;&gt;ngio.iterators.write_conflict_components&lt;/span&gt;" href="../../api/iterators/#ngio.iterators.write_conflict_components"><code>write_conflict_components</code></a> makes the grouping auditable.</p>
-<p>The requirements mirror the model: every job must use the same <code>n_jobs</code> and the same iterator construction; the store must not be in-memory (each process would write its own private copy). Read-only iterators refuse to partition — their gathers (feature coalescing, detection NMS) are global joins.</p>
+<p>The requirements mirror the model: every job must use the same <code>n_jobs</code> and the same iterator construction; the store must not be in-memory (each process would write its own private copy). The read-only iterators partition too — on a slice <code>measure</code>/<code>detect</code> bank a <em>partial</em> instead of joining, and <code>finalize()</code> runs the one global join (see <a href="#distributed-measurement-and-detection">below</a>).</p>
 <h3 id="the-three-phase-recipe-prepare_jobs">The three-phase recipe: <code>prepare_jobs</code><a class="headerlink" href="#the-three-phase-recipe-prepare_jobs" title="Permanent link">&para;</a></h3>
 <p>Schedulers like Fractal run distributed work as <strong>init → parallel tasks → <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr></strong>, where the init task builds a <em>parallelization list</em> (one JSON of arguments per parallel task). <code>prepare_jobs</code> is that init step: it performs any setup the iterator needs — always wiping stale scratch state from earlier runs first — and returns the list, with empty partitions already dropped:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># init task</span>
@@ -2963,7 +2995,7 @@ way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"
 </span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
 </span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># parallel task, once per entry</span>
 </span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
-</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
+</span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">segment</span><span class="p">(</span><span class="n">func</span><span class="p">)</span>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>
 </span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1"># consolidate task, after all parallel tasks</span>
 </span><span id="__span-3-11"><a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">by_chunks</span><span class="p">()</span>
@@ -2971,31 +3003,30 @@ way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"
 </span></code></pre></div>
 <p>For a plain writing iterator <code>prepare_jobs</code> is optional — the two-step recipe above works on its own. A <strong>stitching</strong> segmentation requires it: the scratch band arrays must exist, race-free, before any job banks into them, and the init step is the one safe moment to create them.</p>
 <h3 id="distributed-stitching">Distributed stitching<a class="headerlink" href="#distributed-stitching" title="Permanent link">&para;</a></h3>
-<p>With <code>prepare_jobs</code> in the recipe, <code>stitch=True</code> distributes too. The init step creates only the scratch <em>root</em>; each job creates and writes its own tiles' bank arrays; the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task's <code>finalize()</code> verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:</p>
+<p>With <code>prepare_jobs</code> in the recipe, <code>with_stitch(...)</code> distributes too. The init step creates only the scratch <em>root</em>; each job creates and writes its own tiles' bank arrays; the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task's <code>finalize()</code> verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:</p>
 <ul>
 <li><strong>Banking claims nothing shared</strong>, so a stitched iterator splits into jobs exactly as the plain map would (overlapping tiles share label chunks, so a contiguous overlapping layout travels as one job).</li>
 <li><strong>A failed job never destroys the others' banks</strong> — re-run just that job (banking is idempotent) and gather as planned.</li>
-<li><strong>Every step validates a plan fingerprint</strong> stamped at init: change the tiling, halo, stitch config, or <code>n_jobs</code> between phases and the run fails loudly.</li>
+<li><strong>Every step validates a plan fingerprint</strong> stamped at init: change the tiling, halo, stitch config, or <code>n_jobs</code> between phases and the run fails loudly. A custom seam matcher (like a custom NMS, a declared join, or the function itself) cannot be fingerprinted — declare the identical chain in every phase.</li>
 </ul>
 <p>The <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.</p>
 <h3 id="distributed-measurement-and-detection">Distributed measurement and detection<a class="headerlink" href="#distributed-measurement-and-detection" title="Permanent link">&para;</a></h3>
-<p>The read-only iterators end in a <em>global join</em> — one feature coalesce, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their distributed form therefore stores each job's <strong>raw pre-join records</strong> as a <em>partial</em>, and the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> step runs the single global join:</p>
+<p>The read-only iterators end in a <em>global join</em> — one feature join, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their topic verbs are partition-aware: on a <code>for_job</code> slice, <code>measure</code>/<code>detect</code> store the job's <strong>raw pre-join records</strong> as a <em>partial</em> and return <code>None</code>, and the <abbr title="Propagate a write made at one pyramid level to all the other levels">consolidate</abbr> task's <code>finalize()</code> runs the single global join and returns the table — the same three-phase recipe as the writers, verb for verb:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># init task</span>
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">args_list</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">prepare_jobs</span><span class="p">(</span><span class="n">n_jobs</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
 </span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># parallel task, once per entry of args_list</span>
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">measure_to_partial</span><span class="p">(</span><span class="n">measure</span><span class="p">)</span>      <span class="c1"># features</span>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># iterator.for_job(**args).detect_to_partial(detector)   # detection</span>
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1"># consolidate task, after all parallel tasks</span>
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
-</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">table</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">merge_partials</span><span class="p">()</span>
-</span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="n">container</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;measurements&quot;</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>               <span class="c1"># storing stays yours</span>
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="n">iterator</span><span class="o">.</span><span class="n">for_job</span><span class="p">(</span><span class="o">**</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">measure</span><span class="p">(</span><span class="n">measure</span><span class="p">)</span>      <span class="c1"># features (detection: .detect(detector))</span>
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># consolidate task, after all parallel tasks</span>
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">FeatureExtractorIterator</span><span class="p">(</span><span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span><span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_y</span><span class="o">=</span><span class="mi">512</span><span class="p">,</span> <span class="n">size_x</span><span class="o">=</span><span class="mi">512</span><span class="p">)</span>
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">table</span> <span class="o">=</span> <span class="n">iterator</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">container</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;measurements&quot;</span><span class="p">,</span> <span class="n">table</span><span class="p">)</span>     <span class="c1"># storing stays yours</span>
 </span></code></pre></div>
-<p>The result is bit-identical to a serial <code>measure</code> / <code>detect</code> — including a <strong>custom <code>coalesce</code></strong>, which runs once at merge time over the reconstructed per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> results (dicts normalized to DataFrames, a <code>label</code> index to a <code>label</code> column). Partials live in a transient <code>_ngio_partials</code> group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to <code>list_tables</code>, and removed by the merge; the final table is registered only by your own <code>add_table</code> call.</p>
-<p>The merge refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — and the finished-table verbs (<code>measure</code>, <code>detect</code>) refuse on a <code>for_job</code> slice, pointing at their partial counterparts.</p>
+<p>The result is bit-identical to a serial <code>measure</code> / <code>detect</code> — including a <strong>declared join</strong> (<code>with_join(...)</code> on the chain), which runs once at the gather over the normalized per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> results: dicts become DataFrames, a <code>label</code> index becomes a <code>label</code> column, and every row is stamped with its <code>roi_index</code> (the <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s global index) and <code>roi_name</code>. A serial <code>measure</code>'s declared join sees the identical normalized list — there is one contract, not two — and declaring it on a <code>for_job</code> slice is inert (the slice banks regardless; the gather runs it). Partials live in a transient <code>_ngio_partials</code> group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to <code>list_tables</code>, and removed by the merge; the final table is registered only by your own <code>add_table</code> call.</p>
+<p><code>finalize</code> refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — refuses on a <code>for_job</code> slice (the gather is global), and refuses when nothing was prepared or banked.</p>
 <h2 id="halos-context-without-seams">Halos: context without seams<a class="headerlink" href="#halos-context-without-seams" title="Permanent link">&para;</a></h2>
 <p>Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. <code>with_halo</code> fixes that by reading a margin around each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> and writing only the <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> back:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">scipy.ndimage</span><span class="w"> </span><span class="kn">import</span> <span class="n">uniform_filter</span>
@@ -3021,20 +3052,77 @@ way, as is an order-independent <code>merge=</code> (<code>"max"</code>, <code>"
 
 </div>
 <p><code>smooth</code> receives the grown region and must return it grown too; the border is cropped off before the write, so it never lands on disk. Margins are in pixels and clip at the image borders, so an edge tile simply grows on the sides where there is room.</p>
+<p>Two read-only iterators take a halo too, as a pure read margin — there is no write to crop it from, so the overlap must be reconciled after the fact. Detection reconciles it itself: NMS removes the duplicate boxes. Feature extraction delegates it to you: patches <em>and</em> the <code>roi</code> argument cover the grown region, a border object is measured by every region that sees it, and the resulting duplicate <code>label</code> rows are yours to reconcile in a declared join (<code>with_join</code>) — every row carries <code>roi_index</code>/<code>roi_name</code> for exactly that (the default join keeps the duplicates as-is).</p>
 <p>The <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> themselves do not move, which is the whole point of doing this on the read side: write footprints are unchanged, so a haloed iterator parallelizes exactly as far as it did without one. Overlapping <em>writes</em> would have to be serialized; overlapping reads cost nothing.</p>
 <p>Read the same trick backwards and it is a "trim": if you want each tile's outer margin discarded rather than written, that is exactly a halo of that width.</p>
+<h2 id="overlap-and-reconciliation">Overlap and reconciliation<a class="headerlink" href="#overlap-and-reconciliation" title="Permanent link">&para;</a></h2>
+<p>Every iterator has exactly one <em>reconciliation declaration</em> — the chain call
+that says how per-region results become one consistent answer — and each is
+backed by a swappable protocol, so a custom implementation drops in without
+touching internals:</p>
+<table>
+<thead>
+<tr>
+<th>Iterator</th>
+<th>Declaration</th>
+<th>Required?</th>
+<th>Behind it</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ImageProcessing</code></td>
+<td><code>on_overlap(policy)</code></td>
+<td>optional — undeclared overlap keeps the deterministic wave-order last-writer-wins</td>
+<td>the write path's <code>merge=</code> policies (<code>"max"</code>, <code>"sum"</code>, a callable, …)</td>
+</tr>
+<tr>
+<td><code>Segmentation</code></td>
+<td><code>with_stitch(config)</code> <em>or</em> <code>on_overlap(policy)</code></td>
+<td><strong>required when write footprints overlap</strong> — undeclared overlapping label writes refuse loudly</td>
+<td><code>SeamMatcherProtocol</code> (<code>StitchConfig(seam_matcher=...)</code>, <code>IouSeamMatcher</code> default)</td>
+</tr>
+<tr>
+<td><code>MaskedSegmentation</code></td>
+<td><code>with_stitch(config)</code> (within a mask)</td>
+<td>never — mask-protected writes cannot contest, <code>on_overlap</code> is refused</td>
+<td>same</td>
+</tr>
+<tr>
+<td><code>FeatureExtractor</code></td>
+<td><code>with_join(join)</code></td>
+<td>optional — the default join keeps duplicate rows, provenance columns attached</td>
+<td><code>JoinProtocol</code> (<code>ConcatJoin</code> default)</td>
+</tr>
+<tr>
+<td><code>ObjectDetection</code></td>
+<td><code>with_nms(nms)</code></td>
+<td>optional — <code>GreedyNms()</code> by default</td>
+<td><code>NmsProtocol</code> (<code>GreedyNms</code> default)</td>
+</tr>
+</tbody>
+</table>
+<p>The segmentation rule is the one hard requirement, and it is deliberate:
+last-writer-wins on two overlapping <em>label</em> writes produces torn objects —
+deterministic, but almost never the intent — so the writing verbs refuse until
+you say what should happen. The check is pixel-exact on the write footprints:
+a halo never triggers it (the margin is cropped before the write), and tiles
+that merely share a chunk without sharing pixels pass. <code>on_overlap("last")</code>
+declares exactly the old behavior; any merge rule combines with what is on
+disk instead.</p>
 <h2 id="stitching-a-tiled-segmentation">Stitching a tiled segmentation<a class="headerlink" href="#stitching-a-tiled-segmentation" title="Permanent link">&para;</a></h2>
-<p>Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. <code>stitch=True</code> fixes both:</p>
+<p>Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. <code>with_stitch()</code> fixes both:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">stitched</span> <span class="o">=</span> <span class="n">demo</span><span class="o">.</span><span class="n">derive_label</span><span class="p">(</span><span class="s2">&quot;stitched&quot;</span><span class="p">)</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">stitch_iterator</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">stitched</span><span class="p">,</span> <span class="n">axes_order</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">,</span> <span class="n">stitch</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
-</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
-</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">stitch_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span>
-</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
-</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># Two objects, two ids - the seam-crossing blob was merged back into one.</span>
-</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;objects: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="nb">set</span><span class="p">(</span><span class="n">stitched</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">ravel</span><span class="p">())</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">})</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">SegmentationIterator</span><span class="p">(</span><span class="n">demo_image</span><span class="p">,</span> <span class="n">stitched</span><span class="p">,</span> <span class="n">axes_order</span><span class="o">=</span><span class="s2">&quot;yx&quot;</span><span class="p">)</span>
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="o">.</span><span class="n">with_stitch</span><span class="p">()</span>
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="o">.</span><span class="n">by_grid</span><span class="p">(</span><span class="n">size_x</span><span class="o">=</span><span class="mi">32</span><span class="p">,</span> <span class="n">size_y</span><span class="o">=</span><span class="mi">32</span><span class="p">)</span>
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="p">)</span>
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">stitch_iterator</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span>
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Two objects, two ids - the seam-crossing blob was merged back into one.</span>
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;objects: </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">v</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="nb">set</span><span class="p">(</span><span class="n">stitched</span><span class="o">.</span><span class="n">get_as_numpy</span><span class="p">()</span><span class="o">.</span><span class="n">ravel</span><span class="p">())</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="p">{</span><span class="mi">0</span><span class="p">})</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
@@ -3044,13 +3132,15 @@ objects: [1, 2]
 </div>
 <p>Any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list stitches: a regular grid with a halo, an overlapping-<abbr title="Field of View — the area captured in a single microscope acquisition">FOV</abbr> microscope layout, a ragged <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table. The criterion is that two tiles' predictions <strong>overlap</strong>, not that their objects merely touch across a cut — two distinct objects that abut at a boundary are adjacent but do not overlap, so an adjacency rule would merge them and the overlap rule does not. The shared opinion comes from a halo (each tile reads past its own edge), from the tiles genuinely overlapping (<abbr title="Field of View — the area captured in a single microscope acquisition">FOV</abbr> layouts need no halo — the overlap <em>is</em> the evidence), or both; with neither, stitching refuses, since no two tiles ever predict the same pixel.</p>
 <p>During the map each tile banks its grown prediction into transient per-tile scratch arrays, removed once the stitch resolves. Where two tiles wrote the same <em>output</em> pixels and their objects did not match, the later write wins — deterministically, because every mapper runs in the same wave order.</p>
-<p><code>MaskedSegmentationIterator</code> takes <code>stitch=True</code> too, for tiling <em>within</em> a mask: a huge masked object tiled with <code>by_grid</code> + <code>with_halo</code> gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no <code>UniqueLabelsTransform</code> is needed (combining it with <code>stitch</code> raises).</p>
+<p><code>MaskedSegmentationIterator</code> takes <code>with_stitch()</code> too, for tiling <em>within</em> a mask: a huge masked object tiled with <code>by_grid</code> + <code>with_halo</code> gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no <code>UniqueLabelsTransform</code> is needed (combining it with <code>stitch</code> raises).</p>
 <p>Tune it with <code>StitchConfig</code>:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio.iterators</span><span class="w"> </span><span class="kn">import</span> <span class="n">StitchConfig</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">iterator</span> <span class="o">=</span> <span class="n">SegmentationIterator</span><span class="p">(</span>
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">image</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">stitch</span><span class="o">=</span><span class="n">StitchConfig</span><span class="p">(</span><span class="n">iou_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="mi">50_000</span><span class="p">)</span>
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">image</span><span class="p">,</span> <span class="n">label</span>
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span><span class="o">.</span><span class="n">with_stitch</span><span class="p">(</span>
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>    <span class="n">StitchConfig</span><span class="p">(</span><span class="n">iou_threshold</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">block_size</span><span class="o">=</span><span class="mi">50_000</span><span class="p">)</span>
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="p">)</span>
 </span></code></pre></div>
 <p>By default the banks are kept in a transient group inside the output label, which works under every mapper. <code>scratch_store</code> puts them elsewhere — often worth doing, since labels compress well:</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">zarr.storage</span><span class="w"> </span><span class="kn">import</span> <span class="n">MemoryStore</span>
@@ -3093,8 +3183,9 @@ objects: [1, 2]
 </span><span id="__span-0-25"><a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a>    <span class="o">.</span><span class="n">with_halo</span><span class="p">(</span><span class="n">x</span><span class="o">=</span><span class="mi">8</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
 </span><span id="__span-0-26"><a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a><span class="p">)</span>
 </span><span id="__span-0-27"><a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="n">detections</span> <span class="o">=</span> <span class="n">detect_iterator</span><span class="o">.</span><span class="n">detect</span><span class="p">(</span><span class="n">find_bright_boxes</span><span class="p">)</span>
-</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="n">demo</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;detections&quot;</span><span class="p">,</span> <span class="n">detections</span><span class="p">)</span>
-</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="nb">print</span><span class="p">(</span><span class="n">detections</span><span class="o">.</span><span class="n">dataframe</span><span class="p">[[</span><span class="s2">&quot;x_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;y_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;confidence&quot;</span><span class="p">]])</span>
+</span><span id="__span-0-28"><a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="k">assert</span> <span class="n">detections</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>  <span class="c1"># a serial run always returns the table</span>
+</span><span id="__span-0-29"><a id="__codelineno-0-29" name="__codelineno-0-29" href="#__codelineno-0-29"></a><span class="n">demo</span><span class="o">.</span><span class="n">add_table</span><span class="p">(</span><span class="s2">&quot;detections&quot;</span><span class="p">,</span> <span class="n">detections</span><span class="p">)</span>
+</span><span id="__span-0-30"><a id="__codelineno-0-30" name="__codelineno-0-30" href="#__codelineno-0-30"></a><span class="nb">print</span><span class="p">(</span><span class="n">detections</span><span class="o">.</span><span class="n">dataframe</span><span class="p">[[</span><span class="s2">&quot;x_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;y_micrometer&quot;</span><span class="p">,</span> <span class="s2">&quot;confidence&quot;</span><span class="p">]])</span>
 </span></code></pre></div>
 <div class="result" markdown="1" >
 
@@ -3105,7 +3196,7 @@ FieldIndex
 
 
 </div>
-<p>NMS is configured with <code>nms=NmsConfig(iou_threshold=..., score_column=...)</code> on the constructor, exactly as stitching is with <code>stitch=StitchConfig(...)</code>; a parallel <code>mapper=</code> on <code>detect</code> fans the tiles out like any <code>reduce</code>.</p>
+<p>NMS is declared with <code>with_nms(GreedyNms(iou_threshold=..., score_column=...))</code>, exactly as stitching is with <code>with_stitch(StitchConfig(...))</code> — and both defaults are swappable protocols: any object with <code>score_column</code>, <code>max_detections_per_tile</code>, and a deterministic <code>suppress(detections)</code> satisfies <code>NmsProtocol</code> (soft-NMS, class-aware suppression), and a <code>StitchConfig(seam_matcher=...)</code> replaces the IoU criterion with your own <code>(patch_a, patch_b) -&gt; [(id_a, id_b), ...]</code> pair decision. A parallel <code>mapper=</code> on <code>detect</code> fans the tiles out like any <code>reduce</code>.</p>
 <p>The detector sees one tile at a time and answers in the tile's own pixels; the iterator does the bookkeeping the detector should not — anchoring each tile's boxes into the reference image's world coordinates, and resolving the boundary problem.</p>
 <div class="admonition note">
 <p class="admonition-title">Box contract</p>
@@ -3125,7 +3216,7 @@ FieldIndex
   axes they do not pin.</li>
 </ul>
 </div>
-<p>The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — this is the one read-only iterator on which <code>with_halo</code> is allowed, because there is no write to crop the margin from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard <strong>non-maximum suppression</strong>: boxes overlapping at or above <code>iou_threshold</code> (default <code>0.5</code>) are one object, and the one ranked higher by the <code>score_column</code> (<code>"confidence"</code> by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense <code>1..N</code> and returned; like <code>measure</code>, nothing is written — storing the table is your <code>add_table</code> call.</p>
+<p>The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — on a read-only iterator the halo is a pure read margin, there being no write to crop it from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard <strong>non-maximum suppression</strong>: boxes overlapping at or above <code>iou_threshold</code> (default <code>0.5</code>) are one object, and the one ranked higher by the <code>score_column</code> (<code>"confidence"</code> by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense <code>1..N</code> and returned; like <code>measure</code>, nothing is written — storing the table is your <code>add_table</code> call.</p>
 <h3 id="anchoring-a-local-box-yourself">Anchoring a local box yourself<a class="headerlink" href="#anchoring-a-local-box-yourself" title="Permanent link">&para;</a></h3>
 <p>The coordinate bookkeeping is one call you can also use in a custom flow or the manual pattern: <code>Roi.anchor</code> turns a region's <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> plus a patch-local pixel box into the absolute world <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> —</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">tile_roi</span> <span class="o">=</span> <span class="n">detect_iterator</span><span class="o">.</span><span class="n">rois</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
@@ -3162,10 +3253,10 @@ name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=No
 <td>—</td>
 </tr>
 <tr>
-<td>Terminal verb</td>
-<td><code>map</code></td>
-<td><code>map</code></td>
-<td><code>map</code></td>
+<td>Topic verb</td>
+<td><code>process</code> [5]</td>
+<td><code>segment</code> [5]</td>
+<td><code>segment</code> [5]</td>
 <td><code>measure</code></td>
 <td><code>detect</code></td>
 </tr>
@@ -3174,7 +3265,7 @@ name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=No
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
-<td>✓</td>
+<td>⚠ [6]</td>
 <td>⚠ [1]</td>
 </tr>
 <tr>
@@ -3182,11 +3273,11 @@ name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=No
 <td>✓</td>
 <td>✓</td>
 <td>✓</td>
-<td>✗</td>
+<td>✓ [6]</td>
 <td>✓ [1]</td>
 </tr>
 <tr>
-<td><code>stitch=True</code></td>
+<td><code>with_stitch</code></td>
 <td>—</td>
 <td>✓ [2]</td>
 <td>✓ within a mask [2]</td>
@@ -3218,12 +3309,12 @@ name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=No
 <td>✗ [4]</td>
 </tr>
 <tr>
-<td>Distributed finishing verb</td>
+<td>Distributed gather</td>
 <td><code>finalize</code></td>
 <td><code>finalize</code></td>
 <td><code>finalize</code></td>
-<td><code>merge_partials</code></td>
-<td><code>merge_partials</code></td>
+<td><code>finalize</code> → table</td>
+<td><code>finalize</code> → table</td>
 </tr>
 </tbody>
 </table>
@@ -3232,10 +3323,12 @@ name=None slices=[x: 6.0->21.0, y: 2.0->14.5, t: 0.0->1.0, z: 0.0->1.0] label=No
 <li>Stitching takes any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list. On the masked iterator it merges sub-objects split by a tile boundary <em>within one mask</em>; tiles of different masks are never compared, and ids come out unique across every object — no <code>UniqueLabelsTransform</code> needed (combining it with <code>stitch</code> raises).</li>
 <li>Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative <code>merge=</code> (<code>"max"</code>, <code>"sum"</code>) removes the order-dependence outright. One configuration to avoid: an <em>in-place</em> run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).</li>
 <li><code>BatchedMapper</code> stacks plain arrays; these iterators hand <code>func</code> tuple payloads.</li>
+<li>On the writers the topic verb is the generic <code>map</code> under its domain name; both remain available.</li>
+<li>The feature halo is a pure read margin: patches and the <code>roi</code> argument grow, a border object can be measured by several regions, and the duplicate rows are yours to reconcile in a declared join (<code>with_join</code>) via the stamped <code>roi_index</code>/<code>roi_name</code> (the default join keeps them, silently). <code>reduce</code>/<code>iter</code> read the grown regions too. Without a halo, <code>reduce</code> is unrestricted.</li>
 </ol>
 <p>Restrictions that hold everywhere:</p>
 <ul>
-<li><code>stitch</code> needs a halo or overlapping <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr>, and stays on the numpy path.</li>
+<li><code>with_stitch</code> needs a halo or overlapping <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr>, stays on the numpy path, and cannot combine with <code>on_overlap</code> (the stitch owns the contested pixels).</li>
 <li>A haloed <em>writer</em> refuses <code>reduce</code> and read-only <code>iter</code>; an in-place run (same array in and out) refuses a halo.</li>
 <li><code>by_write_units</code> on the read-only iterators falls back to the input's chunks.</li>
 <li>The deprecated dask verbs run serially, and <code>ProcessMapper</code> refuses in-memory stores.</li>
