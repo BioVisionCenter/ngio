@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from typing import Self
 
 import dask.array as da
 import numpy as np
@@ -18,7 +19,8 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
-from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
+from ngio.iterators._abstract_iterator import AbstractIteratorBuilder, OverlapPolicy
 from ngio.iterators._mappers import MapperProtocol
 
 
@@ -29,7 +31,12 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
     function, and writes the result to the output image — a filter, a
     projection, a restoration model. Compose with `by_write_units()`
     for collision-free parallel writes and `with_halo` for seamless tiles.
+    Overlapping writes default to the deterministic wave-order
+    last-writer-wins; `on_overlap(...)` declares a merge instead.
     """
+
+    _on_overlap: OverlapPolicy | None = None
+    _chain_state_attrs: tuple[str, ...] = ("_on_overlap",)
 
     def __init__(
         self,
@@ -100,6 +107,30 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
         """The image this iterator writes to."""
         return self._output
 
+    def on_overlap(self, policy: OverlapPolicy) -> Self:
+        """Declare how contested write pixels are resolved.
+
+        Optional here: undeclared overlapping writes keep the
+        deterministic wave-order last-writer-wins. `"last"` declares
+        exactly that; any `merge=` policy (`"max"`/`"min"`/`"sum"` are
+        order-independent; `"keep_nonzero"`; a merge function; a
+        `MergePolicy`) combines each write with what is on disk — note it
+        applies to *every* write, so pre-existing content participates
+        too. Declare before `for_job`.
+
+        Args:
+            policy: `"last"`, or anything the write path's `merge=` takes.
+        """
+        if policy != "last":
+            resolve_merge(policy)  # refuse an invalid rule at declaration
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._on_overlap = policy
+        return new_instance
+
+    def _overlap_merge(self) -> MergeInput | None:
+        """The `merge=` the setters carry; `None` for undeclared or "last"."""
+        return None if self._on_overlap in (None, "last") else self._on_overlap
+
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
         return NumpyGetter(
             zarr_array=self._input.zarr_array,
@@ -119,6 +150,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
                 axes_order=self._axes_order,
                 transforms=self._output_transforms,
                 slicing_dict=self._output_slicing_kwargs,
+                merge=self._overlap_merge(),
             ),
             roi,
         )
@@ -142,6 +174,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
                 axes_order=self._axes_order,
                 transforms=self._output_transforms,
                 slicing_dict=self._output_slicing_kwargs,
+                merge=self._overlap_merge(),
             ),
             roi,
         )

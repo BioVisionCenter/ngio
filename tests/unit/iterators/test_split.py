@@ -225,8 +225,8 @@ def _stitched_iterator(ome_zarr, size=32):
             ome_zarr.get_label("seg"),
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=True,
         )
+        .with_stitch()
         .by_grid(size_y=size, size_x=size)
         .with_halo(y=4, x=4)
     )
@@ -295,8 +295,8 @@ def _overlapping_stitched_iterator(ome_zarr):
             ome_zarr.get_label("seg"),
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=True,
         )
+        .with_stitch()
         .by_grid(size_y=32, size_x=32, stride_y=24, stride_x=24, tail="clip")
         .with_halo(y=4, x=4)
     )
@@ -640,7 +640,7 @@ def _feature_iterator(ome_zarr):
     ).by_grid(size_y=32, size_x=32)
 
 
-def _global_norm_coalesce(results):
+def _global_norm_join(results):
     """Non-decomposable on purpose: normalizes by the global mean.
 
     Receives the normalized per-ROI frames (`roi_index`/`roi_name`
@@ -657,20 +657,26 @@ def _global_norm_coalesce(results):
     return FeatureTable(table_data=joined, reference_label="objs")
 
 
-@pytest.mark.parametrize("custom_coalesce", [False, True])
-def test_feature_merge_matches_serial(tmp_path: Path, custom_coalesce: bool):
+@pytest.mark.parametrize("custom_join", [False, True])
+def test_feature_merge_matches_serial(tmp_path: Path, custom_join: bool):
     import pandas as pd
 
-    coalesce = _global_norm_coalesce if custom_coalesce else None
+    join = _global_norm_join if custom_join else None
     serial_oz = _feature_setup(tmp_path / "feat_serial.zarr")
-    serial = _feature_iterator(serial_oz).measure(_measure, coalesce=coalesce)
+    serial_it = _feature_iterator(serial_oz)
+    if join is not None:
+        serial_it = serial_it.with_join(join)
+    serial = serial_it.measure(_measure)
     assert serial is not None
 
     ome_zarr = _feature_setup(tmp_path / "feat_jobs.zarr")
     args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     for args in reversed(args_list):
         assert _feature_iterator(ome_zarr).for_job(**args).measure(_measure) is None
-    merged = _feature_iterator(ome_zarr).finalize(coalesce=coalesce)
+    gather_it = _feature_iterator(ome_zarr)
+    if join is not None:
+        gather_it = gather_it.with_join(join)
+    merged = gather_it.finalize()
 
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
     # The merge cleaned the partials group up.
@@ -684,9 +690,9 @@ def test_feature_slice_measure_banks_and_slice_finalize_refuses(tmp_path: Path):
     args_list = iterator.prepare_jobs(n_jobs=2)
     restricted = _feature_iterator(ome_zarr).for_job(**args_list[0])
 
-    # A slice's coalesce would be silently ignored — refused instead.
-    with pytest.raises(NgioValueError, match="finalize"):
-        restricted.measure(_measure, coalesce=_global_norm_coalesce)
+    # A declared join is inert on a slice: the slice banks regardless.
+    joined_slice = _feature_iterator(ome_zarr).with_join(_global_norm_join)
+    restricted = joined_slice.for_job(**args_list[0])
     # The slice's measure banks its partial and hands nothing back.
     assert restricted.measure(_measure) is None
     label = ome_zarr.get_label("objs")
@@ -931,14 +937,17 @@ def _haloed_feature_iterator(ome_zarr):
     return _feature_iterator(ome_zarr).with_halo(y=8, x=8)
 
 
-@pytest.mark.parametrize("custom_coalesce", [False, True])
-def test_feature_merge_matches_serial_with_halo(tmp_path: Path, custom_coalesce: bool):
+@pytest.mark.parametrize("custom_join", [False, True])
+def test_feature_merge_matches_serial_with_halo(tmp_path: Path, custom_join: bool):
     """The read-only halo distributes: grown reads, same one global join."""
     import pandas as pd
 
-    coalesce = _global_norm_coalesce if custom_coalesce else None
+    join = _global_norm_join if custom_join else None
     serial_oz = _feature_setup(tmp_path / "feat_halo_serial.zarr")
-    serial = _haloed_feature_iterator(serial_oz).measure(_measure, coalesce=coalesce)
+    serial_it = _haloed_feature_iterator(serial_oz)
+    if join is not None:
+        serial_it = serial_it.with_join(join)
+    serial = serial_it.measure(_measure)
     assert serial is not None
     # The halo makes border objects appear in several grown regions.
     assert not serial.dataframe.index.is_unique
@@ -949,7 +958,10 @@ def test_feature_merge_matches_serial_with_halo(tmp_path: Path, custom_coalesce:
         assert (
             _haloed_feature_iterator(ome_zarr).for_job(**args).measure(_measure) is None
         )
-    merged = _haloed_feature_iterator(ome_zarr).finalize(coalesce=coalesce)
+    gather_it = _haloed_feature_iterator(ome_zarr)
+    if join is not None:
+        gather_it = gather_it.with_join(join)
+    merged = gather_it.finalize()
 
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
 
@@ -965,3 +977,46 @@ def test_feature_slice_measure_refuses_reserved_columns(tmp_path: Path):
 
     with pytest.raises(NgioValueError, match="reserved column"):
         restricted.measure(shadowing)
+
+
+class _StrictSeamMatcher:
+    """A picklable non-default matcher (module-level would pickle too)."""
+
+    def __call__(self, patch_a, patch_b):
+        from ngio.iterators import IouSeamMatcher
+
+        return IouSeamMatcher(0.9)(patch_a, patch_b)
+
+
+def test_distributed_custom_seam_matcher_matches_serial(tmp_path: Path):
+    """A custom matcher declared identically on every phase is bit-identical."""
+    from ngio.iterators import StitchConfig
+
+    def _matched_iterator(ome_zarr):
+        return (
+            SegmentationIterator(
+                ome_zarr.get_image(),
+                ome_zarr.get_label("seg"),
+                axes_order="yx",
+                consolidation_mode="dask",
+            )
+            .with_stitch(StitchConfig(seam_matcher=_StrictSeamMatcher()))
+            .by_grid(size_y=32, size_x=32)
+            .with_halo(y=4, x=4)
+        )
+
+    serial_oz = _stitched_setup(tmp_path / "matcher_serial.zarr")
+    serial_oz.derive_label("seg")
+    _matched_iterator(serial_oz).segment(_threshold)
+
+    ome_zarr = _stitched_setup(tmp_path / "matcher_jobs.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _matched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in args_list:
+        _matched_iterator(ome_zarr).for_job(**args).segment(_threshold)
+    _matched_iterator(ome_zarr).finalize()
+
+    np.testing.assert_array_equal(
+        ome_zarr.get_label("seg").get_as_numpy(),
+        serial_oz.get_label("seg").get_as_numpy(),
+    )

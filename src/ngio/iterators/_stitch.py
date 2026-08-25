@@ -20,7 +20,7 @@ import uuid
 import warnings
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 import zarr
@@ -61,6 +61,86 @@ _SCRATCH_GROUP = "_ngio_stitch"
 _LAYOUT = "per-roi/1"
 
 
+class SeamMatcherProtocol(Protocol):
+    """Decides which ids of two overlapping banked predictions are one object.
+
+    Called only at the resolve (the gather step, on the calling thread — no
+    pickling constraints), once per overlapping tile pair, with the two
+    tiles' banked label patches reconstructed over their shared region:
+    aligned, same shape, in the label's own axes order. Ids are as they
+    appear in the patches (each tile's block-offset ids). Return the
+    `(id_in_a, id_in_b)` pairs that are the same object; the framework owns
+    which tile pairs are compared and over which regions, the banking and
+    scratch lifecycle, the union-find, and the global relabel.
+
+    Must be deterministic — a pure function of the two patches — or a
+    distributed gather is no longer bit-identical to a serial run.
+    Background `0` is never pairable, and every returned id must appear in
+    its patch; violations raise at the resolve.
+    """
+
+    def __call__(
+        self, patch_a: np.ndarray, patch_b: np.ndarray
+    ) -> list[tuple[int, int]]:
+        """Return the `(id_in_a, id_in_b)` same-object pairs."""
+        ...
+
+
+@dataclass(frozen=True)
+class IouSeamMatcher:
+    """The default seam criterion: IoU over the shared pixels, thresholded.
+
+    `overlap_iou` counts only pixels labelled on *both* sides, so background
+    (and a masked tile's outside) never enters a pair and can never
+    displace a written id.
+    """
+
+    iou_threshold: float = 0.3
+
+    def __post_init__(self) -> None:
+        """Validate the threshold."""
+        if not 0.0 < self.iou_threshold <= 1.0:
+            raise NgioValueError(
+                f"iou_threshold must be in (0, 1], got {self.iou_threshold}. "
+                "Zero would merge any pair that shares a single pixel."
+            )
+
+    def __call__(
+        self, patch_a: np.ndarray, patch_b: np.ndarray
+    ) -> list[tuple[int, int]]:
+        """The pairs whose IoU over the shared pixels meets the threshold."""
+        return [
+            pair
+            for pair, score in overlap_iou(patch_a, patch_b).items()
+            if score >= self.iou_threshold
+        ]
+
+
+def _validated_seam_pairs(
+    pairs: list[tuple[int, int]], left: np.ndarray, right: np.ndarray
+) -> list[tuple[int, int]]:
+    """Enforce the seam-matcher invariants before anything is unioned.
+
+    Unioning background with a written id would corrupt the label globally,
+    and a foreign id would relabel an object the pair never saw.
+    """
+    left_ids = set(np.unique(left).tolist())
+    right_ids = set(np.unique(right).tolist())
+    for mine, theirs in pairs:
+        if mine == 0 or theirs == 0:
+            raise NgioValueError(
+                f"The seam matcher paired background: ({mine}, {theirs}). "
+                "`0` is not an object and can never merge."
+            )
+        if mine not in left_ids or theirs not in right_ids:
+            raise NgioValueError(
+                f"The seam matcher returned ({mine}, {theirs}), but the id "
+                "is absent from its patch: every pair must reference ids "
+                "that appear in the patches it was given."
+            )
+    return pairs
+
+
 @dataclass(frozen=True, kw_only=True)
 class StitchConfig:
     """How to stitch a tiled segmentation.
@@ -72,7 +152,12 @@ class StitchConfig:
             shared pixels before their ids are called the same object. Low
             values merge eagerly; the default errs towards leaving an object
             split, which is fixable downstream, rather than merging two that
-            are not.
+            are not. Configures the default `IouSeamMatcher`; ignored when
+            `seam_matcher` is set.
+        seam_matcher: Replaces the default pair criterion — see
+            `SeamMatcherProtocol`. Like the measurement function, a custom
+            matcher is not part of the plan fingerprint: declare the
+            identical one on every phase of a distributed run.
         compact: Renumber the surviving ids to a dense `1..N` at the end.
             The renumbering walks the **whole** label, so objects outside the
             iterated ROIs get new ids too — anything keyed by the old ids
@@ -88,6 +173,7 @@ class StitchConfig:
 
     block_size: int = 10_000
     iou_threshold: float = 0.3
+    seam_matcher: SeamMatcherProtocol | None = None
     compact: bool = True
     scratch_store: StoreOrGroup | None = None
 
@@ -100,6 +186,10 @@ class StitchConfig:
                 f"iou_threshold must be in (0, 1], got {self.iou_threshold}. "
                 "Zero would merge any pair that shares a single pixel."
             )
+
+    def matcher(self) -> SeamMatcherProtocol:
+        """The seam matcher the resolve runs; the IoU default unless swapped."""
+        return self.seam_matcher or IouSeamMatcher(self.iou_threshold)
 
 
 @dataclass(frozen=True)
@@ -524,18 +614,17 @@ class StitchPlan:
                 "Run the missing jobs, then finalize again."
             )
 
+        matcher = self._config.matcher()
         union = UnionFind[int]()
         for i, j in self._pairs:
             box = intersection_box(self._works[i].grown, self._works[j].grown)
             assert box is not None  # pairs come from the same boxes
             left = banks.read(self._works[i], box)
             right = banks.read(self._works[j], box)
-            # `overlap_iou` counts only pixels labelled on *both* sides, so 0
-            # (background, and a masked tile's outside) never enters the
-            # union-find and can never displace a written id.
-            for (mine, theirs), score in overlap_iou(left, right).items():
-                if score >= self._config.iou_threshold:
-                    union.union(mine, theirs)
+            for mine, theirs in _validated_seam_pairs(
+                matcher(left, right), left, right
+            ):
+                union.union(mine, theirs)
 
         mapping = union.resolve()
         label_array = output.zarr_array

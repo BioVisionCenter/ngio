@@ -1,4 +1,5 @@
 from collections.abc import Callable, Sequence
+from typing import Self
 
 import dask.array as da
 import numpy as np
@@ -21,9 +22,12 @@ from ngio.io_pipes import (
 from ngio.io_pipes._io_pipe_ops import IoPipeContext, setup_io_pipe
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
-from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
+from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
+from ngio.iterators._abstract_iterator import AbstractIteratorBuilder, OverlapPolicy
 from ngio.iterators._mappers import MapperProtocol
 from ngio.iterators._stitch import (
+    IouSeamMatcher,
     ScratchBanks,
     StitchConfig,
     StitchingSetter,
@@ -80,10 +84,12 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     """Segment an image region by region into a label.
 
     Reads each region from the input image and writes the function's label
-    patch to the output label. With `stitch=True` objects split across region
-    boundaries are resolved into one id after the map — any ROI list works:
-    grids with a halo, overlapping FOV layouts, ragged tables. See
-    `StitchConfig`.
+    patch to the output label. With `with_stitch(...)` objects split across
+    region boundaries are resolved into one id at the gather — any ROI list
+    works: grids with a halo, overlapping FOV layouts, ragged tables. See
+    `StitchConfig`. Regions whose write footprints overlap need a declared
+    resolution — `with_stitch(...)` or `on_overlap(...)` — or the writing
+    verbs refuse.
     """
 
     # Class-level defaults so subclasses that write their own `__init__` are
@@ -91,6 +97,9 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     # `finalize` reads.
     _stitch: StitchConfig | None = None
     _stitch_plan: StitchPlan | None = None
+    _on_overlap: OverlapPolicy | None = None
+    # `_stitch_plan` is derived per-ROI-list, so deliberately not carried.
+    _chain_state_attrs: tuple[str, ...] = ("_stitch", "_on_overlap")
     # The masked iterator restricts stitch comparisons to same-object tiles:
     # an object cannot span two masks, so cross-label pairs can never merge.
     _stitch_same_label_only: bool = False
@@ -105,7 +114,6 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
         consolidation_mode: ConsolidationMode | None = None,
-        stitch: StitchConfig | bool = False,
     ) -> None:
         """Segment `input_image` region by region into `output_label`.
 
@@ -119,19 +127,12 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
                 before the write.
             consolidation_mode: How to build the output pyramid after
                 iteration, see `Label.consolidate`.
-            stitch: Resolve objects split across region boundaries into one
-                id after the map. Needs a halo (`with_halo`) or overlapping
-                ROIs — the evidence is overlap between neighbouring
-                predictions. `True` uses the `StitchConfig` defaults.
         """
         self._input = input_image
         self._output = output_label
         self._ref_image = input_image
         self._rois = input_image.build_image_roi_table(name=None).rois()
         self._consolidation_mode = consolidation_mode
-        self._stitch = StitchConfig() if stitch is True else stitch or None
-        self._stitch_plan: StitchPlan | None = None
-        _require_no_unique_labels_with_stitch(self._stitch, output_transforms)
 
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input, channel_selection=channel_selection, slicing_dict={}
@@ -153,13 +154,100 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
             "consolidation_mode": self._consolidation_mode,
-            "stitch": self._stitch or False,
         }
 
     @property
     def output_image(self) -> Label:
         """The label this iterator writes to."""
         return self._output
+
+    def with_stitch(self, config: StitchConfig | None = None) -> Self:
+        """Declare the stitch: split objects become one id at the gather.
+
+        Objects cut by a region boundary are resolved into one id when the
+        run finalizes — any ROI list works: grids with a halo, overlapping
+        FOV layouts, ragged tables. Needs a halo (`with_halo`) or
+        overlapping ROIs: the evidence is overlap between neighbouring
+        predictions. Declare before `for_job`; `None` uses the
+        `StitchConfig` defaults. Refuses when `on_overlap` is declared —
+        a merge policy would make the disk diverge from the banked
+        predictions, so the resolve would relabel garbage.
+
+        Args:
+            config: The stitch configuration, `None` for the defaults.
+        """
+        resolved = config if config is not None else StitchConfig()
+        if self._on_overlap is not None:
+            raise NgioValueError(
+                "with_stitch and on_overlap cannot be combined: a merge "
+                "policy would make the written labels diverge from the "
+                "banked predictions the resolve compares. The stitch "
+                "already owns the contested pixels (deterministic wave "
+                "order) — drop the `on_overlap` declaration."
+            )
+        _require_no_unique_labels_with_stitch(resolved, self._output_transforms)
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._stitch = resolved
+        return new_instance
+
+    def on_overlap(self, policy: OverlapPolicy) -> Self:
+        """Declare how contested write pixels are resolved.
+
+        `"last"` keeps the deterministic wave-order last-writer-wins — an
+        explicit acknowledgment, no merge is performed. Any `merge=` policy
+        (`"max"`/`"min"`/`"sum"` are order-independent; `"keep_nonzero"`; a
+        merge function; a `MergePolicy`) combines each write with what is
+        on disk — note it applies to *every* write, so pre-existing content
+        participates too. Declare before `for_job`. Refuses when
+        `with_stitch` is declared (the stitch owns the contested pixels).
+
+        Args:
+            policy: `"last"`, or anything the write path's `merge=` takes.
+        """
+        if policy != "last":
+            resolve_merge(policy)  # refuse an invalid rule at declaration
+        if self._stitch is not None:
+            raise NgioValueError(
+                "on_overlap and with_stitch cannot be combined: the stitch "
+                "already owns the contested pixels (deterministic wave "
+                "order), and a merge policy would make the written labels "
+                "diverge from the banked predictions. Drop one of the two."
+            )
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._on_overlap = policy
+        return new_instance
+
+    def _overlap_merge(self) -> MergeInput | None:
+        """The `merge=` the setters carry; `None` for undeclared or "last"."""
+        return None if self._on_overlap in (None, "last") else self._on_overlap
+
+    def _validate_write_plan(self) -> None:
+        """Refuse undeclared overlapping write footprints.
+
+        Without a declared resolution the later tile silently overwrites
+        the earlier one's labels — deterministic, but almost never the
+        intent for a segmentation. Measured pixel-exactly on the setters'
+        write regions (halo margins are cropped before the write, so a
+        halo never triggers this; sharing a chunk without sharing pixels
+        does not either).
+        """
+        if self._stitch is not None or self._on_overlap is not None:
+            return
+        if len(self.rois) < 2:
+            return
+        slicing_tuples = (
+            self.build_numpy_setter(roi).slicing_ops.normalized_slicing_tuple
+            for roi in self.rois
+        )
+        if check_if_regions_overlap(slicing_tuples):
+            raise NgioValueError(
+                "Segmentation regions overlap where they write: without a "
+                "declared resolution, the later tile silently overwrites "
+                "the earlier one's labels. Declare it: `.with_stitch(...)` "
+                "to merge objects split across the seams, or "
+                "`.on_overlap('last')` (or a merge rule) to accept a "
+                "deterministic overwrite."
+            )
 
     def build_numpy_getter(self, roi: Roi) -> DataGetterProtocol[np.ndarray]:
         return NumpyGetter(
@@ -281,9 +369,18 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     def _fingerprint_extras(self) -> tuple[str, ...]:
         if self._stitch is None:
             return ()
+        # The default matcher's repr pins its threshold, so a drift between
+        # phases still refuses; a custom matcher, like the measurement
+        # function, is not fingerprintable — only its type is recorded.
+        matcher = self._stitch.matcher()
+        matcher_term = (
+            f"stitch.matcher={matcher!r}"
+            if isinstance(matcher, IouSeamMatcher)
+            else f"stitch.matcher={type(matcher).__qualname__}"
+        )
         return (
             f"stitch.block_size={self._stitch.block_size}",
-            f"stitch.iou_threshold={self._stitch.iou_threshold}",
+            matcher_term,
             f"stitch.compact={self._stitch.compact}",
         )
 
@@ -310,6 +407,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
                     axes_order=self._axes_order,
                     transforms=self._output_transforms,
                     remove_channel_selection=True,
+                    merge=self._overlap_merge(),
                 ),
                 roi,
             ),
@@ -333,8 +431,8 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
                 "Stitching is only supported on the numpy path: the dask "
                 "setters do not offset ids or bank predictions, so the "
                 "resolve would corrupt the labels. Use "
-                "map()/iter(data_mode='numpy'), or build the iterator with "
-                "stitch=False."
+                "map()/iter(data_mode='numpy'), or drop the `with_stitch` "
+                "declaration."
             )
 
     def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[da.Array]:
@@ -347,6 +445,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
                 axes_order=self._axes_order,
                 transforms=self._output_transforms,
                 remove_channel_selection=True,
+                merge=self._overlap_merge(),
             ),
             roi,
         )
@@ -428,8 +527,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
     are masked to the object (outside pixels filled) and writes protect
     everything outside it (`MaskMerge`) — overlapping bounding boxes are
     safe, because each write only touches its own object's pixels. With
-    `stitch=True` and a tiling (`by_grid` + `with_halo`), sub-objects split
-    by a tile boundary *within one mask* merge into one id; tiles of
+    `with_stitch(...)` and a tiling (`by_grid` + `with_halo`), sub-objects
+    split by a tile boundary *within one mask* merge into one id; tiles of
     different masks are never compared (an object cannot span two masks),
     and ids come out unique and dense across every object — no
     `UniqueLabelsTransform` needed (combining it with `stitch` raises).
@@ -454,7 +553,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
         input_transforms: Sequence[TransformProtocol] | None = None,
         output_transforms: Sequence[TransformProtocol] | None = None,
         consolidation_mode: ConsolidationMode | None = None,
-        stitch: StitchConfig | bool = False,
     ) -> None:
         """Segment each masked object's box from `input_image` into `output_label`.
 
@@ -473,10 +571,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
                 before the write.
             consolidation_mode: How to build the output pyramid after
                 iteration, see `Label.consolidate`.
-            stitch: Merge sub-objects split by a tile boundary within one
-                mask into one id after the map — for masked objects tiled
-                with `by_grid` + `with_halo`. `True` uses the `StitchConfig`
-                defaults.
         """
         self._input = input_image
         self._output = output_label
@@ -484,9 +578,6 @@ class MaskedSegmentationIterator(SegmentationIterator):
         self._ref_image = input_image
         self._set_rois(input_image._masking_roi_table.rois())
         self._consolidation_mode = consolidation_mode
-        self._stitch = StitchConfig() if stitch is True else stitch or None
-        self._stitch_plan = None
-        _require_no_unique_labels_with_stitch(self._stitch, output_transforms)
 
         self._input_slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self._input, channel_selection=channel_selection, slicing_dict={}
@@ -508,8 +599,28 @@ class MaskedSegmentationIterator(SegmentationIterator):
             "input_transforms": self._input_transforms,
             "output_transforms": self._output_transforms,
             "consolidation_mode": self._consolidation_mode,
-            "stitch": self._stitch or False,
         }
+
+    def on_overlap(self, policy: OverlapPolicy) -> Self:
+        """Refused: masked writes never contest.
+
+        Each write touches only its own object's pixels (`MaskMerge`
+        protects everything outside it), so overlapping bounding boxes are
+        safe with nothing to declare — and the setter's one `merge=` slot
+        already carries the mask protection.
+        """
+        raise NgioValueError(
+            "MaskedSegmentationIterator takes no overlap policy: writes are "
+            "mask-protected, so overlapping bounding boxes never contest a "
+            "pixel — there is nothing to declare."
+        )
+
+    def _validate_write_plan(self) -> None:
+        """Masked writes are exempt: bounding boxes overlap by design.
+
+        `MaskMerge` protects everything outside each write's own object,
+        so overlapping boxes never contest a pixel.
+        """
 
     def _input_transforms_with_mask(self) -> Sequence[TransformProtocol]:
         """The input transforms plus a terminal mask over the input image."""

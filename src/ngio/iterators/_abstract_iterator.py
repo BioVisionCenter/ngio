@@ -4,12 +4,13 @@ import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Generator, Mapping
 from types import MappingProxyType
-from typing import Generic, Literal, Self, TypedDict, TypeVar, overload
+from typing import Generic, Literal, Self, TypeAlias, TypedDict, TypeVar, overload
 
 from ngio.common import Roi
 from ngio.common._pyramid import RegionsLike
 from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
+from ngio.io_pipes._merge_policy import MergeInput
 from ngio.io_pipes._ops_slices_utils import (
     _pairs_stream,
     check_if_regions_overlap,
@@ -50,6 +51,12 @@ DaskPipeType = TypeVar("DaskPipeType")
 FinalizeType = TypeVar("FinalizeType")
 R = TypeVar("R")
 T = TypeVar("T")
+
+#: What `on_overlap` accepts: `"last"` keeps the deterministic wave-order
+#: last-writer-wins as an explicit acknowledgment; any `merge=` input
+#: (`"max"`/`"min"`/`"sum"`/`"keep_nonzero"`, a merge function, or a
+#: `MergePolicy`) combines each write with what is on disk instead.
+OverlapPolicy: TypeAlias = Literal["last"] | MergeInput
 
 
 class JobArgs(TypedDict):
@@ -97,6 +104,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
     # a partition slice refuses further reshaping instead of silently
     # invalidating them.
     _partition: tuple[frozenset[int], int, int] | None = None
+    #: Attribute names of builder-chain declarations carried through cloning,
+    #: like `_halo` (subclasses list e.g. `_stitch`, `_nms`, `_join`,
+    #: `_on_overlap`). Derived state (a `_stitch_plan`) must NOT be listed.
+    _chain_state_attrs: tuple[str, ...] = ()
 
     def __repr__(self) -> str:
         halo = f", halo={self._halo}" if self._halo else ""
@@ -178,8 +189,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         new_instance = self.__class__(**init_kwargs)
         new_instance._set_rois(rois)
         # Carried here rather than through every concrete `get_init_kwargs`:
-        # the halo is orthogonal to how an iterator was built.
+        # the halo and the chain declarations are orthogonal to how an
+        # iterator was built.
         new_instance._halo = self._halo
+        for attr in self._chain_state_attrs:
+            setattr(new_instance, attr, getattr(self, attr))
         return new_instance
 
     def with_halo(self, x: int = 0, y: int = 0, z: int = 0, t: int = 0) -> Self:
@@ -607,6 +621,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
     ) -> Generator:
         """`iter()` without the deprecation warnings, for internal callers."""
+        if iterator_mode == "readwrite":
+            self._validate_write_plan()
         if data_mode == "numpy":
             getters = self._numpy_getters_generator()
             setters = self._numpy_setters_generator()
@@ -854,6 +870,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
                 )
             if iterator_mode == "readonly":
                 return self._iter_batched_readonly(batch_size)
+            self._validate_write_plan()
             return self._iter_batched(batch_size)
         if data_mode is None:
             warnings.warn(
@@ -910,6 +927,13 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
                 f"{name} is read-only: map has nothing to write back. "
                 "Use reduce (or iter) to compute without writing."
             )
+
+    def _validate_write_plan(self) -> None:
+        """Hook run before any pixel is written; the base accepts everything.
+
+        A writing subclass with a strict overlap contract (segmentation)
+        refuses undeclared overlapping write footprints here.
+        """
 
     def _require_no_halo_on_readonly_verbs(self) -> None:
         """Refuse `reduce`/readonly `iter` on a haloed *writing* iterator.
@@ -1046,6 +1070,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         if n_jobs < 1:
             raise NgioValueError(f"n_jobs must be >= 1, got {n_jobs}.")
         self._require_splittable()
+        if self.output_image is not None:
+            self._validate_write_plan()
         units = list(self._numpy_units_generator())
         partition = partition_components(write_conflict_components(units), n_jobs)
         self._prepare_distributed(n_jobs)
@@ -1146,6 +1172,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
         units = list(self._numpy_units_generator())
         self._require_writable_units(units)
+        self._validate_write_plan()
         mapper(func, units)
         # A partition slice runs only its share; the finalize (the one global
         # step) belongs to the unrestricted iterator, once every job is done.
@@ -1202,6 +1229,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         _mapper = self._require_serial_dask_mapper(mapper)
         units = list(self._dask_units_generator())
         self._require_writable_units(units)
+        self._validate_write_plan()
         _mapper(func, units)
         if self._partition is None:
             self.finalize()

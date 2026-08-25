@@ -24,15 +24,43 @@ description: API reference for the ngio processing iterators.
 
 ::: ngio.iterators.ObjectDetectionIterator
 
-## Configuration
+## Reconciliation declarations
+
+Each iterator declares its reconciliation in the builder chain —
+`on_overlap`, `with_stitch`, `with_join`, `with_nms` — backed by a swappable
+protocol with a shipped default.
 
 ### StitchConfig
 
 ::: ngio.iterators.StitchConfig
 
-### NmsConfig
+### SeamMatcherProtocol
 
-::: ngio.iterators.NmsConfig
+::: ngio.iterators.SeamMatcherProtocol
+
+### IouSeamMatcher
+
+::: ngio.iterators.IouSeamMatcher
+
+### NmsProtocol
+
+::: ngio.iterators.NmsProtocol
+
+### GreedyNms
+
+::: ngio.iterators.GreedyNms
+
+### Detection
+
+::: ngio.iterators.Detection
+
+### JoinProtocol
+
+::: ngio.iterators.JoinProtocol
+
+### ConcatJoin
+
+::: ngio.iterators.ConcatJoin
 
 ## Mappers
 
@@ -107,10 +135,12 @@ inspecting how a tiling will parallelize or split into jobs.
 
 The shared method surface of every iterator — the reshaping calls
 (`by_grid`, `by_blocks`, `by_chunks`, `by_write_units`, `product`, `with_halo`,
-`for_job`), the generic execution calls (`iter` — batched via `batch_size` —
-`map`, `reduce`) beneath each iterator's topic verb (`process`, `segment`,
-`measure`, `detect`), the distributed-run init step (`prepare_jobs`), and the
-one gather, `finalize` — the writers consolidate and return `None`, the
-read-only iterators merge their banked partials and return the table.
+`for_job`), each class's reconciliation declaration (`on_overlap`,
+`with_stitch`, `with_join`, `with_nms`), the generic execution calls (`iter` —
+batched via `batch_size` — `map`, `reduce`) beneath each iterator's topic verb
+(`process`, `segment`, `measure`, `detect`), the distributed-run init step
+(`prepare_jobs`), and the one gather, `finalize` — the writers consolidate and
+return `None`, the read-only iterators merge their banked partials and return
+the table.
 
 ::: ngio.iterators.AbstractIteratorBuilder

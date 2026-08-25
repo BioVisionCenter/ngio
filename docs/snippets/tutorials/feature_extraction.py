@@ -137,7 +137,7 @@ def keep_most_complete(results: list[pd.DataFrame]) -> Table:
 # is measured whole by every tile that sees it, so its label shows up more
 # than once — each row stamped with the `roi_index`/`roi_name` it came from.
 tiled = iterator.by_blocks(num_y=2, num_x=2).with_halo(y=32, x=32)
-tiled_table = tiled.measure(extract_features, coalesce=keep_most_complete)
+tiled_table = tiled.with_join(keep_most_complete).measure(extract_features)
 assert tiled_table is not None
 ome_zarr.add_table("nuclei_regionprops_tiled", tiled_table, overwrite=True)
 # --8<-- [end:halo_dedup]

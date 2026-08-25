@@ -94,8 +94,9 @@ def _stitched_masked_iterator(ome_zarr, *, stitch=True, halo=6):
         ome_zarr.get_label("nuclei"),
         axes_order="yx",
         consolidation_mode="dask",
-        stitch=stitch,
     ).by_grid(size_y=32, size_x=32)
+    if stitch:
+        iterator = iterator.with_stitch(None if stitch is True else stitch)
     if halo:
         iterator = iterator.with_halo(y=halo, x=halo)
     return iterator
@@ -178,8 +179,8 @@ def test_masked_stitch_with_coarser_masking_label():
             ome_zarr.get_label("nuclei"),
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=True,
         )
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=6, x=6)
     )
@@ -231,18 +232,16 @@ def test_masked_stitch_refuses_unique_labels_transform():
             masked,
             nuclei,
             axes_order="yx",
-            stitch=True,
             output_transforms=[UniqueLabelsTransform(block_size=1000)],
-        )
+        ).with_stitch()
     # The base class shares the double-offset failure mode.
     with pytest.raises(NgioValueError, match="UniqueLabelsTransform"):
         SegmentationIterator(
             ome_zarr.get_image(),
             nuclei,
             axes_order="yx",
-            stitch=True,
             output_transforms=[UniqueLabelsTransform(block_size=1000, block_index=0)],
-        )
+        ).with_stitch()
 
 
 def test_masked_stitch_refuses_the_dask_path():
@@ -252,24 +251,30 @@ def test_masked_stitch_refuses_the_dask_path():
         iterator.build_dask_setter(iterator.rois[0])
 
 
-def test_masked_get_init_kwargs_round_trip():
-    """`stitch=True` must survive the builder chain's reconstruction."""
+def test_masked_stitch_declaration_survives_the_chain():
+    """`with_stitch` must survive the builder chain's reconstruction."""
     ome_zarr, _ = _masked_setup(MemoryStore())
     iterator = _stitched_masked_iterator(ome_zarr)
-    assert iterator._stitch is not None
-    assert isinstance(iterator.get_init_kwargs()["stitch"], StitchConfig)
+    assert isinstance(iterator._stitch, StitchConfig)
+    # The declaration is chain state, not a constructor argument.
+    assert "stitch" not in iterator.get_init_kwargs()
+    reshaped = iterator.by_grid(size_y=16, size_x=16).with_halo(y=2, x=2)
+    assert isinstance(reshaped._stitch, StitchConfig)
 
 
 def test_masked_single_tile_objects_warn_noop_not_error():
     """Untiled masked objects: a soft no-op warning, never the halo error."""
     ome_zarr, _ = _masked_setup(MemoryStore())
-    iterator = MaskedSegmentationIterator(
-        ome_zarr.get_masked_image(masking_label_name="organoids"),
-        ome_zarr.get_label("nuclei"),
-        axes_order="yx",
-        consolidation_mode="dask",
-        stitch=True,
-    ).with_halo(y=6, x=6)
+    iterator = (
+        MaskedSegmentationIterator(
+            ome_zarr.get_masked_image(masking_label_name="organoids"),
+            ome_zarr.get_label("nuclei"),
+            axes_order="yx",
+            consolidation_mode="dask",
+        )
+        .with_stitch()
+        .with_halo(y=6, x=6)
+    )
 
     with pytest.warns(NgioUserWarning, match="per-object no-op"):
         iterator.map(_label_over_128)

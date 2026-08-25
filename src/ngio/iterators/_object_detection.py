@@ -20,7 +20,7 @@ ones.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, Protocol, Self, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -55,8 +55,69 @@ _BBOX_AXES = ("x", "y", "z")
 
 
 @dataclass(frozen=True, kw_only=True)
-class NmsConfig:
-    """How duplicate detections are suppressed.
+class Detection:
+    """One anchored detection, as suppression sees it.
+
+    Constructed by the framework only. A custom suppression returns a
+    subset of the instances it was given — never construct or copy these —
+    so future ngio versions stay free to add fields.
+
+    Attributes:
+        tile_index: Position of the reporting tile in `iterator.rois`.
+        row: The box's position in that tile's returned list.
+            `(tile_index, row)` is the deterministic tie-breaker.
+        score: The ranking value (the `score_column` extra, or box volume
+            when no tile reported one).
+        roi: The absolute world-space ROI, extra fields riding on it (a
+            class id, say) — not yet renumbered.
+        bounds: Reference-image pixel coordinates, `[min, max)` per bbox
+            axis. Treat as read-only.
+        group: Opaque key of the axes the boxes do not pin (t, or z for a
+            2D detector on 3D data). Only detections with equal `group`
+            can be duplicates of each other.
+    """
+
+    tile_index: int
+    row: int
+    score: float
+    roi: Roi
+    bounds: dict[str, tuple[float, float]]
+    group: tuple
+
+
+class NmsProtocol(Protocol):
+    """What the detection iterator needs from its NMS declaration.
+
+    Two properties the framework reads outside suppression, plus the
+    suppression itself. `suppress` runs only at the join (a serial
+    `detect`, or the distributed gather's `finalize`), on the calling
+    thread — no pickling constraints. It must be deterministic — a pure
+    function of the detection list, ties broken deterministically (the
+    default uses `(-score, tile_index, row)`) — or a distributed gather is
+    no longer bit-identical to a serial run.
+
+    Compatibility policy: future ngio versions will only ever add
+    *optional* members, probed with `getattr`.
+    """
+
+    @property
+    def score_column(self) -> str:
+        """Extra field ranking the detections; also names the output column."""
+        ...
+
+    @property
+    def max_detections_per_tile(self) -> int:
+        """Per-tile runaway-detector guard, enforced at collection."""
+        ...
+
+    def suppress(self, detections: Sequence[Detection]) -> list[Detection]:
+        """Return the survivors — a subset of `detections`, any order."""
+        ...
+
+
+@dataclass(frozen=True, kw_only=True)
+class GreedyNms:
+    """Greedy NMS, the default suppression: highest score first.
 
     Attributes:
         iou_threshold: Two boxes overlapping at or above this
@@ -89,6 +150,20 @@ class NmsConfig:
                 "max_detections_per_tile must be > 0, got "
                 f"{self.max_detections_per_tile}."
             )
+
+    def suppress(self, detections: Sequence[Detection]) -> list[Detection]:
+        """Greedy pass: keep by rank, drop what overlaps a kept box."""
+        ranked = sorted(detections, key=lambda d: (-d.score, d.tile_index, d.row))
+        kept: list[Detection] = []
+        for detection in ranked:
+            duplicate = any(
+                other.group == detection.group
+                and bbox_iou(other.bounds, detection.bounds) >= self.iou_threshold
+                for other in kept
+            )
+            if not duplicate:
+                kept.append(detection)
+        return kept
 
 
 class DetectionGetter(DataGetter[tuple[T, Roi]], Generic[T]):
@@ -130,36 +205,7 @@ class _UnpackedDetectionFunc:
         return self._func(patch)
 
 
-class _Detection:
-    """One box, carried from the tile that found it to the final table."""
-
-    __slots__ = ("bounds", "group", "roi", "row", "score", "tile_index")
-
-    def __init__(
-        self,
-        *,
-        tile_index: int,
-        row: int,
-        score: float,
-        roi: Roi,
-        bounds: dict[str, tuple[float, float]],
-        group: tuple,
-    ) -> None:
-        self.tile_index = tile_index
-        self.row = row
-        self.score = score
-        # The absolute, world-space ROI (extras riding on it), not yet
-        # renumbered.
-        self.roi = roi
-        # Reference-image pixel coordinates, `[min, max)` per bbox axis.
-        self.bounds = bounds
-        # Extents along the axes the boxes do not pin (t, or z for a 2D
-        # detector on a 3D image): only detections sharing them can be
-        # duplicates of each other.
-        self.group = group
-
-
-def _bbox_iou(
+def bbox_iou(
     a: dict[str, tuple[float, float]], b: dict[str, tuple[float, float]]
 ) -> float:
     """Intersection-over-union of two boxes over their (shared) axes."""
@@ -294,7 +340,8 @@ class ObjectDetectionIterator(
     A read-only iterator: nothing is written to the image, and the halo is a
     pure read margin — call `with_halo(...)` so an object cut by a tile edge
     is seen whole by the neighbouring tile; the duplicate detections that
-    produces are resolved by NMS (`NmsConfig`). The product is a
+    produces are resolved by NMS (declared with `with_nms`, the
+    `GreedyNms` defaults otherwise). The product is a
     `RoiTable` of world-anchored boxes, returned by `detect` for the
     caller to store. Distributed, a `for_job` slice's `detect` banks a
     partial and `finalize()` runs the one global NMS.
@@ -310,6 +357,27 @@ class ObjectDetectionIterator(
     # The halo is this iterator's read margin: there is no write to crop it
     # from, and NMS is what reconciles the overlapping context.
     _allow_readonly_halo = True
+    # The declared suppression; `GreedyNms` is frozen, so sharing the
+    # default instance across iterators is safe.
+    _nms: NmsProtocol = GreedyNms()
+    _chain_state_attrs: tuple[str, ...] = ("_nms",)
+
+    def with_nms(self, nms: NmsProtocol) -> Self:
+        """Declare how duplicate detections are suppressed.
+
+        The default is `GreedyNms()`. The jobs of a distributed run read
+        `score_column`/`max_detections_per_tile` at banking, so declare the
+        identical NMS on every job and the gather — like the detection
+        function, it is not part of the plan fingerprint. Declare before
+        `for_job`.
+
+        Args:
+            nms: Anything satisfying `NmsProtocol` — `GreedyNms(...)`, or
+                your own suppression.
+        """
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._nms = nms
+        return new_instance
 
     def __init__(
         self,
@@ -318,7 +386,6 @@ class ObjectDetectionIterator(
         channel_selection: ChannelSlicingInputType = None,
         axes_order: Sequence[str] | None = None,
         input_transforms: Sequence[TransformProtocol] | None = None,
-        nms: NmsConfig | None = None,
     ) -> None:
         """Initialize the iterator over `input_image`.
 
@@ -328,8 +395,6 @@ class ObjectDetectionIterator(
             axes_order: Optional axes order for the patches handed to the
                 detector.
             input_transforms: Optional transforms applied to each patch.
-            nms: How duplicate detections are suppressed; `None` uses the
-                `NmsConfig` defaults.
         """
         self._input = input_image
         self._ref_image = input_image
@@ -341,7 +406,6 @@ class ObjectDetectionIterator(
         self._channel_selection = channel_selection
         self._axes_order = axes_order
         self._input_transforms = input_transforms
-        self._nms = nms if nms is not None else NmsConfig()
 
     def get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
@@ -350,7 +414,6 @@ class ObjectDetectionIterator(
             "channel_selection": self._channel_selection,
             "axes_order": self._axes_order,
             "input_transforms": self._input_transforms,
-            "nms": self._nms,
         }
 
     def build_numpy_getter(self, roi: Roi) -> DetectionGetter[np.ndarray]:
@@ -411,7 +474,7 @@ class ObjectDetectionIterator(
                     group.drop(columns=[INDEX_COLUMN])
                 )
         detections = self._collect(results)
-        kept = self._suppress(detections)
+        kept = self._nms.suppress(detections)
         table = RoiTable(rois=self._renumbered(kept))
         delete_partials_root(handler)
         return table
@@ -493,7 +556,7 @@ class ObjectDetectionIterator(
             return None
         results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
         detections = self._collect(results)
-        kept = self._suppress(detections)
+        kept = self._nms.suppress(detections)
         return RoiTable(rois=self._renumbered(kept))
 
     def _partials_handler(self):
@@ -548,14 +611,14 @@ class ObjectDetectionIterator(
         self,
         results: list[list[Roi]],
         tile_indices: Sequence[int] | None = None,
-    ) -> list[_Detection]:
+    ) -> list[Detection]:
         """Validate and anchor every tile's boxes into reference coordinates.
 
         `tile_indices` maps each result to its global position in `rois`;
         `None` means the results cover every ROI in order (the serial case).
         """
         pixel_size = self._ref_image.pixel_size
-        detections: list[_Detection] = []
+        detections: list[Detection] = []
         bbox_axes: tuple[str, ...] | None = None
         tiles: list[tuple[int, list[Roi]]] = []
         scored = 0
@@ -579,7 +642,7 @@ class ObjectDetectionIterator(
             if len(result) > self._nms.max_detections_per_tile:
                 raise NgioValueError(
                     f"Tile {tile_name!r} produced {len(result)} detections, "
-                    "more than NmsConfig.max_detections_per_tile "
+                    "more than the declared NMS's max_detections_per_tile "
                     f"({self._nms.max_detections_per_tile}) allows. Raise the "
                     "cap if the count is genuine; a runaway detector should "
                     "fail here rather than flood the table."
@@ -626,7 +689,7 @@ class ObjectDetectionIterator(
                         assert roi_slice.length is not None
                         score *= roi_slice.length
                 detections.append(
-                    _Detection(
+                    Detection(
                         tile_index=tile_index,
                         row=row,
                         score=score,
@@ -654,22 +717,7 @@ class ObjectDetectionIterator(
                 key.append((axis_name, roi_slice.start, roi_slice.length))
         return tuple(key)
 
-    def _suppress(self, detections: list[_Detection]) -> list[_Detection]:
-        """Greedy NMS: highest score first, drop what overlaps a kept box."""
-        # Deterministic under ties and any mapper: (tile, row) breaks them.
-        ranked = sorted(detections, key=lambda d: (-d.score, d.tile_index, d.row))
-        kept: list[_Detection] = []
-        for detection in ranked:
-            duplicate = any(
-                other.group == detection.group
-                and _bbox_iou(other.bounds, detection.bounds) >= self._nms.iou_threshold
-                for other in kept
-            )
-            if not duplicate:
-                kept.append(detection)
-        return kept
-
-    def _renumbered(self, kept: list[_Detection]) -> list[Roi]:
+    def _renumbered(self, kept: list[Detection]) -> list[Roi]:
         """Dense ids `1..N` in (tile, row) order, stamped on the final ROIs."""
         return [
             detection.roi.model_copy(update={"label": label, "name": str(label)})

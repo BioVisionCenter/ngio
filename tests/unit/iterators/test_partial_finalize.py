@@ -93,7 +93,7 @@ def test_readonly_iterator_has_no_write_regions(tmp_path):
 
 
 def test_stitching_finalize_forces_a_full_rebuild(tmp_path, monkeypatch):
-    """With `stitch=True` the resolve rewrites level 0 globally: no regions."""
+    """With `with_stitch()` the resolve rewrites level 0 globally: no regions."""
     ome_zarr = _build_ome_zarr(tmp_path / "stitch.zarr", chunks=(1, 32, 32))
     image = ome_zarr.get_image()
     label = ome_zarr.derive_label("out")
@@ -105,8 +105,8 @@ def test_stitching_finalize_forces_a_full_rebuild(tmp_path, monkeypatch):
             channel_selection=0,
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=True,
         )
+        .with_stitch()
         .by_grid(size_y=32, size_x=32)
         .with_halo(y=4, x=4)
     )

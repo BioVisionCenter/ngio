@@ -129,8 +129,8 @@ def test_stitch_works_over_a_balance_tiled_grid():
             label,
             axes_order="yx",
             consolidation_mode="dask",
-            stitch=True,
         )
+        .with_stitch()
         .by_grid(size_x=32, size_y=32, tail="balance")
         .with_halo(x=8, y=8)
     )

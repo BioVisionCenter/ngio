@@ -134,7 +134,8 @@ print(blurred.get_image().get_as_numpy().mean().round(2))
 # --8<-- [start:stitch_demo]
 stitched = demo.derive_label("stitched")
 stitch_iterator = (
-    SegmentationIterator(demo_image, stitched, axes_order="yx", stitch=True)
+    SegmentationIterator(demo_image, stitched, axes_order="yx")
+    .with_stitch()
     .by_grid(size_x=32, size_y=32)
     .with_halo(x=8, y=8)
 )

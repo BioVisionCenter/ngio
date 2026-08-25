@@ -1,5 +1,6 @@
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast
+from dataclasses import dataclass
+from typing import Any, Generic, Literal, Protocol, Self, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -39,7 +40,7 @@ FeatureFuncResult: TypeAlias = pd.DataFrame | dict[str, list]
 """What a per-ROI feature function may return: a DataFrame, or the cheaper
 dict-of-columns (`{"label": [...], "area": [...]}`) — lighter to build in a
 worker and to ship across a `ProcessMapper` boundary; normalization turns
-either into one DataFrame per ROI before the coalesce."""
+either into one DataFrame per ROI before the join."""
 
 #: Provenance columns stamped on every normalized result row: the ROI's
 #: global index and its `Roi.get_name()`. Reserved alongside the partials'
@@ -128,8 +129,8 @@ def _as_feature_frame(result: FeatureFuncResult) -> pd.DataFrame:
         return pd.DataFrame(result)
     raise NgioValueError(
         f"A feature function must return a DataFrame or a dict of "
-        f"columns, got {type(result).__name__}. Pass a custom "
-        "`coalesce` to handle other shapes."
+        f"columns, got {type(result).__name__}. Declare a custom join "
+        "(`with_join`) to handle other shapes."
     )
 
 
@@ -150,7 +151,7 @@ def _roi_display_name(roi: Roi, index: int) -> str:
 def _normalized_frame(
     result: FeatureFuncResult, *, index: int, roi: Roi
 ) -> pd.DataFrame:
-    """One ROI's result in the normalized form every coalesce sees.
+    """One ROI's result in the normalized form every join sees.
 
     Dicts become DataFrames; a `label` index becomes a `label` column; a
     zero-row result collapses to the empty, column-less frame; every
@@ -176,46 +177,68 @@ def _normalized_frame(
     return frame
 
 
-def _default_feature_coalesce(
-    results: list[pd.DataFrame], reference_label: str | None
-) -> FeatureTable:
-    """Join per-ROI results into one `FeatureTable` indexed by `label`.
+class JoinProtocol(Protocol):
+    """Joins the normalized per-ROI frames into one ngio table.
 
-    Receives the normalized per-ROI frames (see `_normalized_frame`) and
-    concatenates them; the rows must carry the object id in a `label`
-    column (or already sit on a `label` index). The stamped
-    `roi_index`/`roi_name` columns ride into the final table. Duplicate
-    label ids (a haloed or overlapping tiling measures border objects more
-    than once) are kept as-is — deduplicating is a custom `coalesce`'s job.
-    The zero-object table keeps its label-only schema.
+    Receives the list described in `measure` — one DataFrame per ROI in
+    global ROI order, `label` as a column, every row stamped with
+    `roi_index`/`roi_name`, empty ROIs as empty column-less frames — and
+    returns the table. Plain callables satisfy this structurally. Runs
+    once, wherever the join executes: a serial `measure`, or the
+    distributed gather's `finalize`. Must be deterministic, or a
+    distributed gather is no longer bit-identical to a serial run.
     """
-    if not results:
-        raise NgioValueError(
-            "No per-ROI results to build a table from: the iterator has no "
-            "ROIs. Check the ROI table or the tiling that produced it."
-        )
-    frames = [_as_feature_frame(result) for result in results]
-    # ROIs with no objects contribute empty frames; concatenating those would
-    # silently upcast the surviving columns (an empty `label` is float64, and
-    # a float index fails the table's integer-index validation).
-    frames = [frame for frame in frames if len(frame)]
-    if not frames:
-        # Zero objects is a legitimate outcome, not an error — the same
-        # contract as `detect`. No rows also means no feature columns.
-        empty = pd.DataFrame({"label": pd.Series([], dtype="int64")})
-        return FeatureTable(
-            table_data=empty.set_index("label"), reference_label=reference_label
-        )
-    joined = pd.concat(frames)
-    if "label" in joined.columns:
-        joined = joined.set_index("label")
-    elif joined.index.name != "label":
-        raise NgioValueError(
-            "The per-ROI results carry no 'label' column or index, so the "
-            "rows cannot be tied to the objects they measure. Add a 'label' "
-            "column, or pass a custom `coalesce`."
-        )
-    return FeatureTable(table_data=joined, reference_label=reference_label)
+
+    def __call__(self, results: list[pd.DataFrame]) -> Table:
+        """Return the joined table."""
+        ...
+
+
+@dataclass(frozen=True)
+class ConcatJoin:
+    """The default join: concatenate into a `FeatureTable` indexed by `label`.
+
+    The rows must carry the object id in a `label` column (or already sit
+    on a `label` index). The stamped `roi_index`/`roi_name` columns ride
+    into the final table. Duplicate label ids (a haloed or overlapping
+    tiling measures border objects more than once) are kept as-is —
+    deduplicating is a custom join's job. The zero-object table keeps its
+    label-only schema.
+    """
+
+    reference_label: str | None = None
+
+    def __call__(self, results: list[pd.DataFrame]) -> FeatureTable:
+        """Concatenate the normalized frames into one `FeatureTable`."""
+        if not results:
+            raise NgioValueError(
+                "No per-ROI results to build a table from: the iterator has "
+                "no ROIs. Check the ROI table or the tiling that produced it."
+            )
+        frames = [_as_feature_frame(result) for result in results]
+        # ROIs with no objects contribute empty frames; concatenating those
+        # would silently upcast the surviving columns (an empty `label` is
+        # float64, and a float index fails the integer-index validation).
+        frames = [frame for frame in frames if len(frame)]
+        if not frames:
+            # Zero objects is a legitimate outcome, not an error — the same
+            # contract as `detect`. No rows also means no feature columns.
+            empty = pd.DataFrame({"label": pd.Series([], dtype="int64")})
+            return FeatureTable(
+                table_data=empty.set_index("label"),
+                reference_label=self.reference_label,
+            )
+        joined = pd.concat(frames)
+        if "label" in joined.columns:
+            joined = joined.set_index("label")
+        elif joined.index.name != "label":
+            raise NgioValueError(
+                "The per-ROI results carry no 'label' column or index, so "
+                "the rows cannot be tied to the objects they measure. Add a "
+                "'label' column, or declare a custom join with "
+                "`with_join(...)`."
+            )
+        return FeatureTable(table_data=joined, reference_label=self.reference_label)
 
 
 class FeatureExtractorIterator(
@@ -227,17 +250,52 @@ class FeatureExtractorIterator(
     region. `reduce` collects per-region results; `measure` joins them into
     a single `FeatureTable` for the caller to store. Distributed, a
     `for_job` slice's `measure` banks a partial and `finalize()` runs the
-    one global join. `with_halo(...)` reads context around each region;
-    the duplicate rows it produces for border objects are reconciled in
-    your `coalesce` via the stamped `roi_index`/`roi_name` columns.
+    one global join (declared with `with_join`, `ConcatJoin` otherwise).
+    `with_halo(...)` reads context around each region; the duplicate rows
+    it produces for border objects are reconciled in your declared join
+    via the stamped `roi_index`/`roi_name` columns.
     """
 
     # The halo is a pure read margin here too: there is no write to crop it
     # from. Unlike detection, this iterator does not reconcile the overlap
     # itself — a border object measured by two grown regions yields
     # duplicate label rows, and the stamped `roi_index`/`roi_name` columns
-    # are the handle a custom `coalesce` uses to reconcile them.
+    # are the handle the declared join uses to reconcile them.
     _allow_readonly_halo = True
+    # The declared join; `None` runs `ConcatJoin` against the input label.
+    _join: JoinProtocol | None = None
+    _chain_state_attrs: tuple[str, ...] = ("_join",)
+
+    def with_join(self, join: JoinProtocol) -> Self:
+        """Declare the join that turns the per-ROI results into the table.
+
+        Runs once, wherever the join executes — a serial `measure`, or the
+        distributed gather's `finalize`. On a `for_job` slice the
+        declaration is inert: the slice banks the pre-join records
+        regardless, so declaring it there is harmless. Like the
+        measurement function, the join is not part of the plan
+        fingerprint: declare the identical one on the gather iterator.
+        The default (no declaration) is `ConcatJoin` referencing the
+        input label.
+
+        Args:
+            join: Anything satisfying `JoinProtocol` — a plain callable
+                taking the normalized frame list, or a configured class
+                like `ConcatJoin(reference_label=...)`.
+        """
+        if not callable(join):
+            raise NgioValueError(
+                f"The join must be callable, got {type(join).__name__}."
+            )
+        new_instance = self._new_from_rois(self.rois)
+        new_instance._join = join
+        return new_instance
+
+    def _resolved_join(self) -> JoinProtocol:
+        """The declared join, or the default concat against the input label."""
+        if self._join is not None:
+            return self._join
+        return ConcatJoin(reference_label=self._input_label.meta.name)
 
     def __init__(
         self,
@@ -335,22 +393,19 @@ class FeatureExtractorIterator(
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def finalize(
-        self,
-        *,
-        coalesce: Callable[[list[pd.DataFrame]], Table] | None = None,
-    ) -> Table:
+    def finalize(self) -> Table:
         """Merge a distributed run's partials into the one final table.
 
         The gather step (see `prepare_jobs`): validates that every job of
         the prepared plan produced a matching partial — a half-finished run
         errors instead of returning a silently incomplete table — rebuilds
         the per-ROI result list in global ROI order, and runs the single
-        (default or custom) `coalesce`. The final table matches a serial
-        `measure` row for row; the result list is the normalized form
-        described in `measure`, `roi_index`/`roi_name` included. On success
-        the partials group is removed. Nothing is registered: the returned
-        table is yours to store with `add_table`.
+        declared join (`with_join`, `ConcatJoin` otherwise) exactly once.
+        The final table matches a serial `measure` row for row; the result
+        list is the normalized form described in `measure`,
+        `roi_index`/`roi_name` included. On success the partials group is
+        removed. Nothing is registered: the returned table is yours to
+        store with `add_table`.
 
         Raises on a `for_job` slice (the gather is global) and when no
         partials exist (nothing was prepared or banked).
@@ -377,12 +432,7 @@ class FeatureExtractorIterator(
         results: list[pd.DataFrame] = [
             groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
         ]
-        if coalesce is None:
-            table: Table = _default_feature_coalesce(
-                results, reference_label=self._input_label.meta.name
-            )
-        else:
-            table = coalesce(results)
+        table = self._resolved_join()(results)
         delete_partials_root(handler)
         return table
 
@@ -400,17 +450,17 @@ class FeatureExtractorIterator(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
         *,
-        coalesce: Callable[[list[pd.DataFrame]], Table] | None = None,
         mapper: MapperProtocol | None = None,
     ) -> Table | None:
         """Measure every ROI and join the results into one table.
 
         The per-ROI measurement fans out exactly like `reduce` — pass a
-        `mapper` to parallelize it — and the join happens once, at the end,
-        on the calling thread. Nothing is written: the returned table is
-        yours to store, e.g. `container.add_table(name, table)`.
+        `mapper` to parallelize it — and the declared join (`with_join`,
+        `ConcatJoin` otherwise) runs once, at the end, on the calling
+        thread. Nothing is written: the returned table is yours to store,
+        e.g. `container.add_table(name, table)`.
 
-        A `coalesce` (default or custom, serial or distributed) always sees
+        The join (declared or default, serial or distributed) always sees
         the *normalized* result list, not the function's raw returns: one
         DataFrame per ROI with `label` as a column (a `label` index is
         reset), every row stamped with `roi_index` (the ROI's global index)
@@ -422,41 +472,30 @@ class FeatureExtractorIterator(
 
         With `with_halo(...)` each region is read grown — both patches and
         the `roi` argument cover the grown region — so a border object is
-        measured by every region that sees it. The default `coalesce` keeps
-        the resulting duplicate label rows as-is; reconcile them in a
-        custom `coalesce` via the `roi_index`/`roi_name` columns. `reduce`
-        and `iter` read the grown regions too.
+        measured by every region that sees it. The default join keeps the
+        resulting duplicate label rows as-is; reconcile them in a declared
+        join via the `roi_index`/`roi_name` columns. `reduce` and `iter`
+        read the grown regions too.
 
         On a `for_job` slice it measures only this job's share and banks the
         normalized records as a partial, returning `None` — stored
         **before** any join, so the gather (`finalize()`, once, after all
         jobs) can rebuild the full per-ROI result list and run the ONE
-        global coalesce. Re-running a job overwrites its own partial.
+        global join. Re-running a job overwrites its own partial.
 
         Args:
             func: `(image, label, roi) -> DataFrame | dict[str, list]` — the
                 measurements for one ROI. Rows must carry the object id in a
                 `label` column (or index). Under a parallel mapper it runs on
                 worker threads or processes and must be safe there.
-            coalesce: Joins the normalized per-ROI frames into an ngio
-                table. The default concatenates them into a `FeatureTable`
-                indexed by `label` (the provenance columns ride along),
-                referencing the input label. Refused on a `for_job` slice:
-                the join is global, pass it to `finalize(coalesce=...)`.
             mapper: How the per-ROI work is scheduled; `None` is serial.
 
         Returns:
-            The joined table — a `FeatureTable` under the default `coalesce`.
-            A run that finds zero objects returns an empty table, as `detect`
+            The joined table — a `FeatureTable` under the default join. A
+            run that finds zero objects returns an empty table, as `detect`
             does. On a `for_job` slice: `None` (the partial is banked).
         """
         if self._partition is not None:
-            if coalesce is not None:
-                raise NgioValueError(
-                    "`coalesce` runs once, at the gather: pass it to "
-                    "`finalize(coalesce=...)` after all jobs, not to a "
-                    "partition slice's measure."
-                )
             self._bank_partial(func, mapper=mapper)
             return None
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
@@ -464,11 +503,7 @@ class FeatureExtractorIterator(
             _normalized_frame(result, index=index, roi=roi)
             for index, (roi, result) in enumerate(zip(self.rois, results, strict=True))
         ]
-        if coalesce is None:
-            return _default_feature_coalesce(
-                normalized, reference_label=self._input_label.meta.name
-            )
-        return coalesce(normalized)
+        return self._resolved_join()(normalized)
 
     def _bank_partial(
         self,

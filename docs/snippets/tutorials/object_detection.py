@@ -78,10 +78,11 @@ print(ome_zarr)
 # --8<-- [end:create]
 
 # --8<-- [start:detect]
-from ngio import NmsConfig, ObjectDetectionIterator, ThreadedMapper
+from ngio import GreedyNms, ObjectDetectionIterator, ThreadedMapper
 
 iterator = (
-    ObjectDetectionIterator(image, nms=NmsConfig(iou_threshold=0.4))
+    ObjectDetectionIterator(image)
+    .with_nms(GreedyNms(iou_threshold=0.4))
     .by_grid(size_x=128, size_y=128)
     .with_halo(x=16, y=16)
 )

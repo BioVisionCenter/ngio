@@ -73,14 +73,13 @@ seg_iterator = SegmentationIterator(
     channel_selection="DAPI",
     axes_order=["z", "y", "x"],
     consolidation_mode="auto",
-    stitch=True,
 )
-seg_iterator = seg_iterator.product(roi_table)
+seg_iterator = seg_iterator.with_stitch().product(roi_table)
 
 # Split any remaining time axis, so each step yields one whole ZYX volume
 seg_iterator = seg_iterator.by_zyx()
 
-# Each FOV reads a halo past its edge; `stitch=True` uses that overlap to give
+# Each FOV reads a halo past its edge; `with_stitch()` uses that overlap to give
 # every FOV its own id block and to merge objects split by a FOV boundary,
 # then renumbers everything to a dense 1..N.
 seg_iterator = seg_iterator.with_halo(x=16, y=16)

@@ -126,7 +126,7 @@ def _measure_as_frame(image, label, roi):
 
 
 def test_measure_returns_a_feature_table():
-    """Both result shapes coalesce into the same table; the write is the caller's."""
+    """Both result shapes join into the same table; the write is the caller's."""
     ome_zarr, iterator = _build_container_and_iterator()
 
     from_dicts = iterator.measure(_measure_as_dict)
@@ -162,7 +162,7 @@ def test_measure_parallel_matches_serial():
     assert threaded.dataframe.equals(serial.dataframe)
 
 
-def test_measure_custom_coalesce():
+def test_measure_with_a_declared_join():
     import pandas as pd
 
     from ngio.tables import GenericTable
@@ -170,12 +170,12 @@ def test_measure_custom_coalesce():
     _, iterator = _build_container_and_iterator()
 
     def totals(results):
-        # The coalesce receives normalized DataFrames (empty ROIs are
+        # The join receives normalized DataFrames (empty ROIs are
         # empty frames), never the function's raw dicts.
         joined = pd.concat([r for r in results if len(r)])
         return GenericTable(pd.DataFrame({"total_objects": [len(joined)]}))
 
-    table = iterator.measure(_measure_as_dict, coalesce=totals)
+    table = iterator.with_join(totals).measure(_measure_as_dict)
     assert table is not None
     assert table.dataframe["total_objects"].tolist() == [2]
 
@@ -236,8 +236,8 @@ def test_measure_default_table_carries_provenance_columns():
     assert set(frame["roi_name"]) == names
 
 
-def test_measure_normalizes_results_for_a_custom_coalesce():
-    """Every coalesce sees DataFrames with a label column and provenance."""
+def test_measure_normalizes_results_for_a_declared_join():
+    """Every join sees DataFrames with a label column and provenance."""
     import pandas as pd
 
     from ngio.tables import GenericTable
@@ -255,7 +255,7 @@ def test_measure_normalizes_results_for_a_custom_coalesce():
         captured.extend(results)
         return GenericTable(pd.DataFrame({"n": [len(results)]}))
 
-    iterator.measure(label_indexed, coalesce=capture)
+    iterator.with_join(capture).measure(label_indexed)
     assert len(captured) == len(iterator.rois)
     for index, frame in enumerate(captured):
         assert isinstance(frame, pd.DataFrame)
@@ -279,7 +279,7 @@ def test_measure_refuses_reserved_columns(reserved):
         iterator.measure(shadowing)
 
 
-def test_measure_with_halo_duplicates_then_coalesce_dedups():
+def test_measure_with_halo_duplicates_then_join_dedups():
     """A border object is measured by every grown region; roi_index dedups."""
     import pandas as pd
 
@@ -315,7 +315,7 @@ def test_measure_with_halo_duplicates_then_coalesce_dedups():
             "mean": [float(image[label_patch == i].mean()) for i in ids],
         }
 
-    # Default coalesce keeps the duplicates (status quo), silently.
+    # The default join keeps the duplicates (status quo), silently.
     table = iterator.measure(measure)
     assert table is not None
     counts = table.dataframe.index.value_counts()
@@ -335,10 +335,37 @@ def test_measure_with_halo_duplicates_then_coalesce_dedups():
         )
         return FeatureTable(table_data=joined, reference_label="nuclei")
 
-    deduped = iterator.measure(measure, coalesce=dedup)
+    deduped = iterator.with_join(dedup).measure(measure)
     assert deduped is not None
     frame = deduped.dataframe
     assert frame.index.is_unique
     assert sorted(frame.index.tolist()) == [1, 3]
     # With a 4-px halo every 8-px tile sees object 3 whole: 16 pixels.
     assert frame.loc[3, "pixel_count"] == 16
+
+
+def test_with_join_carries_through_the_chain_and_refuses_on_a_slice():
+    from ngio.iterators import ConcatJoin
+
+    _, iterator = _build_container_and_iterator()
+    declared = iterator.with_join(ConcatJoin(reference_label="nuclei"))
+    reshaped = declared.by_grid(size_x=4, size_y=4).with_halo(x=2, y=2)
+    assert isinstance(reshaped._join, ConcatJoin), "the declaration survives"
+
+    with pytest.raises(NgioValueError, match="callable"):
+        iterator.with_join("not-a-join")  # type: ignore[arg-type]
+
+
+def test_concat_join_is_public_and_delegable():
+    """A declared ConcatJoin equals the undeclared default, column for column."""
+    import pandas as pd
+
+    from ngio.iterators import ConcatJoin
+
+    _, iterator = _build_container_and_iterator()
+    default = iterator.measure(_measure_as_dict)
+    declared = iterator.with_join(ConcatJoin(reference_label="nuclei")).measure(
+        _measure_as_dict
+    )
+    assert default is not None and declared is not None
+    pd.testing.assert_frame_equal(default.dataframe, declared.dataframe)
