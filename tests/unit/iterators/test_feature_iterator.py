@@ -5,7 +5,7 @@ from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
 from ngio.iterators import FeatureExtractorIterator
-from ngio.utils import NgioDeprecationWarning
+from ngio.utils import NgioDeprecationWarning, NgioValueError
 
 
 def _build_iterator() -> FeatureExtractorIterator:
@@ -43,9 +43,9 @@ def test_feature_iterator_numpy():
 
     # Lazy iteration yields the getter objects with image/label properties
     for getter in iterator.iter(lazy=True, data_mode="numpy", iterator_mode="readonly"):
-        assert isinstance(getter.image, np.ndarray)  # ty: ignore[unresolved-attribute]
-        assert isinstance(getter.label, np.ndarray)  # ty: ignore[unresolved-attribute]
-        assert getter.image.shape == getter.label.shape  # ty: ignore[unresolved-attribute]
+        assert isinstance(getter.image, np.ndarray)
+        assert isinstance(getter.label, np.ndarray)
+        assert getter.image.shape == getter.label.shape
 
 
 def test_feature_iterator_dask():
@@ -68,9 +68,9 @@ def test_feature_iterator_dask():
             lazy=True, data_mode="dask", iterator_mode="readonly"
         )
     for getter in lazy_dask_iter:
-        assert isinstance(getter.image, da.Array)  # ty: ignore[unresolved-attribute]
-        assert isinstance(getter.label, da.Array)  # ty: ignore[unresolved-attribute]
-        assert getter.image.shape == getter.label.shape  # ty: ignore[unresolved-attribute]
+        assert isinstance(getter.image, da.Array)
+        assert isinstance(getter.label, da.Array)
+        assert getter.image.shape == getter.label.shape
 
 
 def test_feature_iterator_is_readonly():
@@ -80,7 +80,10 @@ def test_feature_iterator_is_readonly():
     roi = iterator.rois[0]
     assert iterator.build_numpy_setter(roi) is None
     assert iterator.build_dask_setter(roi) is None
-    assert iterator.finalize() is None
+    # finalize is the distributed gather: without banked partials it refuses
+    # loudly instead of quietly doing nothing.
+    with pytest.raises(NgioValueError, match="No partials"):
+        iterator.finalize()
 
 
 def _build_container_and_iterator():
@@ -127,11 +130,13 @@ def test_measure_returns_a_feature_table():
     ome_zarr, iterator = _build_container_and_iterator()
 
     from_dicts = iterator.measure(_measure_as_dict)
+    assert from_dicts is not None
     assert sorted(from_dicts.dataframe.index.tolist()) == [1, 2]
     assert from_dicts.dataframe.index.name == "label"
     assert "feats" not in ome_zarr.list_tables(), "nothing is written implicitly"
 
     from_frames = iterator.measure(_measure_as_frame)
+    assert from_frames is not None
     assert from_frames.dataframe.equals(from_dicts.dataframe)
 
     # The caller stores the table; a round-trip through the container works.
@@ -147,6 +152,7 @@ def test_measure_parallel_matches_serial():
 
     serial = iterator.measure(_measure_as_dict)
     threaded = iterator.measure(_measure_as_dict, mapper=ThreadedMapper(4))
+    assert serial is not None and threaded is not None
     assert threaded.dataframe.equals(serial.dataframe)
 
 
@@ -162,6 +168,7 @@ def test_measure_custom_coalesce():
         return GenericTable(pd.DataFrame({"total_objects": [len(joined)]}))
 
     table = iterator.measure(_measure_as_dict, coalesce=totals)
+    assert table is not None
     assert table.dataframe["total_objects"].tolist() == [2]
 
 
@@ -173,6 +180,7 @@ def test_measure_all_empty_returns_empty_table():
         return {"label": [], "mean": []}
 
     table = iterator.measure(nothing)
+    assert table is not None
     assert len(table.dataframe) == 0
 
 

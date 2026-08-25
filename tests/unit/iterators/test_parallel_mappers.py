@@ -420,6 +420,7 @@ def test_measure_across_processes(tmp_path: Path):
     from_processes = iterator.measure(
         _measure_labels, mapper=ProcessMapper(max_workers=2)
     )
+    assert serial is not None and from_processes is not None
     assert from_processes.dataframe.equals(serial.dataframe)
 
 
@@ -468,4 +469,5 @@ def test_detect_across_processes(tmp_path: Path):
     from_processes = iterator.detect(
         _detect_bright, mapper=ProcessMapper(max_workers=2)
     )
+    assert serial is not None and from_processes is not None
     assert from_processes.dataframe.equals(serial.dataframe)

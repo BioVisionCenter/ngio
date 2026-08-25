@@ -20,7 +20,7 @@ ones.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -286,7 +286,9 @@ def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
     return rois
 
 
-class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
+class ObjectDetectionIterator(
+    AbstractIteratorBuilder[NumpyPipeType, DaskPipeType, RoiTable]
+):
     """Tile an image, detect per tile, return one deduplicated ROI table.
 
     A read-only iterator: nothing is written to the image, and the halo is a
@@ -294,7 +296,8 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     is seen whole by the neighbouring tile; the duplicate detections that
     produces are resolved by NMS (`NmsConfig`). The product is a
     `RoiTable` of world-anchored boxes, returned by `detect` for the
-    caller to store.
+    caller to store. Distributed, a `for_job` slice's `detect` banks a
+    partial and `finalize()` runs the one global NMS.
 
     The box contract: each detection is a `Roi` in the *patch's own* pixel
     coordinates — `Roi.from_values(slices={"x": (x0, w), "y": (y0, h)},
@@ -380,21 +383,63 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def finalize(self) -> None:
-        """A no-op: nothing is written, so there is nothing to consolidate.
+    def finalize(self) -> RoiTable:
+        """Merge a distributed run's partials into the one final ROI table.
 
-        Unlike the writers' `finalize`, this stays a no-op on a `for_job`
-        slice too — the read-only gather verb is `merge_partials`.
+        The gather step (see `prepare_jobs`): validates that every job of
+        the prepared plan produced a matching partial — a half-finished run
+        errors instead of returning a silently incomplete table — then
+        rebuilds every tile's raw boxes and runs the full serial pipeline
+        once, globally: anchoring, the cross-tile invariant checks, NMS, and
+        the dense `1..N` renumbering. Bit-identical to a serial `detect` by
+        construction (one exception: an extra field a detector sets to `NaN`
+        does not survive the partial round-trip). On success the partials
+        group is removed. Nothing is registered: the returned table is yours
+        to store with `add_table`.
+
+        Raises on a `for_job` slice (the gather is global) and when no
+        partials exist (nothing was prepared or banked).
         """
+        self._require_unrestricted_finalize()
+        handler = self._partials_handler()
+        merged = merge_partial_frames(self, handler, job_verb="detect")
+
+        results: list[list[Roi]] = [[] for _ in self.rois]
+        if merged is not None:
+            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+                results[int(cast("Any", index))] = _frame_to_rois(
+                    group.drop(columns=[INDEX_COLUMN])
+                )
+        detections = self._collect(results)
+        kept = self._suppress(detections)
+        table = RoiTable(rois=self._renumbered(kept))
+        delete_partials_root(handler)
+        return table
 
     def iter_as_numpy(self):  # type: ignore[override]
         """Iterate `(patch, roi)` pairs over the (haloed) tiles."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
-    def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
-        """Iterate `(patch, roi)` payloads in batches of `batch_size`."""
-        self._require_valid_batch_size(batch_size)
-        return self._iter_batched_readonly(batch_size)
+    def iter(  # type: ignore[override]
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] | None = None,
+        iterator_mode: Literal["readwrite", "readonly"] = "readonly",
+        *,
+        batch_size: int | None = None,
+    ):
+        """Iterate `(patch, roi)` pairs over the (haloed) tiles.
+
+        Read-only by default: there is nothing to write. With `batch_size`
+        set, yields payload lists of up to that many items. See
+        `AbstractIteratorBuilder.iter` for the remaining knobs.
+        """
+        return self._iter_impl(
+            lazy=lazy,
+            data_mode=data_mode,
+            iterator_mode=iterator_mode,
+            batch_size=batch_size,
+        )
 
     @deprecated(
         replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
@@ -412,7 +457,7 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
-    ) -> RoiTable:
+    ) -> RoiTable | None:
         """Run the detector over every tile and return one table of objects.
 
         The per-tile detection fans out exactly like `reduce` — pass a
@@ -420,6 +465,15 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         renumbering) happens once, at the end, on the calling thread. Nothing
         is written: the returned table is yours to store, e.g.
         `container.add_table(name, table)`.
+
+        On a `for_job` slice it detects only over this job's tiles and banks
+        the detector's raw, **pre-NMS** boxes as a partial, returning `None`
+        — greedy NMS is not hierarchical, so a per-job NMS followed by a
+        merge NMS could differ from a serial run. The gather (`finalize()`,
+        once, after all jobs) runs the ONE global NMS and renumbering,
+        bit-identical to a serial `detect`. The tiles' boxes are validated
+        here, so a malformed detector fails in the job rather than at the
+        gather; re-running a job overwrites its own partial.
 
         Args:
             func: `(patch) -> list[Roi]`, boxes in the *patch's own* pixel
@@ -431,16 +485,12 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
         Returns:
             A `RoiTable` of the surviving detections, ids `1..N` in
             (tile, row) order, in the reference image's world coordinates.
-            An image with nothing to detect gives an empty table.
+            An image with nothing to detect gives an empty table. On a
+            `for_job` slice: `None` (the partial is banked).
         """
         if self._partition is not None:
-            raise NgioValueError(
-                "detect on a partition slice would run NMS over only this "
-                "job's tiles — and greedy NMS is not hierarchical, so the "
-                "result could differ from a serial run. Use "
-                "`detect_to_partial(func)` per job and `merge_partials()` "
-                "once, after all jobs."
-            )
+            self._bank_partial(func, mapper=mapper)
+            return None
         results = self.reduce(_UnpackedDetectionFunc(func), mapper=mapper)
         detections = self._collect(results)
         kept = self._suppress(detections)
@@ -456,29 +506,14 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
     def _validate_job_context(self, n_jobs: int) -> None:
         validate_partials_context(self, self._partials_handler(), n_jobs)
 
-    def detect_to_partial(
+    def _bank_partial(
         self,
         func: Callable[[np.ndarray], list[Roi]],
         *,
         mapper: MapperProtocol | None = None,
     ) -> None:
-        """Detect over this job's tiles and store the raw boxes as a partial.
-
-        The per-job step of a distributed run (see `prepare_jobs`): the
-        detector's raw, **pre-NMS** output is stored tagged with its global
-        tile index, so `merge_partials` can run the ONE global NMS and
-        renumbering — bit-identical to a serial `detect` (per-job NMS
-        followed by a merge NMS would not be: greedy NMS is not
-        hierarchical). The tiles' boxes are validated here, so a malformed
-        detector fails in the job rather than at the merge. Only callable on
-        a `for_job` slice; re-running a job overwrites its own partial.
-        """
-        if self._partition is None:
-            raise NgioValueError(
-                "detect_to_partial is the per-job step of a distributed run: "
-                "restrict the iterator first (`for_job(**args)`), or use "
-                "detect() for a local run."
-            )
+        """Detect over this job's tiles and store the raw boxes as a partial."""
+        assert self._partition is not None
         _, job_index, n_jobs = self._partition
         handler = self._partials_handler()
         validate_partials_context(self, handler, n_jobs)
@@ -508,40 +543,6 @@ class ObjectDetectionIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTyp
                 "fingerprint": self._plan_fingerprint(n_jobs),
             },
         )
-
-    def merge_partials(self) -> RoiTable:
-        """Merge a distributed run's partials into the one final ROI table.
-
-        The consolidate step (see `prepare_jobs`): validates that every job
-        of the prepared plan produced a matching partial — a half-finished
-        run errors instead of returning a silently incomplete table — then
-        rebuilds every tile's raw boxes and runs the full serial pipeline
-        once, globally: anchoring, the cross-tile invariant checks, NMS, and
-        the dense `1..N` renumbering. Bit-identical to a serial `detect` by
-        construction (one exception: an extra field a detector sets to `NaN`
-        does not survive the partial round-trip).
-        On success the partials group is removed. Nothing is
-        registered: the returned table is yours to store with `add_table`.
-        """
-        if self._partition is not None:
-            raise NgioValueError(
-                "merge_partials belongs to the unrestricted iterator: rebuild "
-                "it without `for_job` for the consolidate step."
-            )
-        handler = self._partials_handler()
-        merged = merge_partial_frames(self, handler)
-
-        results: list[list[Roi]] = [[] for _ in self.rois]
-        if merged is not None:
-            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
-                results[int(cast("Any", index))] = _frame_to_rois(
-                    group.drop(columns=[INDEX_COLUMN])
-                )
-        detections = self._collect(results)
-        kept = self._suppress(detections)
-        table = RoiTable(rois=self._renumbered(kept))
-        delete_partials_root(handler)
-        return table
 
     def _collect(
         self,

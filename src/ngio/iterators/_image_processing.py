@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import dask.array as da
 import numpy as np
@@ -19,12 +19,13 @@ from ngio.io_pipes import (
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
+from ngio.iterators._mappers import MapperProtocol
 
 
-class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
+class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     """Apply an image-to-image function region by region.
 
-    Reads each region from the input image, hands the patch to `map`'s
+    Reads each region from the input image, hands the patch to `process`'s
     function, and writes the result to the output image — a filter, a
     projection, a restoration model. Compose with `by_write_units()`
     for collision-free parallel writes and `with_halo` for seamless tiles.
@@ -145,7 +146,26 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
             roi,
         )
 
-    def finalize(self):
+    def process(
+        self,
+        func: Callable[[np.ndarray], np.ndarray],
+        *,
+        mapper: MapperProtocol[np.ndarray, np.ndarray] | None = None,
+    ) -> None:
+        """Process every region and write the results; the topic verb for `map`.
+
+        A serial run finalizes automatically. On a `for_job` slice it
+        processes only this job's share; the gather is the unrestricted
+        iterator's `finalize()`, once, after all jobs.
+
+        Args:
+            func: The transformation. Under a parallel mapper it runs on
+                worker threads (or processes) and must be safe there.
+            mapper: How the units are scheduled; see `map`.
+        """
+        self.map(func, mapper=mapper)
+
+    def finalize(self) -> None:
         """Consolidate the output pyramid, only under the written regions."""
         self._require_unrestricted_finalize()
         self._output.consolidate(

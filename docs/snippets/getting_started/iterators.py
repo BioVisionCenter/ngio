@@ -106,7 +106,7 @@ loop_iterator = ImageProcessingIterator(demo_image, manual.get_image())
 # Uniform 32px tiles, so stacking the batch is a plain np.stack.
 loop_iterator = loop_iterator.by_grid(size_x=32, size_y=32)
 
-for patches, writers in loop_iterator.iter_batched(batch_size=4):
+for patches, writers in loop_iterator.iter(data_mode="numpy", batch_size=4):
     outs = fake_model(np.stack(patches))
     for writer, out in zip(writers, outs, strict=True):
         writer(out)
@@ -172,6 +172,7 @@ detect_iterator = (
     .with_halo(x=8, y=8)
 )
 detections = detect_iterator.detect(find_bright_boxes)
+assert detections is not None  # a serial run always returns the table
 demo.add_table("detections", detections)
 print(detections.dataframe[["x_micrometer", "y_micrometer", "confidence"]])
 # --8<-- [end:detect_demo]

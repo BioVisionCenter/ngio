@@ -76,7 +76,7 @@ class _MaskedBankMask:
         return np.asarray(masked)
 
 
-class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
+class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     """Segment an image region by region into a label.
 
     Reads each region from the input image and writes the function's label
@@ -384,7 +384,26 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array]):
                 self._stitch_plan = None
             raise
 
-    def finalize(self):
+    def segment(
+        self,
+        func: Callable[[np.ndarray], np.ndarray],
+        *,
+        mapper: MapperProtocol[np.ndarray, np.ndarray] | None = None,
+    ) -> None:
+        """Segment every region and write the labels; the topic verb for `map`.
+
+        A serial run finalizes automatically (the stitch resolve included).
+        On a `for_job` slice it segments only this job's share; the gather is
+        the unrestricted iterator's `finalize()`, once, after all jobs.
+
+        Args:
+            func: The segmentation model. Under a parallel mapper it runs on
+                worker threads (or processes) and must be safe there.
+            mapper: How the units are scheduled; see `map`.
+        """
+        self.map(func, mapper=mapper)
+
+    def finalize(self) -> None:
         """Resolve the stitch (when configured), then consolidate the pyramid."""
         self._require_unrestricted_finalize()
         # The relabel has to precede consolidation: every pyramid level is

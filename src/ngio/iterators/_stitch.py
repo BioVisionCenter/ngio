@@ -11,7 +11,7 @@ agree (IoU over the shared pixels), and relabels the output in place.
 Where two tiles wrote the same *output* pixels and their objects do not
 match, the later write wins — deterministically, because every mapper runs
 units in the same canonical wave order (`canonical_unit_order`). The manual
-loops (`iter`, `iter_batched`) run in ROI order instead: deterministic too,
+loops (`iter`, batched or not) run in ROI order instead: deterministic too,
 but not bit-identical to a `map` on contested pixels.
 """
 

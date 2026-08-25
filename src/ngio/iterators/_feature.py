@@ -1,5 +1,5 @@
 from collections.abc import Callable, Sequence
-from typing import Any, Generic, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Literal, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -159,12 +159,16 @@ def _default_feature_coalesce(
     return FeatureTable(table_data=joined, reference_label=reference_label)
 
 
-class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeType]):
+class FeatureExtractorIterator(
+    AbstractIteratorBuilder[NumpyPipeType, DaskPipeType, Table]
+):
     """Measure image/label pairs region by region; nothing is written.
 
     Each unit pairs the image patch with the label patch over the same
-    region. `reduce` collects per-region results; `measure` joins
-    them into a single `FeatureTable` for the caller to store.
+    region. `reduce` collects per-region results; `measure` joins them into
+    a single `FeatureTable` for the caller to store. Distributed, a
+    `for_job` slice's `measure` banks a partial and `finalize()` runs the
+    one global join.
     """
 
     def __init__(
@@ -258,12 +262,47 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
     def build_dask_setter(self, roi: Roi) -> None:
         return None
 
-    def finalize(self):
-        """A no-op: nothing is written, so there is nothing to consolidate.
+    def finalize(
+        self,
+        *,
+        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
+    ) -> Table:
+        """Merge a distributed run's partials into the one final table.
 
-        Unlike the writers' `finalize`, this stays a no-op on a `for_job`
-        slice too — the read-only gather verb is `merge_partials`.
+        The gather step (see `prepare_jobs`): validates that every job of
+        the prepared plan produced a matching partial — a half-finished run
+        errors instead of returning a silently incomplete table — rebuilds
+        the per-ROI result list in global ROI order, and runs the single
+        (default or custom) `coalesce`. The final table matches a serial
+        `measure` row for row; the result list is the normalized form
+        described in `measure`, not the function's raw returns. On success
+        the partials group is removed. Nothing is registered: the returned
+        table is yours to store with `add_table`.
+
+        Raises on a `for_job` slice (the gather is global) and when no
+        partials exist (nothing was prepared or banked).
         """
+        self._require_unrestricted_finalize()
+        handler = self._partials_handler()
+        merged = merge_partial_frames(self, handler, job_verb="measure")
+
+        groups: dict[int, pd.DataFrame] = {}
+        if merged is not None:
+            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+                groups[int(cast("Any", index))] = group.drop(
+                    columns=[INDEX_COLUMN]
+                ).reset_index(drop=True)
+        results: list[FeatureFuncResult] = [
+            groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
+        ]
+        if coalesce is None:
+            table: Table = _default_feature_coalesce(
+                results, reference_label=self._input_label.meta.name
+            )
+        else:
+            table = coalesce(results)
+        delete_partials_root(handler)
+        return table
 
     def _partials_handler(self):
         """Partials live beside the input label's levels, like a stitch scratch."""
@@ -281,13 +320,24 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
         *,
         coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
         mapper: MapperProtocol | None = None,
-    ) -> Table:
+    ) -> Table | None:
         """Measure every ROI and join the results into one table.
 
         The per-ROI measurement fans out exactly like `reduce` — pass a
         `mapper` to parallelize it — and the join happens once, at the end,
         on the calling thread. Nothing is written: the returned table is
         yours to store, e.g. `container.add_table(name, table)`.
+
+        On a `for_job` slice it measures only this job's share and banks the
+        raw records as a partial, returning `None` — the measurements are
+        stored **before** any join, tagged with their global ROI index, so
+        the gather (`finalize()`, once, after all jobs) can rebuild the full
+        per-ROI result list and run the ONE global coalesce. Re-running a
+        job overwrites its own partial. A custom `coalesce` then sees a
+        *normalized* result list, not the function's raw returns: dicts
+        become DataFrames, a `label` index becomes a `label` column, and a
+        ROI whose function returned no rows arrives as an empty,
+        column-less DataFrame.
 
         Args:
             func: `(image, label, roi) -> DataFrame | dict[str, list]` — the
@@ -296,20 +346,25 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
                 worker threads or processes and must be safe there.
             coalesce: Joins the per-ROI results into an ngio table. The
                 default concatenates them into a `FeatureTable` indexed by
-                `label`, referencing the input label.
+                `label`, referencing the input label. Refused on a `for_job`
+                slice: the join is global, pass it to
+                `finalize(coalesce=...)`.
             mapper: How the per-ROI work is scheduled; `None` is serial.
 
         Returns:
             The joined table — a `FeatureTable` under the default `coalesce`.
             A run that finds zero objects returns an empty table, as `detect`
-            does.
+            does. On a `for_job` slice: `None` (the partial is banked).
         """
         if self._partition is not None:
-            raise NgioValueError(
-                "measure on a partition slice would coalesce only "
-                "this job's share. Use `measure_to_partial(func)` per job and "
-                "`merge_partials()` once, after all jobs."
-            )
+            if coalesce is not None:
+                raise NgioValueError(
+                    "`coalesce` runs once, at the gather: pass it to "
+                    "`finalize(coalesce=...)` after all jobs, not to a "
+                    "partition slice's measure."
+                )
+            self._bank_partial(func, mapper=mapper)
+            return None
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
         if coalesce is None:
             return _default_feature_coalesce(
@@ -317,32 +372,14 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             )
         return coalesce(results)
 
-    def measure_to_partial(
+    def _bank_partial(
         self,
         func: Callable[[np.ndarray, np.ndarray, Roi], FeatureFuncResult],
         *,
         mapper: MapperProtocol | None = None,
     ) -> None:
-        """Measure this job's share and store the raw records as a partial.
-
-        The per-job step of a distributed run (see `prepare_jobs`): the
-        measurements are stored **before** any join, tagged with their global
-        ROI index, so `merge_partials` can rebuild the full per-ROI result
-        list and run the ONE global coalesce. The final table matches a
-        serial `measure` row for row. Only callable on a `for_job` slice;
-        re-running a job overwrites its own partial.
-
-        A custom `coalesce` at merge time sees a *normalized* result list,
-        not the function's raw returns: dicts become DataFrames, a `label`
-        index becomes a `label` column, and a ROI whose function returned no
-        rows arrives as an empty, column-less DataFrame.
-        """
-        if self._partition is None:
-            raise NgioValueError(
-                "measure_to_partial is the per-job step of a distributed run: "
-                "restrict the iterator first (`for_job(**args)`), or use "
-                "measure() for a local run."
-            )
+        """Measure this job's share and store the raw records as a partial."""
+        assert self._partition is not None
         _, job_index, n_jobs = self._partition
         handler = self._partials_handler()
         validate_partials_context(self, handler, n_jobs)
@@ -378,57 +415,30 @@ class FeatureExtractorIterator(AbstractIteratorBuilder[NumpyPipeType, DaskPipeTy
             },
         )
 
-    def merge_partials(
-        self,
-        *,
-        coalesce: Callable[[list[FeatureFuncResult]], Table] | None = None,
-    ) -> Table:
-        """Merge a distributed run's partials into the one final table.
-
-        The consolidate step (see `prepare_jobs`): validates that every job
-        of the prepared plan produced a matching partial — a half-finished
-        run errors instead of returning a silently incomplete table —
-        rebuilds the per-ROI result list in global ROI order, and runs the
-        single (default or custom) `coalesce`. The result list is the
-        normalized form described in `measure_to_partial`, not the
-        function's raw returns. On success the partials group is removed.
-        Nothing is registered: the returned table is yours to store with
-        `add_table`.
-        """
-        if self._partition is not None:
-            raise NgioValueError(
-                "merge_partials belongs to the unrestricted iterator: rebuild "
-                "it without `for_job` for the consolidate step."
-            )
-        handler = self._partials_handler()
-        merged = merge_partial_frames(self, handler)
-
-        groups: dict[int, pd.DataFrame] = {}
-        if merged is not None:
-            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
-                groups[int(cast("Any", index))] = group.drop(
-                    columns=[INDEX_COLUMN]
-                ).reset_index(drop=True)
-        results: list[FeatureFuncResult] = [
-            groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
-        ]
-        if coalesce is None:
-            table: Table = _default_feature_coalesce(
-                results, reference_label=self._input_label.meta.name
-            )
-        else:
-            table = coalesce(results)
-        delete_partials_root(handler)
-        return table
-
     def iter_as_numpy(self):  # type: ignore[override]
         """Iterate `(image, label, roi)` payloads over the ROIs."""
         return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
-    def iter_batched(self, batch_size: int = 8):  # type: ignore[override]
-        """Iterate `(image, label, roi)` payloads in batches of `batch_size`."""
-        self._require_valid_batch_size(batch_size)
-        return self._iter_batched_readonly(batch_size)
+    def iter(  # type: ignore[override]
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] | None = None,
+        iterator_mode: Literal["readwrite", "readonly"] = "readonly",
+        *,
+        batch_size: int | None = None,
+    ):
+        """Iterate `(image, label, roi)` payloads over the ROIs.
+
+        Read-only by default: there is nothing to write. With `batch_size`
+        set, yields payload lists of up to that many items. See
+        `AbstractIteratorBuilder.iter` for the remaining knobs.
+        """
+        return self._iter_impl(
+            lazy=lazy,
+            data_mode=data_mode,
+            iterator_mode=iterator_mode,
+            batch_size=batch_size,
+        )
 
     @deprecated(
         replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",

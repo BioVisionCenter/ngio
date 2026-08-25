@@ -660,12 +660,13 @@ def test_feature_merge_matches_serial(tmp_path: Path, custom_coalesce: bool):
     coalesce = _global_norm_coalesce if custom_coalesce else None
     serial_oz = _feature_setup(tmp_path / "feat_serial.zarr")
     serial = _feature_iterator(serial_oz).measure(_measure, coalesce=coalesce)
+    assert serial is not None
 
     ome_zarr = _feature_setup(tmp_path / "feat_jobs.zarr")
     args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     for args in reversed(args_list):
-        _feature_iterator(ome_zarr).for_job(**args).measure_to_partial(_measure)
-    merged = _feature_iterator(ome_zarr).merge_partials(coalesce=coalesce)
+        assert _feature_iterator(ome_zarr).for_job(**args).measure(_measure) is None
+    merged = _feature_iterator(ome_zarr).finalize(coalesce=coalesce)
 
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
     # The merge cleaned the partials group up.
@@ -673,33 +674,38 @@ def test_feature_merge_matches_serial(tmp_path: Path, custom_coalesce: bool):
     assert "_ngio_partials" not in list(label._group_handler.group.keys())
 
 
-def test_feature_finished_verbs_refuse_on_slices(tmp_path: Path):
+def test_feature_slice_measure_banks_and_slice_finalize_refuses(tmp_path: Path):
     ome_zarr = _feature_setup(tmp_path / "feat_guard.zarr")
     iterator = _feature_iterator(ome_zarr)
     args_list = iterator.prepare_jobs(n_jobs=2)
     restricted = _feature_iterator(ome_zarr).for_job(**args_list[0])
 
-    with pytest.raises(NgioValueError, match="measure_to_partial"):
-        restricted.measure(_measure)
-    with pytest.raises(NgioValueError, match="for_job"):
-        _feature_iterator(ome_zarr).measure_to_partial(_measure)
-    with pytest.raises(NgioValueError, match="unrestricted"):
-        restricted.merge_partials()
+    # A slice's coalesce would be silently ignored — refused instead.
+    with pytest.raises(NgioValueError, match="finalize"):
+        restricted.measure(_measure, coalesce=_global_norm_coalesce)
+    # The slice's measure banks its partial and hands nothing back.
+    assert restricted.measure(_measure) is None
+    label = ome_zarr.get_label("objs")
+    partials = label._group_handler.group["_ngio_partials"]
+    assert f"job_{args_list[0]['job_index']}" in list(partials.keys())
+    # The gather stays global.
+    with pytest.raises(NgioValueError, match="gather"):
+        restricted.finalize()
 
 
 def test_feature_merge_refuses_incomplete_run(tmp_path: Path):
     ome_zarr = _feature_setup(tmp_path / "feat_incomplete.zarr")
     args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     # Only one of two jobs runs.
-    _feature_iterator(ome_zarr).for_job(**args_list[0]).measure_to_partial(_measure)
+    _feature_iterator(ome_zarr).for_job(**args_list[0]).measure(_measure)
     with pytest.raises(NgioValueError, match="incomplete"):
-        _feature_iterator(ome_zarr).merge_partials()
+        _feature_iterator(ome_zarr).finalize()
 
 
 def test_feature_merge_refuses_without_prepare(tmp_path: Path):
     ome_zarr = _feature_setup(tmp_path / "feat_noprep.zarr")
     with pytest.raises(NgioValueError, match="No partials"):
-        _feature_iterator(ome_zarr).merge_partials()
+        _feature_iterator(ome_zarr).finalize()
 
 
 def test_feature_fingerprint_drift_refuses(tmp_path: Path):
@@ -711,7 +717,7 @@ def test_feature_fingerprint_drift_refuses(tmp_path: Path):
     with pytest.raises(NgioValueError, match="different plan"):
         retiled.for_job(0, n_jobs=2)
     with pytest.raises(NgioValueError, match="different plan"):
-        retiled.merge_partials()
+        retiled.finalize()
 
 
 def _detection_setup(store):
@@ -769,27 +775,32 @@ def test_detection_merge_matches_serial(tmp_path: Path):
 
     serial_oz = _detection_setup(tmp_path / "det_serial.zarr")
     serial = _detection_iterator(serial_oz).detect(_detector)
+    assert serial is not None
     assert len(serial.dataframe) > 50
 
     ome_zarr = _detection_setup(tmp_path / "det_jobs.zarr")
     args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=3)
     for args in reversed(args_list):
-        _detection_iterator(ome_zarr).for_job(**args).detect_to_partial(_detector)
-    merged = _detection_iterator(ome_zarr).merge_partials()
+        assert _detection_iterator(ome_zarr).for_job(**args).detect(_detector) is None
+    merged = _detection_iterator(ome_zarr).finalize()
 
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
     image = ome_zarr.get_image()
     assert "_ngio_partials" not in list(image._group_handler.group.keys())
 
 
-def test_detection_finished_verbs_refuse_on_slices(tmp_path: Path):
+def test_detection_slice_detect_banks_and_slice_finalize_refuses(tmp_path: Path):
     ome_zarr = _detection_setup(tmp_path / "det_guard.zarr")
     args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=2)
     restricted = _detection_iterator(ome_zarr).for_job(**args_list[0])
-    with pytest.raises(NgioValueError, match="detect_to_partial"):
-        restricted.detect(_detector)
-    with pytest.raises(NgioValueError, match="for_job"):
-        _detection_iterator(ome_zarr).detect_to_partial(_detector)
+    # The slice's detect banks its pre-NMS boxes and hands nothing back.
+    assert restricted.detect(_detector) is None
+    image = ome_zarr.get_image()
+    partials = image._group_handler.group["_ngio_partials"]
+    assert f"job_{args_list[0]['job_index']}" in list(partials.keys())
+    # The gather stays global.
+    with pytest.raises(NgioValueError, match="gather"):
+        restricted.finalize()
 
 
 def test_detection_partial_refuses_colliding_extras(tmp_path: Path):
@@ -811,15 +822,15 @@ def test_detection_partial_refuses_colliding_extras(tmp_path: Path):
         ]
 
     with pytest.raises(NgioValueError, match="collide with the partial table"):
-        restricted.detect_to_partial(shadowing)
+        restricted.detect(shadowing)
 
 
 def _run_feature_job(store: str, job_index: int, n_jobs: int) -> None:
     """One array task of a distributed feature run."""
     ome_zarr = open_ome_zarr_container(store)
-    _feature_iterator(ome_zarr).for_job(
-        job_index=job_index, n_jobs=n_jobs
-    ).measure_to_partial(_measure)
+    _feature_iterator(ome_zarr).for_job(job_index=job_index, n_jobs=n_jobs).measure(
+        _measure
+    )
 
 
 def test_feature_jobs_across_processes_match_serial(tmp_path: Path):
@@ -827,6 +838,7 @@ def test_feature_jobs_across_processes_match_serial(tmp_path: Path):
 
     serial_oz = _feature_setup(tmp_path / "feat_proc_serial.zarr")
     serial = _feature_iterator(serial_oz).measure(_measure)
+    assert serial is not None
 
     store = tmp_path / "feat_procs.zarr"
     ome_zarr = _feature_setup(store)
@@ -841,5 +853,71 @@ def test_feature_jobs_across_processes_match_serial(tmp_path: Path):
         for future in futures:
             future.result()
 
-    merged = _feature_iterator(ome_zarr).merge_partials()
+    merged = _feature_iterator(ome_zarr).finalize()
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+
+
+# --- topic verbs (process/segment/measure/detect + the one finalize) ---------
+
+
+def test_segment_matches_map(tmp_path: Path):
+    """The topic verb is `map` end to end: same levels, auto-finalized."""
+    reference = _serial_reference(tmp_path)
+
+    ome_zarr = _build_ome_zarr(tmp_path / "segment.zarr")
+    ome_zarr.derive_label("out")
+    _fresh_iterator(ome_zarr).segment(_threshold)
+
+    for path, level in _label_levels(ome_zarr).items():
+        np.testing.assert_array_equal(
+            level, reference[path], err_msg=f"level {path} differs"
+        )
+
+
+def test_process_matches_map(tmp_path: Path):
+    from ngio.iterators import ImageProcessingIterator
+
+    def halve(patch):
+        return patch // 2
+
+    def _proc_iterator(ome_zarr, out):
+        return ImageProcessingIterator(
+            ome_zarr.get_image(), out.get_image(), consolidation_mode="dask"
+        ).by_chunks()
+
+    source = _build_ome_zarr(tmp_path / "proc_src.zarr")
+    map_out = source.derive_image(store=tmp_path / "proc_map.zarr")
+    topic_out = source.derive_image(store=tmp_path / "proc_topic.zarr")
+
+    _proc_iterator(source, map_out).map(halve)
+    _proc_iterator(source, topic_out).process(halve)
+
+    np.testing.assert_array_equal(
+        topic_out.get_image().zarr_array[...],
+        map_out.get_image().zarr_array[...],
+    )
+
+
+def test_slice_segment_does_not_finalize(tmp_path: Path):
+    """The topic verb inherits `map`'s slice behavior: write, no gather."""
+    ome_zarr = _build_ome_zarr(tmp_path / "seg_slice.zarr")
+    ome_zarr.derive_label("out")
+    for job_index in range(2):
+        _fresh_iterator(ome_zarr).for_job(job_index, n_jobs=2).segment(_threshold)
+
+    levels = _label_levels(ome_zarr)
+    paths = sorted(levels, key=lambda p: int(p))
+    assert levels[paths[0]].any(), "level 0 must hold the written labels"
+    for path in paths[1:]:
+        assert not levels[path].any(), (
+            f"level {path} must still be stale before finalize()"
+        )
+
+    _fresh_iterator(ome_zarr).finalize()
+    assert _label_levels(ome_zarr)[paths[1]].any()
+
+
+def test_detection_finalize_refuses_without_prepare(tmp_path: Path):
+    ome_zarr = _detection_setup(tmp_path / "det_noprep.zarr")
+    with pytest.raises(NgioValueError, match="No partials"):
+        _detection_iterator(ome_zarr).finalize()

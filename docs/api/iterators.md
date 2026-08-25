@@ -107,8 +107,10 @@ inspecting how a tiling will parallelize or split into jobs.
 
 The shared method surface of every iterator — the reshaping calls
 (`by_grid`, `by_blocks`, `by_chunks`, `by_write_units`, `product`, `with_halo`,
-`for_job`), the execution calls (`iter`, `iter_batched`, `map`, `reduce` and
-each iterator's terminal verb — `measure`, `detect`), and the
-distributed-run init step (`prepare_jobs`).
+`for_job`), the generic execution calls (`iter` — batched via `batch_size` —
+`map`, `reduce`) beneath each iterator's topic verb (`process`, `segment`,
+`measure`, `detect`), the distributed-run init step (`prepare_jobs`), and the
+one gather, `finalize` — the writers consolidate and return `None`, the
+read-only iterators merge their banked partials and return the table.
 
 ::: ngio.iterators.AbstractIteratorBuilder

@@ -87,6 +87,7 @@ iterator = (
 )
 
 detections = iterator.detect(find_nuclei, mapper=ThreadedMapper("auto"))
+assert detections is not None  # a serial run always returns the table
 ome_zarr.add_table("nuclei_detections", detections, overwrite=True)
 print(f"Detected {len(detections.rois())} nuclei")
 # --8<-- [end:detect]
