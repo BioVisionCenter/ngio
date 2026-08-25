@@ -79,9 +79,9 @@ def test_halo_is_not_an_overlap_trigger():
     """Halo-grown reads write cropped cores: disjoint, no declaration needed."""
     ome_zarr = _build_ome_zarr()
     ome_zarr.derive_label("out")
-    _seg_iterator(ome_zarr).by_grid(size_y=32, size_x=32).with_halo(
-        y=4, x=4
-    ).segment(_threshold)
+    _seg_iterator(ome_zarr).by_grid(size_y=32, size_x=32).with_halo(y=4, x=4).segment(
+        _threshold
+    )
     assert ome_zarr.get_label("out").get_as_numpy().any()
 
 
@@ -130,8 +130,8 @@ def test_invalid_overlap_rule_refuses_at_declaration():
 def test_on_overlap_refused_after_for_job():
     ome_zarr = _build_ome_zarr()
     ome_zarr.derive_label("out")
-    restricted = _seg_iterator(ome_zarr).by_grid(size_y=32, size_x=32).for_job(
-        0, n_jobs=2
+    restricted = (
+        _seg_iterator(ome_zarr).by_grid(size_y=32, size_x=32).for_job(0, n_jobs=2)
     )
     with pytest.raises(NgioValueError, match="for_job"):
         restricted.on_overlap("last")
