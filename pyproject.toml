@@ -242,6 +242,8 @@ OME = "OME"
 FO = "FO"
 # Surname
 Comparin = "Comparin"
+# clipPath id in the detection figure of docs/getting_started/6_iterators.md
+odf = "odf"
 
 [tool.check-manifest]
 ignore = [
@@ -305,7 +307,10 @@ snip_hcs = "python docs/snippets/getting_started/hcs.py > /dev/null"
 snip_create_ome_zarr = "python docs/snippets/tutorials/create_ome_zarr.py > /dev/null"
 snip_image_processing = "python docs/snippets/tutorials/image_processing.py > /dev/null"
 snip_image_segmentation = "python docs/snippets/tutorials/image_segmentation.py > /dev/null"
+snip_stitching = "python docs/snippets/tutorials/stitching.py > /dev/null"
+snip_object_detection = "python docs/snippets/tutorials/object_detection.py > /dev/null"
 snip_feature_extraction = "python docs/snippets/tutorials/feature_extraction.py > /dev/null"
+snip_distributed_processing = "python docs/snippets/tutorials/distributed_processing.py > /dev/null"
 snip_hcs_exploration = "python docs/snippets/tutorials/hcs_exploration.py > /dev/null"
 # Must stay sequential: `download_ome_zarr_dataset` stages every extraction through a
 # single shared `<download_dir>/tmp` that it wipes on entry, so two scripts downloading
@@ -319,7 +324,10 @@ python docs/snippets/getting_started/hcs.py > /dev/null &&
 python docs/snippets/tutorials/create_ome_zarr.py > /dev/null &&
 python docs/snippets/tutorials/image_processing.py > /dev/null &&
 python docs/snippets/tutorials/image_segmentation.py > /dev/null &&
+python docs/snippets/tutorials/stitching.py > /dev/null &&
+python docs/snippets/tutorials/object_detection.py > /dev/null &&
 python docs/snippets/tutorials/feature_extraction.py > /dev/null &&
+python docs/snippets/tutorials/distributed_processing.py > /dev/null &&
 python docs/snippets/tutorials/hcs_exploration.py > /dev/null
 """
 

@@ -32,7 +32,7 @@ Start with a function that segments an image, using `skimage` to do the work.
 
 Rather than segmenting the image all at once, map the function over its FOVs. Two
 problems come free with tiling — every FOV numbers its objects from 1, and an object
-crossing a FOV boundary comes out as two objects — and `stitch=True` solves both: each
+crossing a FOV boundary comes out as two objects — and `with_stitch()` solves both: each
 FOV's ids land in a block of their own during the map, the halo overlap is used to merge
 split objects afterwards, and the surviving ids are renumbered to a dense `1..N`.
 
@@ -76,6 +76,7 @@ ROI's own label picks the id block.
 ## Next steps
 
 - [Feature extraction](feature_extraction.md) — measure the objects you just segmented.
+- [Stitching](stitching.md) — the same mechanism on a plain tile grid, tuned.
 - [Iterators](../getting_started/6_iterators.md) — halos, stitching and parallel mappers in full.
 - [Masked images and labels](../getting_started/4_masked_images.md) — read data object-by-object.
 

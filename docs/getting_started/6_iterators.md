@@ -90,96 +90,87 @@ When building image processing pipelines it is often useful to iterate over spec
 
   <path d="M586 168v28H214v-26M209 176l5-6 5 6" fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5" stroke-dasharray="5 4"></path>
   <text x="400" y="216" text-anchor="middle" style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color--light)">repeat for every region the table names</text>
-        </svg>
+</svg>
 </div>
 
 ngio provides five basic `Iterator` classes, all imported from `ngio.iterators` (or from
 the top-level `ngio` namespace):
 
-<!-- Figure 06 — which iterator do I want -->
+<!-- Figure 14 — the five iterators, side by side -->
 <div class="ngio-diagram">
-<svg viewBox="0 0 640 298" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f6t f6d">
-  <title id="f6t">The five iterators, by what they take and return</title>
-  <desc id="f6d">Segmentation takes an image and returns a label. Masked segmentation takes an image and a label and returns a label. Image processing takes an image and returns an image. Feature extraction takes an image and a label and returns a table. Object detection takes an image and returns a table of boxes.</desc>
-
-  <g style="stroke:var(--ngio-line)"><path d="M16 52h608M16 100h608M16 148h608M16 196h608"></path></g>
-
-  <g style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">
-    <text x="16" y="31">SegmentationIterator</text>
-    <text x="16" y="79">MaskedSegmentationIterator</text>
-    <text x="16" y="127">ImageProcessingIterator</text>
-    <text x="16" y="175">FeatureExtractorIterator</text>
-    <text x="16" y="223">ObjectDetectionIterator</text>
-  </g>
-
+<svg viewBox="0 0 640 284" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f14t f14d">
+  <title id="f14t">What each of the five iterators takes, returns and supports</title>
+  <desc id="f14d">Segmentation takes an image and returns a label; masked segmentation takes an image and a mask; image processing returns an image; feature extraction and object detection are read-only and return tables. A features column lists what each one supports: every iterator takes a halo, stitching applies only to the two segmentation iterators, and the read-only ones reconcile their read margin with a join or with NMS.</desc>
   <defs>
-    <g id="n6i">
+    <g id="mci">
       <rect width="22" height="22" rx="3" fill="#151d21"></rect>
       <g fill="#c7d3d7" stroke="#f2f8f9" stroke-width="1.8" stroke-opacity=".85">
-        <g transform="translate(9,8) rotate(-18) scale(.42)"><path d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path></g>
-        <g transform="translate(15,16) rotate(12) scale(.4)"><path d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path></g>
+        <path transform="translate(8,8) rotate(-18) scale(0.42)" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+        <path transform="translate(15,16) rotate(12) scale(0.4)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
       </g>
       <circle cx="4" cy="17" r=".7" fill="#ffffff" opacity=".5"></circle>
-      <circle cx="18.5" cy="5" r=".6" fill="#ffffff" opacity=".4"></circle>
     </g>
-    <g id="n6l">
+    <g id="mcl">
       <rect x=".5" y=".5" width="21" height="21" rx="3" style="fill:var(--ngio-sunk);stroke:var(--ngio-line-strong)"></rect>
       <ellipse cx="8.5" cy="8" rx="6" ry="4.5" transform="rotate(-18 8.5 8)" fill="#4cae4f"></ellipse>
       <ellipse cx="15" cy="16" rx="5" ry="3.8" transform="rotate(10 15 16)" fill="#7c6bd6"></ellipse>
       <ellipse cx="5" cy="17" rx="3.2" ry="2.4" fill="#f4a63a"></ellipse>
     </g>
+    <g id="mcm">
+      <rect x=".5" y=".5" width="21" height="21" rx="3" style="fill:var(--ngio-sunk);stroke:var(--ngio-accent)" stroke-dasharray="3 2"></rect>
+      <path transform="translate(11,11) scale(0.62)" fill="#94dad4" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    </g>
+    <g id="mct">
+      <rect x=".75" y=".75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
+      <path d="M0 7h22M7 0v22M14 0v22" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
+    </g>
   </defs>
-  <use href="#n6i" x="238" y="15"></use>
-  <use href="#n6i" x="238" y="63"></use>
-  <use href="#n6i" x="238" y="111"></use>
-  <use href="#n6i" x="238" y="159"></use>
-  <use href="#n6i" x="238" y="207"></use>
-  <use href="#n6l" x="266" y="63"></use>
-  <use href="#n6l" x="266" y="159"></use>
 
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">
+    <text x="16" y="34">ITERATOR</text><text x="248" y="34">IN → OUT</text><text x="368" y="34">TOPIC VERB</text><text x="472" y="34" data-comment-anchor="halo-col">FEATURES</text>
+  </g>
+  <g style="stroke:var(--ngio-line)"><path d="M16 44h608M16 92h608M16 140h608M16 188h608M16 236h608"></path></g>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:12px;fill:var(--md-default-fg-color)">
+    <text x="16" y="72">SegmentationIterator</text><text x="16" y="120">MaskedSegmentationIterator</text><text x="16" y="168">ImageProcessingIterator</text><text x="16" y="216">FeatureExtractorIterator</text><text x="16" y="264">ObjectDetectionIterator</text>
+  </g>
+
+  <use href="#mci" x="248" y="57"></use>
+  <use href="#mci" x="248" y="105"></use><use href="#mcm" x="272" y="105"></use>
+  <use href="#mci" x="248" y="153"></use>
+  <use href="#mci" x="248" y="201"></use><use href="#mcl" x="272" y="201"></use>
+  <use href="#mci" x="248" y="249"></use>
   <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5">
-    <path d="M300 26h26M320 21l6 5-6 5"></path>
-    <path d="M300 74h26M320 69l6 5-6 5"></path>
-    <path d="M300 122h26M320 117l6 5-6 5"></path>
-    <path d="M300 170h26M320 165l6 5-6 5"></path>
-    <path d="M300 218h26M320 213l6 5-6 5"></path>
+    <path d="M300 68h14M308 63l6 5-6 5"></path><path d="M300 116h14M308 111l6 5-6 5"></path><path d="M300 164h14M308 159l6 5-6 5"></path><path d="M300 212h14M308 207l6 5-6 5"></path><path d="M300 260h14M308 255l6 5-6 5"></path>
+  </g>
+  <use href="#mcl" x="322" y="57"></use><use href="#mcl" x="322" y="105"></use><use href="#mci" x="322" y="153"></use><use href="#mct" x="322" y="201"></use><use href="#mct" x="322" y="249"></use>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:11px;fill:var(--md-default-fg-color)">
+    <text x="368" y="72">segment</text><text x="368" y="120">segment</text><text x="368" y="168">process</text><text x="368" y="216">measure</text><text x="368" y="264">detect</text>
   </g>
 
-  <use href="#n6l" x="338" y="15"></use>
-  <use href="#n6l" x="338" y="63"></use>
-  <use href="#n6i" x="338" y="111"></use>
-  <rect x="338.75" y="159.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
-  <path d="M338 167h22M345 160v20M352 160v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
-  <rect x="338.75" y="207.75" width="20.5" height="20.5" rx="2.5" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
-  <path d="M338 215h22M345 208v20M352 208v20" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></path>
-
-  <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color--light)">
-    <text x="384" y="31">an image in, a new label out</text>
-    <text x="384" y="79">the same, restricted to one mask</text>
-    <text x="384" y="127">an image in, a new image out</text>
-    <text x="384" y="175">read only — measurements out</text>
-    <text x="384" y="223">read only — detected boxes out</text>
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)" stroke-width="1">
+    <rect x="472.5" y="59.5" width="37" height="17" rx="4"></rect><rect x="515.5" y="59.5" width="65" height="17" rx="4"></rect>
+    <rect x="472.5" y="107.5" width="37" height="17" rx="4"></rect><rect x="515.5" y="107.5" width="65" height="17" rx="4"></rect>
+    <rect x="472.5" y="155.5" width="37" height="17" rx="4"></rect>
+    <rect x="472.5" y="203.5" width="65" height="17" rx="4"></rect><rect x="543.5" y="203.5" width="37" height="17" rx="4"></rect>
+    <rect x="472.5" y="251.5" width="65" height="17" rx="4"></rect><rect x="543.5" y="251.5" width="31" height="17" rx="4"></rect>
   </g>
-
-  <path d="M16 254h608" style="stroke:var(--ngio-line)"></path>
-  <use href="#n6i" transform="translate(16,264) scale(0.64)"></use>
-  <use href="#n6l" transform="translate(104,264) scale(0.64)"></use>
-  <rect x="192.75" y="264.75" width="12.5" height="12.5" rx="2" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></rect>
-  <path d="M192 269h14M197 264v14M201 264v14" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
-  <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;fill:var(--md-default-fg-color--light)">
-    <text x="38" y="275">image</text>
-    <text x="126" y="275">labels</text>
-    <text x="214" y="275">table</text>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ngio-accent-ink)">
+    <text x="479" y="72">halo</text><text x="522" y="72">stitching</text>
+    <text x="479" y="120">halo</text><text x="522" y="120">stitching</text>
+    <text x="479" y="168">halo</text>
+    <text x="479" y="216">read halo</text><text x="550" y="216">join</text>
+    <text x="479" y="264">read halo</text><text x="550" y="264">NMS</text>
   </g>
-        </svg>
+</svg>
 </div>
 
-
-* `SegmentationIterator` — `segment` an image into a label; see the [image segmentation tutorial](../tutorials/image_segmentation.md).
-* `MaskedSegmentationIterator` — the same, restricted to the objects of a masking ROI table (segment cells only within a tissue region, say); same tutorial.
-* `ImageProcessingIterator` — `process` an image into a new image (a filter, a projection, a restoration model); see the [image processing tutorial](../tutorials/image_processing.md).
-* `FeatureExtractorIterator` — read-only; `measure` joins per-region measurements into one feature table; see the [feature extraction tutorial](../tutorials/feature_extraction.md).
-* `ObjectDetectionIterator` — read-only; `detect` turns a tile-by-tile detector into one deduplicated ROI table; see [Detecting objects into a ROI table](#detecting-objects-into-a-roi-table).
+- `SegmentationIterator` — `segment` an image into a label; see the [image segmentation tutorial](../tutorials/image_segmentation.md), and the [stitching tutorial](../tutorials/stitching.md) for tiling and seams.
+- `MaskedSegmentationIterator` — the same, restricted to the objects of a masking ROI table (segment cells only within a tissue region, say); same tutorials.
+- `ImageProcessingIterator` — `process` an image into a new image (a filter, a projection, a restoration model); see the [image processing tutorial](../tutorials/image_processing.md).
+- `FeatureExtractorIterator` — read-only; `measure` joins per-region measurements into one feature table; see the [feature extraction tutorial](../tutorials/feature_extraction.md).
+- `ObjectDetectionIterator` — read-only; `detect` turns a tile-by-tile detector into one deduplicated ROI table; see the [object detection tutorial](../tutorials/object_detection.md).
 
 The verbs come in two layers. Every iterator shares the *generic* layer — `map`
 (apply and write back), `reduce` (collect without writing), the hand-driven
@@ -241,9 +232,46 @@ wave, see below, and on segmentation the overlap needs a declared resolution —
 big, and the partition is balanced by construction. `by_chunks()` tiles by the *input*
 image's chunk grid, the natural unit of reading; `by_write_units()` tiles by the
 *output*'s write granularity — the shard shape when the output is sharded, the chunk
-shape otherwise, inspectable as `image.write_granularity()` — which makes parallel
+shape otherwise, inspectable as `image.write_granularity` — which makes parallel
 writes collision-free by construction, so a parallel `map` runs as a single
 fully-parallel wave.
+
+<!-- Figure 10 — what happens to the leftover -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 260" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f10t f10d">
+  <title id="f10t">The four tail policies on a 100 pixel axis tiled at 32</title>
+  <desc id="f10d">Clip shrinks the last tile to 4 pixels. Balance re-splits the last two into 18 and 18. Shift keeps every tile full size by sliding the last one back, so it overlaps its neighbour by 28 pixels — the hatched band. Drop discards the leftover entirely, leaving three tiles.</desc>
+  <defs><pattern id="tphatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><path d="M0 0V6" style="stroke:var(--ngio-magenta)" stroke-width="1.4"></path></pattern></defs>
+
+  <text x="16" y="20" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">100 PX ALONG X, TILED AT 32</text>
+  <g style="stroke:var(--ngio-line-strong)" stroke-width="1"><path d="M128 46h400M128 42v8M256 42v8M384 42v8M512 42v8M528 42v8"></path></g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10px;fill:var(--md-default-fg-color--lighter)"><text x="128" y="39">0</text><text x="256" y="39">32</text><text x="384" y="39">64</text><text x="512" y="39">96</text><text x="532" y="39">100</text></g>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:11.5px;fill:var(--md-default-fg-color)">
+    <text x="16" y="88">tail="clip"</text><text x="16" y="136">tail="balance"</text><text x="16" y="184">tail="shift"</text><text x="16" y="232">tail="drop"</text>
+  </g>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)" stroke-width="1.5">
+    <rect x="128.75" y="68.75" width="126.5" height="30.5" rx="3"></rect><rect x="256.75" y="68.75" width="126.5" height="30.5" rx="3"></rect><rect x="384.75" y="68.75" width="126.5" height="30.5" rx="3"></rect><rect x="512.75" y="68.75" width="14.5" height="30.5" rx="3"></rect>
+    <rect x="128.75" y="116.75" width="126.5" height="30.5" rx="3"></rect><rect x="256.75" y="116.75" width="126.5" height="30.5" rx="3"></rect><rect x="384.75" y="116.75" width="70.5" height="30.5" rx="3"></rect><rect x="456.75" y="116.75" width="70.5" height="30.5" rx="3"></rect>
+    <rect x="128.75" y="164.75" width="126.5" height="30.5" rx="3"></rect><rect x="256.75" y="164.75" width="126.5" height="30.5" rx="3"></rect><rect x="384.75" y="164.75" width="126.5" height="30.5" rx="3"></rect><rect x="400.75" y="164.75" width="126.5" height="30.5" rx="3"></rect>
+    <rect x="128.75" y="212.75" width="126.5" height="30.5" rx="3"></rect><rect x="256.75" y="212.75" width="126.5" height="30.5" rx="3"></rect><rect x="384.75" y="212.75" width="126.5" height="30.5" rx="3"></rect>
+  </g>
+  <rect x="400" y="165" width="112" height="30" fill="url(#tphatch)" opacity=".5"></rect>
+  <rect x="512.75" y="212.75" width="14.5" height="30.5" rx="3" fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5" stroke-dasharray="3 3"></rect>
+
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--ngio-accent-ink)">
+    <text x="192" y="88">32</text><text x="320" y="88">32</text><text x="448" y="88">32</text><text x="520" y="88">4</text>
+    <text x="192" y="136">32</text><text x="320" y="136">32</text><text x="420" y="136">18</text><text x="492" y="136">18</text>
+    <text x="192" y="184">32</text><text x="320" y="184">32</text>
+    <text x="192" y="232">32</text><text x="320" y="232">32</text><text x="448" y="232">32</text>
+  </g>
+
+  <g style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;fill:var(--md-default-fg-color--light)">
+    <text x="544" y="88">a thin tile</text><text x="544" y="136">no thin tile</text><text x="544" y="184">two 32s overlap</text><text x="544" y="232">discarded</text>
+  </g>
+</svg>
+</div>
 
 Two more calls *broadcast* rather than tile: `by_yx()` splits each region into one 2D
 plane per remaining coordinate (every `t`/`z`/`c` combination, full y/x extent — the
@@ -251,7 +279,7 @@ shape for "run this 2D function on every plane"), and `by_zyx(strict=...)` does 
 same per 3D volume. The tutorial snippets use them wherever a 2D or 3D function meets
 a higher-dimensional image.
 
-From here you would call the topic verb (`segment` here) or iterate with `iter_as_numpy` to do the work;
+From here you would call the topic verb (`process` here) or iterate with `iter_as_numpy` to do the work;
 the [image processing tutorial](../tutorials/image_processing.md) carries this through to
 a written result. (`iter_as_numpy` is `iter(data_mode="numpy")` — a bare
 `iter()` still defaults to dask and warns; numpy becomes the default in
@@ -263,7 +291,7 @@ More complete examples can be found in the [Fractal tasks template](https://gith
 
 `map` runs one ROI at a time by default, and that stays the default — parallel writing is explicit opt-in. Concurrency belongs to the *mapper*: pass one, and it sizes its own pool.
 
-The examples from here on run on a small synthetic image — two bright blobs, one of them deliberately crossing a tile boundary:
+The examples from here on run on a small synthetic image — two bright blobs:
 
 ```python exec="true" source="material-block" session="iterators"
 --8<-- "docs/snippets/getting_started/iterators.py:synthetic_setup"
@@ -280,26 +308,59 @@ conflict-free **waves**, so no two concurrent writes ever touch the same
 chunk or shard. `by_write_units()` gives a single fully-parallel wave by
 construction; other tilings just run more waves.
 
-??? note "How the schedule works"
-    Before fanning out, the parallel mappers plan every ROI's *write
-    footprint* — the chunks (or shards, when the output is sharded) it will
-    write on the **output** image — into waves: ROIs sharing a write unit
-    land in different waves, and the waves run back to back, each at full
-    pool width. More sharing means more waves, down to an effectively serial
-    schedule when every ROI collides (ngio logs a warning there rather than
-    refusing). This is also what lets a masked iterator parallelize out of
-    the box: per-object bounding boxes routinely share chunks even when the
-    boxes themselves do not overlap.
+<!-- Figure 13 — conflict-free write waves -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 344" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f13t f13d">
+  <title id="f13t">How overlapping write footprints are scheduled into conflict-free waves</title>
+  <desc id="f13d">The regions tile the whole output array, but they are not chunk-aligned, so every chunk is written by two neighbouring regions. Regions that share a chunk are placed in different waves: the first wave runs regions one, three and five, the second runs regions two and four. Within a wave no two writes touch the same chunk, so no locks are needed.</desc>
 
-    Wave order is the **canonical write order**, and the serial mappers run
-    it too — every mapper writes the same bytes, and two runs of the same
-    version are bit-identical. For ROIs whose *pixels* genuinely overlap (a
-    `by_grid` stride below the size, a `"shift"` tail), which write wins
-    the shared pixels is schedule-defined by default — performance first;
-    declare `write_order="roi"` for the reproducible later-ROI-wins order
-    (see the next note). Mask-protected and pixel-disjoint writes are
-    order-independent either way, as is an order-independent `merge=`
-    (`"max"`, `"min"`, `"sum"`).
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">
+    <text x="16" y="72">CHUNK GRID</text><text x="16" y="136">REGIONS</text><text x="16" y="232">WAVE 1</text><text x="16" y="296">WAVE 2</text>
+  </g>
+
+  <g style="fill:var(--ngio-surface);stroke:var(--ngio-blue)" stroke-width="1.5">
+    <rect x="112.75" y="48.75" width="118.5" height="38.5"></rect><rect x="232.75" y="48.75" width="118.5" height="38.5"></rect><rect x="352.75" y="48.75" width="118.5" height="38.5"></rect><rect x="472.75" y="48.75" width="118.5" height="38.5"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--ngio-blue-t)"><text x="172" y="73">chunk 1</text><text x="292" y="73">chunk 2</text><text x="412" y="73">chunk 3</text><text x="532" y="73">chunk 4</text></g>
+
+  <g style="fill:var(--ngio-magenta)" fill-opacity=".1"><rect x="113" y="113" width="478" height="38"></rect></g>
+  <g fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5">
+    <rect x="112.75" y="112.75" width="94.5" height="38.5"></rect><rect x="208.75" y="112.75" width="94.5" height="38.5"></rect><rect x="304.75" y="112.75" width="94.5" height="38.5"></rect><rect x="400.75" y="112.75" width="94.5" height="38.5"></rect><rect x="496.75" y="112.75" width="94.5" height="38.5"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--md-default-fg-color)"><text x="160" y="137">1</text><text x="256" y="137">2</text><text x="352" y="137">3</text><text x="448" y="137">4</text><text x="544" y="137">5</text></g>
+  <path d="M232 92v20M352 92v20M472 92v20" style="stroke:var(--ngio-blue)" stroke-width="1" stroke-dasharray="3 3" opacity=".7"></path>
+  <text x="112" y="172" style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;fill:var(--md-default-fg-color--light)">the regions are not chunk-aligned</text>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)" stroke-width="1.5">
+    <rect x="112.75" y="208.75" width="94.5" height="38.5"></rect><rect x="304.75" y="208.75" width="94.5" height="38.5"></rect><rect x="496.75" y="208.75" width="94.5" height="38.5"></rect>
+  </g>
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.2" stroke-dasharray="3 3">
+    <rect x="208.75" y="208.75" width="94.5" height="38.5"></rect><rect x="400.75" y="208.75" width="94.5" height="38.5"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--ngio-accent-ink)"><text x="160" y="233">1</text><text x="352" y="233">3</text><text x="544" y="233">5</text></g>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)" stroke-width="1.5">
+    <rect x="208.75" y="272.75" width="94.5" height="38.5"></rect><rect x="400.75" y="272.75" width="94.5" height="38.5"></rect>
+  </g>
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.2" stroke-dasharray="3 3">
+    <rect x="112.75" y="272.75" width="94.5" height="38.5"></rect><rect x="304.75" y="272.75" width="94.5" height="38.5"></rect><rect x="496.75" y="272.75" width="94.5" height="38.5"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--ngio-accent-ink)"><text x="256" y="297">2</text><text x="448" y="297">4</text></g>
+
+  <text x="16" y="332" style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color--light)">Every region in a wave runs in parallel; waves run one after another.</text>
+</svg>
+</div>
+
+??? note "Wave order is the canonical write order"
+    The serial mappers run the same wave order as the parallel ones — every
+    mapper writes the same bytes, and two runs of the same version are
+    bit-identical. For ROIs whose *pixels* genuinely overlap (a `by_grid`
+    stride below the size, a `"shift"` tail), which write wins the shared
+    pixels is schedule-defined by default — performance first; declare
+    `write_order="roi"` for the reproducible later-ROI-wins order (see the
+    next note). Mask-protected and pixel-disjoint writes are order-independent
+    either way, as is an order-independent `merge=` (`"max"`, `"min"`,
+    `"sum"`).
 
 ??? note "Reproducible seams: `write_order="roi"`"
     By default contested writes are scheduled for parallelism alone
@@ -351,7 +412,7 @@ Prefer to drive the loop yourself? `iter(batch_size=...)` yields `(patches, writ
 --8<-- "docs/snippets/getting_started/iterators.py:iter_batched_demo"
 ```
 
-## Distributed runs: selecting a partition
+## Distributed runs
 
 A mapper parallelizes within one machine. On a cluster — SLURM array tasks over a shared filesystem, where processes cannot coordinate — restrict each task to one partition of the work instead:
 
@@ -376,65 +437,113 @@ Each job builds the identical iterator — construction is metadata-only and det
 
 Effective parallelism therefore equals the number of independent groups, which follows the **output's** chunking. Inspect it before submitting: `[it.for_job(i, n_jobs=n).partition_indices for i in range(n)]`. One fat list plus empties means the output chunking (or a tiling like `by_zyx`, which splits along t only) is the constraint, not the cluster — a single-chunk output is one group by construction, since a chunk is one atomic write object. Surplus partitions are harmless no-ops, and [`write_conflict_components`][ngio.iterators.write_conflict_components] makes the grouping auditable.
 
-The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). The read-only iterators partition too — on a slice `measure`/`detect` bank a *partial* instead of joining, and `finalize()` runs the one global join (see [below](#distributed-measurement-and-detection)).
+The requirements mirror the model: every job must use the same `n_jobs` and the same iterator construction; the store must not be in-memory (each process would write its own private copy). The read-only iterators partition too — their global join cannot be reproduced piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass), so on a slice `measure`/`detect` bank a *partial* instead of joining, and `finalize()` runs the one global join and returns the table. A declared join on a slice is inert — the slice banks regardless, and the gather runs it. `finalize` refuses a half-finished run (a missing job errors instead of producing a plausible-looking, silently incomplete table), refuses on a `for_job` slice (the gather is global), and refuses when nothing was prepared or banked.
 
-### The three-phase recipe: `prepare_jobs`
-
-Schedulers like Fractal run distributed work as **init → parallel tasks → consolidate**, where the init task builds a *parallelization list* (one JSON of arguments per parallel task). `prepare_jobs` is that init step: it performs any setup the iterator needs — always wiping stale scratch state from earlier runs first — and returns the list, with empty partitions already dropped:
-
-```python
-# init task
-iterator = SegmentationIterator(image, label, ...).by_chunks()
-args_list = iterator.prepare_jobs(n_jobs=4)
-# -> [{"job_index": 0, "n_jobs": 4}, {"job_index": 1, "n_jobs": 4}, ...]
-
-# parallel task, once per entry
-iterator = SegmentationIterator(image, label, ...).by_chunks()
-iterator.for_job(**args).segment(func)
-
-# consolidate task, after all parallel tasks
-iterator = SegmentationIterator(image, label, ...).by_chunks()
-iterator.finalize()
-```
-
-For a plain writing iterator `prepare_jobs` is optional — the two-step recipe above works on its own. A **stitching** segmentation requires it: the scratch band arrays must exist, race-free, before any job banks into them, and the init step is the one safe moment to create them.
-
-### Distributed stitching
-
-With `prepare_jobs` in the recipe, `with_stitch(...)` distributes too. The init step creates only the scratch *root*; each job creates and writes its own tiles' bank arrays; the consolidate task's `finalize()` verifies every expected bank exists — a half-finished run errors, naming the tiles that never banked — then runs the one global resolve and removes the scratch. Three properties are worth knowing:
-
-- **Banking claims nothing shared**, so a stitched iterator splits into jobs exactly as the plain map would (overlapping tiles share label chunks, so a contiguous overlapping layout travels as one job).
-- **A failed job never destroys the others' banks** — re-run just that job (banking is idempotent) and gather as planned.
-- **Every step validates a plan fingerprint** stamped at init: change the tiling, halo, stitch config, or `n_jobs` between phases and the run fails loudly. A custom seam matcher (like a custom NMS, a declared join, or the function itself) cannot be fingerprinted — declare the identical chain in every phase.
-
-The consolidate task is the one global step — the seam scan and relabel run single-node over the whole label — so distribution accelerates the segmentation itself, not the final reconciliation.
-
-### Distributed measurement and detection
-
-The read-only iterators end in a *global join* — one feature join, one NMS pass — that per-job runs cannot reproduce piecewise (greedy NMS is not hierarchical: suppressing per job and then merging can keep different boxes than one global pass). Their topic verbs are partition-aware: on a `for_job` slice, `measure`/`detect` store the job's **raw pre-join records** as a *partial* and return `None`, and the consolidate task's `finalize()` runs the single global join and returns the table — the same three-phase recipe as the writers, verb for verb:
-
-```python
-# init task
-iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
-args_list = iterator.prepare_jobs(n_jobs=4)
-
-# parallel task, once per entry of args_list
-iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
-iterator.for_job(**args).measure(measure)      # features (detection: .detect(detector))
-
-# consolidate task, after all parallel tasks
-iterator = FeatureExtractorIterator(image, label).by_grid(size_y=512, size_x=512)
-table = iterator.finalize()
-container.add_table("measurements", table)     # storing stays yours
-```
-
-The result is bit-identical to a serial `measure` / `detect` — including a **declared join** (`with_join(...)` on the chain), which runs once at the gather over the normalized per-ROI results: dicts become DataFrames, a `label` index becomes a `label` column, and every row is stamped with its `roi_index` (the ROI's global index) and `roi_name`. A serial `measure`'s declared join sees the identical normalized list — there is one contract, not two — and declaring it on a `for_job` slice is inert (the slice banks regardless; the gather runs it). Partials live in a transient `_ngio_partials` group beside the resolution levels, written through ngio's own table backends (so every store type and the retry policy apply), invisible to `list_tables`, and removed by the merge; the final table is registered only by your own `add_table` call.
-
-`finalize` refuses a half-finished run — a missing job errors instead of producing a plausible-looking, silently incomplete table — refuses on a `for_job` slice (the gather is global), and refuses when nothing was prepared or banked.
+Schedulers like Fractal run distributed work as **init → parallel tasks →
+consolidate**, and `prepare_jobs` is the init step: it performs any setup the
+run needs — always wiping stale scratch state from earlier runs first — and
+returns the *parallelization list* (one JSON-ready argument set per non-empty
+partition, splatting into `for_job(**args)`). It is optional for a plain
+writer — the two-step recipe above works on its own — and **required** for a
+stitching segmentation (the scratch band arrays must exist, race-free, before
+any job banks into them) and for the read-only iterators. The
+[distributed processing tutorial](../tutorials/distributed_processing.md) makes
+the whole three-phase recipe executable — partition layouts, distributed
+stitching, and distributed measurement.
 
 ## Halos: context without seams
 
 Tiling an image and processing each tile independently leaves artifacts at the joins — a smoothing kernel at a tile edge has no neighbours to work with, and a segmentation cuts objects at the boundary. `with_halo` fixes that by reading a margin around each ROI and writing only the ROI back:
+
+<!-- Figure 07 — read grown, write the core -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 220" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f7t f7d">
+  <title id="f7t">How a halo reads a grown region and writes only the core</title>
+  <desc id="f7d">The region is grown by the halo margin on the read, the function sees the grown patch, and the margin is cropped off before the write — so the written region is exactly the region you asked for. Margins clip at the image border.</desc>
+  <defs>
+    <filter id="hgr" x="-20%" y="-20%" width="140%" height="140%"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"></feTurbulence><feColorMatrix type="saturate" values="0"></feColorMatrix></filter>
+    <clipPath id="hp1"><rect x="16" y="44" width="168" height="144" rx="3"></rect></clipPath>
+    <clipPath id="hp2"><rect x="236" y="44" width="168" height="144" rx="3"></rect></clipPath>
+    <clipPath id="hp3"><rect x="456" y="44" width="168" height="144" rx="3"></rect></clipPath>
+    <clipPath id="hpc"><rect x="516" y="84" width="64" height="48"></rect></clipPath>
+    <g id="hcells" fill="#c7d3d7" stroke="#f2f8f9" stroke-width="1.4" stroke-opacity=".9">
+      <path transform="translate(24,20) rotate(15) scale(0.8)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+      <path transform="translate(58,14) rotate(-20) scale(0.7)" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(96,22) rotate(10) scale(0.9)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(136,18) rotate(30) scale(0.75)" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(20,52) rotate(-35) scale(0.8)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(52,44) rotate(-12) scale(0.95)" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+      <path transform="translate(92,54) rotate(22) scale(0.85)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+      <path transform="translate(128,50) rotate(-18) scale(0.9)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(78,50) rotate(-24) scale(0.7)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(110,66) rotate(12) scale(0.65)" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(82,74) rotate(30) scale(0.75)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+      <path transform="translate(28,92) rotate(18) scale(0.9)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+      <path transform="translate(64,84) rotate(-8) scale(0.75)" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(100,96) rotate(-24) scale(0.95)" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+      <path transform="translate(136,88) rotate(14) scale(0.8)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(46,124) rotate(28) scale(0.85)" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(88,128) rotate(-16) scale(0.75)" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(124,126) rotate(8) scale(0.9)" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    </g>
+    <g id="hspk" fill="#ffffff">
+      <circle cx="14" cy="70" r=".7" opacity=".4"></circle><circle cx="150" cy="36" r=".6" opacity=".3"></circle><circle cx="78" cy="112" r=".7" opacity=".3"></circle><circle cx="112" cy="34" r=".5" opacity=".3"></circle><circle cx="40" cy="136" r=".6" opacity=".3"></circle><circle cx="158" cy="108" r=".6" opacity=".3"></circle>
+    </g>
+    <g id="hlabs">
+      <path transform="translate(52,44) rotate(-12) scale(0.95)" fill="#4cae4f" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+      <path transform="translate(92,54) rotate(22) scale(0.85)" fill="#f4a63a" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+      <path transform="translate(64,84) rotate(-8) scale(0.75)" fill="#22a699" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(100,96) rotate(-24) scale(0.95)" fill="#7c6bd6" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+      <path transform="translate(128,50) rotate(-18) scale(0.9)" fill="#7c6bd6" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(78,50) rotate(-24) scale(0.7)" fill="#7c6bd6" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+      <path transform="translate(110,66) rotate(12) scale(0.65)" fill="#4cae4f" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+      <path transform="translate(82,74) rotate(30) scale(0.75)" fill="#ef6f9b" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    </g>
+  </defs>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)">
+    <rect x="16.5" y="16.5" width="15" height="14" rx="3"></rect>
+    <rect x="236.5" y="16.5" width="15" height="14" rx="3"></rect>
+    <rect x="456.5" y="16.5" width="15" height="14" rx="3"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ngio-accent-ink)"><text x="24" y="27">1</text><text x="244" y="27">2</text><text x="464" y="27">3</text></g>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">
+    <text x="38" y="27">THE ROI</text><text x="258" y="27">THE READ</text><text x="478" y="27">THE WRITE</text>
+  </g>
+
+  <g clip-path="url(#hp1)">
+    <rect x="16" y="44" width="168" height="144" fill="#151d21"></rect>
+    <use href="#hcells" transform="translate(16,44)"></use>
+    <use href="#hspk" transform="translate(16,44)"></use>
+    <rect x="16" y="44" width="168" height="144" filter="url(#hgr)" opacity=".1" style="mix-blend-mode:screen"></rect>
+  </g>
+  <rect x="76" y="84" width="64" height="48" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="2.5"></rect>
+
+  <g clip-path="url(#hp2)">
+    <rect x="236" y="44" width="168" height="144" fill="#151d21"></rect>
+    <use href="#hcells" transform="translate(236,44)"></use>
+    <use href="#hspk" transform="translate(236,44)"></use>
+    <rect x="236" y="44" width="168" height="144" filter="url(#hgr)" opacity=".1" style="mix-blend-mode:screen"></rect>
+    <path d="M284 72h88v72h-88z M296 84h64v48h-64z" fill-rule="evenodd" style="fill:var(--ngio-accent)" opacity=".38"></path>
+  </g>
+  <rect x="284" y="72" width="88" height="72" fill="none" style="stroke:var(--ngio-accent)" stroke-width="1.5" stroke-dasharray="4 3"></rect>
+  <rect x="296" y="84" width="64" height="48" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="2"></rect>
+
+  <g clip-path="url(#hp3)">
+    <rect x="456" y="44" width="168" height="144" fill="#151d21"></rect>
+    <use href="#hcells" transform="translate(456,44)"></use>
+    <rect x="516" y="84" width="64" height="48" fill="#151d21"></rect>
+    <g clip-path="url(#hpc)"><use href="#hlabs" transform="translate(456,44)"></use></g>
+    <rect x="456" y="44" width="168" height="144" filter="url(#hgr)" opacity=".1" style="mix-blend-mode:screen"></rect>
+  </g>
+  <rect x="504" y="72" width="88" height="72" fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5" stroke-dasharray="3 4"></rect>
+  <rect x="516" y="84" width="64" height="48" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="2.5"></rect>
+
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--md-default-fg-color--light)">
+    <text x="16" y="206">base ROI</text><text x="236" y="206" style="fill:var(--ngio-accent-ink)">with_halo(x=12, y=12)</text><text x="456" y="206">halo stripped on write</text>
+  </g>
+</svg>
+</div>
 
 ```python exec="true" source="material-block" session="iterators"
 --8<-- "docs/snippets/getting_started/iterators.py:halo_demo"
@@ -476,9 +585,87 @@ disk instead.
 
 Segmenting tile by tile leaves an object that crosses a boundary as two objects with two ids — and, because every tile numbers its objects from 1, leaves ids that mean nothing outside their own tile. `with_stitch()` fixes both:
 
-```python exec="true" source="material-block" session="iterators"
---8<-- "docs/snippets/getting_started/iterators.py:stitch_demo"
-```
+<!-- Figure 08 — overlap is the evidence, not adjacency -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 408" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f8t f8d">
+  <title id="f8t">How stitching merges objects split across tile boundaries</title>
+  <desc id="f8d">Each tile predicts its own objects, numbered from one within that tile. Where two tiles predicted the same pixels and their objects agree above the IoU threshold, a union-find joins the two ids into one object; objects that merely abut across a cut are left as two.</desc>
+  <defs>
+    <clipPath id="sca"><rect x="116" y="60" width="240" height="152" rx="7"></rect></clipPath>
+    <clipPath id="scb"><rect x="284" y="60" width="240" height="152" rx="7"></rect></clipPath>
+    <clipPath id="scov"><rect x="284" y="60" width="72" height="152"></rect></clipPath>
+  </defs>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)"><rect x="16.5" y="8.5" width="15" height="14" rx="3"></rect></g>
+  <text x="24" y="19" text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ngio-accent-ink)">1</text>
+  <text x="38" y="19" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">EACH TILE IS SEGMENTED ALONE, WITH ITS OWN IDS</text>
+
+  <rect x="16.5" y="32.5" width="607" height="200" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:11px;fill:var(--md-default-fg-color)"><text x="116" y="52">tile A</text><text x="524" y="52" text-anchor="end">tile B</text></g>
+
+  <g clip-path="url(#sca)">
+    <rect x="116" y="60" width="240" height="152" style="fill:var(--ngio-surface)"></rect>
+    <path transform="translate(144,90) rotate(-12) scale(0.8)" fill="#4cae4f" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(184,74) rotate(24) scale(1)" fill="#7c6bd6" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(220,100) rotate(-18) scale(0.8)" fill="#f4a63a" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(154,132) rotate(14) scale(0.85)" fill="#22a699" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(200,152) rotate(-8) scale(0.9)" fill="#ef6f9b" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(252,84) rotate(30) scale(1)" fill="#f4a63a" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(256,140) rotate(-22) scale(0.75)" fill="#4cae4f" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+    <path transform="translate(270,182) rotate(10) scale(0.8)" fill="#7c6bd6" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(172,190) rotate(-14) scale(1)" fill="#22a699" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(218,196) rotate(20) scale(0.7)" fill="#4cae4f" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(130,164) rotate(-26) scale(0.9)" fill="#ef6f9b" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(310,124) rotate(-6) scale(0.9)" fill="#f4a63a" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+  </g>
+  <g clip-path="url(#scb)">
+    <rect x="284" y="60" width="240" height="152" style="fill:var(--ngio-surface)"></rect>
+    <path transform="translate(315,127) rotate(-6) scale(0.9)" fill="#ef6f9b" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+    <path transform="translate(356,84) rotate(18) scale(0.85)" fill="#22a699" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(400,72) rotate(-24) scale(1)" fill="#4cae4f" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(376,162) rotate(12) scale(0.8)" fill="#7c6bd6" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(404,140) rotate(-16) scale(0.8)" fill="#f4a63a" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+    <path transform="translate(456,96) rotate(26) scale(0.85)" fill="#ef6f9b" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(448,168) rotate(-10) scale(0.85)" fill="#4cae4f" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(496,120) rotate(14) scale(1)" fill="#22a699" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(380,196) rotate(-20) scale(0.8)" fill="#f4a63a" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+    <path transform="translate(434,204) rotate(22) scale(0.9)" fill="#7c6bd6" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+    <path transform="translate(504,180) rotate(-14) scale(0.8)" fill="#7c6bd6" d="M-11-2c-.4-5.4 4.4-8.6 10.6-8.2 6.8.4 11.2 4.2 11.2 9.6 0 5-3.4 8.6-8.8 9.2-4.6.6-9-.4-11.4-3-1.2-1.4-1.6-3.6-1.6-7.6Z"></path>
+    <path transform="translate(490,66) rotate(8) scale(0.9)" fill="#4cae4f" d="M-8-1.2c-.2-3.8 3-6.2 7.2-5.8 4.4.4 8 3 8.4 6.6.4 3.8-2.8 7.2-7.4 7.4C-4 7.2-7.4 4.6-8-1.2Z"></path>
+  </g>
+  <g clip-path="url(#scov)">
+    <path transform="translate(310,124) rotate(-6) scale(0.9)" fill="#f4a63a" opacity=".9" d="M-18-3c.4-5.4 7-7.4 15-6.8 9 .6 18 2.8 21.6 6.4 1.8 1.8 1 5-2 7.8-4.2 4-13.2 7.2-21.2 6.2C-12 9.6-17 6-18-3Z"></path>
+  </g>
+  <rect x="284" y="60" width="72" height="152" style="fill:var(--ngio-accent)" opacity=".2"></rect>
+  <path transform="translate(302,178) rotate(0) scale(1)" fill="#4cae4f" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <path transform="translate(327,178) rotate(180) scale(1)" fill="#7c6bd6" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+
+  <g fill="none" stroke-width="1.5">
+    <rect x="116.75" y="60.75" width="238.5" height="150.5" rx="7" style="stroke:var(--ngio-magenta)"></rect>
+    <rect x="284.75" y="60.75" width="238.5" height="150.5" rx="7" style="stroke:var(--ngio-magenta)"></rect>
+  </g>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)"><rect x="16.5" y="256.5" width="15" height="14" rx="3"></rect></g>
+  <text x="24" y="267" text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ngio-accent-ink)">2</text>
+  <text x="38" y="267" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">UNION-FIND DECIDES WHICH PAIRS ARE ONE OBJECT</text>
+
+  <rect x="16.5" y="280.5" width="295" height="112" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+  <path opacity=".85" transform="translate(106,321) rotate(-6) scale(1.4)" fill="#f4a63a" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <path opacity=".7" transform="translate(113,325) rotate(-6) scale(1.4)" fill="#ef6f9b" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5"><path d="M152 323h32M178 318l6 5-6 5"></path></g>
+  <text x="168" y="363" text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--md-default-fg-color)">IoU 0.78 ≥ 0.5</text>
+  <path transform="translate(222,323) rotate(-6) scale(1.4)" fill="#f4a63a" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+
+  <rect x="328.5" y="280.5" width="295" height="112" rx="10" style="fill:var(--ngio-sunk);stroke:var(--ngio-line)"></rect>
+  <path transform="translate(387,323) rotate(0) scale(1.4)" fill="#4cae4f" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <path transform="translate(422,323) rotate(180) scale(1.4)" fill="#7c6bd6" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <path d="M405 306V340" style="stroke:var(--ngio-line-strong)" stroke-width="1.5" stroke-dasharray="3 4"></path>
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5"><path d="M460 323h32M486 318l6 5-6 5"></path></g>
+  <text x="476" y="363" text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--md-default-fg-color)">IoU 0 &lt; 0.5</text>
+  <path transform="translate(532,323) rotate(0) scale(1.4)" fill="#4cae4f" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+  <path transform="translate(567,323) rotate(180) scale(1.4)" fill="#7c6bd6" d="M-13-2.2c-.4-4.6 4.4-7.2 11-6.8 7.4.4 13.8 3.4 15.4 7.2 1 2.4-1.4 5.4-6 7.4-5.8 2.4-12.8 2-17-.4-2.4-1.4-3.4-3.8-3.4-7.4Z"></path>
+</svg>
+</div>
 
 Any ROI list stitches: a regular grid with a halo, an overlapping-FOV microscope layout, a ragged ROI table. The criterion is that two tiles' predictions **overlap**, not that their objects merely touch across a cut — two distinct objects that abut at a boundary are adjacent but do not overlap, so an adjacency rule would merge them and the overlap rule does not. The shared opinion comes from a halo (each tile reads past its own edge), from the tiles genuinely overlapping (FOV layouts need no halo — the overlap *is* the evidence), or both; with neither, stitching refuses, since no two tiles ever predict the same pixel.
 
@@ -486,47 +673,66 @@ During the map each tile banks its grown prediction into transient per-tile scra
 
 `MaskedSegmentationIterator` takes `with_stitch()` too, for tiling *within* a mask: a huge masked object tiled with `by_grid` + `with_halo` gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no `UniqueLabelsTransform` is needed (combining it with `stitch` raises).
 
-Tune it with `StitchConfig`:
-
-```python
-from ngio.iterators import StitchConfig
-
-iterator = SegmentationIterator(
-    image, label
-).with_stitch(
-    StitchConfig(iou_threshold=0.5, block_size=50_000)
-)
-```
-
-By default the banks are kept in a transient group inside the output label, which works under every mapper. `scratch_store` puts them elsewhere — often worth doing, since labels compress well:
-
-```python
-from zarr.storage import MemoryStore
-
-StitchConfig(scratch_store=MemoryStore())
-```
-
-That keeps the output store untouched and leaves nothing behind if a run dies. The one restriction is `ProcessMapper`: a `MemoryStore` pickles by value, so each worker would bank into a private copy — ngio refuses that rather than losing the predictions silently.
-
-`iou_threshold` is how much two tiles must agree before their ids are joined. The default errs towards leaving an object split rather than merging two that are not — an over-split label can be fixed downstream, a wrong merge cannot. `block_size` is how many ids each tile is given, and must exceed the largest count a single tile can produce.
-
-Compaction is not exclusive to stitching — `label.relabel_sequential()` renumbers any label to a dense `1..N` on its own (its `consolidation_mode=` controls the pyramid rebuild that follows):
-
-```python
-label.relabel_sequential()
-```
-
-Either way the numbering is assigned in first-encounter order over the chunk grid rather than by sorting the existing ids. That keeps it to a single pass over the label, and means which object ends up as `1` follows the array rather than the tile it came from.
-
-If a run is interrupted between the map and the resolve, the label holds a valid but over-split segmentation; re-running the resolve is safe, because it is idempotent.
+The [stitching tutorial](../tutorials/stitching.md) walks the whole flow on a
+real image — the naive per-tile route, `with_stitch()`, and the `StitchConfig`
+tuning knobs (`iou_threshold`, `block_size`, `scratch_store`).
 
 ## Detecting objects into a ROI table
 
 Not every model produces a mask. An object detector — a YOLO network, a spot finder — reports **bounding boxes**, and the natural home for those is a ROI table, not a label image. The `ObjectDetectionIterator` runs a detector tile by tile and returns one `RoiTable` of the objects it found:
 
-```python exec="true" source="material-block" session="iterators"
---8<-- "docs/snippets/getting_started/iterators.py:detect_demo"
-```
+<!-- Figure 11 — tile-by-tile detection into one ROI table -->
+<div class="ngio-diagram">
+<svg viewBox="0 0 640 256" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f11t f11d">
+  <title id="f11t">How the object detection iterator turns per-tile boxes into one deduplicated ROI table</title>
+  <desc id="f11d">Each tile reads a halo past its edge so a spot at the boundary is seen whole by at least one tile. Both neighbours then report it, so non-maximum suppression keeps the higher-scoring box, and the survivors are merged into one ROI table in world coordinates.</desc>
+  <defs>
+    <clipPath id="odf"><rect x="16" y="64" width="176" height="176" rx="3"></rect></clipPath>
+  </defs>
+
+  <g style="fill:var(--ngio-accent-soft);stroke:var(--ngio-accent)">
+    <rect x="16.5" y="24.5" width="15" height="14" rx="3"></rect><rect x="232.5" y="24.5" width="15" height="14" rx="3"></rect><rect x="448.5" y="24.5" width="15" height="14" rx="3"></rect>
+  </g>
+  <g text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:9.5px;fill:var(--ngio-accent-ink)"><text x="24" y="35">1</text><text x="240" y="35">2</text><text x="456" y="35">3</text></g>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.09em;fill:var(--md-default-fg-color--light)">
+    <text x="38" y="35">DETECT PER TILE</text><text x="254" y="35">DEDUPLICATE</text><text x="470" y="35">MERGE</text>
+  </g>
+
+  <g clip-path="url(#odf)">
+    <rect x="16" y="64" width="176" height="176" fill="#151d21"></rect>
+    <g fill="#e8f0f2"><circle cx="48" cy="100" r="4"></circle><circle cx="150" cy="96" r="3.4"></circle><circle cx="104" cy="152" r="4.4"></circle><circle cx="60" cy="196" r="3.6"></circle><circle cx="160" cy="204" r="3"></circle><circle cx="76" cy="80" r="3.2"></circle><circle cx="132" cy="130" r="3.8"></circle><circle cx="36" cy="160" r="3"></circle><circle cx="176" cy="144" r="3.4"></circle><circle cx="116" cy="222" r="3.6"></circle><circle cx="72" cy="128" r="2.8"></circle></g>
+    <g fill="#ffffff" opacity=".3"><circle cx="30" cy="182" r=".7"></circle><circle cx="140" cy="164" r=".6"></circle><circle cx="182" cy="112" r=".7"></circle><circle cx="90" cy="212" r=".6"></circle></g>
+    <path d="M104 64V240M16 152H192" stroke="#ffffff" stroke-width="1.2" opacity=".35"></path>
+  </g>
+  <rect x="16.5" y="64.5" width="175" height="175" rx="3" fill="none" style="stroke:var(--ngio-line-strong)"></rect>
+  <rect x="80" y="128" width="48" height="48" fill="none" style="stroke:var(--ngio-accent)" stroke-width="1.2" stroke-dasharray="4 3"></rect>
+  <g fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5">
+    <rect x="37.5" y="89.5" width="21" height="21"></rect><rect x="139.5" y="85.5" width="21" height="21"></rect>
+    <rect x="91.5" y="139.5" width="25" height="25"></rect><rect x="95.5" y="143.5" width="25" height="25"></rect>
+    <rect x="49.5" y="185.5" width="21" height="21"></rect><rect x="149.5" y="193.5" width="21" height="21"></rect>
+    <rect x="65.5" y="69.5" width="21" height="21"></rect><rect x="121.5" y="119.5" width="21" height="21"></rect>
+    <rect x="25.5" y="149.5" width="21" height="21"></rect><rect x="165.5" y="133.5" width="21" height="21"></rect>
+    <rect x="105.5" y="211.5" width="21" height="21"></rect><rect x="61.5" y="117.5" width="21" height="21"></rect>
+  </g>
+
+  <g fill="none" style="stroke:var(--ngio-line-strong)" stroke-width="1.5"><path d="M200 152h24M218 147l6 5-6 5"></path><path d="M416 152h24M434 147l6 5-6 5"></path></g>
+
+  <rect x="232.5" y="64.5" width="175" height="175" rx="3" fill="none" style="stroke:var(--ngio-accent)" stroke-width="1.5"></rect>
+  <text x="246" y="92" style="font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;fill:var(--md-default-fg-color)">non-maximum suppression</text>
+  <g fill="none" stroke-width="1.5"><rect x="272.5" y="128.5" width="41" height="41" style="stroke:var(--ngio-magenta)"></rect><rect x="286.5" y="142.5" width="41" height="41" style="stroke:var(--ngio-line-strong)" stroke-dasharray="3 3"></rect></g>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px"><text x="322" y="124" style="fill:var(--ngio-magenta-t)">0.91</text><text x="334" y="196" style="fill:var(--md-default-fg-color--lighter)">0.68</text></g>
+  <text x="320" y="220" text-anchor="middle" style="font-family:'JetBrains Mono',monospace;font-size:11px;fill:var(--md-default-fg-color--light)">iou ≥ 0.5</text>
+
+  <rect x="448.5" y="64.5" width="175" height="175" rx="3" fill="none" style="stroke:var(--ngio-magenta)" stroke-width="1.5"></rect>
+  <path d="M448 92h176M504 64V240M560 64V240M448 122h176M448 152h176M448 182h176M448 212h176" style="stroke:var(--ngio-magenta)" stroke-width="1.2"></path>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10px;fill:var(--md-default-fg-color--light)"><text x="458" y="84">label</text><text x="514" y="84">x, y</text><text x="570" y="84">conf</text></g>
+  <g style="font-family:'JetBrains Mono',monospace;font-size:10.5px;fill:var(--md-default-fg-color)">
+    <text x="458" y="112">1</text><text x="458" y="142">2</text><text x="458" y="172">3</text><text x="458" y="202">4</text><text x="458" y="232">…</text>
+    <text x="514" y="112">world</text><text x="514" y="142">world</text><text x="514" y="172">world</text><text x="514" y="202">world</text><text x="514" y="232">…</text>
+    <text x="570" y="112">0.94</text><text x="570" y="142">0.91</text><text x="570" y="172">0.88</text><text x="570" y="202">0.82</text><text x="570" y="232">…</text>
+  </g>
+</svg>
+</div>
 
 NMS is declared with `with_nms(GreedyNms(iou_threshold=..., score_column=...))`, exactly as stitching is with `with_stitch(StitchConfig(...))` — and both defaults are swappable protocols: any object with `score_column`, `max_detections_per_tile`, and a deterministic `suppress(detections)` satisfies `NmsProtocol` (soft-NMS, class-aware suppression), and a `StitchConfig(seam_matcher=...)` replaces the IoU criterion with your own `(patch_a, patch_b) -> [(id_a, id_b), ...]` pair decision. A parallel `mapper=` on `detect` fans the tiles out like any `reduce`.
 
@@ -549,15 +755,10 @@ The detector sees one tile at a time and answers in the tile's own pixels; the i
 
 The boundary problem is the sliding-window one. An object cut by a tile edge is seen only partially by either tile, so each tile reads a halo past its edge — on a read-only iterator the halo is a pure read margin, there being no write to crop it from — and the object is seen whole by at least one of them. The cost is that both neighbours now report it, and the cure is standard **non-maximum suppression**: boxes overlapping at or above `iou_threshold` (default `0.5`) are one object, and the one ranked higher by the `score_column` (`"confidence"` by default; box volume when the detector reports no score) survives. Per-tile NMS inside the detector composes cleanly with this cross-tile pass. The survivors are renumbered to a dense `1..N` and returned; like `measure`, nothing is written — storing the table is your `add_table` call.
 
-### Anchoring a local box yourself
-
-The coordinate bookkeeping is one call you can also use in a custom flow or the manual pattern: `Roi.anchor` turns a region's ROI plus a patch-local pixel box into the absolute world ROI —
-
-```python exec="true" source="material-block" session="iterators"
---8<-- "docs/snippets/getting_started/iterators.py:anchor_demo"
-```
-
-The `space` fields are what keep this honest: `anchor` refuses a world-space box (already absolute — anchoring it would double the offset) and a pixel-space region, so the classic silent frame mix-up raises instead. Axes the box does not pin inherit the region's extent.
+The [object detection tutorial](../tutorials/object_detection.md) runs a spot
+finder through `detect` end to end, shows the suppression happening on the raw
+pre-NMS boxes, and covers `Roi.anchor` — the coordinate call you can reuse in
+a custom flow.
 
 ## What each iterator supports
 
@@ -589,8 +790,10 @@ Restrictions that hold everywhere:
 
 ## Next steps
 
-- [Object detection tutorial](../tutorials/object_detection.md) — a spot finder through `detect`, end to end.
 - [Image processing tutorial](../tutorials/image_processing.md) — an iterator applied end to end.
 - [Image segmentation tutorial](../tutorials/image_segmentation.md) — segmentation and masked segmentation.
+- [Stitching tutorial](../tutorials/stitching.md) — a tiled segmentation from the naive route to a tuned `with_stitch()`.
+- [Object detection tutorial](../tutorials/object_detection.md) — a spot finder through `detect`, with the NMS walkthrough.
 - [Feature extraction tutorial](../tutorials/feature_extraction.md) — `measure` on a segmented image.
+- [Distributed processing tutorial](../tutorials/distributed_processing.md) — the three-phase recipe end to end.
 - [Iterators API reference](../api/iterators.md) — the full iterator API.

@@ -83,7 +83,23 @@ measurement function returning one of them is refused.)
 --8<-- "docs/snippets/tutorials/feature_extraction.py:read_table_back"
 ```
 
+## Plot the features
+
+The table is made for exactly this — one column against another (the area converted
+to µm²), every dot one nucleus:
+
+```python exec="true" html="1" source="material-block" session="feature_extraction"
+--8<-- "docs/snippets/tutorials/feature_extraction.py:plot_features"
+```
+
+Most nuclei sit in one cloud; the small, bright ones in the upper left — condensed
+chromatin, dividing or dying — are the kind of subpopulation you measure to find.
+
 ## Next steps
 
+- [Iterators](../getting_started/6_iterators.md) — halos, joins, and the read-only
+  iterators in full.
+- [Distributed processing](distributed_processing.md) — the same measurement split
+  across jobs.
 - [HCS exploration](hcs_exploration.md) — aggregate feature tables across a plate.
 - [Table specifications](../table_specs/overview.md) — how feature tables are stored.
