@@ -134,9 +134,21 @@ def test_backoff_unknown_strategy_rejected():
         RetryConfig.model_validate({"backoff": {"strategy": "fibonacci"}})
 
 
-def test_retry_config_blanket_mode_warns():
-    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
-        RetryConfig(retry_all_errors=True)
+def test_retry_config_blanket_mode_warns_once_at_load(monkeypatch, tmp_path):
+    from ngio.config._config import _reset_config, get_config
+
+    config_path = tmp_path / "ngio_config.json"
+    config_path.write_text('{"io_retry": {"retry_all_errors": true}}')
+    monkeypatch.setenv("NGIO_CONFIG_PATH", str(config_path))
+    _reset_config()
+    try:
+        with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+            get_config()
+        # Cached: no re-warning on later calls (validators re-run on every
+        # model_copy, which is exactly where the warning must not live).
+        get_config().io_retry.model_copy(deep=True)
+    finally:
+        _reset_config()
 
 
 def test_retry_on_and_blanket_mode_mutually_exclusive():
@@ -145,16 +157,16 @@ def test_retry_on_and_blanket_mode_mutually_exclusive():
 
 
 def test_retry_on_assignment_rejected_in_blanket_mode():
-    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
-        retry = RetryConfig(retry_all_errors=True)
+    retry = RetryConfig(retry_all_errors=True)
     with pytest.raises(ValidationError, match="mutually exclusive"):
         retry.retry_on = ["OSError"]
 
 
-def test_retry_config_blanket_mode_warns_on_assignment():
-    retry = RetryConfig()
-    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
-        retry.retry_all_errors = True
+def test_retry_config_construction_never_warns(recwarn):
+    retry = RetryConfig(retry_all_errors=True)
+    retry.retry_all_errors = False
+    retry.retry_all_errors = True
+    assert len(recwarn) == 0
 
 
 def test_retry_config_no_warning_by_default(recwarn):

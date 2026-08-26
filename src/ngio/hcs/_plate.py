@@ -28,6 +28,7 @@ from ngio.ome_zarr_meta import (
     update_ngio_well_meta,
 )
 from ngio.tables import (
+    ROI_TABLE_TYPES,
     ConditionTable,
     FeatureTable,
     GenericRoiTable,
@@ -43,6 +44,7 @@ from ngio.utils import (
     AccessModeLiteral,
     NgioCache,
     NgioError,
+    NgioValidationError,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -269,6 +271,9 @@ class OmeZarrPlate:
         self._group_handler = group_handler
         self._meta_handler = PlateMetaHandler(group_handler)
         self._tables_container = table_container
+        # Set when a read-only probe found no `/tables`; see
+        # `_get_tables_container`.
+        self._tables_absent = False
         self._wells_cache: NgioCache[OmeZarrWell] = NgioCache(
             use_cache=self._group_handler.use_cache
         )
@@ -294,6 +299,7 @@ class OmeZarrPlate:
         # Rebuilt on next access against the refreshed handler — it carries a
         # per-table type memo that would otherwise survive the refresh.
         self._tables_container = None
+        self._tables_absent = False
 
     @property
     def meta_handler(self):
@@ -631,8 +637,8 @@ class OmeZarrPlate:
                 file lock, so there is nothing to take on a remote store.
         """
         if image_path is None:
-            raise ValueError(
-                "Image path cannot be None for atomic add_image. "
+            raise NgioValueError(
+                "Image path cannot be None for atomic_add_image. "
                 "If your intent is to add a well, use add_well instead."
             )
         path = self._add_image(
@@ -655,8 +661,8 @@ class OmeZarrPlate:
     ) -> str:
         """Add an image to an ome-zarr plate."""
         if image_path is None:
-            raise ValueError(
-                "Image path cannot be None for atomic add_image. "
+            raise NgioValueError(
+                "Image path cannot be None for add_image. "
                 "If your intent is to add a well, use add_well instead."
             )
         path = self._add_image(
@@ -835,10 +841,15 @@ class OmeZarrPlate:
         """Return the tables container."""
         if self._tables_container is not None:
             return self._tables_container
+        # Only the read-only probe may be remembered; a `create_mode=True`
+        # caller asks for the group to be made, so it must try again.
+        if self._tables_absent and not create_mode and self._group_handler.use_cache:
+            return None
         _tables_container = _try_get_table_container(
             self._group_handler, create_mode=create_mode
         )
         self._tables_container = _tables_container
+        self._tables_absent = _tables_container is None
         return self._tables_container
 
     @property
@@ -846,9 +857,7 @@ class OmeZarrPlate:
         """Return the tables container."""
         _table_container = self._get_tables_container()
         if _table_container is None:
-            raise NgioValueError(
-                "No tables container found. Please add a tables container to the plate."
-            )
+            raise NgioValidationError("No tables found in the plate.")
         return _table_container
 
     def list_tables(self, filter_types: TypedTable | str | None = None) -> list[str]:
@@ -872,9 +881,7 @@ class OmeZarrPlate:
         # sort names the first pass had already sorted.
         types = tables_container.table_types()
         return [
-            name
-            for name, table_type in types.items()
-            if table_type in ("roi_table", "masking_roi_table")
+            name for name, table_type in types.items() if table_type in ROI_TABLE_TYPES
         ]
 
     def get_roi_table(self, name: str) -> RoiTable:

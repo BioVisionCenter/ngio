@@ -52,10 +52,10 @@ FinalizeType = TypeVar("FinalizeType")
 R = TypeVar("R")
 T = TypeVar("T")
 
-#: What `on_overlap` accepts: `"last"` keeps the deterministic wave-order
-#: last-writer-wins as an explicit acknowledgment; any `merge=` input
-#: (`"max"`/`"min"`/`"sum"`/`"keep_nonzero"`, a merge function, or a
-#: `MergePolicy`) combines each write with what is on disk instead.
+#: What `on_overlap` accepts: `"last"` keeps last-writer-wins as an
+#: explicit acknowledgment; any `merge=` input combines each write with
+#: what is on disk instead. The separate `write_order=` kwarg picks who
+#: writes last (see `WriteOrder`).
 OverlapPolicy: TypeAlias = Literal["last"] | MergeInput
 
 
@@ -117,8 +117,18 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             partition = f", partition={job_index}/{n_jobs}"
         return f"{self.__class__.__name__}(rois={len(self._rois)}{halo}{partition})"
 
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        # The 1.1.0b* public name; a subclass still defining it would
+        # silently never be called.
+        if "get_init_kwargs" in cls.__dict__:
+            raise TypeError(
+                f"{cls.__name__} defines get_init_kwargs(), which ngio no "
+                "longer calls: rename it to _get_init_kwargs()."
+            )
+
     @abstractmethod
-    def get_init_kwargs(self) -> dict:
+    def _get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator.
 
         This is used to clone the iterator with the same parameters
@@ -147,7 +157,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
 
     @classmethod
     def _require_complete_init_kwargs(cls, init_kwargs: dict) -> None:
-        """Refuse a `get_init_kwargs` that silently forgets constructor state.
+        """Refuse a `_get_init_kwargs` that silently forgets constructor state.
 
         Every reshaping call rebuilds the iterator from this dict; a
         constructor parameter missing from it is state that vanishes on the
@@ -167,10 +177,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         ]
         if missing:
             raise NgioValueError(
-                f"{cls.__name__}.get_init_kwargs() omits the constructor "
+                f"{cls.__name__}._get_init_kwargs() omits the constructor "
                 f"parameter(s) {missing}: the iterator would silently lose "
                 "that state on the first by_grid()/by_chunks()/with_halo() "
-                "call. Add them to get_init_kwargs()."
+                "call. Add them to _get_init_kwargs()."
             )
         cls._init_kwargs_checked = True
 
@@ -184,11 +194,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
                 "`with_halo`) would silently invalidate the selection. Apply "
                 "`for_job` last, after every reshaping call."
             )
-        init_kwargs = self.get_init_kwargs()
+        init_kwargs = self._get_init_kwargs()
         self._require_complete_init_kwargs(init_kwargs)
         new_instance = self.__class__(**init_kwargs)
         new_instance._set_rois(rois)
-        # Carried here rather than through every concrete `get_init_kwargs`:
+        # Carried here rather than through every concrete `_get_init_kwargs`:
         # the halo and the chain declarations are orthogonal to how an
         # iterator was built.
         new_instance._halo = self._halo
@@ -272,17 +282,6 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             return roi
         read_roi, _ = halo_roi(roi, self._ref_image, self._halo)
         return read_roi
-
-    def _wrap_setter(
-        self, setter: DataSetterProtocol[T], roi: Roi
-    ) -> DataSetterProtocol[T]:
-        """Crop the halo off patches heading into `setter`, if there is one."""
-        if not self._halo:
-            return setter
-        _, margins = halo_roi(roi, self._ref_image, self._halo)
-        if not margins:
-            return setter
-        return HaloCroppingSetter(setter, margins)
 
     def by_grid(
         self,
@@ -484,18 +483,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         raise NotImplementedError
 
     @abstractmethod
-    def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[NumpyPipeType] | None:
-        """Build a setter function for the given ROI."""
-        raise NotImplementedError
-
-    @abstractmethod
     def build_dask_getter(self, roi: Roi) -> DataGetterProtocol[DaskPipeType]:
         """Build a Dask getter function for the given ROI."""
-        raise NotImplementedError
-
-    @abstractmethod
-    def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[DaskPipeType] | None:
-        """Build a Dask setter function for the given ROI."""
         raise NotImplementedError
 
     @abstractmethod
@@ -514,26 +503,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         raise NotImplementedError
 
     def _touched_write_regions(self) -> RegionsLike | None:
-        """The on-disk regions this iterator's setters write, or `None`.
-
-        Derived from the ROI list on the calling side rather than accumulated
-        by the setters: setters run inside `ProcessMapper` children, and
-        nothing accumulated there survives the process boundary. The ROI list
-        is the parent's source of truth for what was written — which is why
-        writing iterators can hand this to `consolidate(regions=...)` in
-        `finalize` and rebuild only the pyramid regions they touched.
-
-        Halo and stitch wrappers forward the core write's `slicing_ops`, so
-        haloed reads and banked stitch bands do not inflate the regions.
-        Building a setter per ROI is pure metadata — no pixel IO.
-        """
-        regions = []
-        for roi in self.rois:
-            setter = self.build_numpy_setter(roi)
-            if setter is None:
-                return None
-            regions.append(setter.slicing_ops.normalized_slicing_tuple)
-        return regions or None
+        """The on-disk regions the setters write; `None` when read-only."""
+        return None
 
     def _numpy_getters_generator(self) -> Generator[DataGetterProtocol[NumpyPipeType]]:
         """Return a list of numpy getter functions for all (selected) ROIs."""
@@ -546,14 +517,14 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
     def _numpy_setters_generator(
         self,
     ) -> Generator[DataSetterProtocol[NumpyPipeType] | None]:
-        """Return a list of numpy setter functions for all (selected) ROIs."""
-        yield from (self.build_numpy_setter(roi) for _, roi in self._selected_rois())
+        """One numpy setter per (selected) ROI; a read-only iterator has none."""
+        yield from (None for _ in self._selected_rois())
 
     def _dask_setters_generator(
         self,
     ) -> Generator[DataSetterProtocol[DaskPipeType] | None]:
-        """Return a list of dask setter functions for all (selected) ROIs."""
-        yield from (self.build_dask_setter(roi) for _, roi in self._selected_rois())
+        """One dask setter per (selected) ROI; a read-only iterator has none."""
+        yield from (None for _ in self._selected_rois())
 
     def _selected_rois(self) -> Generator[tuple[int, Roi]]:
         """`(index, roi)` pairs, filtered to the selected partition if any.
@@ -567,28 +538,38 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             if selection is None or index in selection:
                 yield index, roi
 
+    def _units_write_order(self) -> Literal["roi", "any"]:
+        """The `write_order` stamped on built units; writers override."""
+        return "roi"
+
     def _numpy_units_generator(
         self, with_setters: bool = True
     ) -> Generator[IterUnit[NumpyPipeType]]:
         """Yield one numpy `IterUnit` per (selected) ROI, in ROI order."""
+        setters = self._numpy_setters_generator() if with_setters else None
+        write_order = self._units_write_order()
         for index, roi in self._selected_rois():
             yield IterUnit(
                 index=index,
                 roi=roi,
                 getter=self.build_numpy_getter(roi),
-                setter=self.build_numpy_setter(roi) if with_setters else None,
+                setter=next(setters) if setters is not None else None,
+                write_order=write_order,
             )
 
     def _dask_units_generator(
         self, with_setters: bool = True
     ) -> Generator[IterUnit[DaskPipeType]]:
         """Yield one dask `IterUnit` per (selected) ROI, in ROI order."""
+        setters = self._dask_setters_generator() if with_setters else None
+        write_order = self._units_write_order()
         for index, roi in self._selected_rois():
             yield IterUnit(
                 index=index,
                 roi=roi,
                 getter=self.build_dask_getter(roi),
-                setter=self.build_dask_setter(roi) if with_setters else None,
+                setter=next(setters) if setters is not None else None,
+                write_order=write_order,
             )
 
     def _read_and_write_generator(
@@ -690,34 +671,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         self,
         lazy: Literal[True],
         data_mode: Literal["numpy"],
-        iterator_mode: Literal["readwrite"],
-        *,
-        batch_size: None = ...,
-    ) -> Generator[
-        tuple[DataGetterProtocol[NumpyPipeType], DataSetterProtocol[NumpyPipeType]]
-    ]: ...
-
-    @overload
-    def iter(
-        self,
-        lazy: Literal[True],
-        data_mode: Literal["numpy"],
         iterator_mode: Literal["readonly"] = ...,
         *,
         batch_size: None = ...,
     ) -> Generator[DataGetterProtocol[NumpyPipeType]]: ...
-
-    @overload
-    def iter(
-        self,
-        lazy: Literal[True],
-        data_mode: Literal["dask"],
-        iterator_mode: Literal["readwrite"],
-        *,
-        batch_size: None = ...,
-    ) -> Generator[
-        tuple[DataGetterProtocol[DaskPipeType], DataSetterProtocol[DaskPipeType]]
-    ]: ...
 
     @overload
     def iter(
@@ -734,30 +691,10 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         self,
         lazy: Literal[False],
         data_mode: Literal["numpy"],
-        iterator_mode: Literal["readwrite"],
-        *,
-        batch_size: None = ...,
-    ) -> Generator[tuple[NumpyPipeType, DataSetterProtocol[NumpyPipeType]]]: ...
-
-    @overload
-    def iter(
-        self,
-        lazy: Literal[False],
-        data_mode: Literal["numpy"],
         iterator_mode: Literal["readonly"] = ...,
         *,
         batch_size: None = ...,
     ) -> Generator[NumpyPipeType]: ...
-
-    @overload
-    def iter(
-        self,
-        lazy: Literal[False],
-        data_mode: Literal["dask"],
-        iterator_mode: Literal["readwrite"],
-        *,
-        batch_size: None = ...,
-    ) -> Generator[tuple[DaskPipeType, DataSetterProtocol[DaskPipeType]]]: ...
 
     @overload
     def iter(
@@ -774,18 +711,6 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         self,
         lazy: Literal[False] = ...,
         data_mode: Literal["numpy"] | None = ...,
-        iterator_mode: Literal["readwrite"] = ...,
-        *,
-        batch_size: int,
-    ) -> Generator[
-        tuple[list[NumpyPipeType], list[DataSetterProtocol[NumpyPipeType]]]
-    ]: ...
-
-    @overload
-    def iter(
-        self,
-        lazy: Literal[False] = ...,
-        data_mode: Literal["numpy"] | None = ...,
         iterator_mode: Literal["readonly"] = ...,
         *,
         batch_size: int,
@@ -795,45 +720,26 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         self,
         lazy: bool = False,
         data_mode: Literal["numpy", "dask"] | None = None,
-        iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
+        iterator_mode: Literal["readwrite", "readonly"] = "readonly",
         *,
         batch_size: int | None = None,
     ) -> Generator:
-        """Create an iterator over the pixels of the ROIs.
+        """Iterate the ROIs' payloads, read-only.
 
-        A writing loop finalizes only when fully drained — on a stitching
-        iterator that finalize is the resolve, so abandoning the loop
-        mid-way leaves block-offset ids on disk (plus the transient scratch)
-        until a re-run or a later `finalize()`. To write now and gather
-        later on purpose, iterate a `for_job(0, 1)` slice and call
-        `finalize()` on the unrestricted iterator when ready.
-
-        With `batch_size` set, a writing loop yields `(patches, writers)` —
-        two aligned lists of up to `batch_size` items, in ROI order — and a
-        read-only loop yields the payload lists alone. Stack the patches
-        yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
-        automatic padding), run the model once, and hand each result to its
-        writer. Batches follow ROI order — unlike the mappers' canonical
-        wave order, so on ROIs with overlapping writes the manual loop is
-        deterministic but not bit-identical to `map`. Batching is numpy-only
-        and eager: combining `batch_size` with `lazy=True` or
-        `data_mode="dask"` raises.
+        With `batch_size` set, yields payload lists of up to that many
+        items (the last batch may be smaller). Batching is numpy-only and
+        eager: combining `batch_size` with `lazy=True` or
+        `data_mode="dask"` raises. On a writing iterator (see
+        `WritingIteratorBuilder.iter`) the default mode is `"readwrite"`
+        and the loop yields `(patch, writer)` pairs instead.
 
         Args:
-            lazy: Yield getter/setter handles instead of materialized data.
+            lazy: Yield getter handles instead of materialized data.
             data_mode: `"numpy"` or `"dask"` (deprecated, see note).
-            iterator_mode: `"readwrite"` yields `(patch, writer)` pairs,
-                `"readonly"` yields patches alone.
+            iterator_mode: `"readonly"` yields patches alone; on a writing
+                iterator `"readwrite"` yields `(patch, writer)` pairs.
             batch_size: When set, yield batches of up to this many items;
                 the last batch may be smaller.
-
-        Example:
-            ```python
-            for patches, writers in iterator.iter(data_mode="numpy", batch_size=8):
-                outs = model(np.stack(patches))
-                for writer, out in zip(writers, outs):
-                    writer(out)
-            ```
 
         Note:
             The dask data mode is deprecated and will be removed in ngio=1.2;
@@ -898,7 +804,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         self,
     ):
         """Alias for `iter(data_mode="numpy")`."""
-        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
+        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
 
     @deprecated(
         replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
@@ -911,22 +817,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
 
         Deprecated: removed in ngio=1.2.
         """
-        return self._iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
-
-    def _require_writable_units(
-        self, units: list[IterUnit[NumpyPipeType]] | list[IterUnit[DaskPipeType]]
-    ) -> None:
-        """Raise if every unit is read-only: there is nothing for `map` to write."""
-        # `output_image` first, so a read-only iterator with an *empty* ROI
-        # list still refuses instead of silently succeeding.
-        if self.output_image is None or (
-            units and all(unit.setter is None for unit in units)
-        ):
-            name = self.__class__.__name__
-            raise NgioValueError(
-                f"{name} is read-only: map has nothing to write back. "
-                "Use reduce (or iter) to compute without writing."
-            )
+        return self._iter(lazy=False, data_mode="dask", iterator_mode="readonly")
 
     def _validate_write_plan(self) -> None:
         """Hook run before any pixel is written; the base accepts everything.
@@ -1151,43 +1042,6 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
                 "once, after every job has completed."
             )
 
-    def map(
-        self,
-        func: Callable[[NumpyPipeType], NumpyPipeType],
-        *,
-        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
-    ) -> None:
-        """Apply a transformation function to each ROI's patch and write it back.
-
-        Args:
-            func: The transformation. Under a parallel mapper it runs on
-                worker threads (or processes) and must be safe there.
-            mapper: How the units are scheduled. `None` (the default) is
-                serial — parallel writes stay explicit opt-in. Pass
-                `ThreadedMapper()` or `ProcessMapper()` to fan out; each
-                sizes its own pool from its `max_workers` argument, and both
-                schedule the units into conflict-free waves (`plan_waves`).
-        """
-        if mapper is None:
-            mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
-        units = list(self._numpy_units_generator())
-        self._require_writable_units(units)
-        self._validate_write_plan()
-        mapper(func, units)
-        # A partition slice runs only its share; the finalize (the one global
-        # step) belongs to the unrestricted iterator, once every job is done.
-        if self._partition is None:
-            self.finalize()
-
-    def map_as_numpy(
-        self,
-        func: Callable[[NumpyPipeType], NumpyPipeType],
-        *,
-        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
-    ) -> None:
-        """Alias for `map()`."""
-        return self.map(func, mapper=mapper)
-
     def _require_serial_dask_mapper(
         self, mapper: "MapperProtocol[DaskPipeType, R] | None"
     ) -> "MapperProtocol[DaskPipeType, R]":
@@ -1206,33 +1060,6 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             "Pass no mapper here, or use the numpy verbs with a parallel "
             "mapper."
         )
-
-    @deprecated(
-        replacement="map() / map_as_numpy(mapper=...)",
-        removed_in="1.2",
-    )
-    def map_as_dask(
-        self,
-        func: Callable[[DaskPipeType], DaskPipeType],
-        *,
-        mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
-    ) -> None:
-        """Apply a transformation function to each ROI's patch and write it back.
-
-        Deprecated: removed in ngio=1.2.
-
-        Runs serially: the dask pipes are already executed by dask's own
-        scheduler, and the dask write path (`store_dask`) scopes a global
-        dask config option, so concurrent callers are unsafe. A parallel
-        `mapper` raises.
-        """
-        _mapper = self._require_serial_dask_mapper(mapper)
-        units = list(self._dask_units_generator())
-        self._require_writable_units(units)
-        self._validate_write_plan()
-        _mapper(func, units)
-        if self._partition is None:
-            self.finalize()
 
     def reduce(
         self,
@@ -1323,6 +1150,318 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         if self.check_if_regions_overlap():
             raise NgioValueError("Some rois overlap.")
 
+
+class WritingIteratorBuilder(
+    AbstractIteratorBuilder[NumpyPipeType, DaskPipeType, FinalizeType]
+):
+    """Base class for iterators that write their results back to an image.
+
+    Adds the writer surface on top of `AbstractIteratorBuilder`: per-ROI
+    setters, the `map` verbs, the write-overlap gates, and a `readwrite`
+    default for `iter`. The read-only iterators (feature extraction, object
+    detection) subclass `AbstractIteratorBuilder` directly and carry none of
+    this.
+    """
+
+    @abstractmethod
+    def build_numpy_setter(self, roi: Roi) -> DataSetterProtocol[NumpyPipeType] | None:
+        """Build a setter function for the given ROI."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def build_dask_setter(self, roi: Roi) -> DataSetterProtocol[DaskPipeType] | None:
+        """Build a Dask setter function for the given ROI."""
+        raise NotImplementedError
+
+    def _wrap_setter(
+        self, setter: DataSetterProtocol[T], roi: Roi
+    ) -> DataSetterProtocol[T]:
+        """Crop the halo off patches heading into `setter`, if there is one."""
+        if not self._halo:
+            return setter
+        _, margins = halo_roi(roi, self._ref_image, self._halo)
+        if not margins:
+            return setter
+        return HaloCroppingSetter(setter, margins)
+
+    def _numpy_setters_generator(
+        self,
+    ) -> Generator[DataSetterProtocol[NumpyPipeType] | None]:
+        """Return a list of numpy setter functions for all (selected) ROIs."""
+        yield from (self.build_numpy_setter(roi) for _, roi in self._selected_rois())
+
+    def _dask_setters_generator(
+        self,
+    ) -> Generator[DataSetterProtocol[DaskPipeType] | None]:
+        """Return a list of dask setter functions for all (selected) ROIs."""
+        yield from (self.build_dask_setter(roi) for _, roi in self._selected_rois())
+
+    def _touched_write_regions(self) -> RegionsLike | None:
+        """The on-disk regions this iterator's setters write, or `None`.
+
+        Derived from the ROI list on the calling side rather than accumulated
+        by the setters: setters run inside `ProcessMapper` children, and
+        nothing accumulated there survives the process boundary. The ROI list
+        is the parent's source of truth for what was written — which is why
+        writing iterators can hand this to `consolidate(regions=...)` in
+        `finalize` and rebuild only the pyramid regions they touched.
+
+        Halo and stitch wrappers forward the core write's `slicing_ops`, so
+        haloed reads and banked stitch bands do not inflate the regions.
+        Building a setter per ROI is pure metadata — no pixel IO.
+        """
+        regions = []
+        for roi in self.rois:
+            setter = self.build_numpy_setter(roi)
+            if setter is None:
+                return None
+            regions.append(setter.slicing_ops.normalized_slicing_tuple)
+        return regions or None
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: None = ...,
+    ) -> Generator[
+        tuple[DataGetterProtocol[NumpyPipeType], DataSetterProtocol[NumpyPipeType]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readonly"],
+        *,
+        batch_size: None = ...,
+    ) -> Generator[DataGetterProtocol[NumpyPipeType]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: None = ...,
+    ) -> Generator[
+        tuple[DataGetterProtocol[DaskPipeType], DataSetterProtocol[DaskPipeType]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[True],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readonly"],
+        *,
+        batch_size: None = ...,
+    ) -> Generator[DataGetterProtocol[DaskPipeType]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: None = ...,
+    ) -> Generator[tuple[NumpyPipeType, DataSetterProtocol[NumpyPipeType]]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["numpy"],
+        iterator_mode: Literal["readonly"],
+        *,
+        batch_size: None = ...,
+    ) -> Generator[NumpyPipeType]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: None = ...,
+    ) -> Generator[tuple[DaskPipeType, DataSetterProtocol[DaskPipeType]]]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["dask"],
+        iterator_mode: Literal["readonly"],
+        *,
+        batch_size: None = ...,
+    ) -> Generator[DaskPipeType]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False] = ...,
+        data_mode: Literal["numpy"] | None = ...,
+        iterator_mode: Literal["readwrite"] = ...,
+        *,
+        batch_size: int,
+    ) -> Generator[
+        tuple[list[NumpyPipeType], list[DataSetterProtocol[NumpyPipeType]]]
+    ]: ...
+
+    @overload
+    def iter(
+        self,
+        lazy: Literal[False],
+        data_mode: Literal["numpy"] | None,
+        iterator_mode: Literal["readonly"],
+        *,
+        batch_size: int,
+    ) -> Generator[list[NumpyPipeType]]: ...
+
+    def iter(  # ty: ignore[invalid-method-override]
+        self,
+        lazy: bool = False,
+        data_mode: Literal["numpy", "dask"] | None = None,
+        # "readwrite" by design — the one deliberate LSP variance of the
+        # reader/writer split.
+        iterator_mode: Literal["readwrite", "readonly"] = "readwrite",
+        *,
+        batch_size: int | None = None,
+    ) -> Generator:
+        """Create an iterator over the pixels of the ROIs.
+
+        A writing loop finalizes only when fully drained — on a stitching
+        iterator that finalize is the resolve, so abandoning the loop
+        mid-way leaves block-offset ids on disk (plus the transient scratch)
+        until a re-run or a later `finalize()`. To write now and gather
+        later on purpose, iterate a `for_job(0, 1)` slice and call
+        `finalize()` on the unrestricted iterator when ready.
+
+        With `batch_size` set, a writing loop yields `(patches, writers)` —
+        two aligned lists of up to `batch_size` items, in ROI order — and a
+        read-only loop yields the payload lists alone. Stack the patches
+        yourself (raggedness is yours to handle, unlike `BatchedMapper`'s
+        automatic padding), run the model once, and hand each result to its
+        writer. Batches follow ROI order — under `write_order="roi"` that
+        is the same later-ROI-wins order the mappers schedule, so the
+        manual loop is bit-identical to `map`. Batching is numpy-only
+        and eager: combining `batch_size` with `lazy=True` or
+        `data_mode="dask"` raises.
+
+        Args:
+            lazy: Yield getter/setter handles instead of materialized data.
+            data_mode: `"numpy"` or `"dask"` (deprecated, see note).
+            iterator_mode: `"readwrite"` yields `(patch, writer)` pairs,
+                `"readonly"` yields patches alone.
+            batch_size: When set, yield batches of up to this many items;
+                the last batch may be smaller.
+
+        Example:
+            ```python
+            for patches, writers in iterator.iter(data_mode="numpy", batch_size=8):
+                outs = model(np.stack(patches))
+                for writer, out in zip(writers, outs):
+                    writer(out)
+            ```
+
+        Note:
+            The dask data mode is deprecated and will be removed in ngio=1.2;
+            from then on `iter()` yields numpy arrays.
+        """
+        return self._iter_impl(
+            lazy=lazy,
+            data_mode=data_mode,
+            iterator_mode=iterator_mode,
+            batch_size=batch_size,
+        )
+
+    def iter_as_numpy(
+        self,
+    ):
+        """Alias for `iter(data_mode="numpy")`."""
+        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readwrite")
+
+    @deprecated(
+        replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
+        removed_in="1.2",
+    )
+    def iter_as_dask(
+        self,
+    ):
+        """Alias for `iter(data_mode="dask")`.
+
+        Deprecated: removed in ngio=1.2.
+        """
+        return self._iter(lazy=False, data_mode="dask", iterator_mode="readwrite")
+
+    def map(
+        self,
+        func: Callable[[NumpyPipeType], NumpyPipeType],
+        *,
+        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
+    ) -> None:
+        """Apply a transformation function to each ROI's patch and write it back.
+
+        Args:
+            func: The transformation. Under a parallel mapper it runs on
+                worker threads (or processes) and must be safe there.
+            mapper: How the units are scheduled. `None` (the default) is
+                serial — parallel writes stay explicit opt-in. Pass
+                `ThreadedMapper()` or `ProcessMapper()` to fan out; each
+                sizes its own pool from its `max_workers` argument, and both
+                schedule the units into conflict-free waves (`plan_waves`).
+        """
+        if mapper is None:
+            mapper = BasicMapper[NumpyPipeType, NumpyPipeType]()
+        units = list(self._numpy_units_generator())
+        self._validate_write_plan()
+        mapper(func, units)
+        # A partition slice runs only its share; the finalize (the one global
+        # step) belongs to the unrestricted iterator, once every job is done.
+        if self._partition is None:
+            self.finalize()
+
+    def map_as_numpy(
+        self,
+        func: Callable[[NumpyPipeType], NumpyPipeType],
+        *,
+        mapper: MapperProtocol[NumpyPipeType, NumpyPipeType] | None = None,
+    ) -> None:
+        """Alias for `map()`."""
+        return self.map(func, mapper=mapper)
+
+    @deprecated(
+        replacement="map() / map_as_numpy(mapper=...)",
+        removed_in="1.2",
+    )
+    def map_as_dask(
+        self,
+        func: Callable[[DaskPipeType], DaskPipeType],
+        *,
+        mapper: MapperProtocol[DaskPipeType, DaskPipeType] | None = None,
+    ) -> None:
+        """Apply a transformation function to each ROI's patch and write it back.
+
+        Deprecated: removed in ngio=1.2.
+
+        Runs serially: the dask pipes are already executed by dask's own
+        scheduler, and the dask write path (`store_dask`) scopes a global
+        dask config option, so concurrent callers are unsafe. A parallel
+        `mapper` raises.
+        """
+        _mapper = self._require_serial_dask_mapper(mapper)
+        units = list(self._dask_units_generator())
+        self._validate_write_plan()
+        _mapper(func, units)
+        if self._partition is None:
+            self.finalize()
+
     def check_if_write_units_overlap(self) -> bool:
         """Check if any two ROIs write into the same write unit of the output.
 
@@ -1332,8 +1471,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         shape otherwise. Two ROIs sharing a write unit make concurrent writes
         unsafe: the read-modify-write of that unit can lose data. The parallel
         mappers schedule such ROIs into separate waves, so this check answers
-        "will my map run as a single fully-parallel wave?". A read-only
-        iterator has no write hazard and always returns `False`.
+        "will my map run as a single fully-parallel wave?".
 
         This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a
         loop.

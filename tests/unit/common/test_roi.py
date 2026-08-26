@@ -778,3 +778,21 @@ def test_updated_roi_round_trips_through_a_table(tmp_path):
     assert isinstance(loaded, RoiTable)
     z_slice = loaded.get("roi").get("z")
     assert z_slice is not None and z_slice.length == 5.0
+
+
+def test_roi_slices_are_immutable_and_validated():
+    roi = Roi.from_values(slices={"x": (0.0, 10.0), "y": (0.0, 10.0)}, name="a")
+    # The slices tuple has no element-level surgery.
+    with pytest.raises(AttributeError):
+        roi.slices.append(None)  # type: ignore[attr-defined]
+    # Mutators re-validate: dropping below two slices raises.
+    with pytest.raises(ValidationError):
+        roi.remove_slice("y")
+
+
+def test_roi_mutators_carry_extras():
+    roi = Roi.from_values(
+        slices={"x": (0.0, 10.0), "y": (0.0, 10.0)}, name="a", confidence=0.9
+    )
+    assert roi.zoom(1.5).model_extra == {"confidence": 0.9}
+    assert roi.update_slice("x", (0.0, 5.0)).model_extra == {"confidence": 0.9}

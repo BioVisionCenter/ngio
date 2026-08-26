@@ -380,10 +380,21 @@ def test_plan_pickle_drops_geometry():
         .with_halo(y=4, x=4)
     )
     plan = iterator._stitching_plan()
+
+    # Pickling an unresolved plan refuses: it would have to create the
+    # scratch group on the store as a side effect.
+    with pytest.raises(NgioValueError, match="not resolved yet"):
+        plan.__getstate__()
+
+    _ = plan.banks  # what the writing verbs do up front
+    keys_before = set(label._group_handler.group.keys())
     state = plan.__getstate__()
+    # A resolved plan pickles without touching the store again.
+    assert set(label._group_handler.group.keys()) == keys_before
     assert state["_works"] == []
     assert state["_pairs"] == []
     assert state["_output"] is None
+    plan.cleanup()
 
 
 def test_stitch_handles_a_ragged_roi_list():
@@ -639,3 +650,36 @@ def test_seam_matcher_invalid_pairs_refuse():
 def test_iou_matcher_validates_its_threshold():
     with pytest.raises(NgioValueError, match="iou_threshold"):
         IouSeamMatcher(0.0)
+
+
+def test_stitch_write_order_any_unifies_identically():
+    """`write_order="any"` changes seam scheduling, never unification.
+
+    The banks are per-tile and order-free, so the split object comes out as
+    one id under either write order — compare object structure, not seam
+    bytes.
+    """
+    _ordered_zarr, image, label = _setup(_one_object_across_the_seam())
+    (
+        SegmentationIterator(image, label, axes_order="yx", consolidation_mode="dask")
+        .with_stitch(StitchConfig(write_order="roi"))
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+        .map(_connected_components)
+    )
+    ordered = label.get_as_numpy()
+
+    _any_zarr, image2, label2 = _setup(_one_object_across_the_seam())
+    (
+        SegmentationIterator(image2, label2, axes_order="yx", consolidation_mode="dask")
+        .with_stitch(StitchConfig(write_order="any"))
+        .by_grid(size_y=32, size_x=32)
+        .with_halo(y=4, x=4)
+        .map(_connected_components)
+    )
+    relaxed = label2.get_as_numpy()
+
+    # Same objects: one unified id covering the same pixels.
+    assert set(np.unique(ordered)) == set(np.unique(relaxed))
+    np.testing.assert_array_equal(ordered > 0, relaxed > 0)
+    assert len(np.unique(ordered)) == 2  # background + the one unified object

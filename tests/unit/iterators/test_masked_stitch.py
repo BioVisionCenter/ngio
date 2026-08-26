@@ -257,7 +257,7 @@ def test_masked_stitch_declaration_survives_the_chain():
     iterator = _stitched_masked_iterator(ome_zarr)
     assert isinstance(iterator._stitch, StitchConfig)
     # The declaration is chain state, not a constructor argument.
-    assert "stitch" not in iterator.get_init_kwargs()
+    assert "stitch" not in iterator._get_init_kwargs()
     reshaped = iterator.by_grid(size_y=16, size_x=16).with_halo(y=2, x=2)
     assert isinstance(reshaped._stitch, StitchConfig)
 

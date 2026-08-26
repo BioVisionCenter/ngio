@@ -47,13 +47,11 @@ class TestIsRetryable:
         assert not is_retryable(OSError("boom"), _policy(retry_on=["Timeout"]))
 
     def test_blanket_mode_matches_everything(self):
-        with pytest.warns(UserWarning):
-            policy = _policy(retry_all_errors=True)
+        policy = _policy(retry_all_errors=True)
         assert is_retryable(OSError("boom"), policy)
 
     def test_ngio_errors_never_retried(self):
-        with pytest.warns(UserWarning):
-            policy = _policy(retry_all_errors=True)
+        policy = _policy(retry_all_errors=True)
         assert not is_retryable(NgioValueError("bad value"), policy)
 
     def test_ngio_errors_never_retried_by_marker(self):
@@ -64,8 +62,7 @@ class TestIsRetryable:
         "exc", [KeyboardInterrupt(), SystemExit(), asyncio.CancelledError()]
     )
     def test_control_flow_exceptions_never_retried(self, exc):
-        with pytest.warns(UserWarning):
-            policy = _policy(retry_all_errors=True)
+        policy = _policy(retry_all_errors=True)
         assert not is_retryable(exc, policy)
 
 
@@ -295,8 +292,7 @@ class TestFractalProbeRetry:
         from ngio.utils._fractal_fsspec_store import _probe_key
 
         config = NgioConfig()
-        with pytest.warns(UserWarning):
-            config.io_retry = _policy(retry_all_errors=True)
+        config.io_retry = _policy(retry_all_errors=True)
         monkeypatch.setattr(retry_mod, "get_config", lambda: config)
         mapper = _FakeHTTPMapper([_client_error(401)])
         with pytest.raises(NgioValueError, match="fractal_token"):

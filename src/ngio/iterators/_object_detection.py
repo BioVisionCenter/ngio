@@ -20,7 +20,7 @@ ones.
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, Literal, Protocol, Self, TypeAlias, TypeVar, cast
+from typing import Any, Generic, Protocol, Self, TypeAlias, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -44,7 +44,7 @@ from ngio.iterators._partials import (
     write_partial,
 )
 from ngio.tables import RoiTable
-from ngio.utils import NgioValueError, deprecated
+from ngio.utils import NgioValueError
 
 NumpyPipeType: TypeAlias = tuple[np.ndarray, Roi]
 DaskPipeType: TypeAlias = tuple[da.Array, Roi]
@@ -407,7 +407,7 @@ class ObjectDetectionIterator(
         self._axes_order = axes_order
         self._input_transforms = input_transforms
 
-    def get_init_kwargs(self) -> dict:
+    def _get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
             "input_image": self._input,
@@ -439,12 +439,6 @@ class ObjectDetectionIterator(
                 slicing_dict=self._input_slicing_kwargs,
             )
         )
-
-    def build_numpy_setter(self, roi: Roi) -> None:
-        return None
-
-    def build_dask_setter(self, roi: Roi) -> None:
-        return None
 
     def finalize(self) -> RoiTable:
         """Merge a distributed run's partials into the one final ROI table.
@@ -479,41 +473,8 @@ class ObjectDetectionIterator(
         delete_partials_root(handler)
         return table
 
-    def iter_as_numpy(self):  # type: ignore[override]
-        """Iterate `(patch, roi)` pairs over the (haloed) tiles."""
-        return self._iter(lazy=False, data_mode="numpy", iterator_mode="readonly")
-
-    def iter(  # type: ignore[override]
-        self,
-        lazy: bool = False,
-        data_mode: Literal["numpy", "dask"] | None = None,
-        iterator_mode: Literal["readwrite", "readonly"] = "readonly",
-        *,
-        batch_size: int | None = None,
-    ):
-        """Iterate `(patch, roi)` pairs over the (haloed) tiles.
-
-        Read-only by default: there is nothing to write. With `batch_size`
-        set, yields payload lists of up to that many items. See
-        `AbstractIteratorBuilder.iter` for the remaining knobs.
-        """
-        return self._iter_impl(
-            lazy=lazy,
-            data_mode=data_mode,
-            iterator_mode=iterator_mode,
-            batch_size=batch_size,
-        )
-
-    @deprecated(
-        replacement="iter_as_numpy() (or Image.get_as_dask() for a lazy array)",
-        removed_in="1.2",
-    )
-    def iter_as_dask(self):  # type: ignore[override]
-        """Iterate `(patch, roi)` pairs over the (haloed) tiles.
-
-        Deprecated: removed in ngio=1.2.
-        """
-        return self._iter(lazy=False, data_mode="dask", iterator_mode="readonly")
+    # `iter`/`iter_as_numpy` come from the read-only base and yield
+    # `(patch, roi)` pairs over the (haloed) tiles; there is nothing to write.
 
     def detect(
         self,

@@ -5,6 +5,7 @@ from ngio.iterators._abstract_iterator import (
     AbstractIteratorBuilder,
     JobArgs,
     OverlapPolicy,
+    WritingIteratorBuilder,
 )
 from ngio.iterators._feature import (
     ConcatJoin,
@@ -66,6 +67,7 @@ __all__ = [
     "StitchConfig",
     "TailPolicy",
     "ThreadedMapper",
+    "WritingIteratorBuilder",
     "bbox_iou",
     "canonical_unit_order",
     "compute_write_footprint",

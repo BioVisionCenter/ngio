@@ -448,7 +448,7 @@ def _detect_bright(patch):
 
 def test_detect_across_processes(tmp_path: Path):
     """Per-tile boxes pickle back from the workers; the table matches serial."""
-    from ngio import ObjectDetectionIterator
+    from ngio.iterators import ObjectDetectionIterator
 
     data = np.zeros((1, 64, 64), dtype="uint8")
     data[0, 10:20, 26:38] = 255
@@ -475,3 +475,197 @@ def test_detect_across_processes(tmp_path: Path):
     )
     assert serial is not None and from_processes is not None
     assert from_processes.dataframe.equals(serial.dataframe)
+
+
+def test_map_is_bit_identical_to_iter_on_overlapping_writes():
+    """On contested pixels `map` and the manual `iter` loop write the same image.
+
+    The canonical order puts the higher ROI index last wherever pixels
+    genuinely overlap, which is exactly the order the manual loop runs in.
+    """
+
+    def _fill_mean(patch):
+        return np.full_like(patch, int(patch.mean()) or 1)
+
+    mapped_zarr, mapped_base = _colliding_iterator(MemoryStore())
+    mapped_base.by_grid(size_x=24, stride_x=18).on_overlap(
+        "last", write_order="roi"
+    ).map_as_numpy(_fill_mean)
+
+    looped_zarr, looped_base = _colliding_iterator(MemoryStore())
+    looped = looped_base.by_grid(size_x=24, stride_x=18).on_overlap(
+        "last", write_order="roi"
+    )
+    for patch, writer in looped.iter(lazy=False, data_mode="numpy"):
+        writer(_fill_mean(patch))
+
+    np.testing.assert_array_equal(
+        mapped_zarr.get_label("coarse").get_as_numpy(),
+        looped_zarr.get_label("coarse").get_as_numpy(),
+    )
+
+
+def test_canonical_order_is_index_monotone_on_pixel_overlaps():
+    """Every pixel-overlapping pair runs lower index first, chain included.
+
+    `by_grid(size_x=24, stride_x=18)` overlaps each tile with its successor
+    (a chain, the shape greedy colouring used to invert), so the canonical
+    order must be plain index order here.
+    """
+    from ngio.iterators._mappers import canonical_unit_order
+
+    _, base = _colliding_iterator(MemoryStore())
+    chained = base.by_grid(size_x=24, stride_x=18).on_overlap("last", write_order="roi")
+    units = list(chained._numpy_units_generator())
+    order = [u.index for u in canonical_unit_order(units)]
+    assert order == sorted(order)
+
+
+def test_pixel_disjoint_collisions_keep_packed_waves():
+    """Write-unit sharing without pixel overlap keeps the packed schedule.
+
+    `by_chunks()` into a coarser output shares write units clique-wise but
+    writes disjoint pixels — the index-precedence rule must not serialise it.
+    """
+    _, base = _colliding_iterator(MemoryStore())
+    units = list(base.by_chunks()._numpy_units_generator())
+    waves = plan_waves(units, log=False)
+    assert len(waves) == 4
+    assert all(len(wave) == 4 for wave in waves)
+
+
+def test_write_order_any_collapses_the_wavefront():
+    """All-"any" units schedule for parallelism alone; all-"roi" stays pinned."""
+    _, base = _colliding_iterator(MemoryStore())
+    overlapping = base.by_grid(size_x=24, stride_x=18)
+
+    ordered_units = list(
+        overlapping.on_overlap("last", write_order="roi")._numpy_units_generator()
+    )
+    relaxed_units = list(
+        overlapping.on_overlap("last", write_order="any")._numpy_units_generator()
+    )
+    # The undeclared kwarg defaults to "any" — pin it.
+    default_units = list(overlapping.on_overlap("last")._numpy_units_generator())
+    assert all(u.write_order == "any" for u in default_units)
+    ordered_waves = plan_waves(ordered_units, log=False)
+    relaxed_waves = plan_waves(relaxed_units, log=False)
+
+    # The chain serializes under ordering; safety-only packs it tighter.
+    assert len(relaxed_waves) < len(ordered_waves)
+    # Safety still holds: pairwise-disjoint footprints per wave.
+    for wave in relaxed_waves:
+        footprints = [u.write_footprint for u in wave]
+        for i, fi in enumerate(footprints):
+            for fj in footprints[i + 1 :]:
+                assert not chunk_rects_intersect(fi, fj)
+    # And the schedule is a pure function of the unit sequence.
+    again = plan_waves(relaxed_units, log=False)
+    assert [[u.index for u in w] for w in again] == [
+        [u.index for u in w] for w in relaxed_waves
+    ]
+
+
+def test_write_order_mixed_stream_keeps_roi_precedence():
+    """One "roi" unit among "any" units keeps its ordering edges."""
+    from dataclasses import replace
+
+    _, base = _colliding_iterator(MemoryStore())
+    units = list(
+        base.by_grid(size_x=24, stride_x=18)
+        .on_overlap("last", write_order="any")
+        ._numpy_units_generator()
+    )
+    # Unit 1 insists on the canonical order; its overlapping neighbours
+    # (0 and 2) must still schedule around it in index order.
+    units[1] = replace(units[1], write_order="roi")
+    waves = plan_waves(units, log=False)
+    wave_of = {u.index: i for i, w in enumerate(waves) for u in w}
+    assert wave_of[0] < wave_of[1] < wave_of[2]
+
+
+def test_write_order_any_components_and_results_unchanged():
+    """Job splitting and result order are order-agnostic by design."""
+    from ngio.iterators import write_conflict_components
+
+    _, base = _colliding_iterator(MemoryStore())
+    overlapping = base.by_grid(size_x=24, stride_x=18)
+    ordered = list(
+        overlapping.on_overlap("last", write_order="roi")._numpy_units_generator()
+    )
+    relaxed = list(
+        overlapping.on_overlap("last", write_order="any")._numpy_units_generator()
+    )
+    assert write_conflict_components(ordered) == write_conflict_components(relaxed)
+
+
+def test_write_order_any_map_is_exact_for_commutative_merges():
+    """A commutative merge gives identical pixels under either order."""
+
+    def _fill_mean(patch):
+        return np.full_like(patch, int(patch.mean()) or 1)
+
+    roi_zarr, roi_base = _colliding_iterator(MemoryStore())
+    roi_base.by_grid(size_x=24, stride_x=18).on_overlap(
+        "max", write_order="roi"
+    ).map_as_numpy(_fill_mean, mapper=ThreadedMapper(4))
+
+    any_zarr, any_base = _colliding_iterator(MemoryStore())
+    any_base.by_grid(size_x=24, stride_x=18).on_overlap(
+        "max", write_order="any"
+    ).map_as_numpy(_fill_mean, mapper=ThreadedMapper(4))
+
+    np.testing.assert_array_equal(
+        roi_zarr.get_label("coarse").get_as_numpy(),
+        any_zarr.get_label("coarse").get_as_numpy(),
+    )
+
+
+def test_write_order_any_last_holds_exactly_one_tile_per_pixel():
+    """Under "any" + "last" every contested pixel holds one tile's value."""
+
+    def _fill_index(patch):
+        # Each tile's fill is its own mean-derived constant; with a
+        # constant-4 input all tiles agree, so write a per-call marker.
+        _fill_index.calls += 1
+        return np.full_like(patch, _fill_index.calls)
+
+    _fill_index.calls = 0
+    ome_zarr, base = _colliding_iterator(MemoryStore())
+    it = base.by_grid(size_x=24, stride_x=18).on_overlap("last", write_order="any")
+    it.map_as_numpy(_fill_index)
+    written = ome_zarr.get_label("coarse").get_as_numpy()
+    # Whole image covered, and every pixel holds exactly one tile's marker.
+    assert set(np.unique(written)).issubset(set(range(1, _fill_index.calls + 1)))
+    assert (written > 0).all()
+
+
+def test_masked_units_schedule_for_parallelism_alone():
+    """Mask-protected writes never contest a pixel: no precedence edges."""
+    rng = np.random.default_rng(0)
+    array = rng.integers(0, 255, size=(1, 64, 64)).astype("uint8")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(),
+        array=array,
+        pixelsize=1.0,
+        axes_names="cyx",
+        levels=1,
+        chunks=(1, 64, 64),
+        consolidation_mode="dask",
+    )
+    mask = ome_zarr.derive_label("mask")
+    patch = np.zeros(mask.shape, dtype="uint8")
+    # Two adjacent objects whose bounding boxes overlap in pixel space.
+    patch[..., 8:40, 8:40] = 1
+    patch[..., 24:56, 24:56] = 2
+    mask.set_array(patch)
+    mask.consolidate()
+    ome_zarr.get_masked_image(masking_label_name="mask")
+    out = ome_zarr.derive_label("out", chunks=(1, 64, 64))
+    iterator = MaskedSegmentationIterator(
+        ome_zarr.get_masked_image(masking_label_name="mask"),
+        out,
+        axes_order="yx",
+    )
+    units = list(iterator._numpy_units_generator())
+    assert all(unit.write_order == "any" for unit in units)

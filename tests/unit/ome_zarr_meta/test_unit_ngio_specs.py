@@ -18,7 +18,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     PixelSize,
 )
 from ngio.ome_zarr_meta.ngio_specs._channels import valid_hex_color
-from ngio.utils import NgioValidationError, NgioValueError
+from ngio.utils import NgioUserWarning, NgioValidationError, NgioValueError
 
 
 @pytest.mark.parametrize(
@@ -481,19 +481,36 @@ def test_axes_setup_from_ordered_list():
     setup = AxesSetup.from_ordered_list(["z", "y", "x"], canonical)
     assert (setup.z, setup.y, setup.x) == ("z", "y", "x")
 
-    # all non-canonical: right-aligned slot assignment
+    # all non-canonical: right-aligned into the spatial slots
     setup = AxesSetup.from_ordered_list(["a", "b"], canonical)
     assert setup.x == "b"
     assert setup.y == "a"
 
-    # non-canonical name to the left of the canonical ones
-    setup = AxesSetup.from_ordered_list(["custom", "z", "y", "x"], canonical)
-    assert (setup.z, setup.y, setup.x) == ("z", "y", "x")
-    assert setup.c == "custom"
+    # a third non-canonical name takes z — never c or t
+    setup = AxesSetup.from_ordered_list(["q", "a", "b"], canonical)
+    assert (setup.z, setup.y, setup.x) == ("q", "a", "b")
+    assert (setup.t, setup.c) == ("t", "c")
 
-    # canonical name to the left of a non-canonical one: the custom axis
-    # must not be silently dropped
-    setup = AxesSetup.from_ordered_list(["z", "custom", "y", "x"], canonical)
-    values = [setup.t, setup.c, setup.z, setup.y, setup.x]
-    assert "custom" in values
-    assert (setup.z, setup.y, setup.x) == ("z", "y", "x")
+    # no free spatial slot left: refuse instead of declaring the axis a
+    # channel (its skipping semantics would silently attach to it)
+    with pytest.raises(NgioValueError, match="no free spatial"):
+        AxesSetup.from_ordered_list(["custom", "z", "y", "x"], canonical)
+    with pytest.raises(NgioValueError, match="no free spatial"):
+        AxesSetup.from_ordered_list(["z", "custom", "y", "x"], canonical)
+
+
+def test_pixel_size_cross_unit_comparisons_warn_and_convert():
+    nm = PixelSize(x=1000.0, y=1000.0, z=1000.0, space_unit="nanometer")
+    um = PixelSize(x=1.0, y=1.0, z=1.0, space_unit="micrometer")
+    with pytest.warns(NgioUserWarning, match="different space units"):
+        assert nm == um
+    with pytest.warns(NgioUserWarning):
+        assert PixelSize(x=1.0, y=1.0, z=1.0, space_unit="nanometer") < um
+    # Unknown or None units are not comparable: unequal, silently.
+    assert PixelSize(x=1.0, y=1.0, z=1.0, space_unit="bogus") != um
+
+
+def test_pixel_size_distance_is_spatial_only():
+    fast = PixelSize(x=1.0, y=1.0, z=1.0, t=100.0)
+    slow = PixelSize(x=1.0, y=1.0, z=1.0, t=0.0)
+    assert fast.distance(slow) == 0.0

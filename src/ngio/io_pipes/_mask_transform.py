@@ -12,7 +12,7 @@ They share only the question "which pixels does the mask select here", which
 """
 
 from collections.abc import Sequence
-from typing import TypeVar, cast
+from typing import TYPE_CHECKING, TypeVar, cast
 
 import dask.array as da
 import numpy as np
@@ -36,6 +36,9 @@ from ngio.io_pipes._ops_transforms import (
 )
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
 from ngio.utils import NgioValueError
+
+if TYPE_CHECKING:
+    from ngio.io_pipes._merge_policy import MergePolicy
 
 ArrayT = TypeVar("ArrayT", np.ndarray, DaskArray)
 
@@ -207,14 +210,22 @@ class BaseMaskMerge(_MaskSelection):
 
     A merge policy, so it runs after the transform chain against the array's
     own contents — the protected pixels are carried through byte-identically
-    rather than round-tripped through a transform's inverse.
+    rather than round-tripped through a transform's inverse. An optional
+    `inner` merge decides how the patch combines with the disk *inside* the
+    mask; without one the patch overwrites there.
     """
+
+    def __init__(self, *args, inner: "MergePolicy | None" = None, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._inner = inner
 
     def reconcile(
         self, existing: ArrayLike, patch: ArrayLike, ctx: IoPipeContext
     ) -> ArrayLike:
-        """Take the patch inside the mask, the on-disk data outside it."""
+        """Inside the mask the (merged) patch, outside it the on-disk data."""
         bool_mask = self.mask_for(existing, ctx)
+        if self._inner is not None:
+            patch = self._inner.reconcile(existing, patch, ctx)
         if isinstance(patch, DaskArray):
             return da.where(bool_mask, patch, existing)
         return elementwise(np.where, bool_mask, patch, existing)

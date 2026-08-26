@@ -22,6 +22,7 @@ from ngio.io_pipes import (
     TransformProtocol,
 )
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
+from ngio.io_pipes._merge_policy import resolve_merge
 from ngio.ome_zarr_meta import ImageMetaHandler, LabelMetaHandler
 from ngio.tables import MaskingRoiTable
 from ngio.utils import (
@@ -63,9 +64,13 @@ def _build_mask_merge(
     masked_image: "MaskedImage | MaskedLabel",
     axes_order: Sequence[str] | None,
     allow_rescaling: bool,
+    merge: MergeInput | None = None,
 ) -> BaseMaskMerge:
-    """The write-side mask: keep the on-disk pixels outside the mask."""
-    return BaseMaskMerge(**_mask_kwargs(masked_image, axes_order, allow_rescaling))
+    """The write-side mask; an optional `merge` applies inside the mask."""
+    return BaseMaskMerge(
+        inner=resolve_merge(merge),
+        **_mask_kwargs(masked_image, axes_order, allow_rescaling),
+    )
 
 
 class MaskedImage(Image):
@@ -297,9 +302,15 @@ class MaskedImage(Image):
         zoom_factor: float = 1.0,
         transforms: Sequence[TransformProtocol] | None = None,
         allow_rescaling: bool = True,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
-        """Set the masked array for a given label."""
+        """Set the masked array for a given label.
+
+        `merge` decides how the patch combines with the disk *inside* the
+        mask (`"max"`, a callable, a policy); outside it the disk always
+        wins.
+        """
         slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
         )
@@ -310,6 +321,7 @@ class MaskedImage(Image):
             masked_image=self,
             axes_order=axes_order,
             allow_rescaling=allow_rescaling,
+            merge=merge,
         )
         if isinstance(patch, da.Array):
             path_setter = DaskSetter(
@@ -549,15 +561,22 @@ class MaskedLabel(Label):
         zoom_factor: float = 1.0,
         transforms: Sequence[TransformProtocol] | None = None,
         allow_rescaling: bool = True,
+        merge: MergeInput | None = None,
         **slicing_kwargs: SlicingInputType,
     ) -> None:
-        """Set the masked array for a given label."""
+        """Set the masked array for a given label.
+
+        `merge` decides how the patch combines with the disk *inside* the
+        mask (`"max"`, a callable, a policy); outside it the disk always
+        wins.
+        """
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         mask_merge = _build_mask_merge(
             masked_image=self,
             axes_order=axes_order,
             allow_rescaling=allow_rescaling,
+            merge=merge,
         )
         if isinstance(patch, da.Array):
             path_setter = DaskSetter(

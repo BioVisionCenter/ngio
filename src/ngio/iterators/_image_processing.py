@@ -20,23 +20,24 @@ from ngio.io_pipes import (
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
-from ngio.iterators._abstract_iterator import AbstractIteratorBuilder, OverlapPolicy
-from ngio.iterators._mappers import MapperProtocol
+from ngio.iterators._abstract_iterator import OverlapPolicy, WritingIteratorBuilder
+from ngio.iterators._mappers import MapperProtocol, WriteOrder, validate_write_order
 
 
-class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
+class ImageProcessingIterator(WritingIteratorBuilder[np.ndarray, da.Array, None]):
     """Apply an image-to-image function region by region.
 
     Reads each region from the input image, hands the patch to `process`'s
     function, and writes the result to the output image — a filter, a
     projection, a restoration model. Compose with `by_write_units()`
     for collision-free parallel writes and `with_halo` for seamless tiles.
-    Overlapping writes default to the deterministic wave-order
-    last-writer-wins; `on_overlap(...)` declares a merge instead.
+    Overlapping writes are safe; `on_overlap(...)` declares how contested
+    pixels resolve.
     """
 
     _on_overlap: OverlapPolicy | None = None
-    _chain_state_attrs: tuple[str, ...] = ("_on_overlap",)
+    _write_order: WriteOrder = "any"
+    _chain_state_attrs: tuple[str, ...] = ("_on_overlap", "_write_order")
 
     def __init__(
         self,
@@ -89,7 +90,7 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
 
         self._input.require_dimensions_match(self._output, allow_singleton=True)
 
-    def get_init_kwargs(self) -> dict:
+    def _get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
             "input_image": self._input,
@@ -107,25 +108,36 @@ class ImageProcessingIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None
         """The image this iterator writes to."""
         return self._output
 
-    def on_overlap(self, policy: OverlapPolicy) -> Self:
+    def on_overlap(
+        self, policy: OverlapPolicy, *, write_order: WriteOrder = "any"
+    ) -> Self:
         """Declare how contested write pixels are resolved.
 
-        Optional here: undeclared overlapping writes keep the
-        deterministic wave-order last-writer-wins. `"last"` declares
-        exactly that; any `merge=` policy (`"max"`/`"min"`/`"sum"` are
-        order-independent; `"keep_nonzero"`; a merge function; a
-        `MergePolicy`) combines each write with what is on disk — note it
-        applies to *every* write, so pre-existing content participates
-        too. Declare before `for_job`.
+        Optional here: undeclared overlapping writes are last-writer-wins
+        in schedule order. `"last"` declares exactly that; any `merge=`
+        policy (`"max"`/`"min"`/`"sum"` are order-independent;
+        `"keep_nonzero"`; a merge function; a `MergePolicy`) combines each
+        write with what is on disk — note it applies to *every* write, so
+        pre-existing content participates too. Declare before `for_job`.
 
         Args:
             policy: `"last"`, or anything the write path's `merge=` takes.
+            write_order: Who wins a contested pixel. `"any"` (the default)
+                is schedule-defined — deterministic per version, fastest.
+                `"roi"` makes the later ROI win — reproducible across
+                versions and bit-identical to the manual `iter` loop, at up
+                to 2.5x cost on parallel overlapping tilings. Irrelevant
+                under an order-independent merge.
         """
         if policy != "last":
             resolve_merge(policy)  # refuse an invalid rule at declaration
         new_instance = self._new_from_rois(self.rois)
         new_instance._on_overlap = policy
+        new_instance._write_order = validate_write_order(write_order)
         return new_instance
+
+    def _units_write_order(self) -> WriteOrder:
+        return self._write_order
 
     def _overlap_merge(self) -> MergeInput | None:
         """The `merge=` the setters carry; `None` for undeclared or "last"."""

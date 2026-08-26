@@ -18,6 +18,7 @@ from ngio.io_pipes import (
     NumpyRoiSetter,
     SlicingInputType,
 )
+from ngio.utils import NgioValueError
 
 pytestmark = pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 
@@ -85,6 +86,18 @@ def test_explicit_slicing_dict_overrides_roi_axis():
     )
     assert roi_getter.slicing_ops == bare_getter.slicing_ops
     np.testing.assert_array_equal(roi_getter(), data[6:22, 2:10])
+    # The stored roi no longer describes the effective region: dropped, so
+    # trusting it fails loudly.
+    with pytest.raises(NgioValueError, match="No ROI defined"):
+        _ = roi_getter.roi
+    # No same-axis override: the roi is kept.
+    refined = NumpyRoiGetter(
+        zarr_array=image.zarr_array,
+        dimensions=image.dimensions,
+        roi=roi,
+        slicing_dict={},
+    )
+    assert refined.roi is not None
 
 
 def test_roi_getter_axes_order_passthrough():

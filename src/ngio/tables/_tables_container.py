@@ -50,7 +50,7 @@ class Table(Protocol):
         ...
 
     @property
-    def backend_name(self) -> str | None:
+    def backend_name(self) -> str:
         """The name of the backend."""
         ...
 
@@ -130,6 +130,7 @@ TypedTable = Literal[
     "generic_table",
     "roi_table",
     "masking_roi_table",
+    "generic_roi_table",
     "feature_table",
     "condition_table",
 ]
@@ -137,7 +138,15 @@ TypedTable = Literal[
 TypedRoiTable = Literal[
     "roi_table",
     "masking_roi_table",
+    "generic_roi_table",
 ]
+
+#: Runtime counterpart of `TypedRoiTable`, for membership checks.
+ROI_TABLE_TYPES: tuple[str, ...] = (
+    "roi_table",
+    "masking_roi_table",
+    "generic_roi_table",
+)
 
 TableType = TypeVar("TableType", bound=Table)
 

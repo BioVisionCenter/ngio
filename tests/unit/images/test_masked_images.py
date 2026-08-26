@@ -266,3 +266,40 @@ def test_real_mask(
         label=label, c=c, zoom_factor=zoom_factor
     )
     assert data_no_mask.shape == image_data.shape
+
+
+def test_set_roi_masked_with_merge():
+    """`merge=` applies inside the mask; outside it the disk always wins."""
+    import numpy as np
+    from zarr.storage import MemoryStore
+
+    from ngio import create_ome_zarr_from_array
+
+    data = np.full((32, 32), 10, dtype="uint16")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, levels=1, axes_names="yx"
+    )
+    label_img = np.zeros((32, 32), dtype="uint32")
+    label_img[8:20, 8:20] = 1
+    lbl = ome_zarr.derive_label("mask")
+    lbl.set_array(label_img)
+    lbl.consolidate()
+    ome_zarr.get_label("mask").build_masking_roi_table()
+    masked = ome_zarr.get_masked_image(masking_label_name="mask")
+
+    patch_shape = masked.get_roi_masked_as_numpy(1).shape
+    low = np.full(patch_shape, 3, dtype="uint16")
+    masked.set_roi_masked(1, low, merge="max")
+
+    out = masked.get_as_numpy()
+    inside = label_img == 1
+    # "max" kept the higher on-disk value inside the mask...
+    assert (out[inside] == 10).all()
+    # ...and the disk always wins outside it.
+    assert (out[~inside] == 10).all()
+
+    high = np.full(patch_shape, 99, dtype="uint16")
+    masked.set_roi_masked(1, high, merge="max")
+    out = masked.get_as_numpy()
+    assert (out[label_img == 1] == 99).all()
+    assert (out[label_img != 1] == 10).all()

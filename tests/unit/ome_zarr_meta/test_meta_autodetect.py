@@ -17,7 +17,7 @@ from ngio.ome_zarr_meta._meta_handlers import (
     _plate_decoder_registry,
     _well_decoder_registry,
 )
-from ngio.utils import NgioError, ZarrGroupHandler
+from ngio.utils import ZarrGroupHandler
 
 
 def _image_attrs(version: str) -> dict:
@@ -49,13 +49,13 @@ def _assert_rejected(decoder, attrs, **kwargs):
     """Assert that a decoder refuses the given attrs, in the way the loop expects.
 
     The exception type *is* part of the contract: the autodetect loop only
-    treats `ValidationError` and `NgioError` as "not this version". A decoder
-    that rejected with anything else would abort autodetect instead of falling
-    through to the next version.
+    treats `ValidationError` as "not this version". A decoder that rejected
+    with anything else would abort autodetect instead of falling through to
+    the next version.
     """
     try:
         decoder(attrs, **kwargs)
-    except (ValidationError, NgioError):
+    except ValidationError:
         return
     except Exception as e:
         pytest.fail(

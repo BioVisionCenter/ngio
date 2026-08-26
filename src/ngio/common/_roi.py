@@ -5,7 +5,7 @@ These are the interfaces between the ROI tables / masking ROI tables and
 """
 
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Literal, Self, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -277,14 +277,14 @@ class Roi(BaseModel):
 
     Note:
         Instances are immutable: assigning to a field raises. Build a changed
-        ROI with `update_slice` or `model_copy(update=...)`, and put it back
-        in a table with `add(roi, overwrite=True)`. In-place mutation used to
-        silently diverge from what a containing ROI table serialized, which
-        is why it now fails loudly.
+        ROI with `update_slice`/`remove_slice`, and put it back in a table
+        with `add(roi, overwrite=True)`. In-place mutation used to silently
+        diverge from what a containing ROI table serialized, which is why it
+        now fails loudly.
     """
 
     name: str | None
-    slices: list[RoiSlice] = Field(min_length=2)
+    slices: tuple[RoiSlice, ...] = Field(min_length=2)
     label: int | None = Field(default=None, ge=0)
     space: Literal["world", "pixel"] = "world"
 
@@ -292,13 +292,27 @@ class Roi(BaseModel):
 
     @field_validator("slices")
     @classmethod
-    def validate_no_duplicate_axes(cls, v: list[RoiSlice]) -> list[RoiSlice]:
+    def validate_no_duplicate_axes(
+        cls, v: tuple[RoiSlice, ...]
+    ) -> tuple[RoiSlice, ...]:
         axis_names = [s.axis_name for s in v]
         if len(axis_names) != len(set(axis_names)):
             raise NgioValueError("Roi slices must have unique axis names")
         return v
 
-    def _nice_repr__(self) -> str:
+    def _updated(self, **update) -> Self:
+        """A validated copy carrying `model_extra` (`model_copy` skips both)."""
+        data = {
+            "name": self.name,
+            "slices": self.slices,
+            "label": self.label,
+            "space": self.space,
+            **(self.model_extra or {}),
+            **update,
+        }
+        return type(self)(**data)
+
+    def __repr__(self) -> str:
         slices_repr = ", ".join(repr(s) for s in self.slices)
         if self.label is None:
             label_str = ""
@@ -337,7 +351,7 @@ class Roi(BaseModel):
         _slices = []
         for axis, _slice in slices.items():
             _slices.append(RoiSlice.from_value(axis_name=axis, value=_slice))
-        return cls(name=name, slices=_slices, label=label, space=space, **kwargs)
+        return cls(name=name, slices=tuple(_slices), label=label, space=space, **kwargs)
 
     def __getitem__(self, key):
         """Allow dict-like access to slices by axis name."""
@@ -374,12 +388,12 @@ class Roi(BaseModel):
             return self.name
         if self.label is not None:
             return str(self.label)
-        return self._nice_repr__()
+        return repr(self)
 
     @staticmethod
     def _apply_sym_ops(
-        self_slices: list[RoiSlice],
-        other_slices: list[RoiSlice],
+        self_slices: Sequence[RoiSlice],
+        other_slices: Sequence[RoiSlice],
         op: Callable[[RoiSlice, RoiSlice], RoiSlice | None],
     ) -> list[RoiSlice] | None:
         self_axis_dict = {s.axis_name: s for s in self_slices}
@@ -434,9 +448,7 @@ class Roi(BaseModel):
 
         name = _join_roi_names(self.name, other.name)
         label = _join_roi_labels(self.label, other.label)
-        return self.model_copy(
-            update={"name": name, "slices": out_slices, "label": label}
-        )
+        return self._updated(name=name, slices=out_slices, label=label)
 
     def union(self, other: Self) -> Self:
         """Return the per-axis union (bounding box) of this ROI and other.
@@ -468,9 +480,7 @@ class Roi(BaseModel):
 
         name = _join_roi_names(self.name, other.name)
         label = _join_roi_labels(self.label, other.label)
-        return self.model_copy(
-            update={"name": name, "slices": out_slices, "label": label}
-        )
+        return self._updated(name=name, slices=out_slices, label=label)
 
     def zoom(
         self, zoom_factor: float = 1.0, axes: tuple[str, ...] = ("x", "y")
@@ -491,7 +501,7 @@ class Roi(BaseModel):
                 new_slices.append(roi_slice.zoom(zoom_factor=zoom_factor))
             else:
                 new_slices.append(roi_slice)
-        return self.model_copy(update={"slices": new_slices})
+        return self._updated(slices=new_slices)
 
     def anchor(self, local: "Roi", *, pixel_size: PixelSize) -> "Roi":
         """Anchor a patch-local pixel ROI inside this region.
@@ -570,7 +580,7 @@ class Roi(BaseModel):
             for region_slice in region.slices
             if region_slice.axis_name not in local_axes
         ]
-        anchored = local.model_copy(update={"slices": new_slices, "space": "pixel"})
+        anchored = local._updated(slices=new_slices, space="pixel")
         return anchored.to_world(pixel_size=pixel_size)
 
     def to_world(self, pixel_size: PixelSize | None = None) -> Self:
@@ -599,7 +609,7 @@ class Roi(BaseModel):
         for roi_slice in self.slices:
             pixel_size_ = pixel_size.get(roi_slice.axis_name, default=1.0)
             new_slices.append(roi_slice.to_world(pixel_size=pixel_size_))
-        return self.model_copy(update={"slices": new_slices, "space": "world"})
+        return self._updated(slices=new_slices, space="world")
 
     def to_pixel(self, pixel_size: PixelSize | None = None) -> Self:
         """Convert the ROI to pixel coordinate space.
@@ -629,7 +639,7 @@ class Roi(BaseModel):
         for roi_slice in self.slices:
             pixel_size_ = pixel_size.get(roi_slice.axis_name, default=1.0)
             new_slices.append(roi_slice.to_pixel(pixel_size=pixel_size_))
-        return self.model_copy(update={"slices": new_slices, "space": "pixel"})
+        return self._updated(slices=new_slices, space="pixel")
 
     def to_slicing_dict(self, pixel_size: PixelSize | None = None) -> dict[str, slice]:
         """Convert the ROI to a dict of axis-name -> slice in pixel space.
@@ -670,7 +680,7 @@ class Roi(BaseModel):
                 slices.append(roi_slice)
         if not found:
             slices.append(new_roi_slice)
-        return self.model_copy(update={"slices": slices})
+        return self._updated(slices=slices)
 
     def remove_slice(self, name: str) -> Self:
         """Remove the slice for a given axis.
@@ -687,4 +697,4 @@ class Roi(BaseModel):
         slices = [s for s in self.slices if s.axis_name != name]
         if len(slices) == len(self.slices):
             raise NgioValueError(f"Axis '{name}' not found in ROI slices")
-        return self.model_copy(update={"slices": slices})
+        return self._updated(slices=slices)

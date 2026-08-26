@@ -200,16 +200,28 @@ class AxesSetup(BaseModel):
             )
         chanonical_axes = canonical_axes_order()
         # Canonical names always claim their own slot; non-canonical names
-        # fill the remaining slots right-aligned.
-        free_slots = [c_ax for c_ax in canonical_order if c_ax not in set(axes_names)]
+        # fill the remaining *spatial* slots right-aligned — never `c` or
+        # `t`, whose semantics (channel skipping, time) would silently
+        # attach to an arbitrary axis.
+        free_slots = [
+            c_ax
+            for c_ax in canonical_order
+            if c_ax not in set(axes_names) and c_ax in ("z", "y", "x")
+        ]
         # Only the per-axis string fields are filled in here; which keys are
         # present depends on the input, so the values cannot be narrowed.
         axes_mapping: dict[str, Any] = {}
         for ax in reversed(axes_names):
             if ax in chanonical_axes:
                 axes_mapping[ax] = ax
-            else:
+            elif free_slots:
                 axes_mapping[free_slots.pop()] = ax
+            else:
+                raise NgioValueError(
+                    f"Cannot place non-canonical axis {ax!r}: no free spatial "
+                    "(z/y/x) slot is left. Rename the axis to a canonical "
+                    "name, or use an explicit AxesSetup."
+                )
         return cls(**axes_mapping)
 
     def canonical_map(self) -> dict[str, str]:

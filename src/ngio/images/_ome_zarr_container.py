@@ -29,6 +29,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.tables import (
+    ROI_TABLE_TYPES,
     ConditionTable,
     FeatureTable,
     GenericRoiTable,
@@ -554,7 +555,7 @@ class OmeZarrContainer:
             pixel_size: Select the pyramid level whose pixel size matches this one.
                 A lookup key, not a value to write; to set a pixel size see
                 `pixelsize` on the create/derive entry points.
-                This is only used if path is None.
+                Mutually exclusive with `path` (both raise).
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
@@ -706,9 +707,7 @@ class OmeZarrContainer:
         # sort names the first pass had already sorted.
         types = table_container.table_types()
         return [
-            name
-            for name, table_type in types.items()
-            if table_type in ("roi_table", "masking_roi_table")
+            name for name, table_type in types.items() if table_type in ROI_TABLE_TYPES
         ]
 
     def get_roi_table(self, name: str) -> RoiTable:

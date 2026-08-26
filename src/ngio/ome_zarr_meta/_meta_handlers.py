@@ -40,7 +40,6 @@ from ngio.ome_zarr_meta.v05 import (
     v05_to_ngio_well_meta,
 )
 from ngio.utils import (
-    NgioError,
     NgioValidationError,
     NgioValueError,
     ZarrGroupHandler,
@@ -195,11 +194,11 @@ def get_ngio_meta(
         try:
             ngio_meta = decoder(attrs, **kwargs)
             return ngio_meta
-        except (ValidationError, NgioError) as e:
-            # Only a failed spec check means "these attrs are not this version",
-            # so only that is worth trying the next decoder for. Anything else
-            # is a bug in the decoder and must not be reported as unreadable
-            # metadata.
+        except ValidationError as e:
+            # Only a failed spec check means "these attrs are not this
+            # version". An `NgioError` (bad caller argument, corrupt values)
+            # propagates — retrying it against another version would blame
+            # the file for it.
             all_errors.append(f"Version {version}: {e}")
     error_message = (
         f"Failed to decode NGIO {meta_type.__name__} metadata:\n"

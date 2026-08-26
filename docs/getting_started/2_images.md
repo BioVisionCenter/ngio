@@ -229,6 +229,8 @@ that came back:
 --8<-- "docs/snippets/getting_started/get_started.py:plot_roi_slicing"
 ```
 
+Axis keywords compose with a roi as a hierarchy: `get_roi(roi, z=2)` reads the roi's x/y extent at one absolute z plane. An explicit keyword on an axis the roi already pins replaces the roi-derived selection — coordinates are absolute array indices, not relative to the roi — and drops the pipe's `roi`, so anything needing the region as a `Roi` (a mask transform, world anchoring) refuses rather than misplacing pixels.
+
 ## Labels
 
 A label is a segmentation mask that identifies objects in the image. In ngio a [`Label`][ngio.Label]

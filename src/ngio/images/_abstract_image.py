@@ -382,7 +382,10 @@ class AbstractImage(ABC):
             roi: The region of interest to get the array.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The array of the region of interest.
@@ -432,7 +435,10 @@ class AbstractImage(ABC):
             roi: The region of interest to get the array.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
         """
         roi_dask_getter = DaskGetter(
             zarr_array=self.zarr_array,
@@ -482,7 +488,7 @@ class AbstractImage(ABC):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray | da.Array:
         """Get a slice of the image.
 
@@ -492,18 +498,21 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the array.
             mode: The mode to return the array.
                 Can be "dask", "numpy".
-            **slice_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The array of the region of interest.
         """
         if mode == "numpy":
             return self._get_roi_as_numpy(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+                roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
             )
         elif mode == "dask":
             return self._get_roi_as_dask(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+                roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
             )
         else:
             raise ValueError(
@@ -620,7 +629,10 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the patch.
             merge: How to combine the patch with what is already there.
                 `None` overwrites. See `ngio.transforms`.
-            **slicing_kwargs: The slices to set the patch.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         """
         if isinstance(patch, np.ndarray):

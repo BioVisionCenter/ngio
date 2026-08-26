@@ -59,7 +59,8 @@ demo_image = demo.get_image()
 # --8<-- [end:synthetic_setup]
 
 # --8<-- [start:mapper_demo]
-from ngio import SegmentationIterator, ThreadedMapper
+from ngio import SegmentationIterator
+from ngio.iterators import ThreadedMapper
 from skimage.measure import label as connected_components
 
 
@@ -82,7 +83,8 @@ print([round(mean, 1) for mean in means])
 # --8<-- [end:reduce_demo]
 
 # --8<-- [start:batched_demo]
-from ngio import BatchedMapper, ImageProcessingIterator
+from ngio import ImageProcessingIterator
+from ngio.iterators import BatchedMapper
 
 
 def fake_model(batch: np.ndarray) -> np.ndarray:
@@ -146,7 +148,8 @@ print(f"objects: {sorted(int(v) for v in set(stitched.get_as_numpy().ravel()) - 
 # --8<-- [end:stitch_demo]
 
 # --8<-- [start:detect_demo]
-from ngio import ObjectDetectionIterator, Roi
+from ngio import Roi
+from ngio.iterators import ObjectDetectionIterator
 
 
 def find_bright_boxes(patch: np.ndarray) -> list[Roi]:

@@ -1,6 +1,7 @@
 """Fractal internal module for dataset metadata handling."""
 
 import math
+import warnings
 from functools import total_ordering
 
 import numpy as np
@@ -12,6 +13,55 @@ from ngio.ome_zarr_meta.ngio_specs import (
     SpaceUnits,
     TimeUnits,
 )
+from ngio.utils import NgioUserWarning
+from ngio.utils._warnings import stacklevel_of_first_caller
+
+#: Meters per space unit, for cross-unit comparisons.
+_METERS_PER_UNIT: dict[str, float] = {
+    "yoctometer": 1e-24,
+    "zeptometer": 1e-21,
+    "attometer": 1e-18,
+    "femtometer": 1e-15,
+    "picometer": 1e-12,
+    "angstrom": 1e-10,
+    "nanometer": 1e-9,
+    "micrometer": 1e-6,
+    "millimeter": 1e-3,
+    "centimeter": 1e-2,
+    "decimeter": 1e-1,
+    "meter": 1.0,
+    "hectometer": 1e2,
+    "kilometer": 1e3,
+    "megameter": 1e6,
+    "gigameter": 1e9,
+    "terameter": 1e12,
+    "petameter": 1e15,
+    "exameter": 1e18,
+    "zettameter": 1e21,
+    "yottameter": 1e24,
+    "inch": 0.0254,
+    "foot": 0.3048,
+    "yard": 0.9144,
+    "mile": 1609.344,
+    "parsec": 3.0856775814913673e16,
+}
+
+
+def _space_factor(unit: object) -> float | None:
+    """Meters per unit; `None` for an unknown string or `None` unit."""
+    if isinstance(unit, str):
+        return _METERS_PER_UNIT.get(unit)
+    return None
+
+
+def _warn_space_mismatch(left: object, right: object) -> None:
+    warnings.warn(
+        f"Comparing pixel sizes with different space units ({left!r} vs "
+        f"{right!r}); magnitudes are unit-converted for the comparison.",
+        NgioUserWarning,
+        stacklevel=stacklevel_of_first_caller(),
+    )
+
 
 ################################################################################################
 #
@@ -38,30 +88,36 @@ class PixelSize(BaseModel):
         return f"PixelSize(x={self.x}, y={self.y}, z={self.z}, t={self.t})"
 
     def __eq__(self, other) -> bool:
-        """Check if two pixel sizes are equal."""
+        """Spatial equality, unit-converted when both space units are known.
+
+        Differing time units, unconvertible space units, or a differing `t`
+        compare unequal.
+        """
         if not isinstance(other, PixelSize):
             return NotImplemented
-
-        if self.time_unit != other.time_unit:
+        if self.time_unit != other.time_unit or not math.isclose(self.t, other.t):
             return False
-
-        if self.space_unit != other.space_unit:
+        if self.space_unit != other.space_unit and (
+            _space_factor(self.space_unit) is None
+            or _space_factor(other.space_unit) is None
+        ):
             return False
-        return math.isclose(self.distance(other), 0)
+        scale = max(float(np.linalg.norm(self.zyx)), 1e-30)
+        return self.distance(other) <= 1e-9 * scale
 
     def __lt__(self, other: "PixelSize") -> bool:
-        """Check if one pixel size is less than the other."""
+        """Order by spatial magnitude, unit-converted when both are known."""
         if not isinstance(other, PixelSize):
             raise TypeError("Can only compare PixelSize with PixelSize.")
-        ref = PixelSize(
-            x=0,
-            y=0,
-            z=0,
-            t=0,
-            space_unit=self.space_unit,
-            time_unit=self.time_unit,
-        )
-        return self.distance(ref) < other.distance(ref)
+        self_norm = float(np.linalg.norm(self.zyx))
+        other_norm = float(np.linalg.norm(other.zyx))
+        if self.space_unit != other.space_unit:
+            self_factor = _space_factor(self.space_unit)
+            other_factor = _space_factor(other.space_unit)
+            if self_factor is not None and other_factor is not None:
+                _warn_space_mismatch(self.space_unit, other.space_unit)
+                return self_norm * self_factor < other_norm * other_factor
+        return self_norm < other_norm
 
     def as_dict(self) -> dict[str, float]:
         """Return the pixel size as a dictionary."""
@@ -107,5 +163,16 @@ class PixelSize(BaseModel):
         return self.t
 
     def distance(self, other: "PixelSize") -> float:
-        """Return the distance between two pixel sizes."""
-        return float(np.linalg.norm(np.array(self.tzyx) - np.array(other.tzyx)))
+        """Spatial (z/y/x) distance in `self`'s unit.
+
+        `other` is unit-converted when both space units are known (with a
+        warning); `t` never participates.
+        """
+        other_zyx = np.array(other.zyx, dtype=float)
+        if self.space_unit != other.space_unit:
+            self_factor = _space_factor(self.space_unit)
+            other_factor = _space_factor(other.space_unit)
+            if self_factor is not None and other_factor is not None:
+                _warn_space_mismatch(self.space_unit, other.space_unit)
+                other_zyx = other_zyx * (other_factor / self_factor)
+        return float(np.linalg.norm(np.array(self.zyx) - other_zyx))

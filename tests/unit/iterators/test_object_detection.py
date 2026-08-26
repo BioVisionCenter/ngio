@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import GreedyNms, ObjectDetectionIterator, Roi, create_ome_zarr_from_array
+from ngio import Roi, create_ome_zarr_from_array
 from ngio.common._roi import RoiSlice
-from ngio.iterators import ThreadedMapper
+from ngio.iterators import GreedyNms, ObjectDetectionIterator, ThreadedMapper
 from ngio.utils import NgioValueError
 
 
@@ -324,12 +324,12 @@ def test_rejects_bad_construction():
 
 
 def test_read_only_surface():
-    """No setters; the halo IS allowed here — it is this iterator's read margin."""
+    """No writer surface; the halo IS allowed here — it is a read margin."""
     _, image = _image(np.zeros((64, 64), dtype="uint8"))
     iterator = ObjectDetectionIterator(image, axes_order="yx")
 
-    assert iterator.build_numpy_setter(iterator.rois[0]) is None
-    assert iterator.build_dask_setter(iterator.rois[0]) is None
+    assert not hasattr(iterator, "build_numpy_setter")
+    assert not hasattr(iterator, "map")
     haloed = iterator.with_halo(x=4, y=4)
     assert haloed.halo == {"x": 4, "y": 4}
 

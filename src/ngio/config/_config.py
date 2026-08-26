@@ -115,14 +115,6 @@ class RetryConfig(BaseModel):
                 "exclusive: remove the retry_on markers or disable "
                 "retry_all_errors."
             )
-        if self.retry_all_errors:
-            warnings.warn(
-                "io_retry.retry_all_errors is enabled: every IO error will be "
-                "retried, including non-transient ones. Prefer listing specific "
-                "error markers in io_retry.retry_on.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
         return self
 
 
@@ -239,6 +231,16 @@ def get_config() -> NgioConfig:
     global _config
     if _config is None:
         _config = NgioConfig.model_validate(_load_config_data())
+        # Warned once at load, not in the model validator: validators re-run
+        # on every model_copy/assignment (e.g. per store construction).
+        if _config.io_retry.retry_all_errors:
+            warnings.warn(
+                "io_retry.retry_all_errors is enabled: every IO error will be "
+                "retried, including non-transient ones. Prefer listing "
+                "specific error markers in io_retry.retry_on.",
+                NgioUserWarning,
+                stacklevel=2,
+            )
     return _config
 
 

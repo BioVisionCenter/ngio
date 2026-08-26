@@ -79,6 +79,20 @@ class AxesOps(BaseModel):
 ##############################################################
 
 
+def _require_singleton_squeeze(
+    shape: tuple[int, ...], squeeze_axes: tuple[int, ...]
+) -> None:
+    """`axes_order` drops axes it omits; only size-1 axes may be dropped."""
+    oversized = [axis for axis in squeeze_axes if shape[axis] != 1]
+    if oversized:
+        sizes = ", ".join(f"axis {axis} (size {shape[axis]})" for axis in oversized)
+        raise NgioValueError(
+            f"axes_order omits non-singleton axes: {sizes}. An omitted axis "
+            "is dropped, which needs size 1 — slice it down first, or "
+            "include it in axes_order."
+        )
+
+
 def _apply_numpy_axes_ops(
     array: np.ndarray,
     squeeze_axes: tuple[int, ...] | None = None,
@@ -87,6 +101,7 @@ def _apply_numpy_axes_ops(
 ) -> np.ndarray:
     """Apply axes operations to a numpy array."""
     if squeeze_axes is not None:
+        _require_singleton_squeeze(array.shape, squeeze_axes)
         array = np.squeeze(array, axis=squeeze_axes)
     if transpose_axes is not None:
         array = np.transpose(array, axes=transpose_axes)
@@ -103,6 +118,7 @@ def _apply_dask_axes_ops(
 ) -> da.Array:
     """Apply axes operations to a dask array."""
     if squeeze_axes is not None:
+        _require_singleton_squeeze(array.shape, squeeze_axes)
         array = da.squeeze(array, axis=squeeze_axes)
     if transpose_axes is not None:
         array = da.transpose(array, axes=transpose_axes)
