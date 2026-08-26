@@ -78,7 +78,7 @@ print(ome_zarr)
 # --8<-- [end:create]
 
 # --8<-- [start:detect]
-from ngio import GreedyNms, ObjectDetectionIterator, ThreadedMapper
+from ngio.iterators import GreedyNms, ObjectDetectionIterator, ThreadedMapper
 
 iterator = (
     ObjectDetectionIterator(image)
