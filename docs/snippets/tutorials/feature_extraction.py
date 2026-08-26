@@ -16,7 +16,9 @@ import sys
 # shared module against that.
 sys.path.append("docs/snippets")
 
-from _render import table_html
+from matplotlib import pyplot as plt
+
+from _render import figure_html, table_html
 # --8<-- [end:table_helpers]
 
 
@@ -145,3 +147,34 @@ ome_zarr.add_table("nuclei_regionprops_tiled", tiled_table, overwrite=True)
 # --8<-- [start:read_table_back]
 print(table_html(ome_zarr.get_table("nuclei_regionprops").dataframe.head()))
 # --8<-- [end:read_table_back]
+
+# --8<-- [start:plot_features]
+df = ome_zarr.get_table("nuclei_regionprops").dataframe
+area_um2 = df["area"] * image.pixel_size.x**2
+
+fig, ax = plt.subplots(figsize=(6.4, 4.2))
+# rasterized=True bakes the ~1500 dots into a small embedded image (set_dpi keeps
+# them crisp); the axes and labels stay vector, so the figure embeds light.
+ax.scatter(
+    area_um2,
+    df["mean_intensity-0"],
+    s=10,
+    alpha=0.45,
+    color="#22a699",
+    linewidths=0,
+    rasterized=True,
+)
+ax.set_xlabel("nucleus area (µm²)")
+ax.set_ylabel("mean DAPI intensity")
+ax.set_title("one dot per nucleus")
+ax.spines[["top", "right"]].set_visible(False)
+fig.set_dpi(200)
+print(
+    figure_html(
+        fig,
+        alt="Scatter of nucleus area against mean DAPI intensity: one dense "
+        "cloud around 130 square micrometers, and a tail of small, bright "
+        "nuclei in the upper left.",
+    )
+)
+# --8<-- [end:plot_features]
