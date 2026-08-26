@@ -22,7 +22,19 @@ def test_shim_unknown_attribute():
         _ = experimental_iterators.NotAnIterator
 
 
-@pytest.mark.parametrize("name", sorted(iterators.__all__))
+# The pre-1.1 iterator names are stable top-level API; everything newer
+# lives in `ngio.iterators` only.
+_STABLE_TOP_LEVEL = (
+    "BasicMapper",
+    "FeatureExtractorIterator",
+    "ImageProcessingIterator",
+    "MapperProtocol",
+    "MaskedSegmentationIterator",
+    "SegmentationIterator",
+)
+
+
+@pytest.mark.parametrize("name", _STABLE_TOP_LEVEL)
 def test_reexported_at_top_level(name: str):
     assert getattr(ngio, name) is getattr(iterators, name)
     assert name in ngio.__all__

@@ -76,10 +76,9 @@ def test_feature_iterator_dask():
 def test_feature_iterator_is_readonly():
     iterator = _build_iterator()
 
-    # The feature extractor is a read-only iterator: no setters are built
-    roi = iterator.rois[0]
-    assert iterator.build_numpy_setter(roi) is None
-    assert iterator.build_dask_setter(roi) is None
+    # The feature extractor is read-only: the writer surface does not exist.
+    assert not hasattr(iterator, "build_numpy_setter")
+    assert not hasattr(iterator, "map")
     # finalize is the distributed gather: without banked partials it refuses
     # loudly instead of quietly doing nothing.
     with pytest.raises(NgioValueError, match="No partials"):

@@ -12,7 +12,7 @@ from ngio.iterators import (
     IterUnit,
     SegmentationIterator,
 )
-from ngio.utils import NgioDeprecationWarning, NgioValueError
+from ngio.utils import NgioDeprecationWarning
 
 
 def _build_ome_zarr(chunks="auto", ngff_version="0.4"):
@@ -109,22 +109,12 @@ def test_map_as_numpy_still_writes_and_returns_none():
     )
 
 
-def test_map_readonly_raises_before_func_runs():
+def test_map_absent_on_readonly_iterators():
+    """The writer verbs do not exist on a read-only iterator."""
     iterator = _build_feature_iterator(_build_ome_zarr())
-    calls: list[int] = []
-
-    def recording_func(data):
-        calls.append(1)
-        return data
-
-    with pytest.raises(NgioValueError, match="read-only"):
-        iterator.map_as_numpy(recording_func)
-    with (
-        pytest.warns(NgioDeprecationWarning),
-        pytest.raises(NgioValueError, match="read-only"),
-    ):
-        iterator.map_as_dask(recording_func)
-    assert calls == []
+    assert not hasattr(iterator, "map")
+    assert not hasattr(iterator, "map_as_numpy")
+    assert not hasattr(iterator, "map_as_dask")
 
 
 def test_iter_unit_write_footprint():

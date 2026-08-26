@@ -9,10 +9,9 @@ compares every pair of banks that overlap in pixel space, unions the ids that
 agree (IoU over the shared pixels), and relabels the output in place.
 
 Where two tiles wrote the same *output* pixels and their objects do not
-match, the later write wins — deterministically, because every mapper runs
-units in the same canonical wave order (`canonical_unit_order`). The manual
-loops (`iter`, batched or not) run in ROI order instead: deterministic too,
-but not bit-identical to a `map` on contested pixels.
+match, `StitchConfig.write_order` picks the seam owner: schedule-defined
+by default (`"any"`), the later tile under `"roi"`. Unification itself is
+exact either way — the banks are per-tile and order-free.
 """
 
 import threading
@@ -39,6 +38,7 @@ from ngio.images._abstract_image import AbstractImage
 from ngio.io_pipes._io_pipes_types import DataSetterProtocol
 from ngio.io_pipes._ops_axes import AxesOps, set_as_numpy_axes_ops
 from ngio.io_pipes._ops_slices import SlicingOps
+from ngio.iterators._mappers import WriteOrder, validate_write_order
 from ngio.iterators._stitch_geometry import (
     SpanBox,
     intersection_box,
@@ -169,6 +169,11 @@ class StitchConfig:
             which works under every mapper. A `MemoryStore` avoids touching
             the output store — but an in-memory scratch cannot cross a
             process boundary, so `ProcessMapper` refuses it.
+        write_order: Who owns the seams of *unmatched* objects — object
+            unification is exact either way. `"any"` (the default) is
+            schedule-defined; `"roi"` gives them to the later tile,
+            reproducibly, at up to 2.5x cost on parallel overlapping
+            tilings.
     """
 
     block_size: int = 10_000
@@ -176,9 +181,11 @@ class StitchConfig:
     seam_matcher: SeamMatcherProtocol | None = None
     compact: bool = True
     scratch_store: StoreOrGroup | None = None
+    write_order: WriteOrder = "any"
 
     def __post_init__(self) -> None:
         """Validate the configuration."""
+        validate_write_order(self.write_order)
         if self.block_size <= 0:
             raise NgioValueError(f"block_size must be > 0, got {self.block_size}.")
         if not 0.0 < self.iou_threshold <= 1.0:
@@ -539,18 +546,23 @@ class StitchPlan:
         return self._banks
 
     def __getstate__(self) -> dict:
-        """Resolve the scratch before crossing a process boundary.
+        """Ship the resolved scratch reference across a process boundary.
 
-        The factory is a closure (unpicklable) and the lock is
-        process-local; the resolved banks pickle by store reference, which
-        is exactly what the workers need. Everything a worker does not use
-        is dropped: the output image (its handler carries a file lock), and
-        the plan geometry (`_works`/`_pairs` — shipping O(tiles times pairs)
-        per pickled unit would dominate `ProcessMapper` IPC). A worker only
-        banks through its own setter's `_TileWork`; `resolve`/`cleanup`
-        run on the parent's plan and refuse on a worker copy.
+        The parent must resolve the scratch before pickling (the writing
+        verbs do) — resolving lazily here would make pickling write to the
+        store. The unpicklable factory and process-local lock are dropped,
+        as is everything a worker does not use: the output image (its
+        handler carries a file lock) and the plan geometry (`_works`/
+        `_pairs` would dominate `ProcessMapper` IPC). A worker only banks;
+        `resolve`/`cleanup` refuse on a worker copy.
         """
-        _ = self.banks
+        if self._banks is None:
+            raise NgioValueError(
+                "This stitch plan's scratch is not resolved yet: pickling "
+                "would have to create it as a side effect. Run the plan "
+                "through a writing verb (which resolves it up front), or "
+                "touch `plan.banks` before pickling."
+            )
         state = self.__dict__.copy()
         state["_scratch_factory"] = None
         state["_scratch_lock"] = None

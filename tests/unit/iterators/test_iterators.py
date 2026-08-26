@@ -271,9 +271,8 @@ def test_by_chunks_and_by_write_units():
     assert len(feature_iterator.by_write_units().rois) == 16
 
 
-def test_chunk_gate_readonly_returns_false():
-    """A read-only iterator has no write hazard: the gate returns False and
-    require_no_write_units_overlap does not raise, even for chunk-sharing ROIs."""
+def test_chunk_gate_absent_on_readonly_iterators():
+    """A read-only iterator has no write hazard — and no write-gate surface."""
     ome_zarr = _build_ome_zarr(chunks=(1, 64, 64))
     label = ome_zarr.derive_label("label")
     image = ome_zarr.get_image()
@@ -286,8 +285,8 @@ def test_chunk_gate_readonly_returns_false():
     )
     iterator = iterator.by_grid(size_x=16, size_y=16)
 
-    assert iterator.check_if_write_units_overlap() is False
-    iterator.require_no_write_units_overlap()
+    assert not hasattr(iterator, "check_if_write_units_overlap")
+    assert not hasattr(iterator, "require_no_write_units_overlap")
 
 
 def test_by_zyx_strict_raises_ngio_error():
@@ -350,7 +349,7 @@ def test_incomplete_get_init_kwargs_is_refused():
             super().__init__(input_image, output_label, **kwargs)
             self._favourite = favourite
 
-        # get_init_kwargs inherited: 'favourite' is silently missing from it.
+        # _get_init_kwargs inherited: 'favourite' is silently missing from it.
 
     iterator = Forgetful(
         ome_zarr.get_image(), ome_zarr.derive_label("seg"), favourite=42

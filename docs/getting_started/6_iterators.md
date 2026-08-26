@@ -292,13 +292,38 @@ construction; other tilings just run more waves.
     boxes themselves do not overlap.
 
     Wave order is the **canonical write order**, and the serial mappers run
-    it too — so for ROIs whose *pixels* genuinely overlap (a `by_grid`
-    stride below the size, a `"shift"` tail), which write wins the shared
-    pixels is identical under every mapper. The one exception is the
-    hand-driven loops (`iter`, batched or not), which run in ROI order:
-    deterministic, but not bit-identical to `map` on contested pixels.
-    Mask-protected and pixel-disjoint writes are order-independent either
-    way, as is an order-independent `merge=` (`"max"`, `"min"`, `"sum"`).
+    it too — every mapper writes the same bytes, and two runs of the same
+    version are bit-identical. For ROIs whose *pixels* genuinely overlap (a
+    `by_grid` stride below the size, a `"shift"` tail), which write wins
+    the shared pixels is schedule-defined by default — performance first;
+    declare `write_order="roi"` for the reproducible later-ROI-wins order
+    (see the next note). Mask-protected and pixel-disjoint writes are
+    order-independent either way, as is an order-independent `merge=`
+    (`"max"`, `"min"`, `"sum"`).
+
+??? note "Reproducible seams: `write_order="roi"`"
+    By default contested writes are scheduled for parallelism alone
+    (`write_order="any"`): exactness always — no two overlapping writes
+    ever run concurrently, merges always apply, stitch unification is
+    unchanged — and a run is deterministic per ngio version (the schedule
+    is a pure function of the ROI list, identical under every mapper). What
+    is schedule-defined is *which tile owns a contested pixel*: it can
+    differ from the manual `iter` loop and can change across ngio versions
+    or retilings — pixel-visible differences, not rounding noise.
+    Order-independent merges (`"max"`, `"min"`, `"sum"`, `"keep_nonzero"`)
+    write identical pixels regardless, so for them the default costs
+    nothing.
+
+    When seam ownership must be reproducible — the later ROI wins, `map`
+    bit-identical to the hand-driven loops, stable across versions and
+    mappers — opt in per declaration: `on_overlap(..., write_order="roi")`
+    or `StitchConfig(write_order="roi")`. The price is parallelism on
+    genuinely overlapping tilings: an overlapping grid becomes a chain of
+    ordered neighbours, measured 1.5–2.5× slower on parallel mappers
+    (serial runs are unaffected). Disjoint tilings (`by_write_units()`,
+    halo cores, chunk grids) are bit-identical under either value. A pair
+    is relaxed only when *both* sides declare `"any"` — one `"roi"`
+    declaration keeps its ordering against everything.
 
 Two contracts are yours: under threads the `func` must be thread-safe, and under processes it must be picklable. ngio's side — the per-ROI readers and writers — is safe in both settings. The dask iterator surface (`iter_as_dask`, `map_as_dask`, `reduce_as_dask`) is deprecated and will be removed in ngio=1.2; for lazy whole-region access use `Image.get_as_dask` instead.
 
@@ -432,7 +457,7 @@ touching internals:
 
 | Iterator | Declaration | Required? | Behind it |
 |---|---|---|---|
-| `ImageProcessing` | `on_overlap(policy)` | optional — undeclared overlap keeps the deterministic wave-order last-writer-wins | the write path's `merge=` policies (`"max"`, `"sum"`, a callable, …) |
+| `ImageProcessing` | `on_overlap(policy)` | optional — undeclared overlap is last-writer-wins in schedule order (`write_order="roi"` for reproducible seams) | the write path's `merge=` policies (`"max"`, `"sum"`, a callable, …) |
 | `Segmentation` | `with_stitch(config)` *or* `on_overlap(policy)` | **required when write footprints overlap** — undeclared overlapping label writes refuse loudly | `SeamMatcherProtocol` (`StitchConfig(seam_matcher=...)`, `IouSeamMatcher` default) |
 | `MaskedSegmentation` | `with_stitch(config)` (within a mask) | never — mask-protected writes cannot contest, `on_overlap` is refused | same |
 | `FeatureExtractor` | `with_join(join)` | optional — the default join keeps duplicate rows, provenance columns attached | `JoinProtocol` (`ConcatJoin` default) |
@@ -457,7 +482,7 @@ Segmenting tile by tile leaves an object that crosses a boundary as two objects 
 
 Any ROI list stitches: a regular grid with a halo, an overlapping-FOV microscope layout, a ragged ROI table. The criterion is that two tiles' predictions **overlap**, not that their objects merely touch across a cut — two distinct objects that abut at a boundary are adjacent but do not overlap, so an adjacency rule would merge them and the overlap rule does not. The shared opinion comes from a halo (each tile reads past its own edge), from the tiles genuinely overlapping (FOV layouts need no halo — the overlap *is* the evidence), or both; with neither, stitching refuses, since no two tiles ever predict the same pixel.
 
-During the map each tile banks its grown prediction into transient per-tile scratch arrays, removed once the stitch resolves. Where two tiles wrote the same *output* pixels and their objects did not match, the later write wins — deterministically, because every mapper runs in the same wave order.
+During the map each tile banks its grown prediction into transient per-tile scratch arrays, removed once the stitch resolves. Where two tiles wrote the same *output* pixels and their objects did not match, the schedule picks the owner (unification itself is exact and order-free); `StitchConfig(write_order="roi")` makes those seams deterministically owned by the later ROI instead.
 
 `MaskedSegmentationIterator` takes `with_stitch()` too, for tiling *within* a mask: a huge masked object tiled with `by_grid` + `with_halo` gets its split sub-objects merged, each tile banks only what its own mask can write, and tiles of different masks are never compared — an object cannot span two masks. Ids come out unique and dense across every object, so no `UniqueLabelsTransform` is needed (combining it with `stitch` raises).
 
@@ -550,7 +575,7 @@ The `space` fields are what keep this honest: `anchor` refuses a world-space box
 
 1. Detection reconciles overlap itself: the halo is a pure read margin and NMS removes the duplicate boxes — but only through `detect`. `reduce` returns raw per-tile boxes.
 2. Stitching takes any ROI list. On the masked iterator it merges sub-objects split by a tile boundary *within one mask*; tiles of different masks are never compared, and ids come out unique across every object — no `UniqueLabelsTransform` needed (combining it with `stitch` raises).
-3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so on contested pixels the last writer wins, deterministically. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright. One configuration to avoid: an *in-place* run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).
+3. Overlapping writes are safe under every mapper: they are wave-scheduled and run in the same order everywhere, so a run is deterministic per version. Which write wins a contested pixel is schedule-defined by default; `write_order="roi"` makes it the later ROI and `map` bit-identical to the manual `iter` loop. Masked writes never contest — each touches only its own object's pixels. A commutative `merge=` (`"max"`, `"sum"`) removes the order-dependence outright. One configuration to avoid: an *in-place* run (same array in and out) with an overlapping tiling — reads then race the neighbouring writes; use a separate output (a halo makes this refuse outright).
 4. `BatchedMapper` stacks plain arrays; these iterators hand `func` tuple payloads.
 5. On the writers the topic verb is the generic `map` under its domain name; both remain available.
 6. The feature halo is a pure read margin: patches and the `roi` argument grow, a border object can be measured by several regions, and the duplicate rows are yours to reconcile in a declared join (`with_join`) via the stamped `roi_index`/`roi_name` (the default join keeps them, silently). `reduce`/`iter` read the grown regions too. Without a halo, `reduce` is unrestricted.

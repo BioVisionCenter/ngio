@@ -8,11 +8,11 @@ Four ship with ngio: `BasicMapper` (serial, what `mapper=None` means),
 `BatchedMapper` (serial, one stacked `(B, ...)` array per `func` call),
 `ThreadedMapper` (thread pool), and `ProcessMapper` (spawned processes).
 Every mapper runs the units in the same canonical order — flattened
-conflict-free waves; `plan_waves` carries the safety argument — so
-overlapping writes land identically whichever mapper runs them: the later
-wave wins, deterministically. With no conflicts the canonical order is
-plain index order, and `by_write_units()` yields a single fully-parallel
-wave.
+conflict-free waves; `plan_waves` carries the safety argument — so a run
+is deterministic and identical whichever mapper executes it. Who wins a
+contested pixel is governed by `WriteOrder`. With no conflicts the
+canonical order is plain index order, and `by_write_units()` yields a
+single fully-parallel wave.
 """
 
 import logging
@@ -21,7 +21,7 @@ from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Generic, Protocol, TypeVar, cast
+from typing import Any, Generic, Literal, Protocol, TypeVar, cast
 
 import numpy as np
 
@@ -39,6 +39,17 @@ logger = logging.getLogger(f"ngio:{__name__}")
 
 T = TypeVar("T")
 R = TypeVar("R")
+
+WriteOrder = Literal["roi", "any"]
+"""Who wins a pixel-contested write: `"any"` (schedule-defined, the
+iterators' default) or `"roi"` (the later ROI, reproducible)."""
+
+
+def validate_write_order(value: str) -> WriteOrder:
+    """Refuse anything but the two write orders."""
+    if value not in ("roi", "any"):
+        raise NgioValueError(f'write_order must be "roi" or "any", got {value!r}.')
+    return cast("WriteOrder", value)
 
 
 def _is_same_zarr_array(left, right) -> bool:
@@ -98,12 +109,17 @@ class IterUnit(Generic[T]):
         getter: Reads the ROI's data.
         setter: Writes the transformed data back, or `None` for a read-only
             unit (a read-only iterator, or any `reduce` call).
+        write_order: See `WriteOrder`. A pair is relaxed only when both
+            units declare `"any"`. The field default is `"roi"` so a
+            hand-built unit is strictly ordered unless it asks otherwise;
+            the iterators stamp their own declared value.
     """
 
     index: int
     roi: Roi
     getter: DataGetterProtocol[T]
     setter: DataSetterProtocol[T] | None
+    write_order: Literal["roi", "any"] = "roi"
 
     @property
     def write_footprint(self) -> ChunkRect | None:
@@ -426,27 +442,27 @@ def _sweep_adjacency(
         active.append((index, rect))
 
 
-def _write_conflict_edges(
+def _rect_conflict_edges(
     units: Sequence[IterUnit[Any]],
-    footprints: dict[int, ChunkRect],
+    rects: dict[int, ChunkRect],
 ) -> dict[int, set[int]]:
-    """The adjacency of units whose writes share a write unit anywhere.
+    """The adjacency of units whose write rects intersect on one array.
 
     Keyed and valued by `unit.index`. Units targeting different output
-    arrays never conflict through their footprints — but a setter's
-    side-channel claims (`extra_write_footprints`, if it declares any) join
-    the graph too, exactly like footprints on a shared array.
+    arrays never conflict through their rects — but a setter's side-channel
+    claims (`extra_write_footprints`, if it declares any) join the graph
+    too, exactly like rects on a shared array.
     """
-    adjacency: dict[int, set[int]] = {index: set() for index in footprints}
+    adjacency: dict[int, set[int]] = {index: set() for index in rects}
     # Grouped by *stored* array (store + path), not handle identity: two
     # `zarr.Array` objects onto the same array (e.g. from two `get_label`
-    # calls) must land in one group, or their footprints would never be
+    # calls) must land in one group, or their rects would never be
     # compared. Stores are unhashable, so match against a representative.
     by_array: list[tuple[Any, list[tuple[int, ChunkRect]]]] = []
     for unit in units:
-        if unit.setter is None or unit.index not in footprints:
+        if unit.setter is None or unit.index not in rects:
             continue
-        entry = (unit.index, footprints[unit.index])
+        entry = (unit.index, rects[unit.index])
         for representative, group in by_array:
             if _is_same_zarr_array(unit.setter.zarr_array, representative):
                 group.append(entry)
@@ -461,10 +477,69 @@ def _write_conflict_edges(
     return adjacency
 
 
+def _write_conflict_edges(
+    units: Sequence[IterUnit[Any]],
+    footprints: dict[int, ChunkRect],
+) -> dict[int, set[int]]:
+    """The adjacency of units whose writes share a write unit anywhere.
+
+    This is the safety graph: two adjacent units must never run in the same
+    wave, or they would write the same chunk (or shard) concurrently.
+    """
+    return _rect_conflict_edges(units, footprints)
+
+
+def _collect_pixel_rects(
+    units: Sequence[IterUnit[Any]],
+) -> dict[int, ChunkRect]:
+    """Per-unit write bounding boxes at *pixel* granularity, by `unit.index`.
+
+    Two rects intersect exactly when the writes can touch the same pixel —
+    when write *order* is visible in the output. `list[int]` selections use
+    the bounding box: extra ordering, never a missed one.
+    """
+    rects: dict[int, ChunkRect] = {}
+    for unit in units:
+        if unit.setter is None:
+            continue
+        ops = unit.setter.slicing_ops
+        rect = compute_chunk_rect(
+            shape=ops.on_disk_shape,
+            chunks=(1,) * len(ops.on_disk_shape),
+            slicing_tuple=ops.normalized_slicing_tuple,
+        )
+        if rect is not None:
+            rects[unit.index] = rect
+    return rects
+
+
+def _precedence_edges(units: Sequence[IterUnit[Any]]) -> dict[int, set[int]]:
+    """Pixel-overlap ordering edges; a pair relaxes only when both are `"any"`.
+
+    All-`"any"` writers skip the pixel sweep outright (~half the planner
+    cost).
+    """
+    writers = [unit for unit in units if unit.setter is not None]
+    if writers and all(unit.write_order == "any" for unit in writers):
+        return {}
+    edges = _rect_conflict_edges(units, _collect_pixel_rects(units))
+    relaxed = {unit.index for unit in writers if unit.write_order == "any"}
+    if not relaxed:
+        return edges
+    return {
+        index: {
+            other
+            for other in neighbours
+            if index not in relaxed or other not in relaxed
+        }
+        for index, neighbours in edges.items()
+    }
+
+
 def plan_waves(
     units: Sequence[IterUnit[T]], *, log: bool = True
 ) -> list[list[IterUnit[T]]]:
-    """Partition units into conflict-free waves by first-fit greedy colouring.
+    """Partition units into conflict-free waves that respect ROI-index order.
 
     Two units whose write footprints share a write unit (a chunk, or a shard
     when the output is sharded) of the same output array never share a wave:
@@ -472,14 +547,16 @@ def plan_waves(
     one wave at a time preserves the single-writer-per-write-unit invariant
     that makes parallel writes lock-free in any topology. Read-only units and
     units with an empty write selection conflict with nothing and land in the
-    first wave. Coloring runs in ascending `unit.index`, so the schedule is a
-    pure function of the unit sequence. A conflict-free set — a
-    `by_write_units()` tiling, say — yields a single wave.
+    first wave. Assignment runs in ascending `unit.index` (first-fit greedy),
+    so the schedule is a pure function of the unit sequence. A conflict-free
+    set — a `by_write_units()` tiling, say — yields a single wave.
 
-    Flattened wave order is the canonical write order for every mapper
-    (`canonical_unit_order`), so units whose writes overlap at the *pixel*
-    level land in the same order serially and in parallel: the later wave
-    wins, deterministically.
+    On top of the safety constraint, `write_order="roi"` units are ordered
+    on pixel overlap: the higher `unit.index` lands in a strictly later
+    wave, so the later ROI wins under every mapper and in the manual
+    `iter` loop. A pair where both units declare `"any"` is scheduled for
+    parallelism alone. Sharing a write unit without sharing pixels never
+    orders, so disjoint-pixel tilings keep their packed schedule.
 
     Args:
         units: The units to schedule.
@@ -489,6 +566,7 @@ def plan_waves(
     if not units:
         return []
     adjacency = _write_conflict_edges(units, _collect_write_footprints(units))
+    precedence = _precedence_edges(units)
 
     wave_of: dict[int, int] = {}
     waves: list[list[IterUnit[T]]] = [[]]
@@ -498,7 +576,18 @@ def plan_waves(
             for other in adjacency.get(unit.index, ())
             if other in wave_of
         }
-        color = 0
+        # Ascending-index assignment means every already-assigned pixel
+        # neighbour has a lower index — exactly the ones this unit must
+        # write after.
+        floor = max(
+            (
+                wave_of[other]
+                for other in precedence.get(unit.index, ())
+                if other in wave_of
+            ),
+            default=-1,
+        )
+        color = floor + 1
         while color in taken:
             color += 1
         wave_of[unit.index] = color
@@ -508,15 +597,15 @@ def plan_waves(
 
     if not log:
         return waves
-    if len(waves) == len(units) and len(units) > 1:
+    largest = max(len(wave) for wave in waves)
+    if largest == 1 and len(units) > 1:
         logger.warning(
-            "Parallel map degraded to a serial schedule: every one of the "
-            f"{len(units)} units writes into the same write unit(s) as another, "
-            "so no two can run concurrently. Re-tile with `by_write_units()` "
-            "for a single fully-parallel wave."
+            f"Parallel map degraded to a serial schedule: the {len(units)} "
+            "units' write layout leaves no two free to run concurrently "
+            "(shared write units, or pixel overlaps that force an order). "
+            "Re-tile with `by_write_units()` for a single fully-parallel wave."
         )
     elif len(waves) > 1:
-        largest = max(len(wave) for wave in waves)
         logger.info(
             f"Parallel map scheduled {len(units)} units into {len(waves)} "
             f"conflict-free waves (largest wave: {largest} units). Tiling with "
@@ -529,9 +618,9 @@ def canonical_unit_order(units: Sequence[IterUnit[T]]) -> list[IterUnit[T]]:
     """Units in flattened wave order — the one write order every mapper uses.
 
     Wave 0 in index order, then wave 1, and so on. With no write conflicts
-    this is plain index order, so for disjoint tilings it changes nothing;
-    with pixel-overlapping writes it makes "who wrote last" a pure function
-    of the unit sequence, identical for serial and parallel runs.
+    this is plain index order. On pixel-overlapping `"roi"` units the
+    higher ROI index always lands later; all-`"any"` pairs follow the
+    schedule — either way a pure function of the unit sequence.
     """
     return [unit for wave in plan_waves(units, log=False) for unit in wave]
 

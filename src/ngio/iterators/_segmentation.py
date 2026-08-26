@@ -24,8 +24,8 @@ from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
 from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
-from ngio.iterators._abstract_iterator import AbstractIteratorBuilder, OverlapPolicy
-from ngio.iterators._mappers import MapperProtocol
+from ngio.iterators._abstract_iterator import OverlapPolicy, WritingIteratorBuilder
+from ngio.iterators._mappers import MapperProtocol, WriteOrder, validate_write_order
 from ngio.iterators._stitch import (
     IouSeamMatcher,
     ScratchBanks,
@@ -80,7 +80,7 @@ class _MaskedBankMask:
         return np.asarray(masked)
 
 
-class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
+class SegmentationIterator(WritingIteratorBuilder[np.ndarray, da.Array, None]):
     """Segment an image region by region into a label.
 
     Reads each region from the input image and writes the function's label
@@ -98,8 +98,9 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
     _stitch: StitchConfig | None = None
     _stitch_plan: StitchPlan | None = None
     _on_overlap: OverlapPolicy | None = None
+    _write_order: WriteOrder = "any"
     # `_stitch_plan` is derived per-ROI-list, so deliberately not carried.
-    _chain_state_attrs: tuple[str, ...] = ("_stitch", "_on_overlap")
+    _chain_state_attrs: tuple[str, ...] = ("_stitch", "_on_overlap", "_write_order")
     # The masked iterator restricts stitch comparisons to same-object tiles:
     # an object cannot span two masks, so cross-label pairs can never merge.
     _stitch_same_label_only: bool = False
@@ -144,7 +145,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
 
         self._input.require_dimensions_match(self._output, allow_singleton=False)
 
-    def get_init_kwargs(self) -> dict:
+    def _get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
             "input_image": self._input,
@@ -182,7 +183,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
                 "with_stitch and on_overlap cannot be combined: a merge "
                 "policy would make the written labels diverge from the "
                 "banked predictions the resolve compares. The stitch "
-                "already owns the contested pixels (deterministic wave "
+                "already owns the contested pixels (deterministic write "
                 "order) — drop the `on_overlap` declaration."
             )
         _require_no_unique_labels_with_stitch(resolved, self._output_transforms)
@@ -190,32 +191,47 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
         new_instance._stitch = resolved
         return new_instance
 
-    def on_overlap(self, policy: OverlapPolicy) -> Self:
+    def on_overlap(
+        self, policy: OverlapPolicy, *, write_order: WriteOrder = "any"
+    ) -> Self:
         """Declare how contested write pixels are resolved.
 
-        `"last"` keeps the deterministic wave-order last-writer-wins — an
-        explicit acknowledgment, no merge is performed. Any `merge=` policy
-        (`"max"`/`"min"`/`"sum"` are order-independent; `"keep_nonzero"`; a
-        merge function; a `MergePolicy`) combines each write with what is
-        on disk — note it applies to *every* write, so pre-existing content
-        participates too. Declare before `for_job`. Refuses when
-        `with_stitch` is declared (the stitch owns the contested pixels).
+        `"last"` is last-writer-wins — an explicit acknowledgment, no merge
+        is performed. Any `merge=` policy (`"max"`/`"min"`/`"sum"` are
+        order-independent; `"keep_nonzero"`; a merge function; a
+        `MergePolicy`) combines each write with what is on disk — note it
+        applies to *every* write, so pre-existing content participates
+        too. Declare before `for_job`. Refuses when `with_stitch` is
+        declared (the stitch owns the contested pixels).
 
         Args:
             policy: `"last"`, or anything the write path's `merge=` takes.
+            write_order: Who wins a contested pixel. `"any"` (the default)
+                is schedule-defined — deterministic per version, fastest.
+                `"roi"` makes the later ROI win — reproducible across
+                versions and bit-identical to the manual `iter` loop, at up
+                to 2.5x cost on parallel overlapping tilings. Irrelevant
+                under an order-independent merge.
         """
         if policy != "last":
             resolve_merge(policy)  # refuse an invalid rule at declaration
         if self._stitch is not None:
             raise NgioValueError(
                 "on_overlap and with_stitch cannot be combined: the stitch "
-                "already owns the contested pixels (deterministic wave "
+                "already owns the contested pixels (deterministic write "
                 "order), and a merge policy would make the written labels "
                 "diverge from the banked predictions. Drop one of the two."
             )
         new_instance = self._new_from_rois(self.rois)
         new_instance._on_overlap = policy
+        new_instance._write_order = validate_write_order(write_order)
         return new_instance
+
+    def _units_write_order(self) -> WriteOrder:
+        """The declared write order; a stitch's config takes precedence."""
+        if self._stitch is not None:
+            return self._stitch.write_order
+        return self._write_order
 
     def _overlap_merge(self) -> MergeInput | None:
         """The `merge=` the setters carry; `None` for undeclared or "last"."""
@@ -456,7 +472,7 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
         *,
         mapper: MapperProtocol[np.ndarray, np.ndarray] | None = None,
     ) -> None:
-        """See `AbstractIteratorBuilder.map`; also cleans up on failure.
+        """See `WritingIteratorBuilder.map`; also cleans up on failure.
 
         A failed standalone run cannot be resolved, so the stitch scratch
         arrays are deleted rather than left as a stray `_ngio_stitch` group
@@ -472,7 +488,10 @@ class SegmentationIterator(AbstractIteratorBuilder[np.ndarray, da.Array, None]):
         # Build the plan (and let its validation warnings and errors fire)
         # before any tile runs: lazily it would surface mid-run, from a
         # worker, after some tiles have already written.
-        self._stitching_plan()
+        plan = self._stitching_plan()
+        # Resolve the scratch in the parent, before any unit is pickled or
+        # run — never as a side effect of pickling.
+        _ = plan.banks
         if self._partition is not None:
             return super().map(func, mapper=mapper)
         try:
@@ -543,6 +562,10 @@ class MaskedSegmentationIterator(SegmentationIterator):
     # are disjoint by construction, so comparing them is pure wasted IO.
     _stitch_same_label_only: bool = True
 
+    def _units_write_order(self) -> WriteOrder:
+        """Always `"any"`: mask-protected writes never contest a pixel."""
+        return "any"
+
     def __init__(
         self,
         input_image: MaskedImage,
@@ -589,7 +612,7 @@ class MaskedSegmentationIterator(SegmentationIterator):
 
         self._input.require_dimensions_match(self._output, allow_singleton=False)
 
-    def get_init_kwargs(self) -> dict:
+    def _get_init_kwargs(self) -> dict:
         """Return the initialization arguments for the iterator."""
         return {
             "input_image": self._input,
@@ -601,13 +624,14 @@ class MaskedSegmentationIterator(SegmentationIterator):
             "consolidation_mode": self._consolidation_mode,
         }
 
-    def on_overlap(self, policy: OverlapPolicy) -> Self:
+    def on_overlap(
+        self, policy: OverlapPolicy, *, write_order: WriteOrder = "roi"
+    ) -> Self:
         """Refused: masked writes never contest.
 
         Each write touches only its own object's pixels (`MaskMerge`
-        protects everything outside it), so overlapping bounding boxes are
-        safe with nothing to declare — and the setter's one `merge=` slot
-        already carries the mask protection.
+        protects the rest), so there is nothing to declare — and the one
+        `merge=` slot already carries the mask protection.
         """
         raise NgioValueError(
             "MaskedSegmentationIterator takes no overlap policy: writes are "
