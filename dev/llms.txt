@@ -20,7 +20,7 @@ guides and tutorials are executed when the site is built, so the outputs shown a
 - [Tables](https://biovisioncenter.github.io/ngio/stable/getting_started/3_tables/): Listing and loading ROI, masking ROI and feature tables, and creating new tables in memory or on disk.
 - [Masked images and labels](https://biovisioncenter.github.io/ngio/stable/getting_started/4_masked_images/): Label-indexed access to image regions, zoom_factor, and masked read/write operations.
 - [HCS plates](https://biovisioncenter.github.io/ngio/stable/getting_started/5_hcs/): Plate structure, rows, columns and acquisitions, retrieving images, and creating plates.
-- [Iterators](https://biovisioncenter.github.io/ngio/stable/getting_started/6_iterators/): The five iterators for building scalable processing pipelines, parallel mappers, halos, stitching and object detection.
+- [Iterators](https://biovisioncenter.github.io/ngio/stable/getting_started/6_iterators/): The five iterators for building scalable processing pipelines: parallel mappers, halos, batched inference, overlap reconciliation and distributed runs.
 - [Configuration](https://biovisioncenter.github.io/ngio/stable/getting_started/7_configuration/): The ngio config file: the io_retry policy, consolidation, the dask write-block cap, and the zarr runtime knobs.
 
 ## Tutorials
@@ -28,8 +28,10 @@ guides and tutorials are executed when the site is built, so the outputs shown a
 - [Create an OME-Zarr image](https://biovisioncenter.github.io/ngio/stable/tutorials/create_ome_zarr/): Convert a numpy array to OME-Zarr and add a ROI table.
 - [Image processing](https://biovisioncenter.github.io/ngio/stable/tutorials/image_processing/): Gaussian blur applied eagerly, lazily with dask, and via an iterator.
 - [Image segmentation](https://biovisioncenter.github.io/ngio/stable/tutorials/image_segmentation/): Otsu segmentation per field of view, and masked segmentation.
-- [Object detection](https://biovisioncenter.github.io/ngio/stable/tutorials/object_detection/): A spot detector run tile by tile into a single ROI table.
-- [Feature extraction](https://biovisioncenter.github.io/ngio/stable/tutorials/feature_extraction/): regionprops features written back as a feature table.
+- [Stitching](https://biovisioncenter.github.io/ngio/stable/tutorials/stitching/): A tiled watershed segmentation with and without with_stitch(), and the StitchConfig tuning knobs.
+- [Object detection](https://biovisioncenter.github.io/ngio/stable/tutorials/object_detection/): A spot detector run tile by tile into a single ROI table, with the raw-versus-NMS view and Roi.anchor.
+- [Feature extraction](https://biovisioncenter.github.io/ngio/stable/tutorials/feature_extraction/): regionprops features written back as a feature table, and a scatter drawn straight from it.
+- [Distributed processing](https://biovisioncenter.github.io/ngio/stable/tutorials/distributed_processing/): The prepare_jobs, for_job, finalize recipe run end to end, with partition layouts, distributed stitching and distributed measurement.
 - [HCS exploration](https://biovisioncenter.github.io/ngio/stable/tutorials/hcs_exploration/): Aggregating tables across a plate and creating an empty plate.
 
 ## Table specifications

@@ -37,10 +37,16 @@
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/image_segmentation/</loc>
       </url>
       <url>
+        <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/stitching/</loc>
+      </url>
+      <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/object_detection/</loc>
       </url>
       <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/feature_extraction/</loc>
+      </url>
+      <url>
+        <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/distributed_processing/</loc>
       </url>
       <url>
         <loc>https://biovisioncenter.github.io/ngio/dev/tutorials/hcs_exploration/</loc>

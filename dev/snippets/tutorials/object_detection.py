@@ -116,5 +116,61 @@ for roi in table.rois():
         )
     )
 ax.axis("off")
-print(figure_html(fig))
+print(figure_html(fig, alt="Every detected nucleus outlined on the full image."))
 # --8<-- [end:plot_detections]
+
+# --8<-- [start:nms_raw]
+# Iterate the same (haloed) tiles yourself — the view `detect` sees before
+# suppression.
+raw_boxes = []
+for patch, tile in iterator.iter_as_numpy():
+    for box in find_nuclei(patch):
+        raw_boxes.append(tile.anchor(box, pixel_size=image.pixel_size))
+
+print(f"raw boxes: {len(raw_boxes)}, after NMS: {len(detections.rois())}")
+# --8<-- [end:nms_raw]
+
+
+# --8<-- [start:nms_figure]
+def draw_boxes(ax, boxes, title):
+    ax.imshow(image.get_as_numpy(), cmap="gray")
+    for roi in boxes:
+        box = roi.to_pixel(pixel_size=image.pixel_size)
+        ax.add_patch(
+            Rectangle(
+                (box["x"].start, box["y"].start),
+                box["x"].length,
+                box["y"].length,
+                fill=False,
+                edgecolor="#f4a63a",
+                linewidth=1.0,
+            )
+        )
+    for edge in (256, 384):  # the tile boundaries crossing this zoom
+        ax.axvline(edge - 0.5, color="white", ls="--", lw=0.8)
+        ax.axhline(edge - 0.5, color="white", ls="--", lw=0.8)
+    ax.set_xlim(191.5, 319.5)
+    ax.set_ylim(447.5, 319.5)  # imshow's y axis grows downwards
+    ax.set_title(title)
+    ax.axis("off")
+
+
+fig, (ax_raw, ax_kept) = plt.subplots(1, 2, figsize=(8.6, 4.4))
+draw_boxes(ax_raw, raw_boxes, f"raw: {len(raw_boxes)} boxes")
+draw_boxes(ax_kept, detections.rois(), f"after NMS: {len(detections.rois())} boxes")
+print(
+    figure_html(
+        fig,
+        alt="A zoom onto two tile boundaries: before suppression several "
+        "nuclei near the seams carry two overlapping boxes, one from each "
+        "neighbouring tile; after NMS each carries exactly one.",
+    )
+)
+# --8<-- [end:nms_figure]
+
+# --8<-- [start:anchor_demo]
+tile_roi = iterator.rois[0]
+box = Roi.from_values(slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel")
+abs_roi = tile_roi.anchor(box, pixel_size=image.pixel_size)
+print(abs_roi)
+# --8<-- [end:anchor_demo]

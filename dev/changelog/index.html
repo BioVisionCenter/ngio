@@ -272,6 +272,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -774,6 +778,10 @@
       
         
       
+        
+      
+        
+      
     
     
     
@@ -905,6 +913,33 @@
   
   
     <li class="md-nav__item">
+      <a href="../tutorials/stitching/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Stitching
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../tutorials/object_detection/" class="md-nav__link">
         
   
@@ -940,6 +975,33 @@
     
   
   Feature extraction
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorials/distributed_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+  Distributed processing
 
     
   </span>
@@ -1964,6 +2026,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Docs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v110" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2197,7 +2287,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#docs" class="md-nav__link">
+  <a href="#docs_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Docs
@@ -3278,6 +3368,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#docs" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Docs
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v110" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3511,7 +3629,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#docs" class="md-nav__link">
+  <a href="#docs_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Docs
@@ -4519,6 +4637,15 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The iterators getting-started page is now a concept guide: it keeps the design-system figures (the iterator walk, the five iterators side by side, tail policies, wave scheduling, halos, stitching, and detection) and the short core snippets, and hands the long worked examples to the tutorials.</li>
+<li>New <strong>Stitching</strong> tutorial: a tiled watershed segmentation on real microscopy data, with and without <code>with_stitch()</code>, plus the <code>StitchConfig</code> tuning knobs.</li>
+<li>New <strong>Distributed processing</strong> tutorial: the <code>prepare_jobs → for_job → finalize</code> recipe executable end to end — partition layouts, distributed stitching, and distributed measurement.</li>
+<li>The object detection tutorial gained the NMS walkthrough (raw pre-NMS boxes against the suppressed result) and <code>Roi.anchor</code>; the feature extraction tutorial ends with a scatter drawn from the feature table (area against mean intensity, rasterized marks so the page stays light).</li>
+<li>The object detection snippet script joined the <code>test_snippets</code> chain, where it had been missing.</li>
+</ul>
 <h2 id="v110">[v1.1.0]<a class="headerlink" href="#v110" title="Permanent link">&para;</a></h2>
 <p><strong>Highlights</strong>:</p>
 <ul>
@@ -4547,7 +4674,7 @@
 <li><code>consolidate(regions=...)</code> rebuilds only the pyramid regions that changed, byte-identical to a full rebuild; writing iterators use it automatically, and <code>Image.track_writes()</code> records the regions for you.</li>
 <li><code>NgioConfig</code> gained three sections, each with a public model: <code>zarr</code> (<code>ZarrConfig</code>), <code>dask</code> (<code>DaskConfig</code>), and <code>consolidation</code> (<code>ConsolidationConfig</code>).</li>
 <li>Every <code>max_workers</code> accepts <code>"auto"</code>; <code>refresh()</code> on containers and plates re-reads all held metadata; the scheduling primitives (<code>plan_waves</code>, <code>canonical_unit_order</code>, <code>TailPolicy</code>, …) are public in <code>ngio.iterators</code>.</li>
-<li>New public names: <code>NgioFutureWarning</code>, <code>ChannelSlicingInputType</code> (<code>ngio.images</code>), <code>ConsolidationMode</code> and <code>RegionsLike</code> (<code>ngio.common</code>), and <code>AbstractImage.write_granularity()</code> — the shape zarr writes atomically.</li>
+<li>New public names: <code>NgioFutureWarning</code>, <code>ChannelSlicingInputType</code> (<code>ngio.images</code>), <code>ConsolidationMode</code> and <code>RegionsLike</code> (<code>ngio.common</code>), and <code>AbstractImage.write_granularity</code> — the shape zarr writes atomically.</li>
 <li>The facade carries its own vocabulary: the table classes (<code>RoiTable</code>, <code>MaskingRoiTable</code>, <code>FeatureTable</code>, <code>ConditionTable</code>, <code>GenericRoiTable</code>, <code>GenericTable</code>, <code>Table</code>) and <code>TransformProtocol</code>/<code>MergePolicy</code>/<code>MergeInput</code> are importable from <code>ngio</code> directly.</li>
 <li><code>Image.resolve_channel_selection(selection)</code> resolves anything the <code>get_*</code> methods accept as <code>channel_selection</code> — index, label, <code>ChannelSelectionModel</code>, or a sequence of those — to its slicing entry, touching only metadata. This is the supported way to validate a selection before loading data (Fractal tasks previously imported the private parser for their <code>skip_if_missing</code> checks).</li>
 </ul>
@@ -4786,7 +4913,7 @@
 <li>Real lower bounds on every dependency, exercised by a <code>test-min-deps</code> CI leg: <code>zarr&gt;=3.1.6</code>, <code>numpy&gt;=2.0</code>, <code>fsspec&gt;=2025.3</code>, <code>anndata&gt;=0.12.5</code>, <code>ome-zarr-models&gt;=1.4</code> and the rest. <code>pandas</code> 3.x and <code>anndata</code> 0.13 are now allowed, the <code>requires-python</code> upper cap is gone, and unused <code>requests</code>/<code>distributed</code> are dropped.</li>
 <li>New <code>s3</code> extra: <code>pip install ngio[s3]</code>.</li>
 </ul>
-<h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
+<h3 id="docs_1">Docs<a class="headerlink" href="#docs_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Rebuilt on <a href="https://zensical.org">Zensical</a> with every code block executed at build time, plus new landing, glossary and Configuration pages.</li>
 </ul>

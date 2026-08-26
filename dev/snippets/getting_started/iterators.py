@@ -46,11 +46,10 @@ from zarr.storage import MemoryStore
 
 from ngio import create_ome_zarr_from_array
 
-# A small synthetic image to demonstrate on: two bright blobs, one of them
-# crossing the boundary between two 32x32 tiles.
+# A small synthetic image to demonstrate on: two bright blobs.
 rng = np.random.default_rng(0)
 data = rng.poisson(10, size=(64, 64)).astype("uint16")
-data[10:20, 26:38] += 200  # crosses the tile seam at x=32
+data[10:20, 26:38] += 200
 data[40:50, 8:18] += 200
 demo = create_ome_zarr_from_array(
     store=MemoryStore(), array=data, pixelsize=0.5, axes_names="yx", levels=1
@@ -132,58 +131,3 @@ blur_iterator = blur_iterator.by_write_units().with_halo(x=8, y=8)
 blur_iterator.map(smooth, mapper=ThreadedMapper("auto"))
 print(blurred.get_image().get_as_numpy().mean().round(2))
 # --8<-- [end:halo_demo]
-
-# --8<-- [start:stitch_demo]
-stitched = demo.derive_label("stitched")
-stitch_iterator = (
-    SegmentationIterator(demo_image, stitched, axes_order="yx")
-    .with_stitch()
-    .by_grid(size_x=32, size_y=32)
-    .with_halo(x=8, y=8)
-)
-stitch_iterator.map(segment)
-
-# Two objects, two ids - the seam-crossing blob was merged back into one.
-print(f"objects: {sorted(int(v) for v in set(stitched.get_as_numpy().ravel()) - {0})}")
-# --8<-- [end:stitch_demo]
-
-# --8<-- [start:detect_demo]
-from ngio import Roi
-from ngio.iterators import ObjectDetectionIterator
-
-
-def find_bright_boxes(patch: np.ndarray) -> list[Roi]:
-    ys, xs = np.nonzero(patch > 100)
-    if not len(ys):
-        return []
-    x_min, y_min = int(xs.min()), int(ys.min())
-    return [
-        Roi.from_values(
-            slices={
-                "x": (x_min, int(xs.max()) + 1 - x_min),
-                "y": (y_min, int(ys.max()) + 1 - y_min),
-            },
-            name=None,
-            space="pixel",
-            confidence=float((patch > 100).mean()),
-        )
-    ]
-
-
-detect_iterator = (
-    ObjectDetectionIterator(demo_image, axes_order="yx")
-    .by_grid(size_x=32, size_y=32)
-    .with_halo(x=8, y=8)
-)
-detections = detect_iterator.detect(find_bright_boxes)
-assert detections is not None  # a serial run always returns the table
-demo.add_table("detections", detections)
-print(detections.dataframe[["x_micrometer", "y_micrometer", "confidence"]])
-# --8<-- [end:detect_demo]
-
-# --8<-- [start:anchor_demo]
-tile_roi = detect_iterator.rois[0]
-box = Roi.from_values(slices={"x": (12, 30), "y": (4, 25)}, name=None, space="pixel")
-abs_roi = tile_roi.anchor(box, pixel_size=demo_image.pixel_size)
-print(abs_roi)
-# --8<-- [end:anchor_demo]
