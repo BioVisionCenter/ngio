@@ -382,7 +382,10 @@ class AbstractImage(ABC):
             roi: The region of interest to get the array.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The array of the region of interest.
@@ -432,7 +435,10 @@ class AbstractImage(ABC):
             roi: The region of interest to get the array.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
         """
         roi_dask_getter = DaskGetter(
             zarr_array=self.zarr_array,
@@ -492,7 +498,10 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the array.
             mode: The mode to return the array.
                 Can be "dask", "numpy".
-            **slice_kwargs: The slices to get the array.
+            **slice_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The array of the region of interest.
@@ -620,7 +629,10 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the patch.
             merge: How to combine the patch with what is already there.
                 `None` overwrites. See `ngio.transforms`.
-            **slicing_kwargs: The slices to set the patch.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         """
         if isinstance(patch, np.ndarray):

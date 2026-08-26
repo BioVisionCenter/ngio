@@ -20,6 +20,7 @@ from ngio.io_pipes import (
     NumpySetterMasked,
 )
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
+from ngio.utils import NgioValueError
 
 pytestmark = pytest.mark.filterwarnings("ignore::ngio.utils.NgioDeprecationWarning")
 
@@ -260,8 +261,13 @@ def test_masked_get_multichannel_broadcast(mode: str):
     np.testing.assert_array_equal(result, np.where(mask, data[0, 6:22, 8:26], 0))
 
 
-def test_masked_slicing_dict_overrides_roi_axis():
-    image, label, data, label_img = _make_same_res_setup()
+def test_masked_slicing_dict_override_refuses():
+    """Overriding a roi-pinned axis drops the roi, and masking needs it.
+
+    The old silent path was only correct when the label shared the data's
+    resolution — a pixel override lands on the wrong grid otherwise.
+    """
+    image, label, _data, _label_img = _make_same_res_setup()
     roi = Roi.from_values(slices={"y": (6, 16), "x": (8, 18)}, name="r", label=3)
 
     masked_getter = NumpyGetterMasked(
@@ -269,17 +275,8 @@ def test_masked_slicing_dict_overrides_roi_axis():
         label_slicing_dict={"x": slice(2, 10)},
         **_masked_kwargs(image, label, roi),
     )
-    roi_getter = NumpyRoiGetter(
-        zarr_array=image.zarr_array,
-        dimensions=image.dimensions,
-        roi=roi,
-        slicing_dict={"x": slice(2, 10)},
-    )
-    # The data-side slicing of a masked pipe matches the equivalent roi pipe
-    assert masked_getter.slicing_ops == roi_getter.slicing_ops
-
-    mask = label_img[6:22, 2:10] == 3
-    np.testing.assert_array_equal(masked_getter(), np.where(mask, data[6:22, 2:10], 0))
+    with pytest.raises(NgioValueError, match="Masking requires a ROI-scoped pipe"):
+        masked_getter()
 
 
 def test_masked_pipe_properties():

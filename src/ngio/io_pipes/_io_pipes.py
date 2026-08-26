@@ -157,8 +157,9 @@ class _FromDimensionsInit(_IoPipe):
 
         When a `roi` is given, it defines the slicing (converted at this
         image's pixel size); explicit `slicing_dict` entries override the
-        ROI-derived ones per axis. `merge` applies to setters only and decides
-        how the patch combines with what is already there.
+        ROI-derived ones per axis, and such an override drops the pipe's
+        `roi` (see `setup_io_pipe`). `merge` applies to setters only and
+        decides how the patch combines with what is already there.
         """
         ctx = setup_io_pipe(
             zarr_array=zarr_array,
@@ -173,7 +174,7 @@ class _FromDimensionsInit(_IoPipe):
             slicing_ops=ctx.slicing,
             axes_ops=ctx.axes_ops,
             transforms=transforms,
-            roi=roi,
+            roi=ctx.roi,
             merge=merge,
         )
 

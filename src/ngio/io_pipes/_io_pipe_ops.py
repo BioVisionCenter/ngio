@@ -119,12 +119,20 @@ def setup_io_pipe(
     """Build the context for an io pipe.
 
     When a `roi` is given it is converted to a slicing dict; explicit
-    `slicing_dict` entries override the ROI-derived ones per axis.
+    `slicing_dict` entries override the ROI-derived ones per axis. On such
+    an override the context's `roi` is dropped to `None` — it no longer
+    describes the effective region, and a consumer trusting it (world
+    anchoring, a transform) must fail loudly rather than misplace pixels.
     """
     if roi is not None:
+        overridden = slicing_dict is not None and any(
+            roi.get(axis, default=None) is not None for axis in slicing_dict
+        )
         slicing_dict = roi_to_slicing_dict(
             roi=roi, pixel_size=dimensions.pixel_size, slicing_dict=slicing_dict
         )
+        if overridden:
+            roi = None
     slicing_ops = build_slicing_ops(
         dimensions=dimensions,
         slicing_dict=slicing_dict,

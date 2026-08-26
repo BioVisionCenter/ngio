@@ -263,7 +263,10 @@ class Image(AbstractImage):
                 If None, all channels are returned.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The array of the region of interest.
@@ -317,7 +320,10 @@ class Image(AbstractImage):
                 If None, all channels are returned.
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The dask array of the region of interest.
@@ -377,7 +383,10 @@ class Image(AbstractImage):
             transforms: The transforms to apply to the array.
             mode: The object type to return.
                 Can be "dask", "numpy".
-            **slicing_kwargs: The slices to get the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
 
         Returns:
             The zarr array of the region of interest.
@@ -445,7 +454,10 @@ class Image(AbstractImage):
             transforms: The transforms to apply to the array.
             merge: How to combine the patch with what is already there —
                 a rule name, a callable, or a policy. `None` overwrites.
-            **slicing_kwargs: The slices to set the array.
+            **slicing_kwargs: Per-axis selections in absolute
+                coordinates; an explicit selection on an axis the `roi`
+                already pins replaces the roi-derived one (and drops the
+                pipe's `roi`).
         """
         _slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs

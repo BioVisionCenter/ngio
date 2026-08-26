@@ -554,7 +554,7 @@ class OmeZarrContainer:
             pixel_size: Select the pyramid level whose pixel size matches this one.
                 A lookup key, not a value to write; to set a pixel size see
                 `pixelsize` on the create/derive entry points.
-                This is only used if path is None.
+                Mutually exclusive with `path` (both raise).
             strict (bool): Only used if the pixel size is provided. If True, the
                 pixel size must match the image pixel size exactly. If False, the
                 closest pixel size level will be returned.
