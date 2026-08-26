@@ -121,7 +121,7 @@ print(blurred_image_dask)
 # --8<-- [end:dask_blur]
 
 # --8<-- [start:iterators]
-from ngio import ThreadedMapper
+from ngio.iterators import ThreadedMapper
 from ngio.iterators import ImageProcessingIterator
 
 iterator = ImageProcessingIterator(

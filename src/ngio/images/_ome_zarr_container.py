@@ -29,6 +29,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.ome_zarr_meta.ngio_specs._channels import ChannelsMeta
 from ngio.tables import (
+    ROI_TABLE_TYPES,
     ConditionTable,
     FeatureTable,
     GenericRoiTable,
@@ -706,9 +707,7 @@ class OmeZarrContainer:
         # sort names the first pass had already sorted.
         types = table_container.table_types()
         return [
-            name
-            for name, table_type in types.items()
-            if table_type in ("roi_table", "masking_roi_table")
+            name for name, table_type in types.items() if table_type in ROI_TABLE_TYPES
         ]
 
     def get_roi_table(self, name: str) -> RoiTable:

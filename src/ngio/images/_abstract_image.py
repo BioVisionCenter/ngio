@@ -488,7 +488,7 @@ class AbstractImage(ABC):
         axes_order: Sequence[str] | None = None,
         transforms: Sequence[TransformProtocol] | None = None,
         mode: Literal["numpy", "dask"] = "numpy",
-        **slice_kwargs: SlicingInputType,
+        **slicing_kwargs: SlicingInputType,
     ) -> np.ndarray | da.Array:
         """Get a slice of the image.
 
@@ -498,7 +498,7 @@ class AbstractImage(ABC):
             transforms: The transforms to apply to the array.
             mode: The mode to return the array.
                 Can be "dask", "numpy".
-            **slice_kwargs: Per-axis selections in absolute
+            **slicing_kwargs: Per-axis selections in absolute
                 coordinates; an explicit selection on an axis the `roi`
                 already pins replaces the roi-derived one (and drops the
                 pipe's `roi`).
@@ -508,11 +508,11 @@ class AbstractImage(ABC):
         """
         if mode == "numpy":
             return self._get_roi_as_numpy(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+                roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
             )
         elif mode == "dask":
             return self._get_roi_as_dask(
-                roi=roi, axes_order=axes_order, transforms=transforms, **slice_kwargs
+                roi=roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
             )
         else:
             raise ValueError(

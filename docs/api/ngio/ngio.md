@@ -5,13 +5,12 @@
       members:
         - AxesSetup
         - ChannelSelectionModel
-        - ConsolidationConfig
-        - DaskConfig
         - DefaultNgffVersion
         - Dimensions
         - ImageInWellPath
         - NgffVersions
         - NgioConfig
+        - MergePolicy
         - NgioSupportedStore
         - PixelSize
         - RetryConfig
@@ -19,6 +18,6 @@
         - RoiSlice
         - S3FSConfig
         - StoreOrGroup
-        - ZarrConfig
+        - TransformProtocol
         - create_synthetic_ome_zarr
         - get_config

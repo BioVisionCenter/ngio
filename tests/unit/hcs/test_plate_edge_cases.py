@@ -17,7 +17,7 @@ from ngio.tables import (
     MaskingRoiTable,
     RoiTable,
 )
-from ngio.utils import NgioValueError
+from ngio.utils import NgioValidationError, NgioValueError
 
 
 def _make_roi(name: str, label: int | None = None) -> Roi:
@@ -74,7 +74,7 @@ def test_tables_container_missing_on_readonly_plate(tmp_path: Path):
     plate = open_ome_zarr_plate(tmp_path / "plate.zarr", mode="r")
     # No tables group exists and it cannot be created in read-only mode
     assert plate.list_tables() == []
-    with pytest.raises(NgioValueError, match="No tables container found"):
+    with pytest.raises(NgioValidationError, match="No tables found"):
         _ = plate.tables_container
 
 

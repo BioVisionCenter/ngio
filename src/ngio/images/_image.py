@@ -232,7 +232,7 @@ class Image(AbstractImage):
             channel_selection: Select a specific channel by label.
                 If None, all channels are returned.
                 Alternatively, you can slice arbitrary channels
-                using the slice_kwargs (c=[0, 2]).
+                using the slicing kwargs (c=[0, 2]).
             axes_order: The order of the axes to return the array.
             transforms: The transforms to apply to the array.
             **slicing_kwargs: The slices to get the array.

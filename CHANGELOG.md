@@ -30,10 +30,15 @@
 - `NgioConfig` gained three sections, each with a public model: `zarr` (`ZarrConfig`), `dask` (`DaskConfig`), and `consolidation` (`ConsolidationConfig`).
 - Every `max_workers` accepts `"auto"`; `refresh()` on containers and plates re-reads all held metadata; the scheduling primitives (`plan_waves`, `canonical_unit_order`, `TailPolicy`, …) are public in `ngio.iterators`.
 - New public names: `NgioFutureWarning`, `ChannelSlicingInputType` (`ngio.images`), `ConsolidationMode` and `RegionsLike` (`ngio.common`), and `AbstractImage.write_granularity()` — the shape zarr writes atomically.
+- The top-level facade now carries the vocabulary of its own methods: the table classes (`RoiTable`, `MaskingRoiTable`, `FeatureTable`, `ConditionTable`, `GenericRoiTable`, `GenericTable`, `Table`) and the transform/merge types (`TransformProtocol`, `MergePolicy`, `MergeInput`) are importable from `ngio` directly.
 - `Image.resolve_channel_selection(selection)` resolves anything the `get_*` methods accept as `channel_selection` — index, label, `ChannelSelectionModel`, or a sequence of those — to its slicing entry, touching only metadata. This is the supported way to validate a selection before loading data (Fractal tasks previously imported the private parser for their `skip_if_missing` checks).
 
 ### Fixes
 
+- Container and plate table access behave the same: a missing `/tables` raises `NgioValidationError` with one message on both; the plate now remembers a read-only "no tables" probe like the container (one store probe instead of one per listing); `add_image` raises `NgioValueError` instead of a bare `ValueError` (and no longer calls itself "atomic").
+- `list_roi_tables` includes `generic_roi_table` tables; `"generic_roi_table"` joined the `TypedTable`/`TypedRoiTable` literals, with the runtime tuple public as `ngio.tables.ROI_TABLE_TYPES`.
+- `Label`'s array methods (`get_as_numpy`, `get_roi`, `set_roi`, ...) are real methods with their own signatures and docstrings — they were class-level rebinds of private base methods, so docs and IDEs showed `_get_as_numpy` et al.
+- `ZarrGroupHandler.refresh()` is gone (beta-only removal): it had no callers — `OmeZarrContainer.refresh()`/`OmeZarrPlate.refresh()` are the real entry points, and `invalidate_meta()`/`clean_cache()` remain on the handler.
 - `PixelSize` comparisons respect units: `__eq__`/`__lt__`/`distance` convert magnitudes when both space units are known (warning once via `NgioUserWarning`); `distance` is spatial-only (`t` seconds no longer entered a micrometre norm that ranks pyramid levels). Unknown or `None` units stay incomparable.
 - Metadata autodetect only treats a pydantic `ValidationError` as "not this version": an `NgioError` raised inside a decoder (a bad `axes_setup`, corrupt values) now surfaces directly instead of being reported as unreadable metadata blaming the file.
 - `axes_order` refuses to drop a non-singleton axis with a named error (it silently squeezed, surfacing as a raw numpy error only when the axis happened to be bigger than 1).
@@ -96,6 +101,7 @@ All removals scheduled for `ngio=1.2`. The default-flip entries warn as `NgioFut
 
 ### Removed
 
+- **(beta-only)** The 1.1 betas' iterator/config additions to the top-level namespace moved to their subpackages: the scheduling and reconciliation internals (`plan_waves`, `canonical_unit_order`, `write_conflict_components`, `compute_write_footprint`, `IterUnit`, `TailPolicy`, `OverlapPolicy`, `HaloMargins`, `MaxWorkers`, `JobArgs`, `StitchConfig`, `IouSeamMatcher`, `SeamMatcherProtocol`, `GreedyNms`, `NmsProtocol`, `bbox_iou`, `Detection`, `ConcatJoin`, `JoinProtocol`, `FeatureFuncResult`, `AbstractIteratorBuilder`, `ObjectDetectionIterator`, `ThreadedMapper`, `ProcessMapper`, `BatchedMapper`) live in `ngio.iterators`; `ZarrConfig`/`DaskConfig`/`ConsolidationConfig` live in `ngio.config`. The pre-1.1 top-level names are unchanged.
 - **The surfaces v1.0.0 deprecated for `ngio=1.1` are gone** (except the `experimental.iterators` alias — see Deprecated): the `conctatenate_tables` typo alias, `set_axes_unit`, the `levels_paths=`/`validate_paths=` keyword aliases, and every `*_async` variant — `plate.get_images_async()` becomes `plate.get_images(max_workers="auto")`.
 
 ### Performance

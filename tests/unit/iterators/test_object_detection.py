@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import GreedyNms, ObjectDetectionIterator, Roi, create_ome_zarr_from_array
+from ngio import Roi, create_ome_zarr_from_array
 from ngio.common._roi import RoiSlice
-from ngio.iterators import ThreadedMapper
+from ngio.iterators import GreedyNms, ObjectDetectionIterator, ThreadedMapper
 from ngio.utils import NgioValueError
 
 

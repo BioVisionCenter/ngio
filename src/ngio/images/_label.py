@@ -3,9 +3,11 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
+import dask.array as da
+import numpy as np
 from zarr.core.array import CompressorLike
 
-from ngio.common import compute_masking_roi
+from ngio.common import Roi, compute_masking_roi
 from ngio.common._label_ops import relabel_sequential
 from ngio.common._pyramid import (
     ChunksLike,
@@ -18,6 +20,7 @@ from ngio.images._abstract_image import (
     abstract_derive,
 )
 from ngio.images._image import Image
+from ngio.io_pipes import MergeInput, SlicingInputType, TransformProtocol
 from ngio.ome_zarr_meta import (
     LabelMetaHandler,
     LabelsGroupMetaHandler,
@@ -40,16 +43,186 @@ from ngio.utils import (
 
 
 class Label(AbstractImage):
-    """Placeholder class for a label."""
+    """A single level of a label pyramid."""
 
-    get_as_numpy = AbstractImage._get_as_numpy
-    get_as_dask = AbstractImage._get_as_dask
-    get_array = AbstractImage._get_array
-    get_roi_as_numpy = AbstractImage._get_roi_as_numpy
-    get_roi_as_dask = AbstractImage._get_roi_as_dask
-    get_roi = AbstractImage._get_roi
-    set_array = AbstractImage._set_array
-    set_roi = AbstractImage._set_roi
+    def get_as_numpy(
+        self,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> np.ndarray:
+        """Get the label as a numpy array.
+
+        Args:
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            **slicing_kwargs: The slices to get the array.
+        """
+        return self._get_as_numpy(
+            axes_order=axes_order, transforms=transforms, **slicing_kwargs
+        )
+
+    def get_as_dask(
+        self,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> da.Array:
+        """Get the label as a dask array.
+
+        Args:
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            **slicing_kwargs: The slices to get the array.
+        """
+        return self._get_as_dask(
+            axes_order=axes_order, transforms=transforms, **slicing_kwargs
+        )
+
+    def get_array(
+        self,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        mode: Literal["numpy", "dask"] = "numpy",
+        **slicing_kwargs: SlicingInputType,
+    ) -> np.ndarray | da.Array:
+        """Get the label as a numpy or dask array, by `mode`.
+
+        Args:
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            mode: The object type to return ("numpy" or "dask").
+            **slicing_kwargs: The slices to get the array.
+        """
+        return self._get_array(
+            axes_order=axes_order, transforms=transforms, mode=mode, **slicing_kwargs
+        )
+
+    def get_roi_as_numpy(
+        self,
+        roi: Roi,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> np.ndarray:
+        """Get a region of the label as a numpy array.
+
+        Args:
+            roi: The region of interest to get.
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            **slicing_kwargs: Per-axis selections in absolute coordinates; an
+                explicit selection on an axis the `roi` already pins replaces
+                the roi-derived one (and drops the pipe's `roi`).
+        """
+        return self._get_roi_as_numpy(
+            roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
+        )
+
+    def get_roi_as_dask(
+        self,
+        roi: Roi,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> da.Array:
+        """Get a region of the label as a dask array.
+
+        Args:
+            roi: The region of interest to get.
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            **slicing_kwargs: Per-axis selections in absolute coordinates; an
+                explicit selection on an axis the `roi` already pins replaces
+                the roi-derived one (and drops the pipe's `roi`).
+        """
+        return self._get_roi_as_dask(
+            roi, axes_order=axes_order, transforms=transforms, **slicing_kwargs
+        )
+
+    def get_roi(
+        self,
+        roi: Roi,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        mode: Literal["numpy", "dask"] = "numpy",
+        **slicing_kwargs: SlicingInputType,
+    ) -> np.ndarray | da.Array:
+        """Get a region of the label as a numpy or dask array, by `mode`.
+
+        Args:
+            roi: The region of interest to get.
+            axes_order: The order of the axes to return the array.
+            transforms: The transforms to apply to the array.
+            mode: The object type to return ("numpy" or "dask").
+            **slicing_kwargs: Per-axis selections in absolute coordinates; an
+                explicit selection on an axis the `roi` already pins replaces
+                the roi-derived one (and drops the pipe's `roi`).
+        """
+        return self._get_roi(
+            roi,
+            axes_order=axes_order,
+            transforms=transforms,
+            mode=mode,
+            **slicing_kwargs,
+        )
+
+    def set_array(
+        self,
+        patch: np.ndarray | da.Array,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> None:
+        """Write a patch to the label.
+
+        Args:
+            patch: The patch to set.
+            axes_order: The order of the axes of the patch.
+            transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
+            **slicing_kwargs: The slices to set the patch.
+        """
+        return self._set_array(
+            patch,
+            axes_order=axes_order,
+            transforms=transforms,
+            merge=merge,
+            **slicing_kwargs,
+        )
+
+    def set_roi(
+        self,
+        roi: Roi,
+        patch: np.ndarray | da.Array,
+        axes_order: Sequence[str] | None = None,
+        transforms: Sequence[TransformProtocol] | None = None,
+        merge: MergeInput | None = None,
+        **slicing_kwargs: SlicingInputType,
+    ) -> None:
+        """Write a patch to a region of the label.
+
+        Args:
+            roi: The region of interest to set.
+            patch: The patch to set.
+            axes_order: The order of the axes of the patch.
+            transforms: The transforms to apply to the patch.
+            merge: How to combine the patch with what is already there.
+                `None` overwrites. See `ngio.transforms`.
+            **slicing_kwargs: Per-axis selections in absolute coordinates; an
+                explicit selection on an axis the `roi` already pins replaces
+                the roi-derived one (and drops the pipe's `roi`).
+        """
+        return self._set_roi(
+            roi,
+            patch,
+            axes_order=axes_order,
+            transforms=transforms,
+            merge=merge,
+            **slicing_kwargs,
+        )
 
     def __init__(
         self,

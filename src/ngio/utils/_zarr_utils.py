@@ -361,14 +361,6 @@ class ZarrGroupHandler:
         self.invalidate_meta()
         self._handlers_cache.clear()
 
-    def refresh(self) -> None:
-        """Re-read metadata that `cache=True` would otherwise hold indefinitely.
-
-        The answer to "someone else wrote, and I want to see it". A no-op with
-        `cache=False`, where nothing is held in the first place.
-        """
-        self.invalidate_meta()
-
     @contextmanager
     def locked(self) -> Iterator[BaseFileLock]:
         """Hold the group's file lock, with cached metadata refreshed around it.

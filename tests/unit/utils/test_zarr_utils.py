@@ -113,7 +113,7 @@ def test_cache_true_holds_until_refreshed(tmp_path: Path):
     assert uncached.load_attrs() == {"marker": 1}
     assert cached.load_attrs() == {}
 
-    cached.refresh()
+    cached.invalidate_meta()
     assert cached.load_attrs() == {"marker": 1}
 
 
@@ -288,7 +288,7 @@ def test_multiprocessing_safety(tmp_path: Path, cache: bool):
     assert os.getpid() not in pids
     assert len(pids) > 1
 
-    handler.refresh()
+    handler.invalidate_meta()
     _, counts = np.unique(handler.load_attrs()["test_list"], return_counts=True)
     assert len(counts) == num_items
     assert np.all(counts == 1)

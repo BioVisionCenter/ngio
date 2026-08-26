@@ -448,7 +448,7 @@ def _detect_bright(patch):
 
 def test_detect_across_processes(tmp_path: Path):
     """Per-tile boxes pickle back from the workers; the table matches serial."""
-    from ngio import ObjectDetectionIterator
+    from ngio.iterators import ObjectDetectionIterator
 
     data = np.zeros((1, 64, 64), dtype="uint8")
     data[0, 10:20, 26:38] = 255
