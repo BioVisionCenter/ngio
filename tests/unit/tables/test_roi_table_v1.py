@@ -117,3 +117,12 @@ def test_generic_roi_table_is_constructible_and_loadable(tmp_path: Path):
     assert isinstance(loaded, GenericRoiTable)
     assert loaded.get("roi1") == table.get("roi1")
     assert loaded.get("roi2") == table.get("roi2")
+
+    # The written attrs carry the type, and the registry resolves it: the
+    # typed `open_table` (strict path) returns a GenericRoiTable, not the
+    # untyped GenericTable fallback.
+    handler = ZarrGroupHandler(tmp_path / "generic.zarr")
+    assert handler.load_attrs()["type"] == "generic_roi_table"
+    reopened = open_table(store=tmp_path / "generic.zarr")
+    assert isinstance(reopened, GenericRoiTable)
+    assert reopened.get("roi1") == table.get("roi1")

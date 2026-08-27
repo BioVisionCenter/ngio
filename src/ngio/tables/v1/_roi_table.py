@@ -320,6 +320,20 @@ def _table_to_rois(
     return dataframe, roi_dict_wrapper
 
 
+class GenericRoiTableV1Meta(BackendMeta):
+    """Metadata for the generic ROI table.
+
+    `type` is loose (like `ConditionTableMeta`, unlike the `Literal` siblings)
+    so `open_table_as(store, GenericRoiTable)` keeps working on any on-disk
+    ROI-typed table and re-serializing preserves the original type.
+    """
+
+    table_version: str | None = "1"
+    type: str | None = "generic_roi_table"
+    index_key: str | None = "FieldIndex"
+    index_type: Literal["str", "int"] | None = "str"
+
+
 class GenericRoiTableV1(AbstractBaseTable):
     def __init__(
         self,
@@ -329,9 +343,7 @@ class GenericRoiTableV1(AbstractBaseTable):
         required_columns: list[str] = REQUIRED_COLUMNS,
     ) -> None:
         if meta is None:
-            # Same index defaults as `RoiTableV1`: the ROIs are keyed by name,
-            # and serializing them needs a string index column to round-trip.
-            meta = BackendMeta(index_key="FieldIndex", index_type="str")
+            meta = GenericRoiTableV1Meta()
         table = None
 
         self._rois: RoiDictWrapper | None = None
@@ -403,8 +415,12 @@ class GenericRoiTableV1(AbstractBaseTable):
             return None
 
         if self._table_backend is None:
-            # No backend and no in-memory data: this is an empty ROI table.
-            self._rois = RoiDictWrapper([])
+            if self._rois is None:
+                # No backend and no in-memory data: this is an empty ROI table.
+                self._rois = RoiDictWrapper([])
+            # ROIs added to a lazily-unbuilt table (`RoiTable()` then `add()`)
+            # land here with `_table_data` still `None`; serialize them rather
+            # than resetting to empty.
             self._table_data = self._rois.to_dataframe(index_key=self.index_key)
             self._rois_dirty = False
             return None
@@ -480,7 +496,7 @@ class GenericRoiTableV1(AbstractBaseTable):
         return cls._from_handler(
             handler=handler,
             backend=backend,
-            meta_model=BackendMeta,
+            meta_model=GenericRoiTableV1Meta,
             attrs=attrs,
         )
 

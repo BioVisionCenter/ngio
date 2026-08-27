@@ -46,6 +46,29 @@ def test_wells_and_images_cache(cardiomyocyte_tiny_path_readonly: Path):
     assert plate.get_well("B", "03") is well
 
 
+@pytest.mark.parametrize("add", ["add_image", "atomic_add_image"])
+def test_cached_plate_sees_its_own_add_image(tmp_path: Path, add: str):
+    """A `cache=True` plate lists an image it just added, without `refresh()`.
+
+    `clean_cache()` in the add path used to orphan the cached well's handler,
+    so `_wells_cache` kept serving the pre-write image list from every
+    listing API.
+    """
+    create_empty_plate(tmp_path / "plate.zarr", name="plate")
+    plate = open_ome_zarr_plate(tmp_path / "plate.zarr", cache=True)
+    plate.add_image(row="B", column="03", image_path="0")
+
+    assert plate.images_paths() == ["B/03/0"]  # populate the well cache
+    getattr(plate, add)(row="B", column="03", image_path="1")
+
+    assert sorted(plate.images_paths()) == ["B/03/0", "B/03/1"]
+    assert sorted(plate.get_well("B", "03").paths()) == ["0", "1"]
+
+    # A well added after the cache was populated is visible too.
+    plate.add_well(row="C", column="03")
+    assert "C/03" in plate.wells_paths()
+
+
 def test_add_image_none_path_raises(tmp_path: Path):
     plate = create_empty_plate(tmp_path / "plate.zarr", name="plate")
     with pytest.raises(ValueError, match="Image path cannot be None"):

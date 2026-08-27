@@ -303,3 +303,39 @@ def test_set_roi_masked_with_merge():
     out = masked.get_as_numpy()
     assert (out[label_img == 1] == 99).all()
     assert (out[label_img != 1] == 10).all()
+
+
+def test_set_roi_masked_refuses_a_shape_changing_merge():
+    """The inner merge slot enforces the same anti-broadcast guard as `merge=`.
+
+    The masked fold (`np.where`) would re-broadcast a wrong-shaped inner
+    result back to the region shape, so without its own check a channel- or
+    row-reducing custom rule wrote silently replicated data.
+    """
+    import numpy as np
+    from zarr.storage import MemoryStore
+
+    from ngio import create_ome_zarr_from_array
+    from ngio.utils import NgioValueError
+
+    data = np.full((32, 32), 10, dtype="uint16")
+    ome_zarr = create_ome_zarr_from_array(
+        store=MemoryStore(), array=data, pixelsize=1.0, levels=1, axes_names="yx"
+    )
+    label_img = np.zeros((32, 32), dtype="uint32")
+    label_img[8:20, 8:20] = 1
+    lbl = ome_zarr.derive_label("mask")
+    lbl.set_array(label_img)
+    ome_zarr.get_label("mask").build_masking_roi_table()
+    masked = ome_zarr.get_masked_image(masking_label_name="mask")
+
+    patch_shape = masked.get_roi_masked_as_numpy(1).shape
+    patch = np.full(patch_shape, 99, dtype="uint16")
+
+    def truncating(existing, incoming, ctx):
+        return incoming[:1]
+
+    with pytest.raises(NgioValueError, match="must preserve the region"):
+        masked.set_roi_masked(1, patch, merge=truncating)
+    # Nothing was written on the refused set.
+    assert (masked.get_as_numpy() == 10).all()

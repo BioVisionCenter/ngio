@@ -25,6 +25,7 @@ from ngio.iterators._partials import (
     delete_partials_root,
     merge_partial_frames,
     prepare_partials,
+    unit_columns_record,
     validate_partials_context,
     write_partial,
 )
@@ -409,20 +410,26 @@ class FeatureExtractorIterator(
         merged = merge_partial_frames(self, handler, job_verb="measure")
 
         groups: dict[int, pd.DataFrame] = {}
-        if merged is not None:
-            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+        if merged.frame is not None:
+            for index, group in merged.frame.groupby(INDEX_COLUMN, sort=True):
                 frame = group.drop(columns=[INDEX_COLUMN]).reset_index(drop=True)
-                # The partial round-trip regroups columns by dtype; pin the
-                # provenance columns back to the end, where a serial
-                # normalization puts them.
-                measured = [
-                    column
-                    for column in frame.columns
-                    if column not in (ROI_INDEX_COLUMN, ROI_NAME_COLUMN)
-                ]
-                groups[int(cast("Any", index))] = frame[
-                    [*measured, ROI_INDEX_COLUMN, ROI_NAME_COLUMN]
-                ]
+                record = merged.columns.get(int(cast("Any", index)))
+                if record is not None:
+                    # The concat unioned columns across ROIs (NaN-filled,
+                    # ints upcast); restore this ROI's own schema exactly.
+                    columns, dtypes = record
+                    frame = frame[columns].astype(dtypes)
+                else:
+                    # Partial from an older ngio with no schema record: pin
+                    # the provenance columns back to the end, where a serial
+                    # normalization puts them.
+                    measured = [
+                        column
+                        for column in frame.columns
+                        if column not in (ROI_INDEX_COLUMN, ROI_NAME_COLUMN)
+                    ]
+                    frame = frame[[*measured, ROI_INDEX_COLUMN, ROI_NAME_COLUMN]]
+                groups[int(cast("Any", index))] = frame
         results: list[pd.DataFrame] = [
             groups.get(index, pd.DataFrame()) for index in range(len(self.rois))
         ]
@@ -514,12 +521,14 @@ class FeatureExtractorIterator(
         indices = self.partition_indices or []
         results = self.reduce(_UnpackedFeatureFunc(func), mapper=mapper)
         frames = []
+        column_records = []
         for index, result in zip(indices, results, strict=True):
             frame = _normalized_frame(result, index=index, roi=self.rois[index])
             if not len(frame):
                 continue
-            # The internal merge key comes last, so dropping it at the
-            # gather leaves the columns in the same order as a serial run.
+            # Recorded before the merge key: the concat below unions columns
+            # across ROIs, and the gather restores each ROI's own schema.
+            column_records.append(unit_columns_record(index, frame))
             frame[INDEX_COLUMN] = index
             frames.append(frame)
         payload = pd.concat(frames, ignore_index=True) if frames else None
@@ -531,6 +540,7 @@ class FeatureExtractorIterator(
                 "job_index": job_index,
                 "n_jobs": n_jobs,
                 "fingerprint": self._plan_fingerprint(n_jobs),
+                "columns": column_records,
             },
         )
 

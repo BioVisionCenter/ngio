@@ -340,6 +340,81 @@ def test_stitched_finalize_lists_missing_banks(tmp_path: Path):
         _stitched_iterator(ome_zarr).finalize()
 
 
+def test_a_tile_killed_between_core_write_and_bank_fails_loud(
+    tmp_path: Path, monkeypatch
+):
+    """A job killed after the core write but before banking is caught.
+
+    The core lands first and the bank second, so this crash window leaves a
+    written-but-unbanked tile that the gather refuses by name — the opposite
+    order left a valid-looking bank and a tile silently missing from the
+    output.
+    """
+    import ngio.iterators._stitch as stitch_mod
+
+    ome_zarr = _stitched_setup(tmp_path / "stitch_kill.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    assert len(args_list) == 2
+    _stitched_iterator(ome_zarr).for_job(**args_list[0]).map(_label_components)
+
+    def _killed(*args, **kwargs):
+        raise RuntimeError("killed between core write and bank")
+
+    monkeypatch.setattr(stitch_mod, "set_as_numpy_axes_ops", _killed)
+    with pytest.raises(RuntimeError, match="killed between"):
+        _stitched_iterator(ome_zarr).for_job(**args_list[1]).map(_label_components)
+    monkeypatch.undo()
+
+    with pytest.raises(NgioValueError, match="never banked"):
+        _stitched_iterator(ome_zarr).finalize()
+
+    # Re-running the killed job is the documented recovery.
+    _stitched_iterator(ome_zarr).for_job(**args_list[1]).map(_label_components)
+    _stitched_iterator(ome_zarr).finalize()
+    reference = _stitched_serial_reference(tmp_path)
+    np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
+
+
+def test_interrupted_compaction_refuses_the_retry(tmp_path: Path, monkeypatch):
+    """A finalize killed mid-compaction is refused on retry, not re-walked.
+
+    The in-place renumbering is the one non-idempotent phase: re-resolving a
+    half-compacted label silently splits every object straddling the crash
+    point. The scratch carries a `resolving` marker for exactly this window.
+    """
+    import ngio.iterators._stitch as stitch_mod
+
+    ome_zarr = _stitched_setup(tmp_path / "stitch_crash.zarr")
+    ome_zarr.derive_label("seg")
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in args_list:
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+
+    def _killed(*args, **kwargs):
+        raise RuntimeError("killed mid-compaction")
+
+    monkeypatch.setattr(stitch_mod, "relabel_sequential", _killed)
+    with pytest.raises(RuntimeError, match="killed mid-compaction"):
+        _stitched_iterator(ome_zarr).finalize()
+    monkeypatch.undo()
+
+    # The retry — and any job re-run against the marked scratch — refuses.
+    with pytest.raises(NgioValueError, match="interrupted while compacting"):
+        _stitched_iterator(ome_zarr).finalize()
+    with pytest.raises(NgioValueError, match="interrupted while compacting"):
+        _stitched_iterator(ome_zarr).for_job(**args_list[0]).map(_label_components)
+
+    # `prepare_jobs` deliberately starts over: it clears the marker and the
+    # regenerated run completes.
+    args_list = _stitched_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in args_list:
+        _stitched_iterator(ome_zarr).for_job(**args).map(_label_components)
+    _stitched_iterator(ome_zarr).finalize()
+    reference = _stitched_serial_reference(tmp_path)
+    np.testing.assert_array_equal(ome_zarr.get_label("seg").get_as_numpy(), reference)
+
+
 def test_stitched_reprepare_invalidates_old_banks(tmp_path: Path):
     """Banks from a superseded prepare are stale, not silently resolved."""
     ome_zarr = _stitched_setup(tmp_path / "stitch_stale.zarr")
@@ -684,6 +759,76 @@ def test_feature_merge_matches_serial(tmp_path: Path, custom_join: bool):
     assert "_ngio_partials" not in list(label._group_handler.group.keys())
 
 
+def _hetero_measure(image, label_patch, roi):
+    """Different column sets per ROI: `area` (int) odd objects, `score` even."""
+    objs = [int(obj) for obj in np.unique(label_patch) if obj]
+    rows: dict = {"label": objs}
+    if any(obj % 2 for obj in objs):
+        rows["area"] = [int((label_patch == obj).sum()) for obj in objs]
+    if any(obj % 2 == 0 for obj in objs):
+        rows["score"] = [float(image[label_patch == obj].mean()) for obj in objs]
+    return rows
+
+
+def _column_mean_join(results):
+    """Reads `frame.columns` per ROI — sensitive to the column-union bug."""
+    import pandas as pd
+
+    from ngio.tables import FeatureTable
+
+    rows = []
+    for frame in results:
+        if not len(frame):
+            continue
+        measured = [c for c in frame.columns if c not in ("roi_index", "roi_name")]
+        rows.append(
+            {
+                "label": int(frame["label"].iloc[0]),
+                "n_columns": len(measured),
+                "columns": ",".join(measured),
+            }
+        )
+    return FeatureTable(table_data=pd.DataFrame(rows), reference_label="objs")
+
+
+@pytest.mark.parametrize("custom_join", [False, True])
+def test_feature_merge_matches_serial_heterogeneous_columns(
+    tmp_path: Path, custom_join: bool
+):
+    """Per-ROI column sets and dtypes survive the partial round-trip.
+
+    The partial concat unions columns across ROIs and NaN-fills the gaps
+    (upcasting ints to floats), so before the schema record a custom join
+    saw different frames — and the default join different dtypes — on the
+    distributed path than on the serial one, even at `n_jobs=1`.
+    """
+    import pandas as pd
+
+    join = _column_mean_join if custom_join else None
+    serial_oz = _feature_setup(tmp_path / "feat_het_serial.zarr")
+    serial_it = _feature_iterator(serial_oz)
+    if join is not None:
+        serial_it = serial_it.with_join(join)
+    serial = serial_it.measure(_hetero_measure)
+    assert serial is not None
+    if not custom_join:
+        # The premise: the ROIs really produce different schemas.
+        assert serial.dataframe["area"].isna().any()
+
+    ome_zarr = _feature_setup(tmp_path / "feat_het_jobs.zarr")
+    args_list = _feature_iterator(ome_zarr).prepare_jobs(n_jobs=2)
+    for args in reversed(args_list):
+        assert (
+            _feature_iterator(ome_zarr).for_job(**args).measure(_hetero_measure) is None
+        )
+    gather_it = _feature_iterator(ome_zarr)
+    if join is not None:
+        gather_it = gather_it.with_join(join)
+    merged = gather_it.finalize()
+
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+
+
 def test_feature_slice_measure_banks_and_slice_finalize_refuses(tmp_path: Path):
     ome_zarr = _feature_setup(tmp_path / "feat_guard.zarr")
     iterator = _feature_iterator(ome_zarr)
@@ -797,6 +942,73 @@ def test_detection_merge_matches_serial(tmp_path: Path):
     pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
     image = ome_zarr.get_image()
     assert "_ngio_partials" not in list(image._group_handler.group.keys())
+
+
+def _flagged_detector(patch):
+    """`_detector` plus an integer `class_id` extra on even-count tiles only.
+
+    Tile-homogeneous on purpose: the extra's column exists in some tiles'
+    partials and not others, so the cross-tile concat used to NaN-fill and
+    float-promote it.
+    """
+    from scipy import ndimage
+
+    from ngio import Roi
+
+    labeled, count = ndimage.label(patch > 200)
+    flagged = count % 2 == 0
+    boxes = []
+    for obj in range(1, count + 1):
+        ys, xs = np.where(labeled == obj)
+        extras: dict = {"confidence": float(patch[labeled == obj].mean())}
+        if flagged:
+            extras["class_id"] = 7
+        boxes.append(
+            Roi.from_values(
+                slices={
+                    "x": (float(xs.min()), float(xs.max() + 1 - xs.min())),
+                    "y": (float(ys.min()), float(ys.max() + 1 - ys.min())),
+                },
+                name=None,
+                space="pixel",
+                **extras,
+            )
+        )
+    return boxes
+
+
+def test_detection_merge_keeps_integer_extras(tmp_path: Path):
+    """A tile's int extra survives the partial round-trip as an int.
+
+    Tiles without the field used to NaN-fill its column at the merge,
+    promoting the survivors to float — `class_id=7` came back `7.0` from
+    `finalize()` while a serial `detect` returned `7`.
+    """
+    import pandas as pd
+
+    serial_oz = _detection_setup(tmp_path / "det_int_serial.zarr")
+    serial = _detection_iterator(serial_oz).detect(_flagged_detector)
+    assert serial is not None
+    flags = {"class_id" in (roi.model_extra or {}) for roi in serial.rois()}
+    assert flags == {True, False}, "premise: some tiles flagged, some not"
+
+    ome_zarr = _detection_setup(tmp_path / "det_int_jobs.zarr")
+    args_list = _detection_iterator(ome_zarr).prepare_jobs(n_jobs=3)
+    for args in reversed(args_list):
+        assert (
+            _detection_iterator(ome_zarr).for_job(**args).detect(_flagged_detector)
+            is None
+        )
+    merged = _detection_iterator(ome_zarr).finalize()
+
+    pd.testing.assert_frame_equal(serial.dataframe, merged.dataframe)
+    for serial_roi, merged_roi in zip(serial.rois(), merged.rois(), strict=True):
+        serial_extra = (serial_roi.model_extra or {}).get("class_id")
+        merged_extra = (merged_roi.model_extra or {}).get("class_id")
+        assert (serial_extra is None) == (merged_extra is None)
+        if merged_extra is not None:
+            assert merged_extra == 7
+            assert not isinstance(merged_extra, float)
 
 
 def test_detection_slice_detect_banks_and_slice_finalize_refuses(tmp_path: Path):

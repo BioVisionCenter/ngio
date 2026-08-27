@@ -177,6 +177,9 @@ class Label(AbstractImage):
     ) -> None:
         """Write a patch to the label.
 
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
+
         Args:
             patch: The patch to set.
             axes_order: The order of the axes of the patch.
@@ -203,6 +206,9 @@ class Label(AbstractImage):
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Write a patch to a region of the label.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
 
         Args:
             roi: The region of interest to set.

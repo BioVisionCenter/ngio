@@ -102,9 +102,12 @@ bank into a private copy — ngio refuses that rather than losing the prediction
 silently.
 
 If a run is interrupted between the map and the resolve, the label holds a valid but
-over-split segmentation; re-running the resolve is safe, because it is idempotent.
-Compaction is also available on its own — `label.relabel_sequential()` renumbers any
-label to a dense `1..N`.
+over-split segmentation, and re-running the resolve is safe. An interruption *inside*
+the resolve is different: the default `compact=True` renumbers the label in place, so
+a kill mid-walk leaves mixed ids — ngio marks the walk before it starts and refuses a
+retry loudly rather than silently splitting objects; re-run the map to regenerate the
+label. Compaction is also available on its own — `label.relabel_sequential()`
+renumbers any label to a dense `1..N`.
 
 ## Next steps
 

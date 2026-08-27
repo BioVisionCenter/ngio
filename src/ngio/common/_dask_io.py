@@ -125,7 +125,8 @@ def store_dask(
     Serial callers only: the budget is applied through a process-global
     `dask.config` scope, so two concurrent `store_dask` calls can run under
     each other's budget. The dask iterator verbs enforce this by rejecting
-    parallel mappers.
+    parallel mappers; the array setters only document it (a guard was judged
+    not worth the blast radius with no known concurrent callers).
 
     Args:
         patch: The data to write.

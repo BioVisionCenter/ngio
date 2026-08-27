@@ -10,6 +10,7 @@ from ngio.common import Roi
 from ngio.tables._tables_container import open_table, write_table
 from ngio.tables.v1._roi_table import (
     GenericRoiTableV1,
+    GenericRoiTableV1Meta,
     MaskingRoiTableV1,
     MaskingRoiTableV1Meta,
     RoiDictWrapper,
@@ -160,6 +161,38 @@ def test_roi_dict_wrapper_add_single_roi():
 
 def test_generic_roi_table_type():
     assert GenericRoiTableV1.table_type() == "generic_roi_table"
+
+
+def test_generic_roi_table_meta_defaults():
+    meta = GenericRoiTableV1().meta
+    assert isinstance(meta, GenericRoiTableV1Meta)
+    assert meta.type == "generic_roi_table"
+    assert meta.table_version == "1"
+    assert meta.index_key == "FieldIndex"
+    assert meta.index_type == "str"
+
+
+@pytest.mark.parametrize(
+    "table_cls", [RoiTableV1, MaskingRoiTableV1, GenericRoiTableV1]
+)
+def test_rois_added_before_write_survive_roundtrip(tmp_path: Path, table_cls):
+    """`Table()` then `add()` then write must not serialize an empty table.
+
+    `set_table_data(None)` used to reset populated-but-lazily-unbuilt ROIs to
+    an empty wrapper, silently writing zero ROIs and emptying the in-memory
+    table too.
+    """
+    table = table_cls()
+    # Name is the stringified label: masking tables serialize with an int index.
+    table.add(_make_roi("1", label=1))
+
+    store = tmp_path / "t.zarr"
+    write_table(store=store, table=table, backend="anndata")
+
+    assert [roi.name for roi in table.rois()] == ["1"]
+    loaded = open_table(store=store)
+    assert isinstance(loaded, table_cls)
+    assert [roi.name for roi in loaded.rois()] == ["1"]
 
 
 def test_from_table_data():
