@@ -2038,6 +2038,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#docs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2077,7 +2088,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -2171,7 +2182,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -2265,7 +2276,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_2" class="md-nav__link">
+  <a href="#fixes_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3380,6 +3391,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#docs" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3419,7 +3441,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3513,7 +3535,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3607,7 +3629,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_2" class="md-nav__link">
+  <a href="#fixes_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -4638,8 +4660,20 @@
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A <code>cache=True</code> plate now sees its own <code>add_image</code>/<code>atomic_add_image</code>/<code>add_well</code>: the add path evicted the cached well's group handler mid-operation, so every listing (<code>images_paths</code>, <code>get_well</code>, <code>get_images</code>, and the table helpers on them) kept serving the pre-write image list until <code>refresh()</code>.</li>
+<li>The zarr-python copy fallback (memory/zip stores — <code>derive_*(copy_labels=True)</code>, the anndata <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr>) writes through the write-unit-aligned dask path; it was the one <code>da.to_zarr</code> call the 1.1.0 alignment fix missed, and a shard larger than dask's block budget silently lost most of its pixels.</li>
+<li><code>GenericRoiTable</code> is registered and typed: <code>get(strict=True)</code>/<code>get_generic_roi_table</code> load tables typed <code>generic_roi_table</code> (they were listed by <code>list_roi_tables</code> but unloadable, and could make <code>get_masked_image</code> raise), and a fresh <code>GenericRoiTable</code> writes <code>type</code> to disk so its identity survives the round trip. Tables written by earlier ngio versions carry no type and keep loading as generic tables.</li>
+<li><code>RoiTable()</code>/<code>MaskingRoiTable()</code>/<code>GenericRoiTable()</code> followed by <code>add(roi)</code> then <code>add_table</code> no longer writes an empty table: serialization reset lazily-unbuilt <abbr title="Regions of Interest — rectangular regions of an image, defined in world or pixel coordinates">ROIs</abbr> to an empty wrapper, silently discarding them from the store and the in-memory table alike.</li>
+<li>The inner merge of <code>set_roi_masked(merge=...)</code> enforces the same anti-broadcast guard as top-level <code>merge=</code>: a wrong-shaped result from a custom rule was re-broadcast by the mask fold and written silently.</li>
+<li>A stitch bank's validity attrs land after its payload, and a tile's core write lands before its bank: both crash windows now surface as the loud "never banked" refusal at <code>finalize()</code> instead of a valid-looking zero bank or a tile silently missing from the output.</li>
+<li>A <code>finalize()</code> interrupted inside the <code>compact=True</code> in-place renumbering is detected (a <code>resolving</code> marker on the scratch) and the retry refused with the recovery spelled out — it used to pass every guard and permanently split objects straddling the crash point. <code>prepare_jobs</code> deliberately starts over and clears the marker.</li>
+<li>Distributed <code>measure</code>/<code>detect</code> partials record each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s/tile's own column set and dtypes, and the gather restores them: the merge used to union columns across units (NaN-filled, ints promoted to float), so column- or dtype-sensitive custom joins diverged from serial and integer detection extras came back as floats.</li>
+</ul>
 <h3 id="docs">Docs<a class="headerlink" href="#docs" title="Permanent link">&para;</a></h3>
 <ul>
+<li>The array setters (<code>set_array</code>, <code>set_roi</code>, <code>set_roi_masked</code>) document that dask patches are serial-only: concurrent dask writes from several threads can silently lose updates. Enforcing it was deliberately left out — the guard's blast radius outweighs a hazard with no known concurrent callers.</li>
 <li>The iterators getting-started page is now a concept guide: it keeps the design-system figures (the iterator walk, the five iterators side by side, tail policies, wave scheduling, halos, stitching, and detection) and the short core snippets, and hands the long worked examples to the tutorials.</li>
 <li>New <strong>Stitching</strong> tutorial: a tiled watershed segmentation on real microscopy data, with and without <code>with_stitch()</code>, plus the <code>StitchConfig</code> tuning knobs.</li>
 <li>New <strong>Distributed processing</strong> tutorial: the <code>prepare_jobs → for_job → finalize</code> recipe executable end to end — partition layouts, distributed stitching, and distributed measurement.</li>
@@ -4661,7 +4695,7 @@
 <li>One reconciliation declaration per iterator, in the builder chain: <code>on_overlap(policy)</code> on the writers (contested write pixels: <code>"last"</code> for last-writer-wins, or any <code>merge=</code> rule), <code>with_stitch(config)</code> on segmentation, <code>with_join(join)</code> on features, <code>with_nms(nms)</code> on detection — each backed by a swappable protocol (<code>SeamMatcherProtocol</code>/<code>IouSeamMatcher</code>, <code>JoinProtocol</code>/<code>ConcatJoin</code>, <code>NmsProtocol</code>/<code>GreedyNms</code>).</li>
 <li><code>BatchedMapper(batch_size=...)</code> stacks patches into one <code>(B, ...)</code> array per <code>func</code> call, for neural-network inference; <code>iter(batch_size=...)</code> is the manual batched loop (numpy-only and eager).</li>
 <li><code>with_halo(x=, y=, ...)</code> reads a grown region and writes only the core; write footprints — and so parallelism — are unchanged, and misuse refuses loudly. On the read-only iterators it is a pure read margin, reconciled by NMS (detection) or your join (features).</li>
-<li><code>with_stitch(...)</code> merges objects split across region boundaries into one id, on any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list — grids with a halo, overlapping <abbr title="Fields of View — the areas captured in single microscope acquisitions">FOVs</abbr>, ragged tables — compacting ids to a dense <code>1..N</code>; an interrupted run leaves a valid, merely over-split label. On <code>MaskedSegmentationIterator</code> it merges sub-objects within one mask (no <code>UniqueLabelsTransform</code> needed; combining raises). <code>StitchConfig(seam_matcher=...)</code> swaps the pair criterion.</li>
+<li><code>with_stitch(...)</code> merges objects split across region boundaries into one id, on any <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list — grids with a halo, overlapping <abbr title="Fields of View — the areas captured in single microscope acquisitions">FOVs</abbr>, ragged tables — compacting ids to a dense <code>1..N</code>; a run interrupted before the final resolve leaves a valid, merely over-split label (an interruption inside the in-place compaction itself is detected and the retry refused). On <code>MaskedSegmentationIterator</code> it merges sub-objects within one mask (no <code>UniqueLabelsTransform</code> needed; combining raises). <code>StitchConfig(seam_matcher=...)</code> swaps the pair criterion.</li>
 <li>Distributed runs: <code>prepare_jobs(n_jobs)</code> → <code>for_job(**args).&lt;topic verb&gt;(func)</code> per SLURM/Fractal task → one <code>finalize()</code> gather (read-only iterators return the merged table; slices bank and return <code>None</code>). Partitions never share a write unit, every step validates a plan fingerprint, and the result matches a serial run.</li>
 <li><code>ObjectDetectionIterator.detect(func)</code> (<a href="https://github.com/BioVisionCenter/ngio/issues/111">#111</a>) runs a <code>(patch) -&gt; list[Roi]</code> detector per tile, anchors the boxes to world coordinates, deduplicates by the declared NMS, and returns one renumbered <code>RoiTable</code>; <code>Roi.anchor</code>, <code>Detection</code>, and <code>bbox_iou</code> are public.</li>
 <li><code>FeatureExtractorIterator.measure</code> joins per-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> <code>func(image, label, roi)</code> results into one <code>FeatureTable</code>; every row is stamped with <code>roi_index</code>/<code>roi_name</code> provenance, so a border object measured by several halo-grown regions is deduplicated in your declared join.</li>
@@ -4678,12 +4712,12 @@
 <li>The facade carries its own vocabulary: the table classes (<code>RoiTable</code>, <code>MaskingRoiTable</code>, <code>FeatureTable</code>, <code>ConditionTable</code>, <code>GenericRoiTable</code>, <code>GenericTable</code>, <code>Table</code>) and <code>TransformProtocol</code>/<code>MergePolicy</code>/<code>MergeInput</code> are importable from <code>ngio</code> directly.</li>
 <li><code>Image.resolve_channel_selection(selection)</code> resolves anything the <code>get_*</code> methods accept as <code>channel_selection</code> — index, label, <code>ChannelSelectionModel</code>, or a sequence of those — to its slicing entry, touching only metadata. This is the supported way to validate a selection before loading data (Fractal tasks previously imported the private parser for their <code>skip_if_missing</code> checks).</li>
 </ul>
-<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_1">Fixes<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Container and plate table access align: one <code>NgioValidationError</code> for a missing <code>/tables</code> on both, the plate memoises a read-only "no tables" probe like the container, and <code>add_image</code> raises <code>NgioValueError</code> instead of a bare <code>ValueError</code>.</li>
 <li><code>list_roi_tables</code> includes <code>generic_roi_table</code> tables; the type joined <code>TypedTable</code>/<code>TypedRoiTable</code>, with the runtime tuple public as <code>ngio.tables.ROI_TABLE_TYPES</code>.</li>
 <li><code>Label</code>'s array methods are real methods with their own signatures — they were rebinds of private base methods, so docs and IDEs showed <code>_get_as_numpy</code> et al.</li>
-<li><code>PixelSize</code> comparisons respect units: <code>__eq__</code>/<code>__lt__</code>/<code>distance</code> convert magnitudes when both space units are known (with an <code>NgioUserWarning</code>); <code>distance</code> is spatial-only — <code>t</code> seconds no longer entered the norm that ranks pyramid levels. Unknown or <code>None</code> units stay incomparable.</li>
+<li><code>PixelSize</code> comparisons respect units: <code>__eq__</code>/<code>__lt__</code>/<code>distance</code> convert magnitudes when both space units are known (with an <code>NgioUserWarning</code>); <code>distance</code> is spatial-only — <code>t</code> seconds no longer entered the norm that ranks pyramid levels. Unknown or <code>None</code> units compare unequal under <code>__eq__</code>; ordering and <code>distance</code> fall back to raw magnitudes, so unit-less stores still rank pyramid levels.</li>
 <li>Metadata autodetect only treats a pydantic <code>ValidationError</code> as "not this version": an <code>NgioError</code> from inside a decoder (a bad <code>axes_setup</code>, corrupt values) surfaces directly instead of being blamed on the file.</li>
 <li><code>axes_order</code> refuses to drop a non-singleton axis with a named error (it silently squeezed, surfacing as a raw numpy error only when the axis happened to be bigger than 1).</li>
 <li><code>AxesSetup.from_ordered_list</code> places non-canonical axis names only into free spatial (z/y/x) slots — an unknown name can no longer silently become the channel or time axis — and raises when no spatial slot is left.</li>
@@ -4721,7 +4755,7 @@
 <li><strong>(beta-only break)</strong> Segmentation refuses undeclared overlapping write footprints: without <code>with_stitch</code> or <code>on_overlap</code>, overlapping label writes raise at every writing verb instead of silently last-writer-winning. The check is pixel-exact (a halo never triggers it; sharing a chunk without sharing pixels passes); masked writes are exempt by construction; image processing keeps its permissive default.</li>
 <li><strong>(beta-only break)</strong> Contested-pixel write order is now a defined, declared contract instead of an undocumented by-product of greedy colouring: schedule-owned by default (<code>write_order="any"</code>), later-<abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>-wins on request (<code>"roi"</code>). Earlier 1.1 betas could put an earlier <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> after a later one while the docs claimed "the later wave wins". Pixel-disjoint tilings keep their packed schedules under either value; the serial-degradation warning now fires on schedule width, not wave count.</li>
 <li>A crashed stitched/distributed run can leave transient <code>_ngio_stitch</code>/<code>_ngio_partials</code> groups beside the resolution levels — unregistered, ignored by older ngio, wiped by the next run.</li>
-<li><code>cache=True</code> actually caches: metadata is held for the object's lifetime (outside writes need <code>refresh()</code>), <code>image.dimensions</code> is fixed per object, and caching composes with the atomic plate/well operations. <code>cache=False</code> is unchanged and remains the default.</li>
+<li><code>cache=True</code> actually caches: metadata is held for the object's lifetime (outside writes need <code>refresh()</code>), and caching composes with the atomic plate/well operations. Under <strong>both</strong> cache modes an image's derived values — <code>dimensions</code>, <code>dataset</code>, <code>pixel_size</code> — are pinned per object (<code>refresh()</code> or reopening un-pins; under <code>cache=False</code> any metadata read does too); elsewhere <code>cache=False</code> is unchanged and remains the default.</li>
 <li><code>max_workers=0</code> raises instead of running silently serial; <code>by_grid(tail="drop")</code> raises when it would drop every tile; a writing <code>map</code> no longer holds every written patch in memory until it returns.</li>
 <li>ngio no longer wraps a plain local store in <code>NgioStore</code> when the retry policy is a no-op (the wrapper cost <code>zarrs</code> for nothing), and a codec pipeline that silently fell back now warns once per store type.</li>
 <li><code>measure</code> returns an empty <code>FeatureTable</code> when zero objects are found — the same contract as <code>detect</code> — instead of raising.</li>
@@ -4775,6 +4809,7 @@
 <ul>
 <li><strong>(beta-only)</strong> The 25 iterator names the betas added to the top level (the mappers, the scheduling/reconciliation primitives, <code>ObjectDetectionIterator</code>, <code>AbstractIteratorBuilder</code>, <code>StitchConfig</code>, ...) live in <code>ngio.iterators</code> only, and <code>ZarrConfig</code>/<code>DaskConfig</code>/<code>ConsolidationConfig</code> in <code>ngio.config</code>. The pre-1.1 top-level names are unchanged.</li>
 <li><strong>(beta-only)</strong> <code>ZarrGroupHandler.refresh()</code>: it had no callers — the containers' <code>refresh()</code> are the entry points; <code>invalidate_meta()</code>/<code>clean_cache()</code> remain.</li>
+<li><strong>(beta-only)</strong> <code>NgioCache.set</code> lost its <code>overwrite</code> keyword; <code>set</code> always overwrites.</li>
 <li><strong>The surfaces v1.0.0 deprecated for <code>ngio=1.1</code> are gone</strong> (except the <code>experimental.iterators</code> alias — see Deprecated): the <code>conctatenate_tables</code> typo alias, <code>set_axes_unit</code>, the <code>levels_paths=</code>/<code>validate_paths=</code> keyword aliases, and every <code>*_async</code> variant — <code>plate.get_images_async()</code> becomes <code>plate.get_images(max_workers="auto")</code>.</li>
 </ul>
 <h3 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">&para;</a></h3>
@@ -4799,7 +4834,7 @@
 <li>Lock files moved out of the Zarr store into a <code>&lt;store&gt;.ngio-locks/</code> directory beside it. <strong>Upgrade every writer to a plate at the same time:</strong> a <code>≤1.0.0</code> writer takes the old in-store paths, so mixed versions never exclude each other and one concurrent update is lost silently. Groups differing only after a dot (<code>foo.bar</code>, <code>foo.baz</code>) no longer share a lock. Locks are keyed on the store root, so a well opened directly with <code>open_ome_zarr_well</code> and the same well reached through its plate no longer share one — take atomic well operations through the plate. Old <code>.lock</code> files left inside a store by an earlier version are not cleaned up.</li>
 <li><code>atomic_add_image</code> / <code>atomic_remove_image</code> warn on Windows that their lock is best-effort: <code>filelock</code> can hand it to two writers at once, so concurrent ones can lose an update — <code>v1.0.0</code> lost it silently. A single writer is unaffected. The warning is an error under <code>-W error</code> or <code>filterwarnings = ["error"]</code>.</li>
 </ul>
-<h3 id="fixes_1">Fixes<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_2">Fixes<a class="headerlink" href="#fixes_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Concurrent writers no longer race on creating a group: <code>get_group(create_mode=True)</code> is a get-or-create, and <code>atomic_add_image</code> creates the well group under the plate lock. Two workers adding to the same well could fail with <code>NgioFileExistsError</code>.</li>
 <li>Windows: concurrent <em>reads</em> of a metadata file no longer fail with <code>PermissionError</code>. <code>v1.0.0</code> only retried the conflict when the error carried a Win32 code, which <code>os.replace</code> sets but <code>open()</code> does not.</li>
@@ -4896,7 +4931,7 @@
 <li>A larger public namespace, including <code>MaskedImage</code>, <code>MaskedLabel</code>, <code>Channel</code>, <code>S3FSConfig</code>, <code>derive_ome_zarr_plate</code>, <code>__version__</code>, the <code>get_ngio_*_meta</code> readers and every error class. <code>AbstractBaseTable</code>, <code>ImplementedTables</code> and <code>write_table</code> are exported from <code>ngio.tables</code>, so a custom table type can be registered without private imports.</li>
 <li><code>NgioTableValidationError</code> now subclasses <code>NgioValidationError</code>, so <code>except ValueError</code> catches it like its siblings; new <code>NgioKeyError</code>.</li>
 </ul>
-<h3 id="fixes_2">Fixes<a class="headerlink" href="#fixes_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_3">Fixes<a class="headerlink" href="#fixes_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Dask writes could silently drop data. <code>da.store(..., lock=False)</code> let two blocks read-modify-write the same chunk — or shard, when the target is sharded — concurrently, losing one update. This hit every region write that was not chunk-aligned and every sharded target, including pyramid consolidation. All <code>da.store</code> calls now share a lock; block compute stays parallel.</li>
 <li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. A concurrent reader of <code>zarr.json</code> could break a writer's atomic rename; store operations now absorb these transient conflicts with a short bounded retry. No behaviour change on Linux or macOS.</li>

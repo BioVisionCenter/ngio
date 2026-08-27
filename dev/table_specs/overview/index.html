@@ -2473,8 +2473,10 @@ generic table.</p>
   &lt;span class=&quot;doc doc-labels&quot;&gt;
       &lt;small class=&quot;doc doc-label doc-label-module-attribute&quot;&gt;&lt;code&gt;module-attribute&lt;/code&gt;&lt;/small&gt;
   &lt;/span&gt;" href="../../api/tables/#ngio.tables.GenericRoiTable"><code>GenericRoiTable</code></a>, a <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table without the
-naming and indexing conventions of the standard one. It has no spec page, and is not
-auto-detected on read: reach it explicitly with <code>get_generic_roi_table</code>.</p>
+naming and indexing conventions of the standard one. It has no spec page, but it is
+recognised on read like the four above: <code>list_roi_tables</code> includes it and
+<code>get_generic_roi_table</code> loads it. Tables written by earlier ngio versions carry no type
+on disk and keep loading as generic tables.</p>
 <h2 id="table-groups">Table groups<a class="headerlink" href="#table-groups" title="Permanent link">&para;</a></h2>
 <p>Tables in <abbr title="Cloud-optimised file format for bioimaging data, built on Zarr and the OME-NGFF specification">OME-Zarr</abbr> images are organised into groups of tables. Each group is saved in a Zarr group, and can be associated with a specific image or plate. The table groups are:</p>
 <ul>
