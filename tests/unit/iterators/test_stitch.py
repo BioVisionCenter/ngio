@@ -347,6 +347,36 @@ def test_stale_banks_are_missing_not_zeros():
     assert first.missing([work]) == [0]
 
 
+def test_a_bank_killed_mid_payload_reads_as_missing():
+    """The attrs stamp is the commit marker: it lands after the payload.
+
+    Stamping before the payload left a hard-killed write looking like a
+    valid, zero-filled bank — the gather resolved against background and the
+    output had a silent hole where the tile's segmentation should be.
+    """
+    from ngio.iterators._stitch import ScratchBanks, _TileWork
+
+    _, _, label = _setup(_one_object_across_the_seam())
+    work = _TileWork(
+        index=0, offset=10_000, core=((0, 32), (0, 32)), grown=((0, 36), (0, 36))
+    )
+    banks = ScratchBanks.create(label, None)
+
+    class _KilledPatch:
+        shape = (36, 36)
+
+        def __array__(self, *args, **kwargs):
+            raise RuntimeError("killed mid-payload")
+
+    with pytest.raises(RuntimeError, match="killed mid-payload"):
+        banks.write(work, _KilledPatch())  # ty: ignore[invalid-argument-type]
+    assert banks.missing([work]) == [0]
+
+    # A completed write is valid, and re-banking over the killed one works.
+    banks.write(work, np.ones((36, 36), dtype=label.zarr_array.dtype))
+    assert banks.missing([work]) == []
+
+
 def test_second_finalize_raises_and_leaves_no_scratch():
     """Finalize is not idempotent, but it must fail clean, not create state."""
     ome_zarr, image, label = _setup(_one_object_across_the_seam())

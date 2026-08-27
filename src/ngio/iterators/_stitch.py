@@ -286,7 +286,17 @@ class ScratchBanks:
         _delete_scratch(output, scratch_store)
         group = _scratch_group(output, scratch_store)
         run_id = uuid.uuid4().hex
-        group.attrs.update({"layout": _LAYOUT, "run_id": run_id, **(extra_attrs or {})})
+        # `resolving` is cleared explicitly: on a caller-supplied store the
+        # delete above is a no-op and `attrs.update` merges, so a marker left
+        # by a crashed resolve would otherwise refuse this fresh run forever.
+        group.attrs.update(
+            {
+                "layout": _LAYOUT,
+                "run_id": run_id,
+                "resolving": False,
+                **(extra_attrs or {}),
+            }
+        )
         banks = cls(group, run_id, output.zarr_array)
         banks.created = True
         return banks
@@ -312,6 +322,15 @@ class ScratchBanks:
                 "The stitch scratch was written by an incompatible ngio "
                 f"version (layout {attrs.get('layout')!r}); re-run "
                 "`prepare_jobs(n_jobs)` to recreate it."
+            )
+        if attrs.get("resolving"):
+            raise NgioValueError(
+                "A previous `finalize()` was interrupted while compacting the "
+                "label in place, so the label may hold a mix of renumbered "
+                "and original ids. Refusing to reuse these banks: resolving "
+                "against a half-compacted label silently splits objects. "
+                "Re-run `prepare_jobs(n_jobs)` and the jobs to regenerate the "
+                "label, then finalize again."
             )
         group = _scratch_group(output, scratch_store)
         return cls(group, attrs["run_id"], output.zarr_array)
@@ -350,6 +369,10 @@ class ScratchBanks:
             chunks=chunks,
             overwrite=True,
         )
+        array[...] = disk_patch
+        # The attrs stamp is the commit marker, so it lands after the payload:
+        # a write killed mid-payload leaves an attrs-less array, which
+        # `_open_valid` reads as missing instead of as a valid zero bank.
         array.attrs.update(
             {
                 "index": work.index,
@@ -358,7 +381,6 @@ class ScratchBanks:
                 "run_id": self._run_id,
             }
         )
-        array[...] = disk_patch
 
     def _open_valid(self, work: _TileWork) -> zarr.Array | None:
         """The tile's bank, or `None` when absent, stale, or mismatched.
@@ -385,6 +407,15 @@ class ScratchBanks:
     def missing(self, works: Sequence[_TileWork]) -> list[int]:
         """Indices of tiles with no valid bank."""
         return [work.index for work in works if self._open_valid(work) is None]
+
+    def set_resolving(self, resolving: bool) -> None:
+        """Mark (or unmark) the in-place compaction walk as underway.
+
+        Stamped before `relabel_sequential` and cleared after it: the walk is
+        the one non-idempotent phase, so a scratch found with the marker set
+        means a crashed resolve left the label half-compacted.
+        """
+        self._group.attrs.update({"resolving": resolving})
 
     def read(self, work: _TileWork, box: SpanBox) -> np.ndarray:
         """The tile's banked prediction over `box` (global pixel coords)."""
@@ -601,16 +632,24 @@ class StitchPlan:
     def resolve(self) -> None:
         """Compare every overlapping pair of banks, union, relabel in place."""
         output = self._require_output()
-        if (
-            self._banks is None
-            and read_scratch_attrs(output, self._config.scratch_store) is None
-        ):
+        attrs = read_scratch_attrs(output, self._config.scratch_store)
+        if self._banks is None and attrs is None:
             # Never *create* a scratch on the resolve path: with nothing
             # banked there is nothing to resolve, and creation would leave a
             # stray `_ngio_stitch` group beside the label.
             raise NgioValueError(
                 "Nothing to resolve: no stitched map has banked predictions "
                 "here — the run never mapped, or it already finalized."
+            )
+        if attrs is not None and attrs.get("resolving"):
+            # Checked before `self.banks`: the standalone factory path would
+            # otherwise wipe the crashed run's evidence before this fires.
+            raise NgioValueError(
+                "A previous `finalize()` was interrupted while compacting the "
+                "label in place, so the label may hold a mix of renumbered "
+                "and original ids, and resolving again would silently split "
+                "objects. Re-run the writing verb (or `prepare_jobs(n_jobs)` "
+                "and the jobs) to regenerate the label, then finalize again."
             )
         banks = self.banks
         missing = banks.missing(self._works)
@@ -641,9 +680,11 @@ class StitchPlan:
         mapping = union.resolve()
         label_array = output.zarr_array
         if self._config.compact:
+            banks.set_resolving(True)
             # One pass: canonicalize and renumber together. Collecting the ids
             # first would mean reading the whole label twice.
             dense = relabel_sequential(label_array, mapping)
+            banks.set_resolving(False)
             # Ids this run wrote all carry a tile's offset, so anything outside
             # the offset range pre-existed the run — and just got a new id.
             # (An original id that happens to fall inside the range is missed;
@@ -772,14 +813,23 @@ class StitchingSetter:
         return self.set(patch)
 
     def set(self, patch: np.ndarray) -> None:
-        """Offset the grown patch, bank it, then hand it on."""
+        """Offset the grown patch, hand it on, then bank it.
+
+        Core write first: a run killed between the two leaves the tile
+        written but unbanked, which `resolve()` refuses loudly by name.
+        Banking first left the opposite window — a valid-looking bank and a
+        tile missing from the output, silently absorbed by the gather.
+        Re-running the tile is then the recovery, with the caveats any job
+        re-run already has (order-dependent `merge=` rules re-apply, and
+        seam ownership under `write_order="any"` may shift).
+        """
         check_offset_fits(patch, self._work.offset, self._plan._config.block_size)
         offset = offset_labels(patch, self._work.offset)
         banked = (
             offset if self._bank_transform is None else self._bank_transform(offset)
         )
+        self._setter.set(offset)
         self._plan.bank(
             self._work,
             set_as_numpy_axes_ops(array=banked, axes_ops=self._setter.axes_ops),
         )
-        self._setter.set(offset)

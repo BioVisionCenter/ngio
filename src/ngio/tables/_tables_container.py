@@ -461,6 +461,7 @@ class TablesContainer:
 
 
 ImplementedTables().add_implementation(RoiTableV1)
+ImplementedTables().add_implementation(GenericRoiTableV1)
 ImplementedTables().add_implementation(MaskingRoiTableV1)
 ImplementedTables().add_implementation(FeatureTableV1)
 ImplementedTables().add_implementation(ConditionTableV1)

@@ -226,6 +226,15 @@ class BaseMaskMerge(_MaskSelection):
         bool_mask = self.mask_for(existing, ctx)
         if self._inner is not None:
             patch = self._inner.reconcile(existing, patch, ctx)
+            # The `where` below would broadcast a wrong-shaped inner result
+            # back to the region shape, slipping past the pipe-level check.
+            if tuple(patch.shape) != tuple(existing.shape):
+                raise NgioValueError(
+                    f"Merge policy '{type(self._inner).__name__}' returned "
+                    f"shape {tuple(patch.shape)} for a region of shape "
+                    f"{tuple(existing.shape)}; a merge must preserve the "
+                    "region."
+                )
         if isinstance(patch, DaskArray):
             return da.where(bool_mask, patch, existing)
         return elementwise(np.where, bool_mask, patch, existing)

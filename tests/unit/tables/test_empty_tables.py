@@ -8,6 +8,7 @@ import pytest
 from ngio.tables import (
     ConditionTable,
     FeatureTable,
+    GenericRoiTable,
     MaskingRoiTable,
     RoiTable,
 )
@@ -17,7 +18,7 @@ from ngio.tables.v1._roi_table import REQUIRED_COLUMNS
 
 
 @pytest.mark.parametrize("backend", ["json", "anndata"])
-@pytest.mark.parametrize("table_cls", [RoiTable, MaskingRoiTable])
+@pytest.mark.parametrize("table_cls", [RoiTable, MaskingRoiTable, GenericRoiTable])
 def test_empty_roi_table_roundtrip(tmp_path: Path, backend: str, table_cls):
     store = tmp_path / "t.zarr"
     write_table(store=store, table=table_cls(), backend=backend)

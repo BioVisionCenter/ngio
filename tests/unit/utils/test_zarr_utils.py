@@ -506,6 +506,35 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
     assert "sub_array1" in dest_group["group1"]
 
 
+def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
+    """The zarr-python copy fallback writes whole write units, byte-exact.
+
+    A raw `da.to_zarr` under a block budget smaller than the destination's
+    shard gave one shard several racing read-modify-writers and silently lost
+    most of the data (~75% of pixels in the review's repro).
+    """
+    import dask
+
+    rng = np.random.default_rng(0)
+    data = rng.integers(0, 2**16, size=(512, 512), dtype="uint16")
+    src_group = zarr.create_group(store=tmp_path / "src.zarr", overwrite=True)
+    labels = src_group.create_array(
+        "labels", shape=data.shape, dtype=data.dtype, shards=(256, 256), chunks=(64, 64)
+    )
+    labels[...] = data
+    handler = ZarrGroupHandler(store=src_group, cache=False, mode="r")
+
+    # A MemoryStore destination forces the `_zarr_python_copy` fallback; the
+    # tiny global budget is what a shard bigger than dask's default hits.
+    dest_group = zarr.group(store={}, overwrite=True)
+    with dask.config.set({"array.chunk-size": "64 KiB"}):
+        handler.copy_group(dest_group=dest_group)
+
+    copied = dest_group["labels"]
+    assert isinstance(copied, zarr.Array)
+    np.testing.assert_array_equal(copied[...], data)
+
+
 def test_writes_are_visible_through_a_stale_consolidated_metadata(tmp_path: Path):
     """A store carrying `.zmetadata` must not shadow ngio's own writes.
 

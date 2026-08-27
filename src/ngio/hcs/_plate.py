@@ -175,7 +175,7 @@ class OmeZarrWell:
                 path=image_path, acquisition=acquisition_id, strict=strict
             )
             self.meta_handler.update_meta(meta)
-            self.meta_handler._group_handler.clean_cache()
+            self.meta_handler._group_handler.invalidate_meta()
 
         return self._group_handler.get_group(image_path, create_mode=True)
 
@@ -575,7 +575,10 @@ class OmeZarrPlate:
                     acquisition_id=acquisition_id, acquisition_name=acquisition_name
                 )
             self.meta_handler.update_meta(meta)
-            self.meta_handler._group_handler.clean_cache()
+            # `invalidate_meta`, not `clean_cache`: evicting the child handlers
+            # here orphans the handler inside any cached `OmeZarrWell`, whose
+            # snapshot then outlives the well-doc write below.
+            self.meta_handler._group_handler.invalidate_meta()
 
             # Creating the well group belongs to the same critical section as
             # the plate metadata that lists it. Outside the lock, two workers
@@ -604,7 +607,7 @@ class OmeZarrPlate:
                     path=image_path, acquisition=acquisition_id, strict=False
                 )
             meta_handler.update_meta(well_meta)
-            meta_handler._group_handler.clean_cache()
+            meta_handler._group_handler.invalidate_meta()
 
         if image_path is not None:
             return f"{well_path}/{image_path}"
@@ -698,7 +701,7 @@ class OmeZarrPlate:
         """Add a column to an ome-zarr plate."""
         meta, _ = self.meta.add_column(column)
         self.meta_handler.update_meta(meta)
-        self.meta_handler._group_handler.clean_cache()
+        self.meta_handler._group_handler.invalidate_meta()
         return self
 
     def add_row(
@@ -708,7 +711,7 @@ class OmeZarrPlate:
         """Add a row to an ome-zarr plate."""
         meta, _ = self.meta.add_row(row)
         self.meta_handler.update_meta(meta)
-        self.meta_handler._group_handler.clean_cache()
+        self.meta_handler._group_handler.invalidate_meta()
         return self
 
     def add_acquisition(
@@ -728,7 +731,7 @@ class OmeZarrPlate:
             acquisition_id=acquisition_id, acquisition_name=acquisition_name
         )
         self.meta_handler.update_meta(meta)
-        self.meta_handler._group_handler.clean_cache()
+        self.meta_handler._group_handler.invalidate_meta()
         return self
 
     def _remove_well(

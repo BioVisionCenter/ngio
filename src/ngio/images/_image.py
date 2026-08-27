@@ -413,6 +413,9 @@ class Image(AbstractImage):
     ) -> None:
         """Set the image array.
 
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
+
         Args:
             patch: The array to set.
             channel_selection: Select a what subset of channels to return.
@@ -445,6 +448,9 @@ class Image(AbstractImage):
         **slicing_kwargs: SlicingInputType,
     ) -> None:
         """Set the image array for a region of interest.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
 
         Args:
             roi: The region of interest to set the array.

@@ -310,6 +310,9 @@ class MaskedImage(Image):
         `merge` decides how the patch combines with the disk *inside* the
         mask (`"max"`, a callable, a policy); outside it the disk always
         wins.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
         """
         slicing_kwargs = add_channel_selection_to_slicing_dict(
             image=self, channel_selection=channel_selection, slicing_dict=slicing_kwargs
@@ -569,6 +572,9 @@ class MaskedLabel(Label):
         `merge` decides how the patch combines with the disk *inside* the
         mask (`"max"`, a callable, a policy); outside it the disk always
         wins.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
         """
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)

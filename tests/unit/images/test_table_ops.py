@@ -4,11 +4,12 @@ import pandas as pd
 import pytest
 
 from ngio import OmeZarrContainer, create_empty_ome_zarr
+from ngio.common import Roi
 from ngio.images import (
     concatenate_image_tables_as,
     list_image_tables,
 )
-from ngio.tables import FeatureTable, GenericTable
+from ngio.tables import FeatureTable, GenericRoiTable, GenericTable
 
 
 def create_sample_ome_zarr(
@@ -36,6 +37,20 @@ def sample_ome_zarrs(
     ome_zarr_1 = create_sample_ome_zarr(tmp_path, "test1", ["table1", "table2"])
     ome_zarr_2 = create_sample_ome_zarr(tmp_path, "test2", ["table1"])
     return ome_zarr_1, ome_zarr_2
+
+
+def test_generic_roi_table_container_roundtrip(tmp_path: Path):
+    """A GenericRoiTable added to a container is listed and loadable by type."""
+    ome_zarr = create_empty_ome_zarr(
+        store=tmp_path / "generic_roi.zarr", shape=(32, 32), pixelsize=0.1
+    )
+    roi = Roi.from_values(name="r1", slices={"x": (0, 10), "y": (0, 10)})
+    ome_zarr.add_table("boxes", GenericRoiTable(rois=[roi]), backend="anndata")
+
+    assert "boxes" in ome_zarr.list_roi_tables()
+    loaded = ome_zarr.get_generic_roi_table("boxes")
+    assert isinstance(loaded, GenericRoiTable)
+    assert [r.name for r in loaded.rois()] == ["r1"]
 
 
 def test_list_sync_api(sample_ome_zarrs):

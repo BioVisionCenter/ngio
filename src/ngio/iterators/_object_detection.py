@@ -40,6 +40,7 @@ from ngio.iterators._partials import (
     delete_partials_root,
     merge_partial_frames,
     prepare_partials,
+    unit_columns_record,
     validate_partials_context,
     write_partial,
 )
@@ -312,8 +313,19 @@ def _rois_to_frame(rois: Sequence[Roi], tile_name: str) -> pd.DataFrame:
     return pd.DataFrame(records)
 
 
-def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
-    """Rebuild one tile's patch-local boxes from its partial records."""
+def _frame_to_rois(
+    frame: pd.DataFrame,
+    columns: tuple[list[str], dict[str, str]] | None = None,
+) -> list[Roi]:
+    """Rebuild one tile's patch-local boxes from its partial records.
+
+    `columns` is the tile's recorded schema: the concat across tiles unions
+    extra-field columns (NaN-filled, ints upcast to float), and restoring the
+    tile's own columns and dtypes undoes both.
+    """
+    if columns is not None:
+        cols, dtypes = columns
+        frame = frame[cols].astype(dtypes)
     axes = [axis for axis in _BBOX_AXES if f"{axis}_start" in frame.columns]
     rois = []
     for record in frame.to_dict("records"):
@@ -324,9 +336,10 @@ def _frame_to_rois(frame: pd.DataFrame) -> list[Roi]:
             )
             for axis in axes
         }
-        # Concatenating tiles with heterogeneous extra fields NaN-fills the
-        # union of columns; those fill values are not detector output and a
-        # serial `detect` never sees them.
+        # NaN cells are fill from building the tile frame over boxes with
+        # differing extras, not detector output; a serial `detect` never
+        # sees them. (This is why a genuinely-NaN extra does not survive the
+        # partial round-trip — the documented exception.)
         extras = {key: value for key, value in record.items() if not pd.isna(value)}
         rois.append(Roi.from_values(slices=slices, name=None, space="pixel", **extras))
     return rois
@@ -449,10 +462,12 @@ class ObjectDetectionIterator(
         rebuilds every tile's raw boxes and runs the full serial pipeline
         once, globally: anchoring, the cross-tile invariant checks, NMS, and
         the dense `1..N` renumbering. Bit-identical to a serial `detect` by
-        construction (one exception: an extra field a detector sets to `NaN`
-        does not survive the partial round-trip). On success the partials
-        group is removed. Nothing is registered: the returned table is yours
-        to store with `add_table`.
+        construction — extra fields keep their columns and dtypes through
+        the partial round-trip (two residuals: an extra a detector sets to
+        `NaN` does not survive it, and `float32` extras come back `float64`
+        at the backend level). On success the partials group is removed.
+        Nothing is registered: the returned table is yours to store with
+        `add_table`.
 
         Raises on a `for_job` slice (the gather is global) and when no
         partials exist (nothing was prepared or banked).
@@ -462,10 +477,11 @@ class ObjectDetectionIterator(
         merged = merge_partial_frames(self, handler, job_verb="detect")
 
         results: list[list[Roi]] = [[] for _ in self.rois]
-        if merged is not None:
-            for index, group in merged.groupby(INDEX_COLUMN, sort=True):
+        if merged.frame is not None:
+            for index, group in merged.frame.groupby(INDEX_COLUMN, sort=True):
                 results[int(cast("Any", index))] = _frame_to_rois(
-                    group.drop(columns=[INDEX_COLUMN])
+                    group.drop(columns=[INDEX_COLUMN]).reset_index(drop=True),
+                    columns=merged.columns.get(int(cast("Any", index))),
                 )
         detections = self._collect(results)
         kept = self._nms.suppress(detections)
@@ -550,10 +566,15 @@ class ObjectDetectionIterator(
         self._collect(results, tile_indices=indices)
 
         frames = []
+        column_records = []
         for index, result in zip(indices, results, strict=True):
             if not result:
                 continue
             frame = _rois_to_frame(result, self.rois[index].get_name())
+            # Recorded before the merge key: the concat below unions the
+            # extra-field columns across tiles, and the gather restores each
+            # tile's own schema (see `_frame_to_rois`).
+            column_records.append(unit_columns_record(index, frame))
             frame[INDEX_COLUMN] = index
             frames.append(frame)
         payload = pd.concat(frames, ignore_index=True) if frames else None
@@ -565,6 +586,7 @@ class ObjectDetectionIterator(
                 "job_index": job_index,
                 "n_jobs": n_jobs,
                 "fingerprint": self._plan_fingerprint(n_jobs),
+                "columns": column_records,
             },
         )
 

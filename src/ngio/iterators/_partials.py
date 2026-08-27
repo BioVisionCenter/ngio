@@ -16,9 +16,16 @@ involved, so there is no read-modify-write race), and deleted by the merge.
 Partial tables are written through ngio's own table machinery
 (`GenericTable` + the table backends on a `ZarrGroupHandler`), so every store
 type and the retry policy are inherited.
+
+Schema fidelity: concatenating per-unit frames unions their columns and
+NaN-fills the gaps (upcasting ints to floats), so each job also records every
+unit's own column list and dtypes in its attrs, and the gather subsets and
+`astype`s each unit's rows back to exactly what the function returned. The
+one residual is backend-level: the anndata backend packs mixed float columns
+into one `X` matrix, so a `float32` column comes back `float64`.
 """
 
-from typing import Any
+from typing import Any, NamedTuple
 
 import pandas as pd
 
@@ -133,12 +140,31 @@ def read_partial(
     return attrs, table.dataframe
 
 
+class MergedPartials(NamedTuple):
+    """A complete distributed run's merged records plus per-unit schemas."""
+
+    #: Every job's records concatenated, or `None` when every job was empty.
+    frame: pd.DataFrame | None
+    #: Per unit index: the (column list, {column: dtype}) the function's
+    #: normalized frame actually had, as recorded by the job that ran it.
+    columns: dict[int, tuple[list[str], dict[str, str]]]
+
+
+def unit_columns_record(index: int, frame: pd.DataFrame) -> list[Any]:
+    """One unit's schema entry for the job attrs (JSON: a plain list)."""
+    return [
+        index,
+        list(frame.columns),
+        {column: str(dtype) for column, dtype in frame.dtypes.items()},
+    ]
+
+
 def merge_partial_frames(
     iterator: Any,
     handler: ZarrGroupHandler,
     *,
     job_verb: str,
-) -> pd.DataFrame | None:
+) -> MergedPartials:
     """Validate a complete distributed run and return its merged records.
 
     Refuses loudly when the merge could silently lie: no partials at all
@@ -149,8 +175,9 @@ def merge_partial_frames(
     can only be empty-partition writes and are ignored.
 
     Returns the concatenation of every job's records, stably sorted by
-    `INDEX_COLUMN` (intra-unit row order preserved), or `None` when every
-    job was empty. `job_verb` is the caller's per-job topic verb, used in
+    `INDEX_COLUMN` (intra-unit row order preserved) — `None` when every job
+    was empty — together with the per-unit schema records (see the module
+    docstring). `job_verb` is the caller's per-job topic verb, used in
     error messages.
     """
     from ngio.iterators._mappers import write_conflict_components
@@ -178,6 +205,7 @@ def merge_partial_frames(
     expected = [index for index, indices in enumerate(partition) if indices]
 
     frames: list[pd.DataFrame] = []
+    columns: dict[int, tuple[list[str], dict[str, str]]] = {}
     missing: list[int] = []
     for job_index in expected:
         try:
@@ -190,6 +218,8 @@ def merge_partial_frames(
         if attrs.get("fingerprint") != root_attrs.get("fingerprint"):
             missing.append(job_index)
             continue
+        for index, cols, dtypes in attrs.get("columns", []):
+            columns[int(index)] = (list(cols), dict(dtypes))
         if frame is not None:
             frames.append(frame)
     if missing:
@@ -200,6 +230,8 @@ def merge_partial_frames(
         )
 
     if not frames:
-        return None
+        return MergedPartials(None, columns)
     merged = pd.concat(frames, ignore_index=True)
-    return merged.sort_values(INDEX_COLUMN, kind="stable", ignore_index=True)
+    return MergedPartials(
+        merged.sort_values(INDEX_COLUMN, kind="stable", ignore_index=True), columns
+    )

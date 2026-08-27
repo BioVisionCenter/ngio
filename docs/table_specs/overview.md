@@ -46,8 +46,10 @@ and condition. Anything else — including a table written by another tool — i
 generic table.
 
 There is also [`GenericRoiTable`][ngio.tables.GenericRoiTable], a ROI table without the
-naming and indexing conventions of the standard one. It has no spec page, and is not
-auto-detected on read: reach it explicitly with `get_generic_roi_table`.
+naming and indexing conventions of the standard one. It has no spec page, but it is
+recognised on read like the four above: `list_roi_tables` includes it and
+`get_generic_roi_table` loads it. Tables written by earlier ngio versions carry no type
+on disk and keep loading as generic tables.
 
 ## Table groups
 
