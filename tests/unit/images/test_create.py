@@ -147,6 +147,24 @@ def test_create_fail(tmp_path: Path):
         )
 
 
+def test_first_derive_label_on_a_cached_container(tmp_path: Path):
+    """`cache=True` bootstraps the `/labels` group correctly. (1.1.0 regression)
+
+    The bootstrap reopened the container's group handler but built the labels
+    meta handler on the pre-reopen handler, so the FIRST `derive_label` on a
+    cached container failed decoding empty attrs; the second one worked.
+    """
+    from ngio import open_ome_zarr_container
+
+    create_empty_ome_zarr(tmp_path / "cached.zarr", shape=(32, 32), pixelsize=1.0)
+    cached = open_ome_zarr_container(tmp_path / "cached.zarr", cache=True)
+
+    label = cached.derive_label("seg")
+    assert label.shape == (32, 32)
+    cached.derive_label("seg2")
+    assert sorted(cached.list_labels()) == ["seg", "seg2"]
+
+
 def test_derive_label_channels_policy():
     store = MemoryStore()
     ome_zarr = create_synthetic_ome_zarr(store, shape=(3, 1, 64, 65))

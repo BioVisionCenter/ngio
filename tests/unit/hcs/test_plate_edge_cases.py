@@ -69,6 +69,61 @@ def test_cached_plate_sees_its_own_add_image(tmp_path: Path, add: str):
     assert "C/03" in plate.wells_paths()
 
 
+@pytest.mark.parametrize("remove", ["remove_image", "atomic_remove_image"])
+def test_cached_plate_sees_adds_after_a_well_removal(tmp_path: Path, remove: str):
+    """Removing a well must not orphan the other wells' cached handlers.
+
+    `_remove_well` kept the `clean_cache()` the add paths dropped, so a
+    remove-then-add sequence on a `cache=True` plate served pre-add listings
+    until `refresh()` — and the removed well's cached objects lingered.
+    """
+    create_empty_plate(tmp_path / "plate.zarr", name="plate")
+    plate = open_ome_zarr_plate(tmp_path / "plate.zarr", cache=True)
+    plate.add_image(row="B", column="03", image_path="0")
+    plate.add_image(row="C", column="03", image_path="0")
+    assert sorted(plate.images_paths()) == ["B/03/0", "C/03/0"]
+
+    getattr(plate, remove)(row="C", column="03", image_path="0")  # empties C/03
+    assert plate.wells_paths() == ["B/03"]
+    assert plate.images_paths() == ["B/03/0"]
+
+    plate.add_image(row="B", column="03", image_path="1")
+    assert sorted(plate.images_paths()) == ["B/03/0", "B/03/1"]
+    assert sorted(plate.get_well("B", "03").paths()) == ["0", "1"]
+
+
+def test_cached_well_reads_back_a_converter_written_image(tmp_path: Path):
+    """The converter pattern works on a `cache=True` plate. (1.1.0 regression)
+
+    `well.get_image_store` caches a snapshot of the still-empty image group;
+    the child handler built for `well.get_image` pinned it as fresh, so the
+    read-back after `create_ome_zarr_from_array` failed decoding empty attrs.
+    """
+    import numpy as np
+
+    from ngio import create_ome_zarr_from_array
+
+    create_empty_plate(tmp_path / "plate.zarr", name="plate")
+    plate = open_ome_zarr_plate(tmp_path / "plate.zarr", cache=True)
+    plate.add_image(row="B", column="03", image_path="0")
+
+    well = plate.get_well("B", "03")
+    store = well.get_image_store("0")
+    create_ome_zarr_from_array(
+        store=store,
+        array=np.zeros((16, 16), dtype="uint8"),
+        pixelsize=1.0,
+        axes_names="yx",
+        overwrite=True,
+    )
+
+    image = well.get_image("0")
+    assert image.get_image().shape == (16, 16)
+    # The plate-image flavor of the same regression: first derive on a
+    # cache=True container handed out by the plate.
+    plate.get_image("B", "03", "0").derive_label("seg")
+
+
 def test_add_image_none_path_raises(tmp_path: Path):
     plate = create_empty_plate(tmp_path / "plate.zarr", name="plate")
     with pytest.raises(ValueError, match="Image path cannot be None"):

@@ -170,6 +170,10 @@ def test_generic_roi_table_meta_defaults():
     assert meta.table_version == "1"
     assert meta.index_key == "FieldIndex"
     assert meta.index_type == "str"
+    # The bare meta model stays lax: reading a foreign table must not impose
+    # an index; only fresh construction fills the FieldIndex defaults.
+    assert GenericRoiTableV1Meta().index_key is None
+    assert GenericRoiTableV1Meta().index_type is None
 
 
 @pytest.mark.parametrize(

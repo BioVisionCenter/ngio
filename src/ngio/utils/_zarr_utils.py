@@ -558,15 +558,18 @@ class ZarrGroupHandler:
             handler = self._handlers_cache.get(path)
             if handler is not None:
                 return handler
+        group_was_cached = self._group_cache.get(path) is not None
         group = self.get_group(path, create_mode=create_mode, overwrite=overwrite)
         mode = "r" if group.read_only else "r+"
         handler = ZarrGroupHandler(
             store=group, zarr_format=self.zarr_format, cache=self.use_cache, mode=mode
         )
-        # `get_group` handed over a group that is current within this handler's
-        # caching regime (and invalidation cascades to the child); the
+        # A freshly fetched (or just recreated) group is current, so the
         # pre-opened safety reopen would cost one read per child for nothing.
-        handler._attrs_maybe_stale = False
+        # A `_group_cache` snapshot is not: its attrs can predate a write made
+        # through another handler (the `get_image_store` → converter → read
+        # pattern), so the child takes its first attrs read from the store.
+        handler._attrs_maybe_stale = group_was_cached and not overwrite
         if overwrite:
             # The group was just recreated (evicting the subtree); replace
             # rather than adopt whatever a racing builder may have cached.

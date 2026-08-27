@@ -20,9 +20,10 @@ type and the retry policy are inherited.
 Schema fidelity: concatenating per-unit frames unions their columns and
 NaN-fills the gaps (upcasting ints to floats), so each job also records every
 unit's own column list and dtypes in its attrs, and the gather subsets and
-`astype`s each unit's rows back to exactly what the function returned. The
-one residual is backend-level: the anndata backend packs mixed float columns
-into one `X` matrix, so a `float32` column comes back `float64`.
+`astype`s each unit's rows back to exactly what the function returned —
+backend-level promotions included. Feature frames round-trip exactly; the
+residuals are detection-only and live *within* one tile, before the schema is
+recorded (see `_frame_to_rois`).
 """
 
 from typing import Any, NamedTuple

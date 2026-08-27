@@ -126,3 +126,82 @@ def test_generic_roi_table_is_constructible_and_loadable(tmp_path: Path):
     reopened = open_table(store=tmp_path / "generic.zarr")
     assert isinstance(reopened, GenericRoiTable)
     assert reopened.get("roi1") == table.get("roi1")
+
+
+def test_generic_roi_table_opens_a_foreign_table_without_index_attrs(tmp_path: Path):
+    """The lax reader must not impose its own index on a foreign ROI table.
+
+    A ROI-typed table written by another tool can carry no `index_key` attrs
+    (only type/region/instance_key); the meta's index fields default to `None`
+    so the stored index is used as-is instead of failing to find `FieldIndex`.
+    """
+    import zarr
+
+    from ngio.tables import MaskingRoiTable
+
+    store = tmp_path / "foreign.zarr"
+    table = MaskingRoiTable(
+        rois=[
+            Roi.from_values(
+                name="1",
+                slices={"x": slice(0, 4), "y": slice(0, 4), "z": slice(0, 1)},
+                label=1,
+            )
+        ]
+    )
+    write_table(store=store, table=table, backend="anndata")
+    # Simulate the foreign writer: the type survives, the index attrs do not.
+    group = zarr.open_group(store, mode="r+")
+    attrs = dict(group.attrs)
+    attrs.pop("index_key", None)
+    attrs.pop("index_type", None)
+    group.attrs.put(attrs)
+
+    loaded = open_table_as(store=store, table_cls=GenericRoiTable)
+    assert [roi.label for roi in loaded.rois()] == [1]
+
+
+def test_foreign_table_add_then_consolidate_does_not_destroy_the_store(
+    tmp_path: Path,
+):
+    """`add()` + `consolidate()` on a lax-opened foreign table round-trips.
+
+    With `index_key=None` the dirty rebuild produced a literal `None`-named
+    column, and the failed anndata write truncated the group before raising —
+    the original table was destroyed on disk.
+    """
+    import zarr
+
+    from ngio.tables import MaskingRoiTable
+
+    store = tmp_path / "foreign.zarr"
+    table = MaskingRoiTable(
+        rois=[
+            Roi.from_values(
+                name="1",
+                slices={"x": slice(0, 4), "y": slice(0, 4), "z": slice(0, 1)},
+                label=1,
+            )
+        ]
+    )
+    write_table(store=store, table=table, backend="anndata")
+    group = zarr.open_group(store, mode="r+")
+    attrs = dict(group.attrs)
+    attrs.pop("index_key", None)
+    attrs.pop("index_type", None)
+    group.attrs.put(attrs)
+
+    loaded = open_table_as(store=store, table_cls=GenericRoiTable)
+    loaded.add(
+        Roi.from_values(
+            name="2",
+            slices={"x": slice(4, 8), "y": slice(4, 8), "z": slice(0, 1)},
+            label=2,
+        )
+    )
+    loaded.consolidate()
+
+    reopened = open_table_as(store=store, table_cls=GenericRoiTable)
+    assert sorted(roi.name for roi in reopened.rois() if roi.name) == ["1", "2"]
+    # The foreign table's own index name survives the rebuild.
+    assert reopened.dataframe.index.name == "label"

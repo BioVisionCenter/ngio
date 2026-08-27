@@ -5,6 +5,9 @@
 ### Fixes
 
 - A `cache=True` plate now sees its own `add_image`/`atomic_add_image`/`add_well`: the add path evicted the cached well's group handler mid-operation, so every listing (`images_paths`, `get_well`, `get_images`, and the table helpers on them) kept serving the pre-write image list until `refresh()`.
+- The remove paths align with the add fix: `remove_image`/`atomic_remove_image` (and the well removal they can cascade into) no longer orphan the other wells' cached handlers — a remove-then-add sequence on a `cache=True` plate served pre-add listings — and the removed well's and image's cached objects are dropped instead of lingering.
+- `open_table_as(store, GenericRoiTable)` opens a foreign ROI-typed table that carries no `index_key` attrs again: the new typed meta imposed `FieldIndex` on read, where the reader must use the stored index (fresh tables still write the `FieldIndex` default). `add()` + `consolidate()` on such a table serializes under the table's own stored index name — the rebuild used to produce a `None`-named column whose failed anndata write truncated the group first, destroying the original table on disk.
+- `cache=True` no longer breaks the first `derive_label` on a container (the `/labels` bootstrap read stale pre-write attrs) or the read-back after the `get_image_store` → `create_ome_zarr_from_array` converter pattern (a child handler pinned a cached pre-write group snapshot as fresh) — both regressions vs 1.0.x, loud errors, introduced with the 1.1.0 caching rework.
 - The zarr-python copy fallback (memory/zip stores — `derive_*(copy_labels=True)`, the anndata backend) writes through the write-unit-aligned dask path; it was the one `da.to_zarr` call the 1.1.0 alignment fix missed, and a shard larger than dask's block budget silently lost most of its pixels.
 - `GenericRoiTable` is registered and typed: `get(strict=True)`/`get_generic_roi_table` load tables typed `generic_roi_table` (they were listed by `list_roi_tables` but unloadable, and could make `get_masked_image` raise), and a fresh `GenericRoiTable` writes `type` to disk so its identity survives the round trip. Tables written by earlier ngio versions carry no type and keep loading as generic tables.
 - `RoiTable()`/`MaskingRoiTable()`/`GenericRoiTable()` followed by `add(roi)` then `add_table` no longer writes an empty table: serialization reset lazily-unbuilt ROIs to an empty wrapper, silently discarding them from the store and the in-memory table alike.
@@ -60,7 +63,7 @@
 - Container and plate table access align: one `NgioValidationError` for a missing `/tables` on both, the plate memoises a read-only "no tables" probe like the container, and `add_image` raises `NgioValueError` instead of a bare `ValueError`.
 - `list_roi_tables` includes `generic_roi_table` tables; the type joined `TypedTable`/`TypedRoiTable`, with the runtime tuple public as `ngio.tables.ROI_TABLE_TYPES`.
 - `Label`'s array methods are real methods with their own signatures — they were rebinds of private base methods, so docs and IDEs showed `_get_as_numpy` et al.
-- `PixelSize` comparisons respect units: `__eq__`/`__lt__`/`distance` convert magnitudes when both space units are known (with an `NgioUserWarning`); `distance` is spatial-only — `t` seconds no longer entered the norm that ranks pyramid levels. Unknown or `None` units compare unequal under `__eq__`; ordering and `distance` fall back to raw magnitudes, so unit-less stores still rank pyramid levels.
+- `PixelSize` comparisons respect units: `__eq__`/`__lt__`/`distance` convert magnitudes when both space units are known (with an `NgioUserWarning`); `distance` is spatial-only — `t` seconds no longer entered the norm that ranks pyramid levels. Differing unknown or `None` units compare unequal under `__eq__` (identical unknown units compare by magnitude); ordering and `distance` fall back to raw magnitudes, so unit-less stores still rank pyramid levels.
 - Metadata autodetect only treats a pydantic `ValidationError` as "not this version": an `NgioError` from inside a decoder (a bad `axes_setup`, corrupt values) surfaces directly instead of being blamed on the file.
 - `axes_order` refuses to drop a non-singleton axis with a named error (it silently squeezed, surfacing as a raw numpy error only when the axis happened to be bigger than 1).
 - `AxesSetup.from_ordered_list` places non-canonical axis names only into free spatial (z/y/x) slots — an unknown name can no longer silently become the channel or time axis — and raises when no spatial slot is left.
@@ -118,12 +121,12 @@ All removals scheduled for `ngio=1.2`. The default-flip entries warn as `NgioFut
 | the ROI and masked pipe classes (8 names) | bare pipes with `roi=`, `MaskTransform` in `transforms=`, `merge=MaskMerge(...)` |
 | `consolidate()` without a `mode` | becomes `mode="auto"`; pass `mode="dask"` to pin today's behaviour |
 | plate fan-outs without `max_workers` | becomes `"auto"`; pass `max_workers=1` to pin serial reads |
+| `NgioCache.set(overwrite=)` | drop the argument — it was always ignored, `set` always overwrites |
 
 ### Removed
 
 - **(beta-only)** The 25 iterator names the betas added to the top level (the mappers, the scheduling/reconciliation primitives, `ObjectDetectionIterator`, `AbstractIteratorBuilder`, `StitchConfig`, ...) live in `ngio.iterators` only, and `ZarrConfig`/`DaskConfig`/`ConsolidationConfig` in `ngio.config`. The pre-1.1 top-level names are unchanged.
 - **(beta-only)** `ZarrGroupHandler.refresh()`: it had no callers — the containers' `refresh()` are the entry points; `invalidate_meta()`/`clean_cache()` remain.
-- **(beta-only)** `NgioCache.set` lost its `overwrite` keyword; `set` always overwrites.
 - **The surfaces v1.0.0 deprecated for `ngio=1.1` are gone** (except the `experimental.iterators` alias — see Deprecated): the `conctatenate_tables` typo alias, `set_axes_unit`, the `levels_paths=`/`validate_paths=` keyword aliases, and every `*_async` variant — `plate.get_images_async()` becomes `plate.get_images(max_workers="auto")`.
 
 ### Performance

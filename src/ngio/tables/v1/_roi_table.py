@@ -10,6 +10,7 @@ from typing import Any, Literal, Self
 from uuid import uuid4
 
 import pandas as pd
+from anndata import AnnData
 from pydantic import BaseModel
 
 from ngio.common import Roi
@@ -168,6 +169,10 @@ def _rois_to_dataframe(
 
     Only the values are read; `Roi.name` is optional, so the keys may be `None`.
     """
+    if index_key is None:
+        # A `None` index_key would become a literal `None`-named column, which
+        # anndata's writer rejects *after* truncating the target group.
+        index_key = "FieldIndex"
     data = []
     # Checked once per distinct column after the loop, not once per ROI — a
     # detection table's `class_id` should warn once, not once per object.
@@ -323,15 +328,18 @@ def _table_to_rois(
 class GenericRoiTableV1Meta(BackendMeta):
     """Metadata for the generic ROI table.
 
-    `type` is loose (like `ConditionTableMeta`, unlike the `Literal` siblings)
-    so `open_table_as(store, GenericRoiTable)` keeps working on any on-disk
-    ROI-typed table and re-serializing preserves the original type.
+    A lax reader on purpose (like `ConditionTableMeta`, unlike the `Literal`
+    siblings): `type` is loose so `open_table_as(store, GenericRoiTable)` keeps
+    working on any on-disk ROI-typed table (re-serializing preserves the
+    original type), and the index fields default to `None` so a foreign table
+    without `index_key` attrs opens with its stored index. Fresh construction
+    fills the `FieldIndex`/`str` defaults in `GenericRoiTableV1.__init__`.
     """
 
     table_version: str | None = "1"
     type: str | None = "generic_roi_table"
-    index_key: str | None = "FieldIndex"
-    index_type: Literal["str", "int"] | None = "str"
+    index_key: str | None = None
+    index_type: Literal["str", "int"] | None = None
 
 
 class GenericRoiTableV1(AbstractBaseTable):
@@ -343,7 +351,9 @@ class GenericRoiTableV1(AbstractBaseTable):
         required_columns: list[str] = REQUIRED_COLUMNS,
     ) -> None:
         if meta is None:
-            meta = GenericRoiTableV1Meta()
+            # Same index defaults as `RoiTableV1`: the ROIs are keyed by name,
+            # and serializing them needs a string index column to round-trip.
+            meta = GenericRoiTableV1Meta(index_key="FieldIndex", index_type="str")
         table = None
 
         self._rois: RoiDictWrapper | None = None
@@ -386,9 +396,31 @@ class GenericRoiTableV1(AbstractBaseTable):
             return super().table_data
 
         if self._rois_dirty:
-            self._table_data = self._rois.to_dataframe(index_key=self.meta.index_key)
+            self._table_data = self._rois.to_dataframe(
+                index_key=self._serialization_index_key()
+            )
             self._rois_dirty = False
         return super().table_data
+
+    def _serialization_index_key(self) -> str:
+        """The index name used when rebuilding the frame from the ROIs.
+
+        A foreign table opened with `index_key=None` keeps its own stored
+        index name; only a table with neither falls back to the constructor
+        default.
+        """
+        if self.index_key is not None:
+            return self.index_key
+        # `_table_data` may hold the backend's raw load (an AnnData) or the
+        # converted DataFrame; the stored index name lives in different spots.
+        table_data = self._table_data
+        if isinstance(table_data, pd.DataFrame):
+            index_name = table_data.index.name
+        elif isinstance(table_data, AnnData):
+            index_name = table_data.obs.index.name
+        else:
+            index_name = None
+        return str(index_name) if index_name else "FieldIndex"
 
     def set_table_data(
         self, table_data: TabularData | None = None, refresh: bool = False
@@ -421,7 +453,9 @@ class GenericRoiTableV1(AbstractBaseTable):
             # ROIs added to a lazily-unbuilt table (`RoiTable()` then `add()`)
             # land here with `_table_data` still `None`; serialize them rather
             # than resetting to empty.
-            self._table_data = self._rois.to_dataframe(index_key=self.index_key)
+            self._table_data = self._rois.to_dataframe(
+                index_key=self._serialization_index_key()
+            )
             self._rois_dirty = False
             return None
 

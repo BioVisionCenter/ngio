@@ -180,7 +180,11 @@ class MaskedImage(Image):
         merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
-        """Set the array for a given ROI."""
+        """Set the array for a given ROI.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
+        """
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().set_roi(
@@ -457,7 +461,11 @@ class MaskedLabel(Label):
         merge: MergeInput | None = None,
         **slicing_kwargs: slice | int | Sequence[int],
     ) -> None:
-        """Set the array for a given ROI."""
+        """Set the array for a given ROI.
+
+        Dask patches are serial-only: concurrent dask writes from several
+        threads can silently lose updates (numpy patches are unaffected).
+        """
         roi = self._masking_roi_table.get_label(label)
         roi = roi.zoom(zoom_factor)
         return super().set_roi(

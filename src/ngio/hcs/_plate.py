@@ -743,9 +743,19 @@ class OmeZarrPlate:
         """Remove a well from an ome-zarr plate."""
         with _atomic_scope(self._group_handler, atomic):
             meta = self.meta
+            well_path = self._well_path(row=row, column=column)
             meta = meta.remove_well(row, column)
             self.meta_handler.update_meta(meta)
-            self.meta_handler._group_handler.clean_cache()
+            # `invalidate_meta`, not `clean_cache`: see `_add_image` — evicting
+            # the child handlers orphans every cached `OmeZarrWell`'s handler,
+            # so a later add through this handle served pre-write listings.
+            self.meta_handler._group_handler.invalidate_meta()
+            # The removed well's cached objects no longer back anything the
+            # plate lists; drop them so `_get_well` cannot hand them back.
+            self._wells_cache.pop(well_path)
+            for image_path in list(self._images_cache.cache):
+                if image_path.startswith(f"{well_path}/"):
+                    self._images_cache.pop(image_path)
 
     def _remove_image(
         self,
@@ -763,7 +773,10 @@ class OmeZarrPlate:
             well_meta = well.meta
             well_meta = well_meta.remove_image(path=image_path)
             well.meta_handler.update_meta(well_meta)
-            well.meta_handler._group_handler.clean_cache()
+            well.meta_handler._group_handler.invalidate_meta()
+            self._images_cache.pop(
+                f"{self._well_path(row=row, column=column)}/{image_path}"
+            )
             if len(well_meta.paths()) == 0:
                 self._remove_well(row, column, atomic=atomic)
 

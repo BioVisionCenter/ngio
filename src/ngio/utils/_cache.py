@@ -1,6 +1,9 @@
-from typing import Generic, TypeVar
+import warnings
+from typing import Any, Generic, TypeVar
 
 T = TypeVar("T")
+
+_UNSET: Any = object()
 
 
 class NgioCache(Generic[T]):
@@ -35,7 +38,19 @@ class NgioCache(Generic[T]):
             return default
         return self._cache.get(key, default)
 
-    def set(self, key: str, value: T) -> None:
+    def set(self, key: str, value: T, overwrite: bool = _UNSET) -> None:
+        if overwrite is not _UNSET:
+            # Shipped in 1.0 and always ignored; kept as a warning no-op
+            # through the 1.1 cycle rather than removed outright.
+            from ngio.utils._warnings import NgioDeprecationWarning
+
+            warnings.warn(
+                "The 'overwrite' argument of NgioCache.set() is deprecated "
+                "and will be removed in ngio=1.2. It was always ignored: "
+                "'set' always overwrites.",
+                NgioDeprecationWarning,
+                stacklevel=2,
+            )
         if not self._use_cache:
             self._cache_sanity_check()
             return
@@ -53,6 +68,13 @@ class NgioCache(Generic[T]):
             self._cache_sanity_check()
             return value
         return self._cache.setdefault(key, value)
+
+    def pop(self, key: str) -> T | None:
+        """Drop one entry, returning it (or `None` when absent)."""
+        if not self._use_cache:
+            self._cache_sanity_check()
+            return None
+        return self._cache.pop(key, None)
 
     def clear(self) -> None:
         if not self._use_cache:

@@ -1,6 +1,6 @@
 import pytest
 
-from ngio.utils import NgioCache
+from ngio.utils import NgioCache, NgioDeprecationWarning
 
 
 def test_cache_enabled():
@@ -22,6 +22,26 @@ def test_cache_enabled():
     cache.clear()
     assert cache.is_empty
     assert cache.get("a") is None
+
+
+def test_cache_pop():
+    cache: NgioCache[int] = NgioCache(use_cache=True)
+    cache.set("a", 1)
+    assert cache.pop("a") == 1
+    assert cache.pop("a") is None
+    assert cache.is_empty
+
+    disabled: NgioCache[int] = NgioCache(use_cache=False)
+    assert disabled.pop("a") is None
+
+
+def test_cache_set_overwrite_kwarg_is_a_deprecated_no_op():
+    cache: NgioCache[int] = NgioCache(use_cache=True)
+    cache.set("a", 1)
+    with pytest.warns(NgioDeprecationWarning, match="always ignored"):
+        cache.set("a", 2, overwrite=False)
+    # Unchanged behaviour: `set` always overwrites, as it did in 1.0.
+    assert cache.get("a") == 2
 
 
 def test_cache_disabled():

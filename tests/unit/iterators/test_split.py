@@ -358,13 +358,28 @@ def test_a_tile_killed_between_core_write_and_bank_fails_loud(
     assert len(args_list) == 2
     _stitched_iterator(ome_zarr).for_job(**args_list[0]).map(_label_components)
 
-    def _killed(*args, **kwargs):
-        raise RuntimeError("killed between core write and bank")
+    # Kill at the bank of the first tile with content: zero tiles bank
+    # normally, so the killed tile is guaranteed to have visible core pixels.
+    killed = []
+    original_bank = stitch_mod.StitchPlan.bank
 
-    monkeypatch.setattr(stitch_mod, "set_as_numpy_axes_ops", _killed)
-    with pytest.raises(RuntimeError, match="killed between"):
+    def _kill_on_content(self, work, patch):
+        if patch.any():
+            killed.append(work)
+            raise RuntimeError("killed after core write, before bank")
+        return original_bank(self, work, patch)
+
+    monkeypatch.setattr(stitch_mod.StitchPlan, "bank", _kill_on_content)
+    with pytest.raises(RuntimeError, match="killed after core write"):
         _stitched_iterator(ome_zarr).for_job(**args_list[1]).map(_label_components)
     monkeypatch.undo()
+
+    # The killed tile's core landed BEFORE the bank — this is the ordering
+    # under test: a bank-first revert would raise before the core write and
+    # leave this region empty.
+    (y0, y1), (x0, x1) = killed[0].core
+    label = ome_zarr.get_label("seg").get_as_numpy()
+    assert (label[y0:y1, x0:x1] > 0).any()
 
     with pytest.raises(NgioValueError, match="never banked"):
         _stitched_iterator(ome_zarr).finalize()

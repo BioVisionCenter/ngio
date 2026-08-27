@@ -463,11 +463,12 @@ class ObjectDetectionIterator(
         once, globally: anchoring, the cross-tile invariant checks, NMS, and
         the dense `1..N` renumbering. Bit-identical to a serial `detect` by
         construction — extra fields keep their columns and dtypes through
-        the partial round-trip (two residuals: an extra a detector sets to
-        `NaN` does not survive it, and `float32` extras come back `float64`
-        at the backend level). On success the partials group is removed.
-        Nothing is registered: the returned table is yours to store with
-        `add_table`.
+        the partial round-trip. Two residuals, both within one tile: an
+        extra a detector sets to `NaN` does not survive, and an integer
+        extra present on only some of a tile's boxes comes back float (the
+        tile frame NaN-fills it before the schema is recorded). On success
+        the partials group is removed. Nothing is registered: the returned
+        table is yours to store with `add_table`.
 
         Raises on a `for_job` slice (the gather is global) and when no
         partials exist (nothing was prepared or banked).

@@ -351,7 +351,10 @@ class LabelsContainer:
                 ngio_meta=meta,
             )
             self._group_handler = self._group_handler.reopen_handler()
-            self._meta_handler = LabelsGroupMetaHandler(group_handler)
+            # The reopened handler, not the parameter: under `cache=True` the
+            # pre-reopen handler pins the pre-bootstrap (empty) attrs and the
+            # FIRST label derived on a container failed decoding them.
+            self._meta_handler = LabelsGroupMetaHandler(self._group_handler)
 
     @property
     def meta(self) -> NgioLabelsGroupMeta:
