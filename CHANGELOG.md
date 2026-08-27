@@ -1,30 +1,5 @@
 # Changelog
 
-## [Unreleased]
-
-### Fixes
-
-- A `cache=True` plate now sees its own `add_image`/`atomic_add_image`/`add_well`: the add path evicted the cached well's group handler mid-operation, so every listing (`images_paths`, `get_well`, `get_images`, and the table helpers on them) kept serving the pre-write image list until `refresh()`.
-- The remove paths align with the add fix: `remove_image`/`atomic_remove_image` (and the well removal they can cascade into) no longer orphan the other wells' cached handlers — a remove-then-add sequence on a `cache=True` plate served pre-add listings — and the removed well's and image's cached objects are dropped instead of lingering.
-- `open_table_as(store, GenericRoiTable)` opens a foreign ROI-typed table that carries no `index_key` attrs again: the new typed meta imposed `FieldIndex` on read, where the reader must use the stored index (fresh tables still write the `FieldIndex` default). `add()` + `consolidate()` on such a table serializes under the table's own stored index name — the rebuild used to produce a `None`-named column whose failed anndata write truncated the group first, destroying the original table on disk.
-- `cache=True` no longer breaks the first `derive_label` on a container (the `/labels` bootstrap read stale pre-write attrs) or the read-back after the `get_image_store` → `create_ome_zarr_from_array` converter pattern (a child handler pinned a cached pre-write group snapshot as fresh) — both regressions vs 1.0.x, loud errors, introduced with the 1.1.0 caching rework.
-- The zarr-python copy fallback (memory/zip stores — `derive_*(copy_labels=True)`, the anndata backend) writes through the write-unit-aligned dask path; it was the one `da.to_zarr` call the 1.1.0 alignment fix missed, and a shard larger than dask's block budget silently lost most of its pixels.
-- `GenericRoiTable` is registered and typed: `get(strict=True)`/`get_generic_roi_table` load tables typed `generic_roi_table` (they were listed by `list_roi_tables` but unloadable, and could make `get_masked_image` raise), and a fresh `GenericRoiTable` writes `type` to disk so its identity survives the round trip. Tables written by earlier ngio versions carry no type and keep loading as generic tables.
-- `RoiTable()`/`MaskingRoiTable()`/`GenericRoiTable()` followed by `add(roi)` then `add_table` no longer writes an empty table: serialization reset lazily-unbuilt ROIs to an empty wrapper, silently discarding them from the store and the in-memory table alike.
-- The inner merge of `set_roi_masked(merge=...)` enforces the same anti-broadcast guard as top-level `merge=`: a wrong-shaped result from a custom rule was re-broadcast by the mask fold and written silently.
-- A stitch bank's validity attrs land after its payload, and a tile's core write lands before its bank: both crash windows now surface as the loud "never banked" refusal at `finalize()` instead of a valid-looking zero bank or a tile silently missing from the output.
-- A `finalize()` interrupted inside the `compact=True` in-place renumbering is detected (a `resolving` marker on the scratch) and the retry refused with the recovery spelled out — it used to pass every guard and permanently split objects straddling the crash point. `prepare_jobs` deliberately starts over and clears the marker.
-- Distributed `measure`/`detect` partials record each ROI's/tile's own column set and dtypes, and the gather restores them: the merge used to union columns across units (NaN-filled, ints promoted to float), so column- or dtype-sensitive custom joins diverged from serial and integer detection extras came back as floats.
-
-### Docs
-
-- The array setters (`set_array`, `set_roi`, `set_roi_masked`) document that dask patches are serial-only: concurrent dask writes from several threads can silently lose updates. Enforcing it was deliberately left out — the guard's blast radius outweighs a hazard with no known concurrent callers.
-- The iterators getting-started page is now a concept guide: it keeps the design-system figures (the iterator walk, the five iterators side by side, tail policies, wave scheduling, halos, stitching, and detection) and the short core snippets, and hands the long worked examples to the tutorials.
-- New **Stitching** tutorial: a tiled watershed segmentation on real microscopy data, with and without `with_stitch()`, plus the `StitchConfig` tuning knobs.
-- New **Distributed processing** tutorial: the `prepare_jobs → for_job → finalize` recipe executable end to end — partition layouts, distributed stitching, and distributed measurement.
-- The object detection tutorial gained the NMS walkthrough (raw pre-NMS boxes against the suppressed result) and `Roi.anchor`; the feature extraction tutorial ends with a scatter drawn from the feature table (area against mean intensity, rasterized marks so the page stays light).
-- The object detection snippet script joined the `test_snippets` chain, where it had been missing.
-
 ## [v1.1.0]
 
 **Highlights**:
@@ -36,7 +11,7 @@
 ### Features
 
 - `ThreadedMapper` and `ProcessMapper` parallelize `map`/`reduce`. Writes run in conflict-free waves, and wave order is the canonical write order for every mapper — serial included — so overlapping writes land identically everywhere. The default stays serial.
-- One verb table across the five iterators: a partition-aware topic verb per class (`process`, `segment` — masked included — `measure`, `detect`) over the shared generic layer — `map`, `reduce` (collect without writing), `iter` (numpy backend; `*_as_numpy` stay as aliases) — plus tiling calls that say what they tile by: `by_grid(size_*, stride_*, tail=...)`, `by_blocks(num_*)`, `by_chunks()`, `by_write_units()`. `finalize()` is the one gather everywhere.
+- One verb table across the five iterators: a partition-aware topic verb per class (`process`, `segment` — masked included — `measure`, `detect`) over the shared generic layer — `map`, `reduce` (collect without writing) — both numpy — and `iter` (the `*_as_numpy` aliases stay; bare `iter()` still defaults to the dask backend in 1.1 and warns, see Deprecated) — plus tiling calls that say what they tile by: `by_grid(size_*, stride_*, tail=...)`, `by_blocks(num_*)`, `by_chunks()`, `by_write_units()`. `finalize()` is the one gather everywhere.
 - `write_order=` on `on_overlap(...)` and `StitchConfig` — performance first, reproducibility opt-in, exactness always. `"any"` (the default) schedules pixel-contested writes for parallelism alone (1.5–2.5x on parallel mappers over overlapping tilings; deterministic per version, seam ownership schedule-defined); `"roi"` opts into the later-ROI-wins order, `map` bit-identical to the manual `iter` loop. A pair relaxes only when both sides declare `"any"`.
 - One reconciliation declaration per iterator, in the builder chain: `on_overlap(policy)` on the writers (contested write pixels: `"last"` for last-writer-wins, or any `merge=` rule), `with_stitch(config)` on segmentation, `with_join(join)` on features, `with_nms(nms)` on detection — each backed by a swappable protocol (`SeamMatcherProtocol`/`IouSeamMatcher`, `JoinProtocol`/`ConcatJoin`, `NmsProtocol`/`GreedyNms`).
 - `BatchedMapper(batch_size=...)` stacks patches into one `(B, ...)` array per `func` call, for neural-network inference; `iter(batch_size=...)` is the manual batched loop (numpy-only and eager).
@@ -92,6 +67,18 @@
 - `GenericRoiTable` is constructible and loadable again: `from_handler` was left abstract with a `pass` body and never overridden, so the public export could not be instantiated and — since `abstractmethod` only guards instantiation, not classmethod calls — `get_as(name, GenericRoiTable)` silently returned `None`. It now has a concrete `from_handler`, a default meta (same `FieldIndex` index as `RoiTable`), and the abstract signature gained the `attrs` pass-through the `Table` protocol already declared; a future missing override raises `NotImplementedError` instead of returning `None`.
 - `plate.get_images(max_workers=...)` forwards `max_workers` to its internal `images_paths()` listing. Dropping it on that hop kept the per-well walk serial and fired the plate fan-out `NgioFutureWarning` at callers who had already opted in — its own documented remedy could not silence it, transitively from every table helper built on `get_images`.
 
+- A `cache=True` plate now sees its own `add_image`/`atomic_add_image`/`add_well`: the add path evicted the cached well's group handler mid-operation, so every listing (`images_paths`, `get_well`, `get_images`, and the table helpers on them) kept serving the pre-write image list until `refresh()`.
+- The remove paths align with the add fix: `remove_image`/`atomic_remove_image` (and the well removal they can cascade into) no longer orphan the other wells' cached handlers — a remove-then-add sequence on a `cache=True` plate served pre-add listings — and the removed well's and image's cached objects are dropped instead of lingering.
+- `open_table_as(store, GenericRoiTable)` opens a foreign ROI-typed table that carries no `index_key` attrs again: the new typed meta imposed `FieldIndex` on read, where the reader must use the stored index (fresh tables still write the `FieldIndex` default). `add()` + `consolidate()` on such a table serializes under the table's own stored index name — the rebuild used to produce a `None`-named column whose failed anndata write truncated the group first, destroying the original table on disk.
+- `cache=True` no longer breaks the first `derive_label` on a container (the `/labels` bootstrap read stale pre-write attrs) or the read-back after the `get_image_store` → `create_ome_zarr_from_array` converter pattern (a child handler pinned a cached pre-write group snapshot as fresh) — both regressions vs 1.0.x, loud errors, introduced with the 1.1.0 caching rework.
+- The zarr-python copy fallback (memory/zip stores — `derive_*(copy_labels=True)`, the anndata backend) writes through the write-unit-aligned dask path; it was the one `da.to_zarr` call the 1.1.0 alignment fix missed, and a shard larger than dask's block budget silently lost most of its pixels.
+- `GenericRoiTable` is registered and typed: `get(strict=True)`/`get_generic_roi_table` load tables typed `generic_roi_table` (they were listed by `list_roi_tables` but unloadable, and could make `get_masked_image` raise), and a fresh `GenericRoiTable` writes `type` to disk so its identity survives the round trip. Tables written by earlier ngio versions carry no type and keep loading as generic tables.
+- `RoiTable()`/`MaskingRoiTable()`/`GenericRoiTable()` followed by `add(roi)` then `add_table` no longer writes an empty table: serialization reset lazily-unbuilt ROIs to an empty wrapper, silently discarding them from the store and the in-memory table alike.
+- The inner merge of `set_roi_masked(merge=...)` enforces the same anti-broadcast guard as top-level `merge=`: a wrong-shaped result from a custom rule was re-broadcast by the mask fold and written silently.
+- A stitch bank's validity attrs land after its payload, and a tile's core write lands before its bank: both crash windows now surface as the loud "never banked" refusal at `finalize()` instead of a valid-looking zero bank or a tile silently missing from the output.
+- A `finalize()` interrupted inside the `compact=True` in-place renumbering is detected (a `resolving` marker on the scratch) and the retry refused with the recovery spelled out — it used to pass every guard and permanently split objects straddling the crash point. `prepare_jobs` deliberately starts over and clears the marker.
+- Distributed `measure`/`detect` partials record each ROI's/tile's own column set and dtypes, and the gather restores them: the merge used to union columns across units (NaN-filled, ints promoted to float), so column- or dtype-sensitive custom joins diverged from serial and integer detection extras came back as floats.
+
 ### Behaviour changes
 
 - **`Roi` and `RoiSlice` are frozen** — assigning to a field (`roi.label = 2`, `roi.get("z").length = 5.0`) raises a pydantic `ValidationError` instead of mutating. In-place mutation had started to silently diverge from what a containing ROI table serialized (the table's frame rebuilds only through `add()`), so stale values were written with no error. Build a changed ROI with `update_slice` or `model_copy(update=...)` and put it back with `add(roi, overwrite=True)` — both unchanged. `slices` is a tuple and every mutator (`update_slice`, `remove_slice`, `zoom`, ...) re-validates and carries extra fields, so element-level surgery and invalid copies are no longer possible.
@@ -137,6 +124,15 @@ All removals scheduled for `ngio=1.2`. The default-flip entries warn as `NgioFut
 - `zarrs` actually engages on local stores: `set_array` 76 → 17 ms, `get_as_numpy` 39 → 9 ms on a 32 MB image.
 - Consolidation reads less: sharded sources read at their write unit (324 chunk reads → 8), the numpy path chains levels through memory, coarsening drops its float64 intermediate (~3× peak), and the dask mode stops computing every source chunk twice.
 - Tables and overlap checks: type-filtered listings are one memoised pass under `cache=True` (95 reads → 2 warm; `cache=False` re-reads per call, by contract), ROI tables rebuild their DataFrame only on change, and `check_if_regions_overlap` sweeps instead of scanning all pairs (2,048 ROIs: 1,083 ms → 31 ms; `check_if_write_units_overlap` remains all-pairs).
+
+### Docs
+
+- The array setters (`set_array`, `set_roi`, `set_roi_masked`) document that dask patches are serial-only: concurrent dask writes from several threads can silently lose updates. Enforcing it was deliberately left out — the guard's blast radius outweighs a hazard with no known concurrent callers.
+- The iterators getting-started page is now a concept guide: it keeps the design-system figures (the iterator walk, the five iterators side by side, tail policies, wave scheduling, halos, stitching, and detection) and the short core snippets, and hands the long worked examples to the tutorials.
+- New **Stitching** tutorial: a tiled watershed segmentation on real microscopy data, with and without `with_stitch()`, plus the `StitchConfig` tuning knobs.
+- New **Distributed processing** tutorial: the `prepare_jobs → for_job → finalize` recipe executable end to end — partition layouts, distributed stitching, and distributed measurement.
+- The object detection tutorial gained the NMS walkthrough (raw pre-NMS boxes against the suppressed result) and `Roi.anchor`; the feature extraction tutorial ends with a scatter drawn from the feature table (area against mean intensity, rasterized marks so the page stays light).
+- The object detection snippet script joined the `test_snippets` chain, where it had been missing.
 
 ### Chores
 
