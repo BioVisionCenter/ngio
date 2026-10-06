@@ -307,7 +307,6 @@ def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
                     f"Invalid value {i} of type {type(i)} in sequence {value}"
                 ) from e
         value = _value
-    # If the input is not sorted, return it as a tuple
     max_input = max(value)
     min_input = min(value)
     if min_input < 0:
@@ -316,7 +315,9 @@ def _try_to_slice(value: Sequence[int]) -> slice | list[int]:
             "Slicing sequences must contain non-negative integers."
         )
 
-    if sorted(value) == list(range(min_input, max_input + 1)):
+    # Only an ascending run is a slice. Any other order must reach the
+    # indexer as requested: a slice would read and write it in stored order.
+    if list(value) == list(range(min_input, max_input + 1)):
         return slice(min_input, max_input + 1)
 
     return list(value)

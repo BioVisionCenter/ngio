@@ -1,5 +1,6 @@
 """Coverage tests for channel metadata and channel selection in ngio images."""
 
+import dask.array as da
 import numpy as np
 import pytest
 from pydantic import ValidationError
@@ -105,6 +106,29 @@ def test_channel_selection_by_wavelength_id():
     selection = ChannelSelectionModel(mode="wavelength_id", identifier="A02_C02")
     array = image.get_array(channel_selection=selection)
     np.testing.assert_array_equal(array, image.get_array(c=1))
+
+
+@pytest.mark.parametrize("mode", ["numpy", "dask"])
+def test_channel_selection_order_is_the_requested_one(mode):
+    """Adjacent channels are read and written in the requested order (#255)."""
+    image = _make_container().get_image()
+    plane = np.ones((8, 8), dtype=image.dtype)
+    image.set_array(plane * 1, channel_selection="DAPI")
+    image.set_array(plane * 2, channel_selection="GFP")
+
+    swapped = image.get_array(channel_selection=["GFP", "DAPI"], mode=mode)
+    assert np.asarray(swapped)[:, 0, 0].tolist() == [2, 1]
+    in_order = image.get_array(channel_selection=["DAPI", "GFP"], mode=mode)
+    assert np.asarray(in_order)[:, 0, 0].tolist() == [1, 2]
+
+    # The write follows the same order: patch position 0 lands on GFP.
+    patch = np.stack([plane * 20, plane * 10])
+    image.set_array(
+        da.from_array(patch) if mode == "dask" else patch,
+        channel_selection=["GFP", "DAPI"],
+    )
+    assert image.get_as_numpy(channel_selection="DAPI")[0, 0] == 10
+    assert image.get_as_numpy(channel_selection="GFP")[0, 0] == 20
 
 
 def test_channel_selection_invalid_type_in_sequence():
