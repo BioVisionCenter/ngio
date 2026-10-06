@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- A sequence selection that was a permutation of a contiguous run — `channel_selection=["C1", "C0"]`, `z=[1, 0]` — was read **and written** in stored order, while a non-contiguous one (`["C2", "C0"]`) kept the requested order ([#255](https://github.com/BioVisionCenter/ngio/issues/255)). Selections now always follow the requested order. Data written through such a selection with `ngio<=1.1.0` landed swapped on disk.
+
 ## [v1.1.0]
 
 **Highlights**:

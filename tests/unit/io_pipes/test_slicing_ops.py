@@ -1,3 +1,5 @@
+import dask.array as da
+import numpy as np
 import pytest
 import zarr
 
@@ -64,6 +66,61 @@ def test_slicing_ops_base(
     data = get_slice_as_dask(zarr_data, slicing_ops=slicing_ops)
     assert data.shape == output_shape
     set_slice_as_dask(zarr_array=zarr_data, patch=data, slicing_ops=slicing_ops)
+
+
+@pytest.mark.parametrize(
+    "selection,expected",
+    [
+        ((0, 1), slice(0, 2)),
+        ((1, 0), [1, 0]),
+        ((2, 1), [2, 1]),
+        ((2, 1, 0), [2, 1, 0]),
+        ((1, 0, 2), [1, 0, 2]),
+        ((2, 0), [2, 0]),
+    ],
+)
+def test_sequence_selection_keeps_requested_order(
+    selection: tuple[int, ...], expected: slice | list[int]
+):
+    """Only an ascending run collapses to a slice (#255).
+
+    A permuted contiguous run used to become a slice too, so it was read and
+    written in stored order while a non-contiguous one kept the requested one.
+    """
+    shape, chunks = (3, 4, 4), (1, 4, 4)
+    axes = [Axis(name=name) for name in "cyx"]
+    ds = Dataset(
+        path="0",
+        axes_handler=AxesHandler(axes=axes),
+        scale=[1.0] * len(axes),
+        translation=[0.0] * len(axes),
+    )
+    dims = Dimensions(shape=shape, chunks=chunks, dataset=ds)
+    slicing_ops = build_slicing_ops(dimensions=dims, slicing_dict={"c": selection})
+    assert slicing_ops.slicing_tuple[0] == expected
+
+    # Read: channel `c` holds the value `c`.
+    zarr_data = zarr.zeros(shape=shape, chunks=chunks, dtype="uint8")
+    zarr_data[:] = np.arange(3, dtype="uint8")[:, None, None]
+    numpy_data = get_slice_as_numpy(zarr_data, slicing_ops=slicing_ops)
+    dask_data = get_slice_as_dask(zarr_data, slicing_ops=slicing_ops).compute()
+    assert numpy_data[:, 0, 0].tolist() == list(selection)
+    assert dask_data[:, 0, 0].tolist() == list(selection)
+
+    # Write: patch position `i` must land on channel `selection[i]`.
+    patch = np.empty((len(selection), 4, 4), dtype="uint8")
+    patch[:] = 10 + np.arange(len(selection), dtype="uint8")[:, None, None]
+    for write in ("numpy", "dask"):
+        zarr_data = zarr.zeros(shape=shape, chunks=chunks, dtype="uint8")
+        if write == "numpy":
+            set_slice_as_numpy(zarr_data, patch=patch, slicing_ops=slicing_ops)
+        else:
+            set_slice_as_dask(
+                zarr_data, patch=da.from_array(patch), slicing_ops=slicing_ops
+            )
+        on_disk = np.asarray(zarr_data[:])
+        for position, channel in enumerate(selection):
+            assert on_disk[channel, 0, 0] == 10 + position, (write, selection)
 
 
 def test_chunk_slice():
