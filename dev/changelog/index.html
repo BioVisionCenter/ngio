@@ -2026,6 +2026,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v110" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2049,7 +2077,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -2154,7 +2182,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -2248,7 +2276,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_2" class="md-nav__link">
+  <a href="#fixes_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3351,6 +3379,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixes" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Fixes
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v110" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3374,7 +3430,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes" class="md-nav__link">
+  <a href="#fixes_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3479,7 +3535,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_1" class="md-nav__link">
+  <a href="#fixes_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -3573,7 +3629,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#fixes_2" class="md-nav__link">
+  <a href="#fixes_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Fixes
@@ -4603,6 +4659,11 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<ul>
+<li>A sequence selection that was a permutation of a contiguous run — <code>channel_selection=["C1", "C0"]</code>, <code>z=[1, 0]</code> — was read <strong>and written</strong> in stored order, while a non-contiguous one (<code>["C2", "C0"]</code>) kept the requested order (<a href="https://github.com/BioVisionCenter/ngio/issues/255">#255</a>). Selections now always follow the requested order. Data written through such a selection with <code>ngio&lt;=1.1.0</code> landed swapped on disk.</li>
+</ul>
 <h2 id="v110">[v1.1.0]<a class="headerlink" href="#v110" title="Permanent link">&para;</a></h2>
 <p><strong>Highlights</strong>:</p>
 <ul>
@@ -4635,7 +4696,7 @@
 <li>The facade carries its own vocabulary: the table classes (<code>RoiTable</code>, <code>MaskingRoiTable</code>, <code>FeatureTable</code>, <code>ConditionTable</code>, <code>GenericRoiTable</code>, <code>GenericTable</code>, <code>Table</code>) and <code>TransformProtocol</code>/<code>MergePolicy</code>/<code>MergeInput</code> are importable from <code>ngio</code> directly.</li>
 <li><code>Image.resolve_channel_selection(selection)</code> resolves anything the <code>get_*</code> methods accept as <code>channel_selection</code> — index, label, <code>ChannelSelectionModel</code>, or a sequence of those — to its slicing entry, touching only metadata. This is the supported way to validate a selection before loading data (Fractal tasks previously imported the private parser for their <code>skip_if_missing</code> checks).</li>
 </ul>
-<h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_1">Fixes<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Container and plate table access align: one <code>NgioValidationError</code> for a missing <code>/tables</code> on both, the plate memoises a read-only "no tables" probe like the container, and <code>add_image</code> raises <code>NgioValueError</code> instead of a bare <code>ValueError</code>.</li>
 <li><code>list_roi_tables</code> includes <code>generic_roi_table</code> tables; the type joined <code>TypedTable</code>/<code>TypedRoiTable</code>, with the runtime tuple public as <code>ngio.tables.ROI_TABLE_TYPES</code>.</li>
@@ -4784,7 +4845,7 @@
 <li>Lock files moved out of the Zarr store into a <code>&lt;store&gt;.ngio-locks/</code> directory beside it. <strong>Upgrade every writer to a plate at the same time:</strong> a <code>≤1.0.0</code> writer takes the old in-store paths, so mixed versions never exclude each other and one concurrent update is lost silently. Groups differing only after a dot (<code>foo.bar</code>, <code>foo.baz</code>) no longer share a lock. Locks are keyed on the store root, so a well opened directly with <code>open_ome_zarr_well</code> and the same well reached through its plate no longer share one — take atomic well operations through the plate. Old <code>.lock</code> files left inside a store by an earlier version are not cleaned up.</li>
 <li><code>atomic_add_image</code> / <code>atomic_remove_image</code> warn on Windows that their lock is best-effort: <code>filelock</code> can hand it to two writers at once, so concurrent ones can lose an update — <code>v1.0.0</code> lost it silently. A single writer is unaffected. The warning is an error under <code>-W error</code> or <code>filterwarnings = ["error"]</code>.</li>
 </ul>
-<h3 id="fixes_1">Fixes<a class="headerlink" href="#fixes_1" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_2">Fixes<a class="headerlink" href="#fixes_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Concurrent writers no longer race on creating a group: <code>get_group(create_mode=True)</code> is a get-or-create, and <code>atomic_add_image</code> creates the well group under the plate lock. Two workers adding to the same well could fail with <code>NgioFileExistsError</code>.</li>
 <li>Windows: concurrent <em>reads</em> of a metadata file no longer fail with <code>PermissionError</code>. <code>v1.0.0</code> only retried the conflict when the error carried a Win32 code, which <code>os.replace</code> sets but <code>open()</code> does not.</li>
@@ -4881,7 +4942,7 @@
 <li>A larger public namespace, including <code>MaskedImage</code>, <code>MaskedLabel</code>, <code>Channel</code>, <code>S3FSConfig</code>, <code>derive_ome_zarr_plate</code>, <code>__version__</code>, the <code>get_ngio_*_meta</code> readers and every error class. <code>AbstractBaseTable</code>, <code>ImplementedTables</code> and <code>write_table</code> are exported from <code>ngio.tables</code>, so a custom table type can be registered without private imports.</li>
 <li><code>NgioTableValidationError</code> now subclasses <code>NgioValidationError</code>, so <code>except ValueError</code> catches it like its siblings; new <code>NgioKeyError</code>.</li>
 </ul>
-<h3 id="fixes_2">Fixes<a class="headerlink" href="#fixes_2" title="Permanent link">&para;</a></h3>
+<h3 id="fixes_3">Fixes<a class="headerlink" href="#fixes_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Dask writes could silently drop data. <code>da.store(..., lock=False)</code> let two blocks read-modify-write the same chunk — or shard, when the target is sharded — concurrently, losing one update. This hit every region write that was not chunk-aligned and every sharded target, including pyramid consolidation. All <code>da.store</code> calls now share a lock; block compute stays parallel.</li>
 <li>Windows: concurrent access to a store no longer fails with <code>PermissionError: [WinError 5]</code>/<code>[WinError 32]</code>. A concurrent reader of <code>zarr.json</code> could break a writer's atomic rename; store operations now absorb these transient conflicts with a short bounded retry. No behaviour change on Linux or macOS.</li>
