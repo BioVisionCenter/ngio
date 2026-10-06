@@ -1,3 +1,5 @@
+import warnings
+
 import zarr
 from anndata import AnnData
 from pandas import DataFrame
@@ -52,6 +54,23 @@ class AnnDataBackend(AbstractTableBackend):
         """Load the table as an AnnData object."""
         return self.load_as_anndata()
 
+    def _write_zarr(self, table: AnnData, target) -> None:
+        """Call `AnnData.write_zarr`, muting anndata's zarr v2 removal notice."""
+        with warnings.catch_warnings():
+            if self._group_handler.zarr_format == 2:
+                # anndata 0.13 deprecates zarr v2 writes; ngio still writes v2 on
+                # purpose, and downstream warnings-as-errors cannot fix our call.
+                # The `anndata<0.14` cap in pyproject.toml guards the actual
+                # removal. Matched on the message so other DeprecationWarnings
+                # still surface. `catch_warnings` is not thread-safe.
+                warnings.filterwarnings(
+                    "ignore",
+                    message="zarr v3 will become the only option in 0.14 anndata",
+                    category=DeprecationWarning,
+                )
+            # ty resolves AnnData.write_zarr as an unbound function, not a method.
+            table.write_zarr(target)  # type: ignore
+
     @retry_io
     def _write_to_local_store(
         self, store: NgioStore, path: str, table: AnnData
@@ -66,8 +85,7 @@ class AnnDataBackend(AbstractTableBackend):
             raise NgioValueError(
                 f"Cannot resolve a local path for store {store} at {path}."
             )
-        # ty resolves AnnData.write_zarr as an unbound function, not a method.
-        table.write_zarr(url)  # type: ignore
+        self._write_zarr(table, url)
 
     @retry_io
     def _write_to_fsspec_store(
@@ -78,12 +96,12 @@ class AnnDataBackend(AbstractTableBackend):
         AnnData writes through a raw fsspec mapper, bypassing the (retrying)
         `NgioStore`, so the `io_retry` policy is applied here.
         """
-        table.write_zarr(store.get_mapper(path))  # type: ignore
+        self._write_zarr(table, store.get_mapper(path))
 
     def _write_to_memory_store(self, table: AnnData) -> None:
         """Write the AnnData table to a MemoryStore."""
         scratch_store = MemoryStore()
-        table.write_zarr(scratch_store)  # type: ignore
+        self._write_zarr(table, scratch_store)
         anndata_group = zarr.open_group(scratch_store, mode="r")
         copy_group(
             anndata_group,

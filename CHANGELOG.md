@@ -1,10 +1,11 @@
 # Changelog
 
-## [Unreleased]
+## [v1.1.1]
 
 ### Fixes
 
 - A sequence selection that was a permutation of a contiguous run — `channel_selection=["C1", "C0"]`, `z=[1, 0]` — was read **and written** in stored order, while a non-contiguous one (`["C2", "C0"]`) kept the requested order ([#255](https://github.com/BioVisionCenter/ngio/issues/255)). Selections now always follow the requested order. Data written through such a selection with `ngio<=1.1.0` landed swapped on disk.
+- Writing a zarr v2 AnnData table with `anndata>=0.13` no longer leaks anndata's `DeprecationWarning` about `settings.zarr_write_format` from ngio's internal `write_zarr` call — projects running warnings-as-errors could not write v2 tables and had no way to fix it. ngio still writes zarr v2; the `anndata<0.14` cap guards the actual removal.
 
 ## [v1.1.0]
 
