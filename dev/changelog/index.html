@@ -2026,15 +2026,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#unreleased" class="md-nav__link">
+  <a href="#v111" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        [Unreleased]
+        [v1.1.1]
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+    <nav class="md-nav" aria-label="[v1.1.1]">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3379,15 +3379,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#unreleased" class="md-nav__link">
+  <a href="#v111" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        [Unreleased]
+        [v1.1.1]
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+    <nav class="md-nav" aria-label="[v1.1.1]">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4659,10 +4659,11 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="v111">[v1.1.1]<a class="headerlink" href="#v111" title="Permanent link">&para;</a></h2>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
 <li>A sequence selection that was a permutation of a contiguous run — <code>channel_selection=["C1", "C0"]</code>, <code>z=[1, 0]</code> — was read <strong>and written</strong> in stored order, while a non-contiguous one (<code>["C2", "C0"]</code>) kept the requested order (<a href="https://github.com/BioVisionCenter/ngio/issues/255">#255</a>). Selections now always follow the requested order. Data written through such a selection with <code>ngio&lt;=1.1.0</code> landed swapped on disk.</li>
+<li>Writing a zarr v2 AnnData table with <code>anndata&gt;=0.13</code> no longer leaks anndata's <code>DeprecationWarning</code> about <code>settings.zarr_write_format</code> from ngio's internal <code>write_zarr</code> call — projects running warnings-as-errors could not write v2 tables and had no way to fix it. ngio still writes zarr v2; the <code>anndata&lt;0.14</code> cap guards the actual removal.</li>
 </ul>
 <h2 id="v110">[v1.1.0]<a class="headerlink" href="#v110" title="Permanent link">&para;</a></h2>
 <p><strong>Highlights</strong>:</p>
