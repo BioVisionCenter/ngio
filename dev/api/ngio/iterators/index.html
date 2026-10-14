@@ -7989,9 +7989,8 @@ schedule the units into conflict-free waves (<code>plan_waves</code>).</p>
         <p>Apply a transformation function to each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s patch and write it back.</p>
 <p>Deprecated: removed in ngio=1.2.</p>
 <p>Runs serially: the dask pipes are already executed by dask's own
-scheduler, and the dask write path (<code>store_dask</code>) scopes a global
-dask config option, so concurrent callers are unsafe. A parallel
-<code>mapper</code> raises.</p>
+scheduler, so a parallel <code>mapper</code> would only oversubscribe it. One
+raises.</p>
 
 
             <details class="mkdocstrings-source">
@@ -8019,8 +8018,7 @@ dask config option, so concurrent callers are unsafe. A parallel
 <span class="normal"><a href="#__codelineno-0-1459">1459</a></span>
 <span class="normal"><a href="#__codelineno-0-1460">1460</a></span>
 <span class="normal"><a href="#__codelineno-0-1461">1461</a></span>
-<span class="normal"><a href="#__codelineno-0-1462">1462</a></span>
-<span class="normal"><a href="#__codelineno-0-1463">1463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-1462">1462</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
 </span><span id="__span-0-1440"><a id="__codelineno-0-1440" name="__codelineno-0-1440"></a>    <span class="n">replacement</span><span class="o">=</span><span class="s2">&quot;map() / map_as_numpy(mapper=...)&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1441"><a id="__codelineno-0-1441" name="__codelineno-0-1441"></a>    <span class="n">removed_in</span><span class="o">=</span><span class="s2">&quot;1.2&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1442"><a id="__codelineno-0-1442" name="__codelineno-0-1442"></a><span class="p">)</span>
@@ -8035,16 +8033,15 @@ dask config option, so concurrent callers are unsafe. A parallel
 </span><span id="__span-0-1451"><a id="__codelineno-0-1451" name="__codelineno-0-1451"></a><span class="sd">    Deprecated: removed in ngio=1.2.</span>
 </span><span id="__span-0-1452"><a id="__codelineno-0-1452" name="__codelineno-0-1452"></a>
 </span><span id="__span-0-1453"><a id="__codelineno-0-1453" name="__codelineno-0-1453"></a><span class="sd">    Runs serially: the dask pipes are already executed by dask&#39;s own</span>
-</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, and the dask write path (`store_dask`) scopes a global</span>
-</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    dask config option, so concurrent callers are unsafe. A parallel</span>
-</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    `mapper` raises.</span>
-</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
-</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
-</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
-</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
-</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1463"><a id="__codelineno-0-1463" name="__codelineno-0-1463"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, so a parallel `mapper` would only oversubscribe it. One</span>
+</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    raises.</span>
+</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
+</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
+</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
+</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8090,7 +8087,8 @@ loop.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1464">1464</a></span>
+<span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
 <span class="normal"><a href="#__codelineno-0-1466">1466</a></span>
 <span class="normal"><a href="#__codelineno-0-1467">1467</a></span>
 <span class="normal"><a href="#__codelineno-0-1468">1468</a></span>
@@ -8115,34 +8113,33 @@ loop.</p>
 <span class="normal"><a href="#__codelineno-0-1487">1487</a></span>
 <span class="normal"><a href="#__codelineno-0-1488">1488</a></span>
 <span class="normal"><a href="#__codelineno-0-1489">1489</a></span>
-<span class="normal"><a href="#__codelineno-0-1490">1490</a></span>
-<span class="normal"><a href="#__codelineno-0-1491">1491</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
-</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a>
-</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
-</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
-</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
-</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
-</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
-</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
-</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
-</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a>
-</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
-</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a><span class="sd">    loop.</span>
-</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a>
-</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
-</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>        <span class="k">return</span> <span class="kc">False</span>
-</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>
-</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
-</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
-</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="p">)</span>
-</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-1491"><a id="__codelineno-0-1491" name="__codelineno-0-1491"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
+<span class="normal"><a href="#__codelineno-0-1490">1490</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1464"><a id="__codelineno-0-1464" name="__codelineno-0-1464"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
+</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a>
+</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
+</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
+</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
+</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
+</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
+</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
+</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
+</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a>
+</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
+</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    loop.</span>
+</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a>
+</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
+</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>
+</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
+</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
+</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>    <span class="p">)</span>
+</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8170,23 +8167,23 @@ this to insist on a single-wave tiling instead.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1492">1492</a></span>
+<span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
 <span class="normal"><a href="#__codelineno-0-1494">1494</a></span>
 <span class="normal"><a href="#__codelineno-0-1495">1495</a></span>
 <span class="normal"><a href="#__codelineno-0-1496">1496</a></span>
 <span class="normal"><a href="#__codelineno-0-1497">1497</a></span>
 <span class="normal"><a href="#__codelineno-0-1498">1498</a></span>
 <span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
-<span class="normal"><a href="#__codelineno-0-1500">1500</a></span>
-<span class="normal"><a href="#__codelineno-0-1501">1501</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
-</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a>
-</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
-</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
-</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
-</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
-</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1500">1500</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1492"><a id="__codelineno-0-1492" name="__codelineno-0-1492"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
+</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a>
+</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
+</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
+</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
+</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
+</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -14320,9 +14317,8 @@ schedule the units into conflict-free waves (<code>plan_waves</code>).</p>
         <p>Apply a transformation function to each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s patch and write it back.</p>
 <p>Deprecated: removed in ngio=1.2.</p>
 <p>Runs serially: the dask pipes are already executed by dask's own
-scheduler, and the dask write path (<code>store_dask</code>) scopes a global
-dask config option, so concurrent callers are unsafe. A parallel
-<code>mapper</code> raises.</p>
+scheduler, so a parallel <code>mapper</code> would only oversubscribe it. One
+raises.</p>
 
 
             <details class="mkdocstrings-source">
@@ -14350,8 +14346,7 @@ dask config option, so concurrent callers are unsafe. A parallel
 <span class="normal"><a href="#__codelineno-0-1459">1459</a></span>
 <span class="normal"><a href="#__codelineno-0-1460">1460</a></span>
 <span class="normal"><a href="#__codelineno-0-1461">1461</a></span>
-<span class="normal"><a href="#__codelineno-0-1462">1462</a></span>
-<span class="normal"><a href="#__codelineno-0-1463">1463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-1462">1462</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
 </span><span id="__span-0-1440"><a id="__codelineno-0-1440" name="__codelineno-0-1440"></a>    <span class="n">replacement</span><span class="o">=</span><span class="s2">&quot;map() / map_as_numpy(mapper=...)&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1441"><a id="__codelineno-0-1441" name="__codelineno-0-1441"></a>    <span class="n">removed_in</span><span class="o">=</span><span class="s2">&quot;1.2&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1442"><a id="__codelineno-0-1442" name="__codelineno-0-1442"></a><span class="p">)</span>
@@ -14366,16 +14361,15 @@ dask config option, so concurrent callers are unsafe. A parallel
 </span><span id="__span-0-1451"><a id="__codelineno-0-1451" name="__codelineno-0-1451"></a><span class="sd">    Deprecated: removed in ngio=1.2.</span>
 </span><span id="__span-0-1452"><a id="__codelineno-0-1452" name="__codelineno-0-1452"></a>
 </span><span id="__span-0-1453"><a id="__codelineno-0-1453" name="__codelineno-0-1453"></a><span class="sd">    Runs serially: the dask pipes are already executed by dask&#39;s own</span>
-</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, and the dask write path (`store_dask`) scopes a global</span>
-</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    dask config option, so concurrent callers are unsafe. A parallel</span>
-</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    `mapper` raises.</span>
-</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
-</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
-</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
-</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
-</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1463"><a id="__codelineno-0-1463" name="__codelineno-0-1463"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, so a parallel `mapper` would only oversubscribe it. One</span>
+</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    raises.</span>
+</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
+</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
+</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
+</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -14421,7 +14415,8 @@ loop.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1464">1464</a></span>
+<span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
 <span class="normal"><a href="#__codelineno-0-1466">1466</a></span>
 <span class="normal"><a href="#__codelineno-0-1467">1467</a></span>
 <span class="normal"><a href="#__codelineno-0-1468">1468</a></span>
@@ -14446,34 +14441,33 @@ loop.</p>
 <span class="normal"><a href="#__codelineno-0-1487">1487</a></span>
 <span class="normal"><a href="#__codelineno-0-1488">1488</a></span>
 <span class="normal"><a href="#__codelineno-0-1489">1489</a></span>
-<span class="normal"><a href="#__codelineno-0-1490">1490</a></span>
-<span class="normal"><a href="#__codelineno-0-1491">1491</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
-</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a>
-</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
-</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
-</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
-</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
-</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
-</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
-</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
-</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a>
-</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
-</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a><span class="sd">    loop.</span>
-</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a>
-</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
-</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>        <span class="k">return</span> <span class="kc">False</span>
-</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>
-</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
-</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
-</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="p">)</span>
-</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-1491"><a id="__codelineno-0-1491" name="__codelineno-0-1491"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
+<span class="normal"><a href="#__codelineno-0-1490">1490</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1464"><a id="__codelineno-0-1464" name="__codelineno-0-1464"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
+</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a>
+</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
+</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
+</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
+</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
+</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
+</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
+</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
+</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a>
+</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
+</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    loop.</span>
+</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a>
+</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
+</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>
+</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
+</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
+</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>    <span class="p">)</span>
+</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -14501,23 +14495,23 @@ this to insist on a single-wave tiling instead.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1492">1492</a></span>
+<span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
 <span class="normal"><a href="#__codelineno-0-1494">1494</a></span>
 <span class="normal"><a href="#__codelineno-0-1495">1495</a></span>
 <span class="normal"><a href="#__codelineno-0-1496">1496</a></span>
 <span class="normal"><a href="#__codelineno-0-1497">1497</a></span>
 <span class="normal"><a href="#__codelineno-0-1498">1498</a></span>
 <span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
-<span class="normal"><a href="#__codelineno-0-1500">1500</a></span>
-<span class="normal"><a href="#__codelineno-0-1501">1501</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
-</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a>
-</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
-</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
-</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
-</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
-</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1500">1500</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1492"><a id="__codelineno-0-1492" name="__codelineno-0-1492"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
+</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a>
+</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
+</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
+</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
+</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
+</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -22269,9 +22263,8 @@ The already-written tiles stay in every case.</p>
         <p>Apply a transformation function to each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s patch and write it back.</p>
 <p>Deprecated: removed in ngio=1.2.</p>
 <p>Runs serially: the dask pipes are already executed by dask's own
-scheduler, and the dask write path (<code>store_dask</code>) scopes a global
-dask config option, so concurrent callers are unsafe. A parallel
-<code>mapper</code> raises.</p>
+scheduler, so a parallel <code>mapper</code> would only oversubscribe it. One
+raises.</p>
 
 
             <details class="mkdocstrings-source">
@@ -22299,8 +22292,7 @@ dask config option, so concurrent callers are unsafe. A parallel
 <span class="normal"><a href="#__codelineno-0-1459">1459</a></span>
 <span class="normal"><a href="#__codelineno-0-1460">1460</a></span>
 <span class="normal"><a href="#__codelineno-0-1461">1461</a></span>
-<span class="normal"><a href="#__codelineno-0-1462">1462</a></span>
-<span class="normal"><a href="#__codelineno-0-1463">1463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-1462">1462</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
 </span><span id="__span-0-1440"><a id="__codelineno-0-1440" name="__codelineno-0-1440"></a>    <span class="n">replacement</span><span class="o">=</span><span class="s2">&quot;map() / map_as_numpy(mapper=...)&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1441"><a id="__codelineno-0-1441" name="__codelineno-0-1441"></a>    <span class="n">removed_in</span><span class="o">=</span><span class="s2">&quot;1.2&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1442"><a id="__codelineno-0-1442" name="__codelineno-0-1442"></a><span class="p">)</span>
@@ -22315,16 +22307,15 @@ dask config option, so concurrent callers are unsafe. A parallel
 </span><span id="__span-0-1451"><a id="__codelineno-0-1451" name="__codelineno-0-1451"></a><span class="sd">    Deprecated: removed in ngio=1.2.</span>
 </span><span id="__span-0-1452"><a id="__codelineno-0-1452" name="__codelineno-0-1452"></a>
 </span><span id="__span-0-1453"><a id="__codelineno-0-1453" name="__codelineno-0-1453"></a><span class="sd">    Runs serially: the dask pipes are already executed by dask&#39;s own</span>
-</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, and the dask write path (`store_dask`) scopes a global</span>
-</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    dask config option, so concurrent callers are unsafe. A parallel</span>
-</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    `mapper` raises.</span>
-</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
-</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
-</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
-</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
-</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1463"><a id="__codelineno-0-1463" name="__codelineno-0-1463"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, so a parallel `mapper` would only oversubscribe it. One</span>
+</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    raises.</span>
+</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
+</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
+</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
+</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -22370,7 +22361,8 @@ loop.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1464">1464</a></span>
+<span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
 <span class="normal"><a href="#__codelineno-0-1466">1466</a></span>
 <span class="normal"><a href="#__codelineno-0-1467">1467</a></span>
 <span class="normal"><a href="#__codelineno-0-1468">1468</a></span>
@@ -22395,34 +22387,33 @@ loop.</p>
 <span class="normal"><a href="#__codelineno-0-1487">1487</a></span>
 <span class="normal"><a href="#__codelineno-0-1488">1488</a></span>
 <span class="normal"><a href="#__codelineno-0-1489">1489</a></span>
-<span class="normal"><a href="#__codelineno-0-1490">1490</a></span>
-<span class="normal"><a href="#__codelineno-0-1491">1491</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
-</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a>
-</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
-</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
-</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
-</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
-</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
-</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
-</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
-</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a>
-</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
-</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a><span class="sd">    loop.</span>
-</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a>
-</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
-</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>        <span class="k">return</span> <span class="kc">False</span>
-</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>
-</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
-</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
-</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="p">)</span>
-</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-1491"><a id="__codelineno-0-1491" name="__codelineno-0-1491"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
+<span class="normal"><a href="#__codelineno-0-1490">1490</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1464"><a id="__codelineno-0-1464" name="__codelineno-0-1464"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
+</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a>
+</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
+</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
+</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
+</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
+</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
+</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
+</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
+</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a>
+</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
+</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    loop.</span>
+</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a>
+</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
+</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>
+</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
+</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
+</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>    <span class="p">)</span>
+</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -22450,23 +22441,23 @@ this to insist on a single-wave tiling instead.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1492">1492</a></span>
+<span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
 <span class="normal"><a href="#__codelineno-0-1494">1494</a></span>
 <span class="normal"><a href="#__codelineno-0-1495">1495</a></span>
 <span class="normal"><a href="#__codelineno-0-1496">1496</a></span>
 <span class="normal"><a href="#__codelineno-0-1497">1497</a></span>
 <span class="normal"><a href="#__codelineno-0-1498">1498</a></span>
 <span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
-<span class="normal"><a href="#__codelineno-0-1500">1500</a></span>
-<span class="normal"><a href="#__codelineno-0-1501">1501</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
-</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a>
-</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
-</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
-</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
-</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
-</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1500">1500</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1492"><a id="__codelineno-0-1492" name="__codelineno-0-1492"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
+</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a>
+</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
+</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
+</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
+</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
+</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -25653,9 +25644,8 @@ the right question.</p>
         <p>Apply a transformation function to each <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr>'s patch and write it back.</p>
 <p>Deprecated: removed in ngio=1.2.</p>
 <p>Runs serially: the dask pipes are already executed by dask's own
-scheduler, and the dask write path (<code>store_dask</code>) scopes a global
-dask config option, so concurrent callers are unsafe. A parallel
-<code>mapper</code> raises.</p>
+scheduler, so a parallel <code>mapper</code> would only oversubscribe it. One
+raises.</p>
 
 
             <details class="mkdocstrings-source">
@@ -25683,8 +25673,7 @@ dask config option, so concurrent callers are unsafe. A parallel
 <span class="normal"><a href="#__codelineno-0-1459">1459</a></span>
 <span class="normal"><a href="#__codelineno-0-1460">1460</a></span>
 <span class="normal"><a href="#__codelineno-0-1461">1461</a></span>
-<span class="normal"><a href="#__codelineno-0-1462">1462</a></span>
-<span class="normal"><a href="#__codelineno-0-1463">1463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-1462">1462</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1439"><a id="__codelineno-0-1439" name="__codelineno-0-1439"></a><span class="nd">@deprecated</span><span class="p">(</span>
 </span><span id="__span-0-1440"><a id="__codelineno-0-1440" name="__codelineno-0-1440"></a>    <span class="n">replacement</span><span class="o">=</span><span class="s2">&quot;map() / map_as_numpy(mapper=...)&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1441"><a id="__codelineno-0-1441" name="__codelineno-0-1441"></a>    <span class="n">removed_in</span><span class="o">=</span><span class="s2">&quot;1.2&quot;</span><span class="p">,</span>
 </span><span id="__span-0-1442"><a id="__codelineno-0-1442" name="__codelineno-0-1442"></a><span class="p">)</span>
@@ -25699,16 +25688,15 @@ dask config option, so concurrent callers are unsafe. A parallel
 </span><span id="__span-0-1451"><a id="__codelineno-0-1451" name="__codelineno-0-1451"></a><span class="sd">    Deprecated: removed in ngio=1.2.</span>
 </span><span id="__span-0-1452"><a id="__codelineno-0-1452" name="__codelineno-0-1452"></a>
 </span><span id="__span-0-1453"><a id="__codelineno-0-1453" name="__codelineno-0-1453"></a><span class="sd">    Runs serially: the dask pipes are already executed by dask&#39;s own</span>
-</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, and the dask write path (`store_dask`) scopes a global</span>
-</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    dask config option, so concurrent callers are unsafe. A parallel</span>
-</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    `mapper` raises.</span>
-</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
-</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
-</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
-</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
-</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1463"><a id="__codelineno-0-1463" name="__codelineno-0-1463"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</span><span id="__span-0-1454"><a id="__codelineno-0-1454" name="__codelineno-0-1454"></a><span class="sd">    scheduler, so a parallel `mapper` would only oversubscribe it. One</span>
+</span><span id="__span-0-1455"><a id="__codelineno-0-1455" name="__codelineno-0-1455"></a><span class="sd">    raises.</span>
+</span><span id="__span-0-1456"><a id="__codelineno-0-1456" name="__codelineno-0-1456"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1457"><a id="__codelineno-0-1457" name="__codelineno-0-1457"></a>    <span class="n">_mapper</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_require_serial_dask_mapper</span><span class="p">(</span><span class="n">mapper</span><span class="p">)</span>
+</span><span id="__span-0-1458"><a id="__codelineno-0-1458" name="__codelineno-0-1458"></a>    <span class="n">units</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dask_units_generator</span><span class="p">())</span>
+</span><span id="__span-0-1459"><a id="__codelineno-0-1459" name="__codelineno-0-1459"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">_validate_write_plan</span><span class="p">()</span>
+</span><span id="__span-0-1460"><a id="__codelineno-0-1460" name="__codelineno-0-1460"></a>    <span class="n">_mapper</span><span class="p">(</span><span class="n">func</span><span class="p">,</span> <span class="n">units</span><span class="p">)</span>
+</span><span id="__span-0-1461"><a id="__codelineno-0-1461" name="__codelineno-0-1461"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_partition</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1462"><a id="__codelineno-0-1462" name="__codelineno-0-1462"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -25754,7 +25742,8 @@ loop.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1464">1464</a></span>
+<span class="normal"><a href="#__codelineno-0-1465">1465</a></span>
 <span class="normal"><a href="#__codelineno-0-1466">1466</a></span>
 <span class="normal"><a href="#__codelineno-0-1467">1467</a></span>
 <span class="normal"><a href="#__codelineno-0-1468">1468</a></span>
@@ -25779,34 +25768,33 @@ loop.</p>
 <span class="normal"><a href="#__codelineno-0-1487">1487</a></span>
 <span class="normal"><a href="#__codelineno-0-1488">1488</a></span>
 <span class="normal"><a href="#__codelineno-0-1489">1489</a></span>
-<span class="normal"><a href="#__codelineno-0-1490">1490</a></span>
-<span class="normal"><a href="#__codelineno-0-1491">1491</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
-</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a>
-</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
-</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
-</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
-</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
-</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
-</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
-</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
-</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a>
-</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
-</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a><span class="sd">    loop.</span>
-</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a>
-</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">    Returns:</span>
-</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
-</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
-</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>        <span class="k">return</span> <span class="kc">False</span>
-</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>
-</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
-</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
-</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
-</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
-</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="p">)</span>
-</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
-</span><span id="__span-0-1491"><a id="__codelineno-0-1491" name="__codelineno-0-1491"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
+<span class="normal"><a href="#__codelineno-0-1490">1490</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1464"><a id="__codelineno-0-1464" name="__codelineno-0-1464"></a><span class="k">def</span><span class="w"> </span><span class="nf">check_if_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-0-1465"><a id="__codelineno-0-1465" name="__codelineno-0-1465"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if any two ROIs write into the same write unit of the output.</span>
+</span><span id="__span-0-1466"><a id="__codelineno-0-1466" name="__codelineno-0-1466"></a>
+</span><span id="__span-0-1467"><a id="__codelineno-0-1467" name="__codelineno-0-1467"></a><span class="sd">    Measured on the write target: slicing tuples come from the setters and</span>
+</span><span id="__span-0-1468"><a id="__codelineno-0-1468" name="__codelineno-0-1468"></a><span class="sd">    the grid is the output array&#39;s write granularity — the shard shape when</span>
+</span><span id="__span-0-1469"><a id="__codelineno-0-1469" name="__codelineno-0-1469"></a><span class="sd">    the output is sharded (writes are atomic per shard object), the chunk</span>
+</span><span id="__span-0-1470"><a id="__codelineno-0-1470" name="__codelineno-0-1470"></a><span class="sd">    shape otherwise. Two ROIs sharing a write unit make concurrent writes</span>
+</span><span id="__span-0-1471"><a id="__codelineno-0-1471" name="__codelineno-0-1471"></a><span class="sd">    unsafe: the read-modify-write of that unit can lose data. The parallel</span>
+</span><span id="__span-0-1472"><a id="__codelineno-0-1472" name="__codelineno-0-1472"></a><span class="sd">    mappers schedule such ROIs into separate waves, so this check answers</span>
+</span><span id="__span-0-1473"><a id="__codelineno-0-1473" name="__codelineno-0-1473"></a><span class="sd">    &quot;will my map run as a single fully-parallel wave?&quot;.</span>
+</span><span id="__span-0-1474"><a id="__codelineno-0-1474" name="__codelineno-0-1474"></a>
+</span><span id="__span-0-1475"><a id="__codelineno-0-1475" name="__codelineno-0-1475"></a><span class="sd">    This is O(n^2) in the number of ROIs; avoid calling it repeatedly in a</span>
+</span><span id="__span-0-1476"><a id="__codelineno-0-1476" name="__codelineno-0-1476"></a><span class="sd">    loop.</span>
+</span><span id="__span-0-1477"><a id="__codelineno-0-1477" name="__codelineno-0-1477"></a>
+</span><span id="__span-0-1478"><a id="__codelineno-0-1478" name="__codelineno-0-1478"></a><span class="sd">    Returns:</span>
+</span><span id="__span-0-1479"><a id="__codelineno-0-1479" name="__codelineno-0-1479"></a><span class="sd">        `True` if any two ROIs share a write unit.</span>
+</span><span id="__span-0-1480"><a id="__codelineno-0-1480" name="__codelineno-0-1480"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1481"><a id="__codelineno-0-1481" name="__codelineno-0-1481"></a>    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">rois</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+</span><span id="__span-0-1482"><a id="__codelineno-0-1482" name="__codelineno-0-1482"></a>        <span class="k">return</span> <span class="kc">False</span>
+</span><span id="__span-0-1483"><a id="__codelineno-0-1483" name="__codelineno-0-1483"></a>
+</span><span id="__span-0-1484"><a id="__codelineno-0-1484" name="__codelineno-0-1484"></a>    <span class="n">footprints</span> <span class="o">=</span> <span class="p">(</span>
+</span><span id="__span-0-1485"><a id="__codelineno-0-1485" name="__codelineno-0-1485"></a>        <span class="n">compute_write_footprint</span><span class="p">(</span><span class="n">setter</span><span class="p">)</span>
+</span><span id="__span-0-1486"><a id="__codelineno-0-1486" name="__codelineno-0-1486"></a>        <span class="k">for</span> <span class="n">setter</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_numpy_setters_generator</span><span class="p">()</span>
+</span><span id="__span-0-1487"><a id="__codelineno-0-1487" name="__codelineno-0-1487"></a>        <span class="k">if</span> <span class="n">setter</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+</span><span id="__span-0-1488"><a id="__codelineno-0-1488" name="__codelineno-0-1488"></a>    <span class="p">)</span>
+</span><span id="__span-0-1489"><a id="__codelineno-0-1489" name="__codelineno-0-1489"></a>    <span class="n">non_empty</span> <span class="o">=</span> <span class="p">(</span><span class="n">footprint</span> <span class="k">for</span> <span class="n">footprint</span> <span class="ow">in</span> <span class="n">footprints</span> <span class="k">if</span> <span class="n">footprint</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">)</span>
+</span><span id="__span-0-1490"><a id="__codelineno-0-1490" name="__codelineno-0-1490"></a>    <span class="k">return</span> <span class="nb">any</span><span class="p">(</span><span class="n">chunk_rects_intersect</span><span class="p">(</span><span class="n">fi</span><span class="p">,</span> <span class="n">fj</span><span class="p">)</span> <span class="k">for</span> <span class="n">fi</span><span class="p">,</span> <span class="n">fj</span> <span class="ow">in</span> <span class="n">_pairs_stream</span><span class="p">(</span><span class="n">non_empty</span><span class="p">))</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -25834,23 +25822,23 @@ this to insist on a single-wave tiling instead.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/ngio/iterators/_abstract_iterator.py</code></summary>
-              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
+              <div class="language-python highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-1492">1492</a></span>
+<span class="normal"><a href="#__codelineno-0-1493">1493</a></span>
 <span class="normal"><a href="#__codelineno-0-1494">1494</a></span>
 <span class="normal"><a href="#__codelineno-0-1495">1495</a></span>
 <span class="normal"><a href="#__codelineno-0-1496">1496</a></span>
 <span class="normal"><a href="#__codelineno-0-1497">1497</a></span>
 <span class="normal"><a href="#__codelineno-0-1498">1498</a></span>
 <span class="normal"><a href="#__codelineno-0-1499">1499</a></span>
-<span class="normal"><a href="#__codelineno-0-1500">1500</a></span>
-<span class="normal"><a href="#__codelineno-0-1501">1501</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
-</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a>
-</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
-</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
-</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
-</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a><span class="sd">    &quot;&quot;&quot;</span>
-</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
-</span><span id="__span-0-1501"><a id="__codelineno-0-1501" name="__codelineno-0-1501"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-1500">1500</a></span></pre></div></td><td class="code"><div><pre><span></span><code><span id="__span-0-1492"><a id="__codelineno-0-1492" name="__codelineno-0-1492"></a><span class="k">def</span><span class="w"> </span><span class="nf">require_no_write_units_overlap</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+</span><span id="__span-0-1493"><a id="__codelineno-0-1493" name="__codelineno-0-1493"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Ensure that the ROIs do not share write units on the output.</span>
+</span><span id="__span-0-1494"><a id="__codelineno-0-1494" name="__codelineno-0-1494"></a>
+</span><span id="__span-0-1495"><a id="__codelineno-0-1495" name="__codelineno-0-1495"></a><span class="sd">    The strict opt-in gate: the parallel mappers no longer refuse shared</span>
+</span><span id="__span-0-1496"><a id="__codelineno-0-1496" name="__codelineno-0-1496"></a><span class="sd">    write units on their own (they wave-schedule around them), so call</span>
+</span><span id="__span-0-1497"><a id="__codelineno-0-1497" name="__codelineno-0-1497"></a><span class="sd">    this to insist on a single-wave tiling instead.</span>
+</span><span id="__span-0-1498"><a id="__codelineno-0-1498" name="__codelineno-0-1498"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-0-1499"><a id="__codelineno-0-1499" name="__codelineno-0-1499"></a>    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_if_write_units_overlap</span><span class="p">():</span>
+</span><span id="__span-0-1500"><a id="__codelineno-0-1500" name="__codelineno-0-1500"></a>        <span class="k">raise</span> <span class="n">NgioValueError</span><span class="p">(</span><span class="s2">&quot;Some ROIs share write units on the output.&quot;</span><span class="p">)</span>
 </span></code></pre></div></td></tr></table></div>
             </details>
     </div>
