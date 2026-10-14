@@ -1047,8 +1047,8 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
     ) -> "MapperProtocol[DaskPipeType, R]":
         """The dask verbs run serially; reject any parallel mapper.
 
-        `store_dask` scopes a process-global dask config option, so
-        concurrent dask writers are unsafe by construction.
+        Dask already schedules its own workers per write; a parallel mapper
+        on top would only oversubscribe the machine and multiply peak memory.
         """
         if mapper is None:
             return BasicMapper[DaskPipeType, R]()
@@ -1451,9 +1451,8 @@ class WritingIteratorBuilder(
         Deprecated: removed in ngio=1.2.
 
         Runs serially: the dask pipes are already executed by dask's own
-        scheduler, and the dask write path (`store_dask`) scopes a global
-        dask config option, so concurrent callers are unsafe. A parallel
-        `mapper` raises.
+        scheduler, so a parallel `mapper` would only oversubscribe it. One
+        raises.
         """
         _mapper = self._require_serial_dask_mapper(mapper)
         units = list(self._dask_units_generator())

@@ -463,3 +463,72 @@ def test_on_disk_zoom_sharded_matches_unsharded(
         results[name] = target_array[...]
 
     np.testing.assert_array_equal(results["sharded"], results["unsharded"])
+
+
+def test_dask_zoom_onto_a_level_of_one_and_a_half_units(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A pyramid level of 1.5 write units, with the unit at the block budget.
+
+    The converter geometry: dask's own grid for this shape is cut inside the
+    unit, which made the whole-array write refuse (`NgioValueError`) and so
+    crashed `consolidate()` on every image with such a level. The grid is
+    ngio's now; the write must land and match the numpy path.
+    """
+    from ngio.config import DaskConfig
+
+    source = zarr.create_array(
+        tmp_path / "source.zarr", shape=(1, 2, 1, 192, 192), dtype="uint16"
+    )
+    source[...] = np.random.default_rng(0).integers(
+        0, 1000, size=(1, 2, 1, 192, 192), dtype="uint16"
+    )
+    results = {}
+    for mode in ("dask", "numpy"):
+        target = zarr.create_array(
+            tmp_path / f"target_{mode}.zarr",
+            shape=(1, 2, 1, 96, 96),
+            chunks=(1, 1, 1, 64, 64),
+            dtype="uint16",
+        )
+        unit_bytes = 64 * 64 * 2
+        monkeypatch.setattr(
+            get_config(), "dask", DaskConfig(write_block_max_bytes=unit_bytes)
+        )
+        on_disk_zoom(source, target, order="nearest", mode=mode)  # type: ignore[arg-type]
+        results[mode] = target[...]
+
+    np.testing.assert_array_equal(results["dask"], results["numpy"])
+
+
+def test_consolidate_with_a_level_of_one_and_a_half_units(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """`consolidate(mode="dask")` through the public API on the same geometry."""
+    from ngio import create_empty_ome_zarr
+    from ngio.config import DaskConfig
+
+    container = create_empty_ome_zarr(
+        store=tmp_path / "image.zarr",
+        shape=(2, 192, 192),
+        axes_names=["c", "y", "x"],
+        pixelsize=1.0,
+        levels=2,
+        chunks=(1, 64, 64),
+        dtype="uint16",
+    )
+    image = container.get_image(path="0")
+    data = np.random.default_rng(0).integers(0, 1000, (2, 192, 192), dtype="uint16")
+    image.set_array(data)
+    level_1 = container.get_image(path="1")
+    assert level_1.shape == (2, 96, 96), "fixture must be 1.5 units on y and x"
+
+    monkeypatch.setattr(
+        get_config(), "dask", DaskConfig(write_block_max_bytes=64 * 64 * 2)
+    )
+    image.consolidate(mode="dask")
+
+    np.testing.assert_array_equal(
+        level_1.get_as_numpy(),
+        numpy_zoom(data, target_shape=(2, 96, 96), order="linear"),
+    )
