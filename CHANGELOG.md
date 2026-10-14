@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- A dask write could silently lose pixels. `store_dask` trusted dask's auto chunking to cut its block grid on whole chunks or shards, but for write units of 8 MiB or more (the default `write_block_max_bytes`) on an array that is not a multiple of the unit, dask balances the axis instead and two lock-free writers share a unit. Every `set_array`/`set_roi` with a dask patch on such a geometry wrote wrong pixels without error, and `consolidate()` raised `NgioValueError` on any pyramid level of that shape. ngio now builds the grid from whole write units itself; dask's heuristic only decides how many units make one block. The process-global `dask.config` scope around the write is gone with it.
+
 ## [v1.1.1]
 
 ### Fixes

@@ -82,7 +82,7 @@ The two mechanisms are complementary and independent: `s3fs` retries individual 
 
 `dask.write_block_max_bytes` caps how much data ngio lets dask assemble in memory before writing it, in bytes. It defaults to **8 MiB**.
 
-Every dask write — pyramid consolidation, `set_array`, `set_roi` — goes through `da.to_zarr`, which glues whole *write units* (a shard if the array is sharded, a chunk otherwise) into larger *blocks* sized to dask's own `array.chunk-size`, 128 MiB by default. The unit grid is what makes the write safe; the block grid is only batching. Since a write unit is commonly a few hundred KiB, the dask default packs around a thousand of them into one resident block, and peak memory is roughly the number of blocks in flight times their size.
+Every dask write — pyramid consolidation, `set_array`, `set_roi` — rechunks the patch onto a block grid ngio builds from whole *write units* (a shard if the array is sharded, a chunk otherwise), glued into larger *blocks* sized to dask's own `array.chunk-size`, 128 MiB by default. The unit grid is what makes the write safe; the block grid is only batching. Since a write unit is commonly a few hundred KiB, the dask default packs around a thousand of them into one resident block, and peak memory is roughly the number of blocks in flight times their size.
 
 Capping that is close to free. Consolidating a 3-level pyramid, peak memory and wall clock:
 
