@@ -509,7 +509,7 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
 def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     """The zarr-python copy fallback writes whole write units, byte-exact.
 
-    A raw `da.to_zarr` under a block budget smaller than the destination's
+    A raw dask write under a block budget smaller than the destination's
     shard gave one shard several racing read-modify-writers and silently lost
     most of the data (~75% of pixels in the review's repro).
     """

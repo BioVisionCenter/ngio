@@ -6,8 +6,8 @@ one update is lost, on a schedule nobody controls. `GatedStore` below holds the
 first reader of the contested chunk until a second one arrives, which turns that
 race from luck into a certainty.
 
-ngio writes through `da.to_zarr`, which rechunks the patch onto the target's
-write-unit grid before storing, so the contention this fixture constructs cannot
+ngio's `store_dask` rechunks the patch onto a block grid cut on the target's
+write units before storing, so the contention this fixture constructs cannot
 exist: the chunk has exactly one writer. The gate therefore never gets its second
 arrival and times out, and *that is the pass condition*. A second arrival means
 two blocks are read-modify-writing one chunk again — the alignment regressed.

@@ -11,6 +11,7 @@ from dask.array.core import _get_zarr_write_chunks
 from dask.utils import parse_bytes
 
 from ngio.common._dask_io import (
+    _normalize_region,
     block_budget,
     store_dask,
     write_block,
@@ -34,6 +35,11 @@ def _memory_array(**kwargs):
 def _with_cap(monkeypatch, cap):
     """Pin `write_block_max_bytes` for one test. `None` removes the ceiling."""
     monkeypatch.setattr(get_config(), "dask", DaskConfig(write_block_max_bytes=cap))
+
+
+def _grid(zarr_array, region):
+    """`write_grid` on a raw region, as `store_dask` feeds it."""
+    return write_grid(zarr_array, _normalize_region(region, zarr_array.shape))
 
 
 def _resident(zarr_array):
@@ -259,7 +265,7 @@ def test_an_overhanging_unit_is_one_block_on_that_axis(z):
 
     assert block[2] == z
     assert block[3] % 2160 == 0 and block[4] % 2560 == 0
-    grid = write_grid(array, None)
+    grid = _grid(array, None)
     assert grid[2] == (z,)
     _assert_grid_is_unit_aligned(grid, None, array)
 
@@ -300,7 +306,7 @@ def test_the_grid_never_splits_a_unit(shape, chunks, shards, dtype):
             slice(uy // 2, shape[3]),
             slice(ux // 4, shape[4] - 7),
         ),
-        # a whole-unit field, offset by one unit
+        # a whole-unit field at the origin
         (
             slice(0, 1),
             slice(0, shape[1]),
@@ -312,11 +318,9 @@ def test_the_grid_never_splits_a_unit(shape, chunks, shards, dtype):
     block = write_block(array)
     assert all(b % u == 0 for b, u in zip(block, _resident(array), strict=True))
     budget = block_budget(array)
-    assert int(np.prod(block)) * array.dtype.itemsize <= budget or block == _resident(
-        array
-    )
+    assert int(np.prod(block)) * array.dtype.itemsize <= budget
     for region in regions:
-        _assert_grid_is_unit_aligned(write_grid(array, region), region, array)
+        _assert_grid_is_unit_aligned(_grid(array, region), region, array)
 
 
 def test_the_reported_shapes_get_one_unit_per_block():
@@ -324,40 +328,49 @@ def test_the_reported_shapes_get_one_unit_per_block():
     for shape in [(1, 2, 1, 3072, 3072), (1, 2, 1, 3072, 2048), (1, 2, 3, 3072, 3072)]:
         array = _memory_array(shape=shape, chunks=(1, 1, 1, 2048, 2048))
         assert write_block(array) == (1, 1, 1, 2048, 2048)
-        grid = write_grid(array, None)
+        grid = _grid(array, None)
         assert grid[3] == (2048, 1024) and grid[4][0] == 2048
 
 
 def test_the_grid_rejects_stepped_slices_and_non_slices():
     array = _memory_array(shape=(8, 8), chunks=(4, 4))
     with pytest.raises(NgioValueError, match="stepped"):
-        write_grid(array, (slice(0, 8, 2), slice(0, 8)))
+        _grid(array, (slice(0, 8, 2), slice(0, 8)))
     with pytest.raises(NgioValueError, match="tuple of slices"):
-        write_grid(array, (3, slice(0, 8)))
+        _grid(array, (3, slice(0, 8)))
 
 
 def test_a_zero_length_axis_is_an_empty_write():
     """An empty table index copied through the zarr fallback has shape `(0,)`."""
     array = _memory_array(shape=(0, 4), chunks=(1, 4))
-    assert write_grid(array, None) == ((0,), (4,))
+    assert _grid(array, None) == ((0,), (4,))
     store_dask(da.zeros((0, 4), chunks=(1, 4), dtype="uint16"), array)
 
     array = _memory_array(shape=(8, 4), chunks=(4, 4))
     array[...] = 3
     region = (slice(3, 3), slice(0, 4))
-    assert write_grid(array, region) == ((0,), (4,))
+    assert _grid(array, region) == ((0,), (4,))
     store_dask(da.zeros((0, 4), chunks=(1, 4), dtype="uint16"), array, region)
     assert (array[...] == 3).all()
 
 
 def test_store_dask_leaves_the_dask_config_alone():
-    """The budget is passed to dask as an argument, never as a global scope."""
+    """The budget is passed to dask as an argument, never as a global scope.
+
+    Observed *during* the write: a scope around the `da.store` call would be
+    restored on exit and so invisible to a check made afterwards.
+    """
     array = _memory_array(shape=(4, 32, 32), chunks=(1, 32, 32))
-    before = dask.config.get("array.chunk-size")
+    seen = []
+
+    def spy(block):
+        seen.append(dask.config.get("array.chunk-size"))
+        return block
+
+    patch = da.zeros((4, 32, 32), chunks=(1, 32, 32), dtype="uint16")
     with dask.config.set({"array.chunk-size": "1MiB"}):
-        store_dask(da.zeros((4, 32, 32), chunks=(1, 32, 32), dtype="uint16"), array)
-        assert dask.config.get("array.chunk-size") == "1MiB"
-    assert dask.config.get("array.chunk-size") == before
+        store_dask(patch.map_blocks(spy, dtype=patch.dtype), array)
+    assert seen and all(value == "1MiB" for value in seen)
 
 
 # ---------------------------------------------------------------------------

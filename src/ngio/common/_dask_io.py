@@ -71,21 +71,15 @@ def block_budget(zarr_array: zarr.Array) -> int:
 def write_block(zarr_array: zarr.Array) -> tuple[int, ...]:
     """The block one dask task writes: whole write units, sized under the budget.
 
-    Dask's `normalize_chunks("auto", previous_chunks=...)` is only a byte-size
-    and aspect-ratio heuristic; it never promised to land on unit boundaries,
-    and on an array that is not a multiple of its unit it does not (it sizes
-    against the *median* of the clipped unit tuple, then balances the axis).
-    So it is asked on a shape rounded up to whole units, where every previous
-    chunk is a full unit and its aggregation branch returns unit multiples —
-    and its answer is used only if it is one. Otherwise one unit per block,
-    which is always safe and still one task per unit.
-
-    The unit is clipped to the array first: an overhanging chunk is one
-    partial unit on that axis, and the declared extent would push dask into
-    its shrinking branch.
+    Dask's `normalize_chunks("auto", previous_chunks=...)` is a byte-size and
+    aspect-ratio heuristic that never promised unit alignment (on an array that
+    is not a unit multiple it sizes against the clipped last unit and balances
+    the axis). So it is asked on a shape rounded up to whole units, where it
+    only ever aggregates full units, and its answer is kept only if it is a unit
+    multiple; otherwise one unit per block, always safe.
     """
     unit = _resident_unit(zarr_array)
-    padded = tuple(
+    padded = tuple(  # `max`: a zero-length axis still pads to one unit
         max(u, -(-s // u) * u) for s, u in zip(zarr_array.shape, unit, strict=True)
     )
     auto = normalize_chunks(
@@ -127,22 +121,20 @@ def _normalize_region(
 
 
 def write_grid(
-    zarr_array: zarr.Array, region: tuple[RegionType, ...] | None
+    zarr_array: zarr.Array, region: tuple[slice, ...]
 ) -> tuple[tuple[int, ...], ...]:
     """Block sizes for `region` whose interior edges all lie on write-unit edges.
 
-    The region is cut at every multiple of `write_block` that falls strictly
-    inside it, in *array* coordinates. Each unit is then touched by exactly one
-    block, which is what makes a lock-free `da.store` safe: a unit with one
-    writer cannot lose an update. A region that starts or ends inside a unit
-    gives that unit a partial block, still a single writer -- its
-    read-modify-write is unavoidable but not a hazard.
+    `region` is normalized (see `_normalize_region`). It is cut at every
+    multiple of `write_block` that falls strictly inside it, in *array*
+    coordinates. Each unit is then touched by exactly one block, which is what
+    makes a lock-free `da.store` safe: a unit with one writer cannot lose an
+    update. A region that starts or ends inside a unit gives that unit a
+    partial block, still a single writer -- its read-modify-write is
+    unavoidable but not a hazard.
     """
-    block = write_block(zarr_array)
     grid = []
-    for index, b in zip(
-        _normalize_region(region, zarr_array.shape), block, strict=True
-    ):
+    for index, b in zip(region, write_block(zarr_array), strict=True):
         start, stop = index.start, index.stop
         first_inner = -(-start // b) * b
         if first_inner == start:
