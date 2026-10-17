@@ -1,6 +1,7 @@
 """Generic class to handle Image-like data in a OME-NGFF file."""
 
 import logging
+import warnings
 from collections.abc import Mapping, Sequence
 from typing import Any, Literal
 
@@ -37,6 +38,7 @@ from ngio.ome_zarr_meta import (
 from ngio.ome_zarr_meta.ngio_specs import (
     Channel,
     ChannelsMeta,
+    ChannelVisualisation,
     DefaultSpaceUnit,
     DefaultTimeUnit,
     NgffVersions,
@@ -45,6 +47,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
 )
 from ngio.ome_zarr_meta.ngio_specs._axes import AxesSetup
 from ngio.utils import (
+    NgioUserWarning,
     NgioValueError,
     StoreOrGroup,
     ZarrGroupHandler,
@@ -689,6 +692,10 @@ class ImagesContainer:
         These values are used by viewers to set the display
         range of each channel.
 
+        The spec puts no order on `start`/`end` or `min`/`max`, so any value is
+        written as given, but a pair that is not strictly increasing is useless
+        to a viewer and napari refuses it, so it warns.
+
         Args:
             starts_ends (Sequence[tuple[float, float]]): The start and end values
                 for each channel.
@@ -713,10 +720,16 @@ class ImagesContainer:
         # opens the image and reloads its metadata, and it is the same value
         # already bound above.
         for se, mm, ch in zip(starts_ends, min_max_, current_channels, strict=True):
+            _warn_if_not_increasing("start/end", ch.label, se)
             updates = {"start": se[0], "end": se[1]}
             if mm is not None:
+                _warn_if_not_increasing("min/max", ch.label, mm)
                 updates.update({"min": mm[0], "max": mm[1]})
-            channel_visualisation = ch.channel_visualisation.model_copy(update=updates)
+            # `model_validate`, not `model_copy(update=...)`: a copy skips the
+            # validators, so what lands on disk would never be checked.
+            channel_visualisation = ChannelVisualisation.model_validate(
+                {**ch.channel_visualisation.model_dump(), **updates}
+            )
             channel = ch.model_copy(
                 update={"channel_visualisation": channel_visualisation}
             )
@@ -919,6 +932,24 @@ class ImagesContainer:
         )
 
 
+def _warn_if_not_increasing(what: str, label: str, pair: tuple[float, float]) -> None:
+    """Warn when a channel window pair is not strictly increasing.
+
+    The OME-NGFF spec puts no order on the pair, so it is written as given;
+    but it is useless to a viewer and napari refuses to open it.
+    """
+    low, high = pair
+    if high > low:
+        return
+    warnings.warn(
+        f"Channel {label!r}: {what} = ({low}, {high}) is not strictly "
+        "increasing. The spec allows it and the value is written as given, but "
+        "viewers cannot use it and napari refuses to open it.",
+        NgioUserWarning,
+        stacklevel=3,
+    )
+
+
 def compute_image_percentile(
     image: Image,
     percentiles: tuple[float, float] | list[tuple[float, float]] = (0.1, 99.9),
@@ -933,6 +964,11 @@ def compute_image_percentile(
 
     Returns:
         A tuple containing the start and end percentiles for each channel.
+
+    Note:
+        Viewers need `start < end`. When the percentiles coincide (sparse or
+        constant data) the window opens to the channel max, then to `0`; an
+        empty channel gets `(0, 1)`.
     """
     num_channels = image.num_channels
     # handle the case where a single tuple is provided
@@ -967,15 +1003,22 @@ def compute_image_percentile(
         data = data[mask]
         _data = data.compute()
         if _data.size == 0:
-            starts_and_ends.append((0.0, 0.0))
+            starts_and_ends.append((0.0, 1.0))
             continue
 
         # compute the percentiles
         _s_perc, _e_perc = da.percentile(
             data, [start_percentile, end_percentile], method="nearest"
         ).compute()
-
-        starts_and_ends.append((float(_s_perc), float(_e_perc)))
+        start, end = float(_s_perc), float(_e_perc)
+        if end <= start:
+            # Sparse data: the nearest percentiles coincide. Open to the max.
+            end = float(_data.max())
+        if end <= start:
+            # Constant channel: show the value against the zero background.
+            # Every masked value is > 0, so this is always a valid window.
+            start = 0.0
+        starts_and_ends.append((start, end))
     return starts_and_ends
 
 

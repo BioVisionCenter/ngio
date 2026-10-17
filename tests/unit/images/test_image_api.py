@@ -1,5 +1,7 @@
 """Coverage tests for channel metadata and channel selection in ngio images."""
 
+from typing import Any
+
 import dask.array as da
 import numpy as np
 import pytest
@@ -9,7 +11,7 @@ from zarr.storage import MemoryStore
 from ngio import create_empty_ome_zarr
 from ngio.images import ChannelSelectionModel
 from ngio.ome_zarr_meta.ngio_specs import Channel, ChannelsMeta
-from ngio.utils import NgioValueError
+from ngio.utils import NgioUserWarning, NgioValueError
 
 
 def _make_container():
@@ -172,3 +174,86 @@ def test_resolve_channel_selection():
         image.resolve_channel_selection("not_a_channel")
     with pytest.raises(NgioValueError):
         image.resolve_channel_selection(["DAPI", 7])
+
+
+def _raw_windows(store) -> list[tuple[float, float]]:
+    """Read the channel windows from the on-disk JSON, bypassing ngio's models."""
+    import zarr
+
+    attrs: dict[str, Any] = dict(zarr.open_group(store, mode="r").attrs)
+    channels = attrs["omero"]["channels"]
+    return [(c["window"]["start"], c["window"]["end"]) for c in channels]
+
+
+@pytest.mark.parametrize(
+    ("data", "expected"),
+    [
+        # empty: no nonzero data at all
+        (np.zeros((64, 64), dtype="uint16"), (0.0, 1.0)),
+        # constant: percentiles and max coincide, drop the start to 0
+        (np.full((64, 64), 7, dtype="uint16"), (0.0, 7.0)),
+        # binary mask: the nonzero data is constant
+        (np.indices((64, 64)).sum(axis=0) % 2, (0.0, 1.0)),
+        # float constant
+        (np.full((64, 64), 0.3, dtype="float32"), (0.0, np.float32(0.3))),
+    ],
+)
+def test_percentile_window_never_degenerate(data, expected):
+    """Viewers need start < end; the raw JSON must never carry start == end."""
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=(1, 64, 64),
+        axes_names=("c", "y", "x"),
+        pixelsize=1.0,
+        levels=1,
+        dtype=str(data.dtype),
+    )
+    ome_zarr.get_image().set_array(data[None])
+    ome_zarr.set_channel_windows_with_percentiles()
+    (window,) = _raw_windows(store)
+    assert window[0] < window[1]
+    assert window == pytest.approx(expected)
+
+
+def test_percentile_window_sparse_opens_to_max():
+    """A single outlier is beyond the 99.9th percentile: the window opens to it."""
+    data = np.ones((1, 64, 64), dtype="uint8")
+    data[0, 3, 5] = 2
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=data.shape,
+        axes_names=("c", "y", "x"),
+        pixelsize=1.0,
+        levels=1,
+        dtype="uint8",
+    )
+    ome_zarr.get_image().set_array(data)
+    ome_zarr.set_channel_windows_with_percentiles()
+    assert _raw_windows(store) == [(1.0, 2.0)]
+
+
+def test_set_channel_windows_warns_but_writes_as_given():
+    """A non-increasing pair is spec-legal: warn, but write exactly what was asked."""
+    store = MemoryStore()
+    ome_zarr = create_empty_ome_zarr(
+        store,
+        shape=(2, 8, 8),
+        axes_names=("c", "y", "x"),
+        pixelsize=1.0,
+        levels=1,
+    )
+    with pytest.warns(NgioUserWarning, match="start/end = \\(5.0, 5.0\\)"):
+        ome_zarr.set_channel_windows(starts_ends=[(5.0, 5.0), (0.0, 1.0)])
+    with pytest.warns(NgioUserWarning, match="start/end = \\(3.0, 1.0\\)"):
+        ome_zarr.set_channel_windows(starts_ends=[(0.0, 1.0), (3.0, 1.0)])
+    assert _raw_windows(store) == [(0.0, 1.0), (3.0, 1.0)]
+    with pytest.warns(NgioUserWarning, match="min/max = \\(7, 7\\)"):
+        ome_zarr.set_channel_windows(
+            starts_ends=[(0.0, 1.0), (0.0, 1.0)], min_max=[(7, 7), (0, 255)]
+        )
+    # The model reflects the disk: no silent repair on read either.
+    (bad, good) = ome_zarr.get_image().channels_meta.channels
+    assert (bad.channel_visualisation.min, bad.channel_visualisation.max) == (7, 7)
+    assert (good.channel_visualisation.min, good.channel_visualisation.max) == (0, 255)
