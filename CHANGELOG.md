@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.1.3]
+
+### Fixes
+
+- Channel windows could land on disk with `start == end`. `compute_image_percentile` returned a degenerate window for a constant, binary, sparse or empty channel: the percentile window now opens to the channel max when the percentiles coincide, then to `(0, value)` for a constant channel (a binary mask gets `(0, 1)`), and an empty channel gets `(0, 1)`. Such a window is spec-legal but useless to a viewer, and napari refuses to open it ([#74](https://github.com/BioVisionCenter/ngio/issues/74)).
+- `ChannelVisualisation` no longer silently rewrites `end` to `start + 1` when the two are equal. The repair ran at model construction, so it never reached the disk through `set_channel_windows` (built with `model_copy`, which skips validators) while a file that already carried `(7, 7)` read back as `(7, 8)`: ngio reported a window the disk did not hold. The model now reflects the disk. Instead, `set_channel_windows` warns (`NgioUserWarning`) when a `start`/`end` or `min`/`max` pair is not strictly increasing and writes the values as given, since the spec puts no order on them.
+
 ## [v1.1.2]
 
 ### Fixes

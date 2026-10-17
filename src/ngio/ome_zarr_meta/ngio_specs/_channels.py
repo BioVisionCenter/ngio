@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any, TypeVar
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ngio.utils import NgioValidationError, NgioValueError
 
@@ -155,20 +155,6 @@ class ChannelVisualisation(BaseModel):
             return value.value
         else:
             raise NgioValueError(f"Invalid color {value}.")
-
-    @model_validator(mode="before")
-    def check_start_end(cls, data):
-        """Check that the start and end values are valid.
-
-        If the start and end values are equal, set the end value to start + 1
-        """
-        start = data.get("start", None)
-        end = data.get("end", None)
-        if start is None or end is None:
-            return data
-        if abs(end - start) < 1e-6:
-            data["end"] = start + 1
-        return data
 
     @classmethod
     def default_init(
