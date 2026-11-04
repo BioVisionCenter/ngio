@@ -45,6 +45,24 @@ config.io_retry = RetryConfig(
 )
 ```
 
+### Replacing the whole configuration
+
+`set_config()` swaps in a complete `NgioConfig` and applies it straight away, so it works at any point before or after `import ngio`, with no need for `NGIO_CONFIG_PATH`. Anything loaded from the config file is discarded, and the `s3fs` and `zarr` sections are forwarded to those libraries immediately. Example:
+
+```python
+from ngio import set_config
+from ngio.config import NgioConfig, RetryConfig, S3FSConfig
+
+set_config(
+    NgioConfig(
+        io_retry=RetryConfig(max_retries=5, retry_on=["ServerTimeoutError"]),
+        s3fs=S3FSConfig(custom_retry_markers=["RequestTimeTooSkewed"]),
+    )
+)
+```
+
+The same limits apply as for any runtime change: containers opened earlier keep the `io_retry` they were opened with, and `zarr.threading_max_workers` only takes effect before the first zarr operation.
+
 ## IO retry (`io_retry`)
 
 By default ngio never retries a failed IO operation (`max_retries=0`). When enabled, the policy applies to **all** ngio IO: zarr metadata and pixel data (including lazy dask reads/writes executed on workers), non-zarr table IO (parquet/CSV via pyarrow, AnnData writes), and remote store probes.
@@ -74,7 +92,7 @@ ngio's own errors (`NgioError` subclasses, e.g. validation errors) are never ret
 
 ## s3fs retry markers (`s3fs`)
 
-`s3fs.custom_retry_markers` is a separate, lower-level mechanism: it registers an error handler inside `s3fs` itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew `RequestTimeTooSkewed` errors). Apply changes at runtime with `ngio.utils.refresh_s3fs_config(get_config())`.
+`s3fs.custom_retry_markers` is a separate, lower-level mechanism: it registers an error handler inside `s3fs` itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew `RequestTimeTooSkewed` errors). Apply changes at runtime with `ngio.utils.refresh_s3fs_config(get_config())`, or replace the whole configuration with `set_config()`, which applies them for you.
 
 The two mechanisms are complementary and independent: `s3fs` retries individual S3 requests inside a single ngio IO call, while `io_retry` retries the whole ngio IO call. If both are enabled and their triggers overlap, an error can be retried at both layers, so the effective number of attempts is multiplicative — keep the two configurations narrow.
 
@@ -119,7 +137,7 @@ Two knobs ngio forwards into zarr's own runtime configuration. Both default to `
 ### When changes take effect
 
 - **`async_concurrency` is read by zarr on every call**, so changing it at runtime works: set it directly with `zarr.config.set({"async.concurrency": 64})` (also usable as a context manager for a single operation).
-- **`threading_max_workers` is snapshotted by zarr into a process-global executor at the first zarr operation.** ngio applies this section during `import ngio` for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file.
+- **`threading_max_workers` is snapshotted by zarr into a process-global executor at the first zarr operation.** ngio applies this section during `import ngio` for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file (or a `set_config()` call made before any zarr operation).
 
 ## Next steps
 
