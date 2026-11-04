@@ -272,3 +272,88 @@ def test_zarr_config_from_json(monkeypatch, tmp_path):
     config = NgioConfig.model_validate(_load_config_data())
     assert config.zarr.async_concurrency == 64
     assert config.zarr.threading_max_workers is None
+
+
+@pytest.fixture
+def restore_config():
+    """Restore ngio's config, zarr's runtime config and s3fs's handler afterwards."""
+    import zarr
+
+    from ngio.config._config import _reset_config
+    from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
+
+    saved_zarr = {"async.concurrency": zarr.config.get("async.concurrency")}
+    yield
+    _reset_config()
+    zarr.config.set(saved_zarr)
+    refresh_s3fs_config(get_config())
+    apply_zarr_config(get_config())
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_replaces_the_singleton():
+    from ngio.config import set_config
+
+    config = NgioConfig(io_retry=RetryConfig(max_retries=4))
+    set_config(config)
+    assert get_config() is config
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_discards_the_config_file(monkeypatch, tmp_path):
+    from ngio.config import set_config
+    from ngio.config._config import _reset_config
+
+    path = tmp_path / "cfg.json"
+    path.write_text(
+        '{"io_retry": {"max_retries": 7}, "dask": {"write_block_max_bytes": 1}}'
+    )
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    _reset_config()
+    assert get_config().io_retry.max_retries == 7
+
+    set_config(NgioConfig())
+    assert get_config().io_retry.max_retries == 0
+    assert get_config().dask == DaskConfig()
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_applies_s3fs_retry_markers(monkeypatch):
+    s3fs = pytest.importorskip("s3fs")
+    if not hasattr(s3fs, "set_custom_error_handler"):
+        pytest.skip("s3fs predates set_custom_error_handler")
+    from ngio.config import set_config
+
+    handlers = []
+    monkeypatch.setattr(s3fs, "set_custom_error_handler", handlers.append)
+    set_config(NgioConfig(s3fs=S3FSConfig(custom_retry_markers=["Skewed"])))
+
+    assert len(handlers) == 1
+    assert handlers[0](RuntimeError("RequestTimeTooSkewed"))
+    assert not handlers[0](RuntimeError("NoSuchKey"))
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_applies_zarr_config():
+    import zarr
+
+    from ngio.config import ZarrConfig, set_config
+
+    set_config(NgioConfig(zarr=ZarrConfig(async_concurrency=42)))
+    assert zarr.config.get("async.concurrency") == 42
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_warns_on_retry_all_errors():
+    from ngio.config import set_config
+
+    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+        set_config(NgioConfig(io_retry=RetryConfig(retry_all_errors=True)))
+
+
+def test_set_config_exported_at_top_level():
+    import ngio
+    from ngio.config import set_config
+
+    assert ngio.set_config is set_config
+    assert "set_config" in ngio.__all__
