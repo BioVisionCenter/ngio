@@ -300,6 +300,19 @@ def test_set_config_replaces_the_singleton():
 
 
 @pytest.mark.usefixtures("restore_config")
+def test_set_config_rejects_non_config():
+    from ngio.config import set_config
+
+    before = get_config()
+    with pytest.raises(NgioValidationError, match="expects an NgioConfig"):
+        set_config({"io_retry": {"max_retries": 3}})
+    with pytest.raises(NgioValidationError, match="expects an NgioConfig"):
+        set_config(RetryConfig(max_retries=3))
+    # The bad argument never became the singleton.
+    assert get_config() is before
+
+
+@pytest.mark.usefixtures("restore_config")
 def test_set_config_discards_the_config_file(monkeypatch, tmp_path):
     import zarr
 

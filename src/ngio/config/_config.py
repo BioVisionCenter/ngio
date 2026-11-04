@@ -268,11 +268,16 @@ def set_config(config: NgioConfig) -> None:
     # Imported here: `ngio.utils._zarr_utils` imports this module
     from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
 
-    global _config
-    _config = config
+    if not isinstance(config, NgioConfig):
+        raise NgioValidationError(
+            f"set_config expects an NgioConfig, got {type(config).__name__}."
+        )
     _warn_if_retry_all_errors(config)
     refresh_s3fs_config(config)
     apply_zarr_config(config)
+    # Installed last: a failure above leaves the previous configuration in place.
+    global _config
+    _config = config
 
 
 def _reset_config() -> None:
