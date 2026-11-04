@@ -217,13 +217,26 @@ def _load_config_data() -> dict[str, Any]:
 _config: NgioConfig | None = None
 
 
+def _warn_if_retry_all_errors(config: NgioConfig) -> None:
+    # Warned once per load/set, not in the model validator: validators re-run
+    # on every model_copy/assignment (e.g. per store construction).
+    if config.io_retry.retry_all_errors:
+        warnings.warn(
+            "io_retry.retry_all_errors is enabled: every IO error will be "
+            "retried, including non-transient ones. Prefer listing "
+            "specific error markers in io_retry.retry_on.",
+            NgioUserWarning,
+            stacklevel=3,
+        )
+
+
 def get_config() -> NgioConfig:
     """Return the global ngio configuration singleton.
 
     The singleton is built on first call rather than at import of this module.
     In practice `import ngio` already triggers that first call (see
     `ngio.utils._zarr_utils`), so `NGIO_CONFIG_PATH` must be set *before*
-    importing ngio.
+    importing ngio. To configure ngio from code at any time, use `set_config`.
 
     Note:
         Use `_reset_config()` to force a reload, e.g. in tests.
@@ -231,17 +244,34 @@ def get_config() -> NgioConfig:
     global _config
     if _config is None:
         _config = NgioConfig.model_validate(_load_config_data())
-        # Warned once at load, not in the model validator: validators re-run
-        # on every model_copy/assignment (e.g. per store construction).
-        if _config.io_retry.retry_all_errors:
-            warnings.warn(
-                "io_retry.retry_all_errors is enabled: every IO error will be "
-                "retried, including non-transient ones. Prefer listing "
-                "specific error markers in io_retry.retry_on.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
+        _warn_if_retry_all_errors(_config)
     return _config
+
+
+def set_config(config: NgioConfig) -> None:
+    """Replace the global ngio configuration and apply it immediately.
+
+    Can be called at any time, before or after `import ngio`. The whole
+    configuration is replaced, including anything loaded from the config file,
+    and the `s3fs` and `zarr` sections are forwarded to those libraries right
+    away. `config` itself becomes the singleton returned by `get_config`.
+
+    Args:
+        config: The new configuration.
+
+    Note:
+        Important: containers opened earlier keep the `io_retry` they were
+        opened with, and `zarr.threading_max_workers` only takes effect if this
+        runs before the first zarr operation.
+    """
+    # Imported here: `ngio.utils._zarr_utils` imports this module
+    from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
+
+    global _config
+    _config = config
+    _warn_if_retry_all_errors(config)
+    refresh_s3fs_config(config)
+    apply_zarr_config(config)
 
 
 def _reset_config() -> None:
