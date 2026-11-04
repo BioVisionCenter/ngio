@@ -301,20 +301,29 @@ def test_set_config_replaces_the_singleton():
 
 @pytest.mark.usefixtures("restore_config")
 def test_set_config_discards_the_config_file(monkeypatch, tmp_path):
+    import zarr
+
     from ngio.config import set_config
     from ngio.config._config import _reset_config
+    from ngio.utils._zarr_utils import apply_zarr_config
 
     path = tmp_path / "cfg.json"
     path.write_text(
-        '{"io_retry": {"max_retries": 7}, "dask": {"write_block_max_bytes": 1}}'
+        '{"io_retry": {"max_retries": 7}, "dask": {"write_block_max_bytes": 1}, '
+        '"zarr": {"async_concurrency": 64}}'
     )
     monkeypatch.setenv(_ENV_VAR, str(path))
     _reset_config()
     assert get_config().io_retry.max_retries == 7
+    apply_zarr_config(get_config())  # what `import ngio` does with the file
 
     set_config(NgioConfig())
     assert get_config().io_retry.max_retries == 0
     assert get_config().dask == DaskConfig()
+    # Documented limit: a `None` zarr field leaves zarr as found, so the value
+    # the file forwarded earlier survives the replacement.
+    assert get_config().zarr.async_concurrency is None
+    assert zarr.config.get("async.concurrency") == 64
 
 
 @pytest.mark.usefixtures("restore_config")
