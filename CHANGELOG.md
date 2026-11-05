@@ -4,7 +4,7 @@
 
 ### Features
 
-- Add `set_config()` (exported from `ngio` and `ngio.config`) to replace the global `NgioConfig` from code at any time. It discards any configuration loaded from the config file and immediately applies the `s3fs` retry markers and the `zarr` section, so libraries can configure ngio without setting `NGIO_CONFIG_PATH` before `import ngio`.
+- Add `set_config()` (exported from `ngio` and `ngio.config`) to replace the global `NgioConfig` from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the `s3fs` retry markers and the `zarr` section, so libraries can configure ngio without setting `NGIO_CONFIG_PATH` before `import ngio`.
 
 ## [v1.1.3]
 

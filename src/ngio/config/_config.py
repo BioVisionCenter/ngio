@@ -168,7 +168,8 @@ class ZarrConfig(BaseModel):
         default=None,
         ge=1,
         description="Size of zarr's decode thread executor. Snapshotted by "
-        "zarr at the first operation, so it only works from the config file.",
+        "zarr at the first operation, so it only takes effect from the config "
+        "file or a `set_config` call made before that.",
     )
     model_config = ConfigDict(validate_assignment=True)
 
@@ -178,7 +179,8 @@ class NgioConfig(BaseModel):
 
     Sections: `s3fs` (S3 credentials/endpoint), `io_retry` (transient-error
     retries), `consolidation`, `dask`, and `zarr`. Loaded from the config
-    file at import; see the configuration guide.
+    file at import and replaceable with `set_config`; see the configuration
+    guide.
     """
 
     s3fs: S3FSConfig | None = None
@@ -251,10 +253,11 @@ def get_config() -> NgioConfig:
 def set_config(config: NgioConfig) -> None:
     """Replace the global ngio configuration and apply it immediately.
 
-    Can be called at any time, before or after `import ngio`. The whole
-    configuration is replaced, including anything loaded from the config file,
-    and the `s3fs` and `zarr` sections are forwarded to those libraries right
-    away. `config` itself becomes the singleton returned by `get_config`.
+    Can be called at any time after import, regardless of what imported ngio
+    first. The whole configuration is replaced and the `s3fs` and `zarr`
+    sections are forwarded to those libraries right away. A zarr setting
+    forwarded by an earlier configuration stays in place unless the new one
+    sets it. `config` itself becomes the singleton returned by `get_config`.
 
     Args:
         config: The new configuration.
@@ -267,11 +270,16 @@ def set_config(config: NgioConfig) -> None:
     # Imported here: `ngio.utils._zarr_utils` imports this module
     from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
 
-    global _config
-    _config = config
+    if not isinstance(config, NgioConfig):
+        raise NgioValidationError(
+            f"set_config expects an NgioConfig, got {type(config).__name__}."
+        )
     _warn_if_retry_all_errors(config)
     refresh_s3fs_config(config)
     apply_zarr_config(config)
+    # Installed last: a failure above leaves the previous configuration in place.
+    global _config
+    _config = config
 
 
 def _reset_config() -> None:
