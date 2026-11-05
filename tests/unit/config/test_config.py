@@ -343,19 +343,22 @@ def test_set_config_discards_the_config_file(monkeypatch, tmp_path):
 
 
 @pytest.mark.usefixtures("restore_config")
-def test_set_config_applies_s3fs_retry_markers(monkeypatch):
+def test_set_config_applies_s3fs_retry_markers():
     s3fs = pytest.importorskip("s3fs")
     if not hasattr(s3fs, "set_custom_error_handler"):
         pytest.skip("s3fs predates set_custom_error_handler")
     from ngio.config import set_config
 
-    handlers = []
-    monkeypatch.setattr(s3fs, "set_custom_error_handler", handlers.append)
-    set_config(NgioConfig(s3fs=S3FSConfig(custom_retry_markers=["Skewed"])))
+    original = s3fs.core.CUSTOM_ERROR_HANDLER
+    try:
+        set_config(NgioConfig(s3fs=S3FSConfig(custom_retry_markers=["Skewed"])))
 
-    assert len(handlers) == 1
-    assert handlers[0](RuntimeError("RequestTimeTooSkewed"))
-    assert not handlers[0](RuntimeError("NoSuchKey"))
+        handler = s3fs.core.CUSTOM_ERROR_HANDLER
+        assert handler is not original
+        assert handler(RuntimeError("RequestTimeTooSkewed")) is True
+        assert handler(RuntimeError("NoSuchKey")) is False
+    finally:
+        s3fs.set_custom_error_handler(original)
 
 
 @pytest.mark.usefixtures("restore_config")
