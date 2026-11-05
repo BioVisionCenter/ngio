@@ -47,7 +47,7 @@ config.io_retry = RetryConfig(
 
 ### Replacing the whole configuration
 
-`set_config()` swaps in a complete `NgioConfig` and applies it straight away, so it works at any point before or after `import ngio`, with no need for `NGIO_CONFIG_PATH`. The previous configuration is replaced, and the `s3fs` and `zarr` sections are forwarded to those libraries immediately. A zarr setting forwarded by an earlier configuration (for example from the config file) stays in place unless the new one sets it. Example:
+`set_config()` swaps in a complete `NgioConfig` and applies it straight away, so it works at any point after import, regardless of what imported ngio first and with no need for `NGIO_CONFIG_PATH`. The previous configuration is replaced, and the `s3fs` and `zarr` sections are forwarded to those libraries immediately. A zarr setting forwarded by an earlier configuration (for example from the config file) stays in place unless the new one sets it. Example:
 
 ```python
 from ngio import set_config

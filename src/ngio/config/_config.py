@@ -251,11 +251,11 @@ def get_config() -> NgioConfig:
 def set_config(config: NgioConfig) -> None:
     """Replace the global ngio configuration and apply it immediately.
 
-    Can be called at any time, before or after `import ngio`. The whole
-    configuration is replaced and the `s3fs` and `zarr` sections are forwarded
-    to those libraries right away. A zarr setting forwarded by an earlier
-    configuration stays in place unless the new one sets it. `config` itself
-    becomes the singleton returned by `get_config`.
+    Can be called at any time after import, regardless of what imported ngio
+    first. The whole configuration is replaced and the `s3fs` and `zarr`
+    sections are forwarded to those libraries right away. A zarr setting
+    forwarded by an earlier configuration stays in place unless the new one
+    sets it. `config` itself becomes the singleton returned by `get_config`.
 
     Args:
         config: The new configuration.
