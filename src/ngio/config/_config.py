@@ -168,7 +168,8 @@ class ZarrConfig(BaseModel):
         default=None,
         ge=1,
         description="Size of zarr's decode thread executor. Snapshotted by "
-        "zarr at the first operation, so it only works from the config file.",
+        "zarr at the first operation, so it only takes effect from the config "
+        "file or a `set_config` call made before that.",
     )
     model_config = ConfigDict(validate_assignment=True)
 
@@ -178,7 +179,8 @@ class NgioConfig(BaseModel):
 
     Sections: `s3fs` (S3 credentials/endpoint), `io_retry` (transient-error
     retries), `consolidation`, `dask`, and `zarr`. Loaded from the config
-    file at import; see the configuration guide.
+    file at import and replaceable with `set_config`; see the configuration
+    guide.
     """
 
     s3fs: S3FSConfig | None = None
