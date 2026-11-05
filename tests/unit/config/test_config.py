@@ -276,18 +276,21 @@ def test_zarr_config_from_json(monkeypatch, tmp_path):
 
 @pytest.fixture
 def restore_config():
-    """Restore ngio's config, zarr's runtime config and s3fs's handler afterwards."""
+    """Put back the config object that was installed, and zarr's runtime config.
+
+    `set_config(saved)` also re-applies the s3fs handler and the zarr section,
+    so nothing is reloaded from disk and the developer's own config file never
+    leaks into later tests.
+    """
     import zarr
 
-    from ngio.config._config import _reset_config
-    from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
+    from ngio.config import set_config
 
+    saved_config = get_config()
     saved_zarr = {"async.concurrency": zarr.config.get("async.concurrency")}
     yield
-    _reset_config()
     zarr.config.set(saved_zarr)
-    refresh_s3fs_config(get_config())
-    apply_zarr_config(get_config())
+    set_config(saved_config)
 
 
 @pytest.mark.usefixtures("restore_config")
