@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Writing a group's attributes is one metadata document write. It used to be one write per existing key plus one per new key (zarr's `Attributes` only implements item access, so `clear()` + `update()` rewrote the document key by key): a round-trip each on remote stores, a dead copy each in a zip archive. Same bytes on disk; the op-count baselines moved by exactly the saved writes.
+
 ## [v1.1.3]
 
 ### Fixes

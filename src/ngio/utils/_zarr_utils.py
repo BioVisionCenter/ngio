@@ -429,9 +429,14 @@ class ZarrGroupHandler:
         if self.read_only:
             raise NgioValueError("The group is read only. Cannot write metadata.")
         group = self.reopen_group()
+        # One metadata document write either way. zarr's `Attributes` only
+        # implements `__setitem__`/`__delitem__`, so `clear()` + `update()`
+        # would rewrite the document once per existing key and once per new
+        # key: a round-trip each remotely, a dead copy each in a zip archive.
         if overwrite:
-            group.attrs.clear()
-        group.attrs.update(attrs)
+            group.attrs.put(attrs)
+        else:
+            group.update_attributes(attrs)
         # The write went through a freshly opened group, so `_group` and the
         # attrs cache both describe the state from before it.
         self.invalidate_meta()
