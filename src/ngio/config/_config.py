@@ -168,7 +168,8 @@ class ZarrConfig(BaseModel):
         default=None,
         ge=1,
         description="Size of zarr's decode thread executor. Snapshotted by "
-        "zarr at the first operation, so it only works from the config file.",
+        "zarr at the first operation, so it only takes effect from the config "
+        "file or a `set_config` call made before that.",
     )
     model_config = ConfigDict(validate_assignment=True)
 
@@ -178,7 +179,8 @@ class NgioConfig(BaseModel):
 
     Sections: `s3fs` (S3 credentials/endpoint), `io_retry` (transient-error
     retries), `consolidation`, `dask`, and `zarr`. Loaded from the config
-    file at import; see the configuration guide.
+    file at import and replaceable with `set_config`; see the configuration
+    guide.
     """
 
     s3fs: S3FSConfig | None = None
@@ -217,13 +219,26 @@ def _load_config_data() -> dict[str, Any]:
 _config: NgioConfig | None = None
 
 
+def _warn_if_retry_all_errors(config: NgioConfig) -> None:
+    # Warned once per load/set, not in the model validator: validators re-run
+    # on every model_copy/assignment (e.g. per store construction).
+    if config.io_retry.retry_all_errors:
+        warnings.warn(
+            "io_retry.retry_all_errors is enabled: every IO error will be "
+            "retried, including non-transient ones. Prefer listing "
+            "specific error markers in io_retry.retry_on.",
+            NgioUserWarning,
+            stacklevel=3,
+        )
+
+
 def get_config() -> NgioConfig:
     """Return the global ngio configuration singleton.
 
     The singleton is built on first call rather than at import of this module.
     In practice `import ngio` already triggers that first call (see
     `ngio.utils._zarr_utils`), so `NGIO_CONFIG_PATH` must be set *before*
-    importing ngio.
+    importing ngio. To configure ngio from code at any time, use `set_config`.
 
     Note:
         Use `_reset_config()` to force a reload, e.g. in tests.
@@ -231,17 +246,40 @@ def get_config() -> NgioConfig:
     global _config
     if _config is None:
         _config = NgioConfig.model_validate(_load_config_data())
-        # Warned once at load, not in the model validator: validators re-run
-        # on every model_copy/assignment (e.g. per store construction).
-        if _config.io_retry.retry_all_errors:
-            warnings.warn(
-                "io_retry.retry_all_errors is enabled: every IO error will be "
-                "retried, including non-transient ones. Prefer listing "
-                "specific error markers in io_retry.retry_on.",
-                NgioUserWarning,
-                stacklevel=2,
-            )
+        _warn_if_retry_all_errors(_config)
     return _config
+
+
+def set_config(config: NgioConfig) -> None:
+    """Replace the global ngio configuration and apply it immediately.
+
+    Can be called at any time after import, regardless of what imported ngio
+    first. The whole configuration is replaced and the `s3fs` and `zarr`
+    sections are forwarded to those libraries right away. A zarr setting
+    forwarded by an earlier configuration stays in place unless the new one
+    sets it. `config` itself becomes the singleton returned by `get_config`.
+
+    Args:
+        config: The new configuration.
+
+    Note:
+        Important: containers opened earlier keep the `io_retry` they were
+        opened with, and `zarr.threading_max_workers` only takes effect if this
+        runs before the first zarr operation.
+    """
+    # Imported here: `ngio.utils._zarr_utils` imports this module
+    from ngio.utils._zarr_utils import apply_zarr_config, refresh_s3fs_config
+
+    if not isinstance(config, NgioConfig):
+        raise NgioValidationError(
+            f"set_config expects an NgioConfig, got {type(config).__name__}."
+        )
+    _warn_if_retry_all_errors(config)
+    refresh_s3fs_config(config)
+    apply_zarr_config(config)
+    # Installed last: a failure above leaves the previous configuration in place.
+    global _config
+    _config = config
 
 
 def _reset_config() -> None:

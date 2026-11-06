@@ -15,6 +15,7 @@ from ngio.config import (
     RetryConfig,
     S3FSConfig,
     get_config,
+    set_config,
 )
 from ngio.hcs import (
     OmeZarrPlate,
@@ -152,4 +153,5 @@ __all__ = [
     "open_ome_zarr_container",
     "open_ome_zarr_plate",
     "open_ome_zarr_well",
+    "set_config",
 ]
