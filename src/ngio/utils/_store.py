@@ -12,6 +12,7 @@ import asyncio
 import functools
 import json
 import logging
+import os
 import warnings
 from itertools import starmap
 from pathlib import Path
@@ -26,6 +27,7 @@ from zarr.storage._common import make_store
 from ngio.config import RetryConfig, get_config
 from ngio.utils import _retry
 from ngio.utils._errors import NgioValueError
+from ngio.utils._ozx import OZX_SUFFIX, OzxStore
 from ngio.utils._retry import (
     aretry_call,
     aretry_sharing_violation,
@@ -90,6 +92,26 @@ def _bypass_is_safe(store: Store) -> bool:
     return type(store) is LocalStore
 
 
+def _as_ozx(
+    store: object, mode: Literal["r", "r+", "w", "w-", "a"] | None
+) -> OzxStore | None:
+    """Route a `.ozx` path to an `OzxStore`, before zarr's `make_store`.
+
+    zarr's `make_store` never yields a `ZipStore`: a `.ozx` path would become
+    a `LocalStore` and a directory of that name would be created.
+    """
+    if not isinstance(store, str | Path):
+        return None
+    location = os.fspath(store)
+    if not location.endswith(OZX_SUFFIX):
+        return None
+    if "://" in location:
+        raise NgioValueError(
+            f"Remote OME-Zarr zip files are not supported yet ({location})."
+        )
+    return OzxStore(Path(location), mode=mode if mode is not None else "a")
+
+
 def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
     fs_dict = json.loads(fs.to_json())
     fs_dict["asynchronous"] = False
@@ -143,7 +165,7 @@ class NgioStore(WrapperStore[Store]):
         if isinstance(store, NgioStore):
             return store
         if not isinstance(store, Store):
-            store = sync(make_store(store, mode=mode))
+            store = _as_ozx(store, mode) or sync(make_store(store, mode=mode))
         _warn_if_unknown_store(store)
         return cls(store, retry=retry)
 
@@ -178,7 +200,7 @@ class NgioStore(WrapperStore[Store]):
         if isinstance(store, NgioStore):
             return store
         if not isinstance(store, Store):
-            store = sync(make_store(store, mode=mode))
+            store = _as_ozx(store, mode) or sync(make_store(store, mode=mode))
         _warn_if_unknown_store(store)
         if _bypass_is_safe(store) and not _wrapper_changes_behaviour(retry):
             return store
@@ -304,6 +326,22 @@ class NgioStore(WrapperStore[Store]):
             return [key async for key in self.list_dir(prefix)]
 
         return sync(_collect())
+
+    @property
+    def is_ozx(self) -> bool:
+        """Whether the wrapped store is an OME-Zarr zip file (`OzxStore`)."""
+        return isinstance(self._store, OzxStore)
+
+    def flush(self) -> None:
+        """Publish the hierarchy written so far to readers with their own handle.
+
+        A single-file store (`.ozx`) keeps its directory in memory during a
+        writing session; this writes it. Every other store is consistent after
+        each write, so this is a no-op for them. Called by the group handler
+        whenever the hierarchy changes.
+        """
+        if isinstance(self._store, OzxStore):
+            self._store.flush()
 
     # ------------------------------------------------------------------
     # Retried IO

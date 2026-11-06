@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- OME-Zarr zip files (`.ozx`, [OME-NGFF RFC-9](https://ngff.openmicroscopy.org/rfc/9/)). Any local `.ozx` path works where a store is accepted, images and plates alike: `open_ome_zarr_container("image.ozx")`, `create_empty_ome_zarr("image.ozx", ..., ngff_version="0.5")`. ngio edits the archive in place: a rewritten `zarr.json` never leaves a duplicate central directory record, deletes and `overwrite=True` work, and whenever the directory is written every `zarr.json` record comes first (root, then breadth-first) with the RFC archive comment (`jsonFirst: true`). The file is a complete, readable archive after every metadata or structure change; array chunks written after the last one are published when the store is closed or released. For explicit control open the store yourself: `with OzxStore("image.ozx", mode="r+") as store: img = open_ome_zarr_container(store)`. `OzxStore.repack()` reclaims the dead space left by overwrites; `check_ozx(path)` reports RFC conformance. RFC-9 is 0.5-only, so OME-Zarr 0.4 into an `.ozx` raises. One writer per archive: a second writable store on the same file, or pickling a writable store, raises `NgioValueError`.
+
 ### Changed
 
 - Writing a group's attributes is one metadata document write. It used to be one write per existing key plus one per new key (zarr's `Attributes` only implements item access, so `clear()` + `update()` rewrote the document key by key): a round-trip each on remote stores, a dead copy each in a zip archive. Same bytes on disk; the op-count baselines moved by exactly the saved writes.

@@ -1314,7 +1314,12 @@ def create_ome_zarr_from_array(
     # times over, and this function is the only writer for the whole sequence —
     # the same reason `create_empty_plate` and `create_empty_well` build with
     # `cache=True`. The caller still gets an uncached container.
-    working = open_ome_zarr_container(store=store, mode="r+", cache=True)
+    # Through the handler's own group rather than the `store` argument: a
+    # path would open a second store on the same location, which a
+    # single-file store (`.ozx`) cannot serve.
+    working = open_ome_zarr_container(
+        store=ome_zarr._group_handler.group, mode="r+", cache=True
+    )
     image = working.get_image()
     image.set_array(array)
     image.consolidate(mode=consolidation_mode)

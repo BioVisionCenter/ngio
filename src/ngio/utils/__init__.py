@@ -16,6 +16,7 @@ from ngio.utils._errors import (
     NgioValueError,
 )
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
+from ngio.utils._ozx import OzxReport, OzxStore, check_ozx
 from ngio.utils._retry import retry_io
 from ngio.utils._store import NgioStore
 
@@ -53,8 +54,11 @@ __all__ = [
     "NgioUserWarning",
     "NgioValidationError",
     "NgioValueError",
+    "OzxReport",
+    "OzxStore",
     "StoreOrGroup",
     "ZarrGroupHandler",
+    "check_ozx",
     "copy_group",
     "deprecated",
     "deprecated_alias",

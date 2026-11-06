@@ -83,7 +83,9 @@ from ngio.utils import (
     NgioTableValidationError,
     NgioValidationError,
     NgioValueError,
+    OzxStore,
     StoreOrGroup,
+    check_ozx,
 )
 
 __all__ = [
@@ -122,6 +124,7 @@ __all__ = [
     "OmeZarrContainer",
     "OmeZarrPlate",
     "OmeZarrWell",
+    "OzxStore",
     "PixelSize",
     "RetryConfig",
     "Roi",
@@ -133,6 +136,7 @@ __all__ = [
     "Table",
     "TransformProtocol",
     "__version__",
+    "check_ozx",
     "create_empty_ome_zarr",
     "create_empty_plate",
     "create_empty_well",

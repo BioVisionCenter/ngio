@@ -28,6 +28,7 @@ from ngio.utils._errors import (
     NgioFileNotFoundError,
     NgioValueError,
 )
+from ngio.utils._ozx import OzxStore
 from ngio.utils._store import NgioStore
 from ngio.utils._warnings import NgioUserWarning
 
@@ -46,6 +47,7 @@ NgioSupportedStore: TypeAlias = (
     | dict
     | LocalStore
     | ZipStore
+    | OzxStore
     | NgioStore
 )
 GenericStore: TypeAlias = NgioSupportedStore | Store
@@ -74,6 +76,12 @@ def _check_group(
             use_consolidated=False,
         )
     return group
+
+
+def _is_ozx(store: Store) -> bool:
+    if isinstance(store, NgioStore):
+        return store.is_ozx
+    return isinstance(store, OzxStore)
 
 
 def open_group_wrapper(
@@ -115,12 +123,22 @@ def open_group_wrapper(
     try:
         mode = mode if mode is not None else "a"
         ngio_store = NgioStore.normalize(store, mode=mode)
+        if zarr_format == 2 and _is_ozx(ngio_store):
+            raise NgioValueError(
+                "OME-Zarr zip files (RFC-9) hold OME-Zarr 0.5 or later, which "
+                "is Zarr v3; cannot write Zarr v2 (OME-Zarr 0.4) into one."
+            )
         group = zarr.open_group(
             store=ngio_store,
             mode=mode,
             zarr_format=zarr_format,
             use_consolidated=False,
         )
+        if group.metadata.zarr_format == 2 and _is_ozx(ngio_store):
+            raise NgioValueError(
+                f"The archive at {store} holds a Zarr v2 hierarchy; OME-Zarr "
+                "zip files (RFC-9) require OME-Zarr 0.5 (Zarr v3)."
+            )
 
     except FileExistsError as e:
         raise NgioFileExistsError(
@@ -440,6 +458,7 @@ class ZarrGroupHandler:
         # The write went through a freshly opened group, so `_group` and the
         # attrs cache both describe the state from before it.
         self.invalidate_meta()
+        self.store.flush()
 
     def _evict_subtree(self, path: str) -> None:
         """Drop `path` and everything below it from all three caches.
@@ -473,6 +492,7 @@ class ZarrGroupHandler:
         if overwrite:
             self._evict_subtree(path)
         self._group_cache.set(path, group)
+        self.store.flush()
         return group
 
     def get_group(
@@ -599,12 +619,14 @@ class ZarrGroupHandler:
             raise NgioValueError("Cannot delete a group in read only mode.")
         self.group.__delitem__(path)
         self._evict_subtree(path)
+        self.store.flush()
 
     def delete_self(self) -> None:
         """Delete the current group."""
         if self.group.read_only:
             raise NgioValueError("Cannot delete a group in read only mode.")
         self.group.__delitem__("/")
+        self.store.flush()
 
     def copy_group(self, dest_group: zarr.Group):
         """Copy the group to a new store."""
