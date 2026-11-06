@@ -103,6 +103,43 @@ def memory_url() -> Iterator[str]:
     fs.rm(f"/{name}", recursive=True)
 
 
+def test_tables_survive_pack_and_unpack(tmp_path: Path) -> None:
+    """Parquet and csv tables are files beside the zarr nodes; copied all the same."""
+    from pandas import DataFrame
+    from pandas.testing import assert_frame_equal
+
+    from ngio.tables import FeatureTable
+
+    backends = ["anndata", "json", "csv", "parquet"]
+    frame = DataFrame({"label": [1, 2, 3], "area": [0.5, 1.5, 2.5]})
+    src = _image(tmp_path / "src.zarr")
+    for backend in backends:
+        src.add_table(
+            f"t_{backend}",
+            FeatureTable(table_data=frame, reference_label="seg"),
+            backend=backend,
+        )
+
+    to_ozx(tmp_path / "src.zarr", tmp_path / "a.ozx")
+    mem = to_memory(tmp_path / "a.ozx")
+    from_memory(mem, tmp_path / "b.zarr")
+    from_ozx(tmp_path / "a.ozx", tmp_path / "c.zarr")
+    from_memory(mem, tmp_path / "d.ozx")
+
+    for dst in ("a.ozx", "b.zarr", "c.zarr", "d.ozx"):
+        img = open_ome_zarr_container(tmp_path / dst, mode="r")
+        assert sorted(img.list_tables()) == sorted(f"t_{b}" for b in backends), dst
+        for backend in backends:
+            got = img.get_table(f"t_{backend}").dataframe.reset_index()
+            assert_frame_equal(got.sort_index(axis=1), frame.sort_index(axis=1))
+    img = open_ome_zarr_container(mem, mode="r")
+    for backend in backends:
+        got = img.get_table(f"t_{backend}").dataframe.reset_index()
+        assert_frame_equal(got.sort_index(axis=1), frame.sort_index(axis=1))
+    assert check_ozx(tmp_path / "a.ozx").must == []
+    assert check_ozx(tmp_path / "d.ozx").must == []
+
+
 def test_remote_ozx_round_trip(tmp_path: Path, memory_url: str) -> None:
     src = _image(tmp_path / "src.zarr")
     assert to_ozx(tmp_path / "src.zarr", memory_url) == memory_url

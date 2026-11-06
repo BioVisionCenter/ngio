@@ -8,22 +8,30 @@ writes, where editing the archive in place is the wrong tool.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import tempfile
 from pathlib import Path
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import fsspec
+from zarr.core.buffer import default_buffer_prototype
+from zarr.core.sync import sync
 from zarr.storage import MemoryStore
 
 from ngio.utils._errors import NgioFileExistsError
 from ngio.utils._ozx import OZX_SUFFIX, OzxStore, is_remote, open_ozx
+from ngio.utils._store import NgioStore
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     StoreOrGroup,
-    copy_group,
     open_group_wrapper,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable
+
+    import zarr
 
 
 def _is_ozx_location(dst: object) -> bool:
@@ -39,6 +47,50 @@ def _upload_ozx(src: StoreOrGroup, url: str, *, overwrite: bool) -> None:
         local = Path(tmp) / Path(remote_path).name
         _copy_hierarchy(src, local, overwrite=True)
         fs.put_file(os.fspath(local), remote_path)
+
+
+# Written when the destination group is created, from the source's attributes.
+_ROOT_METADATA = frozenset({"zarr.json", ".zgroup", ".zattrs", ".zmetadata"})
+
+
+def _copy_keys(src_group: zarr.Group, dst_group: zarr.Group) -> None:
+    """Copy every key under the source group, byte for byte.
+
+    Key level rather than node level: a zarr walk misses the files that
+    table backends keep beside the zarr nodes (parquet, csv). The source's
+    root metadata document is skipped: the destination group was created with
+    the same format and attributes, and ngio neither writes nor trusts
+    consolidated metadata.
+    """
+    src_store, dst_store = src_group.store, dst_group.store
+    src_prefix = f"{src_group.path}/" if src_group.path else ""
+    dst_prefix = f"{dst_group.path}/" if dst_group.path else ""
+    prototype = default_buffer_prototype()
+
+    async def copy_one(key: str) -> None:
+        rel = key[len(src_prefix) :]
+        if rel in _ROOT_METADATA:
+            return
+        value = await src_store.get(key, prototype=prototype)
+        if value is not None:
+            await dst_store.set(dst_prefix + rel, value)
+
+    async def run() -> None:
+        pending: list[Awaitable[None]] = []
+        async for key in src_store.list_prefix(src_prefix):
+            pending.append(copy_one(key))
+            if len(pending) >= _COPY_BATCH:
+                await asyncio.gather(*pending)
+                pending = []
+        await asyncio.gather(*pending)
+
+    sync(run())
+    # The copy ends on chunk writes, which a single-file store publishes only
+    # when its directory is written.
+    NgioStore.ensure(dst_store).flush()
+
+
+_COPY_BATCH = 32
 
 
 def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) -> None:
@@ -59,9 +111,7 @@ def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) ->
             zarr_format=src_group.metadata.zarr_format,
             attributes=src_group.attrs.asdict(),
         )
-        # The copy warns when it cannot take the filesystem shortcut; a memory
-        # or zip endpoint never can, so the warning carries no information here.
-        copy_group(src_group, dst_group, suppress_warnings=True)
+        _copy_keys(src_group, dst_group)
     finally:
         if owned is not None:
             owned.close()
