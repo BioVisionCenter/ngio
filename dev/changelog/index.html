@@ -2026,6 +2026,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v113" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -2122,7 +2150,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#features_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -2321,7 +2349,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#features_1" class="md-nav__link">
+  <a href="#features_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -2711,7 +2739,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_2" class="md-nav__link">
+  <a href="#features_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -2873,7 +2901,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_3" class="md-nav__link">
+  <a href="#features_4" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -3135,7 +3163,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_4" class="md-nav__link">
+  <a href="#features_5" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -3435,6 +3463,34 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        [Unreleased]
+      </span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="[Unreleased]">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#features" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Features
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#v113" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
@@ -3531,7 +3587,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
+  <a href="#features_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -3730,7 +3786,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#features_1" class="md-nav__link">
+  <a href="#features_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -4120,7 +4176,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_2" class="md-nav__link">
+  <a href="#features_3" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -4282,7 +4338,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_3" class="md-nav__link">
+  <a href="#features_4" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -4544,7 +4600,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#features_4" class="md-nav__link">
+  <a href="#features_5" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Features
@@ -4771,6 +4827,11 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add <code>set_config()</code> (exported from <code>ngio</code> and <code>ngio.config</code>) to replace the global <code>NgioConfig</code> from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the <code>s3fs</code> retry markers and the <code>zarr</code> section, so libraries can configure ngio without setting <code>NGIO_CONFIG_PATH</code> before <code>import ngio</code>.</li>
+</ul>
 <h2 id="v113">[v1.1.3]<a class="headerlink" href="#v113" title="Permanent link">&para;</a></h2>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
@@ -4795,7 +4856,7 @@
 <li><strong>Iterators run at scale, under one verb table</strong>: a topic verb per iterator (<code>process</code>, <code>segment</code>, <code>measure</code>, <code>detect</code>) over the shared <code>map</code>/<code>reduce</code>/<code>iter</code> layer, one reconciliation declaration each (<code>with_stitch</code>, <code>with_nms</code>, <code>with_join</code>, <code>on_overlap</code>) backed by swappable protocols, thread/process fan-out in conflict-free waves, halos at unchanged parallelism, batched inference, and the one <code>prepare_jobs → for_job → finalize</code> distributed recipe.</li>
 <li><strong>New capabilities</strong>: <code>with_stitch(...)</code> merges objects split across region boundaries on <em>any</em> <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> list — grids, overlapping <abbr title="Fields of View — the areas captured in single microscope acquisitions">FOVs</abbr>, ragged tables, tiled masked objects; the new <code>ObjectDetectionIterator</code> turns a tile-by-tile detector into one deduplicated <abbr title="Region of Interest — a rectangular region of an image, defined in world or pixel coordinates">ROI</abbr> table (<a href="https://github.com/BioVisionCenter/ngio/issues/111">#111</a>); <code>FeatureExtractorIterator.measure</code> joins per-region measurements into a single <code>FeatureTable</code>.</li>
 </ul>
-<h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
+<h3 id="features_1">Features<a class="headerlink" href="#features_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>ThreadedMapper</code> and <code>ProcessMapper</code> parallelize <code>map</code>/<code>reduce</code>. Writes run in conflict-free waves, and wave order is the canonical write order for every mapper — serial included — so overlapping writes land identically everywhere. The default stays serial.</li>
 <li>One verb table across the five iterators: a partition-aware topic verb per class (<code>process</code>, <code>segment</code> — masked included — <code>measure</code>, <code>detect</code>) over the shared generic layer — <code>map</code>, <code>reduce</code> (collect without writing) — both numpy — and <code>iter</code> (the <code>*_as_numpy</code> aliases stay; bare <code>iter()</code> still defaults to the dask <abbr title="The on-disk serialisation used for a table (anndata, parquet, csv or json)">backend</abbr> in 1.1 and warns, see Deprecated) — plus tiling calls that say what they tile by: <code>by_grid(size_*, stride_*, tail=...)</code>, <code>by_blocks(num_*)</code>, <code>by_chunks()</code>, <code>by_write_units()</code>. <code>finalize()</code> is the one gather everywhere.</li>
@@ -5057,7 +5118,7 @@
 </span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">SegmentationIterator</span>                          <span class="c1"># was ngio.experimental</span>
 </span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">plate</span><span class="o">.</span><span class="n">get_images</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>                                <span class="c1"># was get_images_async()</span>
 </span></code></pre></div>
-<h3 id="features_1">Features<a class="headerlink" href="#features_1" title="Permanent link">&para;</a></h3>
+<h3 id="features_2">Features<a class="headerlink" href="#features_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>The iterators are stable API: <code>from ngio import SegmentationIterator</code>.</li>
 <li>Configurable IO retries: <code>NgioConfig.io_retry</code> plus the <code>ngio.utils.retry_io</code> decorator. ngio's own <code>NgioError</code>s are never retried. See the Configuration page.</li>
@@ -5173,7 +5234,7 @@
 <li>Fix shape compatibility check in <code>_check_compatibility_of_shapes</code>: integer indices in the slicing tuple now correctly reduce the expected shape rank instead of inserting a spurious size-1 dimension.</li>
 </ul>
 <h2 id="v055">[v0.5.5]<a class="headerlink" href="#v055" title="Permanent link">&para;</a></h2>
-<h3 id="features_2">Features<a class="headerlink" href="#features_2" title="Permanent link">&para;</a></h3>
+<h3 id="features_3">Features<a class="headerlink" href="#features_3" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>Roi</code> now supports dict-like slice access: <code>roi["x"]</code> returns the slice for axis <code>"x"</code> and raises <code>KeyError</code> if the axis is not present.</li>
 <li><code>Roi.get(axis_name, default=None)</code> now accepts an explicit <code>default</code> value, following the <code>dict.get</code> convention.</li>
@@ -5213,7 +5274,7 @@
 <li>Improve logging consistency across the codebase.</li>
 </ul>
 <h2 id="v050">[v0.5.0]<a class="headerlink" href="#v050" title="Permanent link">&para;</a></h2>
-<h3 id="features_3">Features<a class="headerlink" href="#features_3" title="Permanent link">&para;</a></h3>
+<h3 id="features_4">Features<a class="headerlink" href="#features_4" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Add support for OME-<abbr title="Next Generation File Format — the OME specification that OME-Zarr implements">NGFF</abbr> v0.5</li>
 <li>Move to zarr-python v3</li>
@@ -5337,7 +5398,7 @@
 <li>Fix bug in zoom transform when input axes contain unknown axes (e.g. virtual axes). Now unknown axes are treated as virtual axes and set to 1 in the target shape.</li>
 </ul>
 <h2 id="v040">[v0.4.0]<a class="headerlink" href="#v040" title="Permanent link">&para;</a></h2>
-<h3 id="features_4">Features<a class="headerlink" href="#features_4" title="Permanent link">&para;</a></h3>
+<h3 id="features_5">Features<a class="headerlink" href="#features_5" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Add Iterators for image processing pipelines</li>
 <li>Add support for time in rois and roi-tables</li>

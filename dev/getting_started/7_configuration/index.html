@@ -802,6 +802,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The config file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#replacing-the-whole-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Replacing the whole configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2332,6 +2349,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="The config file">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#replacing-the-whole-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Replacing the whole configuration
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2586,6 +2620,19 @@
 </span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>    <span class="n">retry_on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ServerTimeoutError&quot;</span><span class="p">],</span>
 </span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="p">)</span>
 </span></code></pre></div>
+<h3 id="replacing-the-whole-configuration">Replacing the whole configuration<a class="headerlink" href="#replacing-the-whole-configuration" title="Permanent link">&para;</a></h3>
+<p><code>set_config()</code> swaps in a complete <code>NgioConfig</code> and applies it straight away, so it works at any point after import, regardless of what imported ngio first and with no need for <code>NGIO_CONFIG_PATH</code>. The previous configuration is replaced, and the <code>s3fs</code> and <code>zarr</code> sections are forwarded to those libraries immediately. A zarr setting forwarded by an earlier configuration (for example from the config file) stays in place unless the new one sets it. Example:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio</span><span class="w"> </span><span class="kn">import</span> <span class="n">set_config</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">ngio.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">NgioConfig</span><span class="p">,</span> <span class="n">RetryConfig</span><span class="p">,</span> <span class="n">S3FSConfig</span>
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">set_config</span><span class="p">(</span>
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">NgioConfig</span><span class="p">(</span>
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>        <span class="n">io_retry</span><span class="o">=</span><span class="n">RetryConfig</span><span class="p">(</span><span class="n">max_retries</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">retry_on</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ServerTimeoutError&quot;</span><span class="p">]),</span>
+</span><span id="__span-2-7"><a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>        <span class="n">s3fs</span><span class="o">=</span><span class="n">S3FSConfig</span><span class="p">(</span><span class="n">custom_retry_markers</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;RequestTimeTooSkewed&quot;</span><span class="p">]),</span>
+</span><span id="__span-2-8"><a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="p">)</span>
+</span><span id="__span-2-9"><a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="p">)</span>
+</span></code></pre></div>
+<p>The same limits apply as for any runtime change: containers opened earlier keep the <code>io_retry</code> they were opened with, and <code>zarr.threading_max_workers</code> only takes effect before the first zarr operation.</p>
 <h2 id="io-retry-io_retry">IO retry (<code>io_retry</code>)<a class="headerlink" href="#io-retry-io_retry" title="Permanent link">&para;</a></h2>
 <p>By default ngio never retries a failed IO operation (<code>max_retries=0</code>). When enabled, the policy applies to <strong>all</strong> ngio IO: zarr metadata and pixel data (including lazy dask reads/writes executed on workers), non-zarr table IO (parquet/CSV via pyarrow, AnnData writes), and remote store probes.</p>
 <p>Fields:</p>
@@ -2616,7 +2663,7 @@
 </li>
 </ul>
 <h2 id="s3fs-retry-markers-s3fs">s3fs retry markers (<code>s3fs</code>)<a class="headerlink" href="#s3fs-retry-markers-s3fs" title="Permanent link">&para;</a></h2>
-<p><code>s3fs.custom_retry_markers</code> is a separate, lower-level mechanism: it registers an error handler inside <code>s3fs</code> itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew <code>RequestTimeTooSkewed</code> errors). Apply changes at runtime with <code>ngio.utils.refresh_s3fs_config(get_config())</code>.</p>
+<p><code>s3fs.custom_retry_markers</code> is a separate, lower-level mechanism: it registers an error handler inside <code>s3fs</code> itself, making s3fs's internal request loop retry any botocore error whose message contains one of the markers (the motivating case is AWS clock-skew <code>RequestTimeTooSkewed</code> errors). Apply changes at runtime with <code>ngio.utils.refresh_s3fs_config(get_config())</code>, or replace the whole configuration with <code>set_config()</code>, which applies them for you.</p>
 <p>The two mechanisms are complementary and independent: <code>s3fs</code> retries individual S3 requests inside a single ngio IO call, while <code>io_retry</code> retries the whole ngio IO call. If both are enabled and their triggers overlap, an error can be retried at both layers, so the effective number of attempts is multiplicative — keep the two configurations narrow.</p>
 <h2 id="dask-writes-dask">Dask writes (<code>dask</code>)<a class="headerlink" href="#dask-writes-dask" title="Permanent link">&para;</a></h2>
 <p><code>dask.write_block_max_bytes</code> caps how much data ngio lets dask assemble in memory before writing it, in bytes. It defaults to <strong>8 MiB</strong>.</p>
@@ -2664,7 +2711,7 @@
 <h3 id="when-changes-take-effect">When changes take effect<a class="headerlink" href="#when-changes-take-effect" title="Permanent link">&para;</a></h3>
 <ul>
 <li><strong><code>async_concurrency</code> is read by zarr on every call</strong>, so changing it at runtime works: set it directly with <code>zarr.config.set({"async.concurrency": 64})</code> (also usable as a context manager for a single operation).</li>
-<li><strong><code>threading_max_workers</code> is snapshotted by zarr into a process-global executor at the first zarr operation.</strong> ngio applies this section during <code>import ngio</code> for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file.</li>
+<li><strong><code>threading_max_workers</code> is snapshotted by zarr into a process-global executor at the first zarr operation.</strong> ngio applies this section during <code>import ngio</code> for exactly that reason; changing it afterwards has no effect for the life of the process, so it must come from the config file (or a <code>set_config()</code> call made before any zarr operation).</li>
 </ul>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <ul>
