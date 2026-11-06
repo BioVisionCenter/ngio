@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 from urllib.parse import quote
 
 import dask.array as da
@@ -88,6 +88,7 @@ def open_group_wrapper(
     store: StoreOrGroup,
     mode: AccessModeLiteral | None = None,
     zarr_format: Literal[2, 3] | None = None,
+    attributes: dict | None = None,
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
@@ -113,6 +114,8 @@ def open_group_wrapper(
         store (StoreOrGroup): The store or group to open.
         mode (AccessModeLiteral): The mode to open the group in.
         zarr_format (int): The Zarr format version to use.
+        attributes (dict | None): Attributes for a group created by this call,
+            written together with the group so its document is written once.
 
     Returns:
         zarr.Group: The opened Zarr group.
@@ -132,6 +135,7 @@ def open_group_wrapper(
             store=ngio_store,
             mode=mode,
             zarr_format=zarr_format,
+            attributes=attributes,
             use_consolidated=False,
         )
         if group.metadata.zarr_format == 2 and _is_ozx(ngio_store):
@@ -222,6 +226,17 @@ class ZarrGroupHandler:
         if self._store_facade is None:
             self._store_facade = NgioStore.ensure(self._group.store)
         return self._store_facade
+
+    @property
+    def held_store(self) -> NgioSupportedStore:
+        """Return the store object zarr holds for this group.
+
+        Unlike `store`, not a facade: a plain local store comes back bare, as
+        `open_group_wrapper` handed it to zarr. Use it to open a second handler
+        on the same location without re-normalizing a path, which a
+        single-file store cannot serve twice and which would cost a reopen.
+        """
+        return cast("NgioSupportedStore", self._group.store)
 
     @property
     def path(self) -> str:
@@ -732,8 +747,12 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
     # Deferred: `ngio.common` imports `ngio.utils`.
     from ngio.common._dask_io import store_dask
 
-    # Copy attributes
-    dest_group.attrs.put(src_group.attrs.asdict())
+    # Copy attributes. Skipped when the group was created with them already:
+    # a rewrite of identical content is a round-trip remotely and a dead copy
+    # of the document in a zip archive.
+    src_attrs = src_group.attrs.asdict()
+    if dest_group.attrs.asdict() != src_attrs:
+        dest_group.attrs.put(src_attrs)
     # Copy arrays
     for name, array in src_group.arrays():
         if array.metadata.zarr_format == 2:
@@ -759,7 +778,9 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
                 store_dask(dask_array, dst)
     # Copy subgroups
     for name, subgroup in src_group.groups():
-        dest_subgroup = dest_group.create_group(name, overwrite=True)
+        dest_subgroup = dest_group.create_group(
+            name, overwrite=True, attributes=subgroup.attrs.asdict()
+        )
         _zarr_python_copy(subgroup, dest_subgroup)
 
 

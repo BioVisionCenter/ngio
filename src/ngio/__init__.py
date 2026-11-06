@@ -86,6 +86,10 @@ from ngio.utils import (
     OzxStore,
     StoreOrGroup,
     check_ozx,
+    from_memory,
+    from_ozx,
+    to_memory,
+    to_ozx,
 )
 
 __all__ = [
@@ -143,6 +147,8 @@ __all__ = [
     "create_ome_zarr_from_array",
     "create_synthetic_ome_zarr",
     "derive_ome_zarr_plate",
+    "from_memory",
+    "from_ozx",
     "get_config",
     "get_ngio_image_meta",
     "get_ngio_label_meta",
@@ -156,4 +162,6 @@ __all__ = [
     "open_ome_zarr_container",
     "open_ome_zarr_plate",
     "open_ome_zarr_well",
+    "to_memory",
+    "to_ozx",
 ]

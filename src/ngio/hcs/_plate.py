@@ -1228,11 +1228,12 @@ def create_empty_plate(
             well_handler = group_handler.get_handler(well_path, create_mode=True)
             update_ngio_well_meta(well_handler, well_meta)
 
-    # Through the handler's own group rather than the `store` argument: a
-    # path would open a second store on the same location, which a
-    # single-file store (`.ozx`) cannot serve.
+    # Through the store zarr already holds rather than the `store` argument:
+    # a path would open a second store on the same location, which a
+    # single-file store (`.ozx`) cannot serve. The store, not the group: a
+    # group argument costs the new handler a stale-attributes reopen.
     return open_ome_zarr_plate(
-        store=group_handler.group,
+        store=group_handler.held_store,
         cache=cache,
         mode="r+",
     )
@@ -1274,11 +1275,12 @@ def derive_ome_zarr_plate(
         meta=new_meta,
         overwrite=overwrite,
     )
-    # Through the handler's own group rather than the `store` argument: a
-    # path would open a second store on the same location, which a
-    # single-file store (`.ozx`) cannot serve.
+    # Through the store zarr already holds rather than the `store` argument:
+    # a path would open a second store on the same location, which a
+    # single-file store (`.ozx`) cannot serve. The store, not the group: a
+    # group argument costs the new handler a stale-attributes reopen.
     return open_ome_zarr_plate(
-        store=group_handler.group,
+        store=group_handler.held_store,
         cache=cache,
         mode="r+",
     )
