@@ -107,11 +107,7 @@ class AnnDataBackend(AbstractTableBackend):
         scratch_store = MemoryStore()
         self._write_zarr(table, scratch_store)
         anndata_group = zarr.open_group(scratch_store, mode="r")
-        copy_group(
-            anndata_group,
-            self._group_handler._group,
-            suppress_warnings=True,
-        )
+        copy_group(anndata_group, self._group_handler._group)
 
     def _cleanup_after_write(self) -> None:
         """Clean up any temporary data after writing."""

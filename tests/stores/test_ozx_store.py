@@ -45,10 +45,10 @@ def test_ozx_store_derive_to_local_and_back(tmp_path: Path) -> None:
         store=path, supported_backends=ALL_BACKENDS, ngff_version="0.5"
     )
     derived = derive_image(ome_zarr, other_store=tmp_path / "derived.zarr")
-    check_ome_zarr(derived, supported_backends=["anndata", "json"])
+    check_ome_zarr(derived, supported_backends=ALL_BACKENDS)
 
     back = derive_image(derived, other_store=tmp_path / "derived.ozx")
-    check_ome_zarr(back, supported_backends=["anndata", "json"])
+    check_ome_zarr(back, supported_backends=ALL_BACKENDS)
     _conformant(tmp_path / "derived.ozx")
 
 

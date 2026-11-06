@@ -12,6 +12,8 @@
 
 ### Changed
 
+- `copy_group` (behind `derive_image(copy_labels=True, copy_tables=True)` and the AnnData backend) no longer falls back to a zarr-python node walk when the two sides are not both filesystems. It copies every key through the stores instead, so parquet and csv tables now survive a derive into a `MemoryStore`, an S3 store or a `.ozx`, chunks and shards travel byte for byte, and the "Fsspec copy not possible" warning is gone (`suppress_warnings` is kept and ignored).
+
 - Parquet and csv tables on a `MemoryStore` are held as serialized bytes under their key, like on every other store, instead of as pyarrow objects stashed in the backing dict. A hierarchy copied into or out of memory now carries them; the memory op-count baseline gained the one read per table load.
 
 - Writing a group's attributes is one metadata document write. It used to be one write per existing key plus one per new key (zarr's `Attributes` only implements item access, so `clear()` + `update()` rewrote the document key by key): a round-trip each on remote stores, a dead copy each in a zip archive. Same bytes on disk; the op-count baselines moved by exactly the saved writes.

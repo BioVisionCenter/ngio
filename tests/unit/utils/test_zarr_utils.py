@@ -507,11 +507,12 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
 
 
 def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
-    """The zarr-python copy fallback writes whole write units, byte-exact.
+    """The store-level copy fallback keeps sharded data byte-exact.
 
     A raw dask write under a block budget smaller than the destination's
     shard gave one shard several racing read-modify-writers and silently lost
-    most of the data (~75% of pixels in the review's repro).
+    most of the data (~75% of pixels in the review's repro). The copy now moves
+    keys, so no write unit is ever rebuilt.
     """
     import dask
 
@@ -524,7 +525,7 @@ def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     labels[...] = data
     handler = ZarrGroupHandler(store=src_group, cache=False, mode="r")
 
-    # A MemoryStore destination forces the `_zarr_python_copy` fallback; the
+    # A MemoryStore destination forces the key-copy fallback; the
     # tiny global budget is what a shard bigger than dask's default hits.
     dest_group = zarr.group(store={}, overwrite=True)
     with dask.config.set({"array.chunk-size": "64 KiB"}):

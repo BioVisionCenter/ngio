@@ -51,4 +51,6 @@ def test_local_store_derive_to_memory_store(tmp_path: Path) -> None:
     )
     other_store = {}
     derived_ome_zarr = derive_image(ome_zarr, other_store=other_store)
-    check_ome_zarr(derived_ome_zarr, supported_backends=["anndata", "json"])
+    check_ome_zarr(
+        derived_ome_zarr, supported_backends=["anndata", "json", "csv", "parquet"]
+    )

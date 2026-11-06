@@ -1,21 +1,21 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
+import asyncio
 import logging
 import warnings
-from collections.abc import Iterator
+from collections.abc import Awaitable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from typing import Literal, TypeAlias, cast
 from urllib.parse import quote
 
-import dask.array as da
 import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
-from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
-from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
+from zarr.core.buffer import default_buffer_prototype
+from zarr.core.sync import sync
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
@@ -747,50 +747,63 @@ def _fsspec_copy(
         dest_mapper[key] = src_mapper[key]
 
 
-def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
-    # Deferred: `ngio.common` imports `ngio.utils`.
-    from ngio.common._dask_io import store_dask
+# Root metadata documents: synced through zarr's attributes API, never copied.
+_ROOT_METADATA = frozenset({"zarr.json", ".zgroup", ".zattrs", ".zmetadata"})
+_COPY_BATCH = 32
 
-    # Copy attributes. Skipped when the group was created with them already:
-    # a rewrite of identical content is a round-trip remotely and a dead copy
-    # of the document in a zip archive.
+
+def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
+    """Copy every key under `src_group` into `dest_group`, byte for byte.
+
+    Key level rather than node level: a zarr walk misses the files that table
+    backends keep beside the zarr nodes (parquet, csv), and a byte copy keeps
+    chunks and shards exactly as written. The root metadata document is not
+    copied: the destination keeps its own and takes the source's attributes
+    through zarr, so consolidated metadata, which ngio neither writes nor
+    trusts, never travels.
+    """
     src_attrs = src_group.attrs.asdict()
     if dest_group.attrs.asdict() != src_attrs:
         dest_group.attrs.put(src_attrs)
-    # Copy arrays
-    for name, array in src_group.arrays():
-        if array.metadata.zarr_format == 2:
-            spec = AnyArraySpecV2.from_zarr(array)
-        else:
-            spec = AnyArraySpecV3.from_zarr(array)
-        dst = spec.to_zarr(
-            store=dest_group.store,
-            path=f"{dest_group.path}/{name}",
-            overwrite=True,
-        )
-        if array.ndim > 0:
-            if array.dtype.hasobject or array.dtype.kind in ("U", "S"):
-                # dask >=2025.11 refuses auto-chunking for object/string dtypes
-                # (NotImplementedError in dask.array.core.auto_chunks). These
-                # arrays come from table backends and are small; copy directly.
-                dst[:] = array[:]
-            else:
-                dask_array = da.from_zarr(array)
-                # Aligned to the destination's write unit: a raw `da.to_zarr`
-                # under a sub-unit block budget gives one shard several racing
-                # read-modify-writers and silently loses updates.
-                store_dask(dask_array, dst)
-    # Copy subgroups
-    for name, subgroup in src_group.groups():
-        dest_subgroup = dest_group.create_group(
-            name, overwrite=True, attributes=subgroup.attrs.asdict()
-        )
-        _zarr_python_copy(subgroup, dest_subgroup)
+
+    src_store, dest_store = src_group.store, dest_group.store
+    src_prefix = f"{src_group.path}/" if src_group.path else ""
+    dest_prefix = f"{dest_group.path}/" if dest_group.path else ""
+    prototype = default_buffer_prototype()
+
+    async def copy_one(key: str) -> None:
+        rel = key[len(src_prefix) :]
+        if rel in _ROOT_METADATA:
+            return
+        value = await src_store.get(key, prototype=prototype)
+        if value is not None:
+            await dest_store.set(dest_prefix + rel, value)
+
+    async def run() -> None:
+        pending: list[Awaitable[None]] = []
+        async for key in src_store.list_prefix(src_prefix):
+            pending.append(copy_one(key))
+            if len(pending) >= _COPY_BATCH:
+                await asyncio.gather(*pending)
+                pending = []
+        await asyncio.gather(*pending)
+
+    sync(run())
+    # The copy ends on chunk writes, which a single-file store publishes only
+    # when its directory is written.
+    NgioStore.ensure(dest_store).flush()
 
 
 def copy_group(
     src_group: zarr.Group, dest_group: zarr.Group, suppress_warnings: bool = False
 ):
+    """Copy a group and everything under it into `dest_group`.
+
+    Through fsspec mappers when both sides are filesystems, otherwise key by
+    key through the stores (`copy_keys`); both carry non-zarr files such as
+    parquet and csv tables. `suppress_warnings` is kept for callers; the copy
+    no longer warns.
+    """
     if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
         raise NgioValueError(
             "Different Zarr format versions between source and destination, "
@@ -808,18 +821,7 @@ def copy_group(
     if src_store.store_type in fs_types and dest_store.store_type in fs_types:
         _fsspec_copy(src_store, src_group.path, dest_store, dest_group.path)
         return
-    if not suppress_warnings:
-        warnings.warn(
-            "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
-            "This will preserve some tabular data non-zarr native (parquet, and csv), "
-            "and it will be slower for large datasets.",
-            NgioUserWarning,
-            stacklevel=2,
-        )
-    _zarr_python_copy(src_group, dest_group)
-    # The copy ends on chunk writes, which a single-file store publishes only
-    # when its directory is written.
-    dest_store.flush()
+    copy_keys(src_group, dest_group)
 
 
 def refresh_s3fs_config(config: NgioConfig) -> None:
