@@ -86,8 +86,15 @@ class PyArrowBackend(AbstractTableBackend):
         return dataset
 
     def _load_from_zip_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
-        """Load the table from a zip store."""
-        raise NotImplementedError("Zip store loading is not implemented yet.")
+        """Load the table from a single-file store, as one entry read in full."""
+        table_path = f"{path}/{self.table_name}"
+        data = store.read_bytes(table_path)
+        if data is None:
+            raise NgioValueError(f"Table {self.table_name} not found at {table_path}.")
+        reader = pa.BufferReader(data)
+        if self.table_format == "parquet":
+            return pa_ds.dataset(pa_parquet.read_table(reader))
+        return pa_ds.dataset(pa_csv.read_csv(reader))
 
     @retry_io
     def _load_pyarrow_dataset(self) -> pa_ds.Dataset:
@@ -178,8 +185,10 @@ class PyArrowBackend(AbstractTableBackend):
         store.memory_dict[table_path] = table
 
     def _write_to_zip_store(self, store: NgioStore, path: str, table: pa.Table) -> None:
-        """Write the table to a zip store."""
-        raise NotImplementedError("Writing to zip store is not implemented yet.")
+        """Write the table to a single-file store, as one entry written in full."""
+        stream = pa.BufferOutputStream()
+        self._write_to_stream(stream, table)
+        store.write_bytes(f"{path}/{self.table_name}", stream.getvalue().to_pybytes())
 
     @retry_io
     def _write_pyarrow_dataset(self, dataset: pa.Table) -> None:

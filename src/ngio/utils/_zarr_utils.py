@@ -817,6 +817,9 @@ def copy_group(
             stacklevel=2,
         )
     _zarr_python_copy(src_group, dest_group)
+    # The copy ends on chunk writes, which a single-file store publishes only
+    # when its directory is written.
+    dest_store.flush()
 
 
 def refresh_s3fs_config(config: NgioConfig) -> None:

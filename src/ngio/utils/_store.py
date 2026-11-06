@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import fsspec
 from zarr.abc.store import ByteRequest, Store
+from zarr.core.buffer import default_buffer_prototype
 from zarr.core.sync import sync
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, WrapperStore, ZipStore
 from zarr.storage._common import make_store
@@ -323,6 +324,15 @@ class NgioStore(WrapperStore[Store]):
             return [key async for key in self.list_dir(prefix)]
 
         return sync(_collect())
+
+    def read_bytes(self, key: str) -> bytes | None:
+        """Return the whole value at `key`, or `None` if absent, synchronously."""
+        buffer = sync(self.get(key, prototype=default_buffer_prototype()))
+        return None if buffer is None else buffer.to_bytes()
+
+    def write_bytes(self, key: str, data: bytes) -> None:
+        """Store `data` at `key`, synchronously."""
+        sync(self.set(key, default_buffer_prototype().buffer.from_bytes(data)))
 
     @property
     def is_ozx(self) -> bool:

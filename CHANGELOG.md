@@ -8,6 +8,8 @@
 
 - `to_memory`, `from_memory`, `to_ozx` and `from_ozx` copy a whole OME-Zarr hierarchy between stores: the explicit extract, modify, repack workflow RFC-9 recommends for heavy or parallel writes. `to_ozx` writes a closed, conformant archive in one pass; `to_memory("image.ozx")` loads an archive into RAM to work on it with any store-agnostic code. A remote `.ozx` (`https://`, `s3://`, ...) opens read-only in place, fetching only the central directory and the entries read; `to_ozx(src, "s3://bucket/image.ozx")` packs into a local temporary file and uploads. Opening a URL with a writable mode raises `NgioValueError`.
 
+- Every table backend works on an OME-Zarr zip file: parquet and csv tables are one archive entry read and written in full through the store, AnnData tables are written through a scratch in-memory store and copied in group by group, as on a `MemoryStore`.
+
 ### Changed
 
 - Writing a group's attributes is one metadata document write. It used to be one write per existing key plus one per new key (zarr's `Attributes` only implements item access, so `clear()` + `update()` rewrote the document key by key): a round-trip each on remote stores, a dead copy each in a zip archive. Same bytes on disk; the op-count baselines moved by exactly the saved writes.
