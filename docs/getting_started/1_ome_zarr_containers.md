@@ -394,3 +394,4 @@ whatever the mode.
 
 - [Images and labels](2_images.md) — read and write pixel data.
 - [Tables](3_tables.md) — ROIs, features and measurements stored alongside the image.
+- [OME-Zarr zip files](8_ome_zarr_zip.md) — the same containers in a single `.ozx` file.

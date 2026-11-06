@@ -17,7 +17,7 @@ import fsspec
 from zarr.storage import MemoryStore
 
 from ngio.utils._errors import NgioFileExistsError
-from ngio.utils._ozx import OZX_SUFFIX, OzxStore, is_remote, open_ozx
+from ngio.utils._ozx import OZX_SUFFIX, OzxStore, is_remote, live_writer, open_ozx
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     StoreOrGroup,
@@ -44,13 +44,18 @@ def _upload_ozx(src: StoreOrGroup, url: str, *, overwrite: bool) -> None:
 def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) -> None:
     mode: AccessModeLiteral = "w" if overwrite else "w-"
     # A `.ozx` path becomes a store this function opens and therefore closes;
-    # a store object stays the caller's to close.
+    # a store object, or the live writer of an archive already open in this
+    # process, stays the caller's to close.
     owned: OzxStore | None = None
     if _is_ozx_location(dst):
-        if is_remote(cast("str | Path", dst)):
-            _upload_ozx(src, os.fspath(cast("str | Path", dst)), overwrite=overwrite)
+        location = cast("str | Path", dst)
+        if is_remote(location):
+            _upload_ozx(src, os.fspath(location), overwrite=overwrite)
             return
-        owned = OzxStore(cast("str | Path", dst), mode=mode)
+        if live_writer(location) is None:
+            owned = OzxStore(location, mode=mode)
+        else:
+            dst = open_ozx(location, mode=mode)
     try:
         src_group = open_group_wrapper(src, mode="r")
         dst_group = open_group_wrapper(

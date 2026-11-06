@@ -159,6 +159,20 @@ def test_remote_ozx_round_trip(tmp_path: Path, memory_url: str) -> None:
     _same(src, open_ome_zarr_container(memory_url, mode="r"))
 
 
+def test_repack_into_an_archive_held_open_by_path(tmp_path: Path) -> None:
+    """`from_memory(..., overwrite=True)` onto an archive a container still holds."""
+    held = _image(tmp_path / "held.ozx")
+    mem = to_memory(tmp_path / "held.ozx")
+    open_ome_zarr_container(mem).derive_label("extra")
+    from_memory(mem, tmp_path / "held.ozx", overwrite=True)
+    assert (
+        "extra"
+        in open_ome_zarr_container(tmp_path / "held.ozx", mode="r").list_labels()
+    )
+    assert "extra" in held.list_labels()
+    assert check_ozx(tmp_path / "held.ozx").must == []
+
+
 def test_to_memory_from_live_store(tmp_path: Path) -> None:
     from ngio import OzxStore
 

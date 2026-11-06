@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from zarr.core.buffer import Buffer
+from zarr.core.sync import sync
 from zarr.storage import ZipStore
 
 from ngio.utils._errors import NgioValueError
@@ -630,21 +631,41 @@ def remote_ozx_store(url: str) -> FsspecStore:
     )
 
 
+def live_writer(location: str | Path) -> OzxStore | None:
+    """Return the store writing to this local archive in this process, if any."""
+    with _registry_lock:
+        store = _open_writable.get(_registry_key(Path(location)))
+    return None if store is None or store.closed else store
+
+
 def open_ozx(location: str | Path, mode: OzxAccessMode = "r") -> OzxStore | FsspecStore:
-    """Open an OME-Zarr zip file at a local path or URL.
+    """Open an OME-Zarr zip file at a local path or URL, as a path argument does.
 
     A URL is read-only: Python's `zipfile` needs a seekable local file, and an
     object store has no in-place writes. Use `to_ozx` to produce a remote
     archive (packed locally, then uploaded).
+
+    An archive already open for writing in this process is not opened again:
+    a second `zipfile` handle would not see the live session, and a container
+    opened by path never closes its store explicitly, so "create, then reopen
+    by path" must keep working. The live store is returned instead (a
+    read-only view for `mode="r"`), and `mode="w"` empties it in place.
     """
-    if not is_remote(location):
+    if is_remote(location):
+        if mode != "r":
+            raise NgioValueError(
+                f"A remote OME-Zarr zip file is read-only; open {location} with "
+                "mode='r' (to write one, pack locally and upload with `to_ozx`)."
+            )
+        return remote_ozx_store(os.fspath(location))
+    live = live_writer(location)
+    if live is None:
         return OzxStore(location, mode=mode)
-    if mode != "r":
-        raise NgioValueError(
-            f"A remote OME-Zarr zip file is read-only; open {location} with "
-            "mode='r' (to write one, pack locally and upload with `to_ozx`)."
-        )
-    return remote_ozx_store(os.fspath(location))
+    if mode == "r":
+        return live.with_read_only(True)
+    if mode == "w":
+        sync(live.clear())
+    return live
 
 
 # ----------------------------------------------------------------------

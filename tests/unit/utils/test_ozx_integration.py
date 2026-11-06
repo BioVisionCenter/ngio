@@ -173,7 +173,32 @@ class TestPathRouting:
         with OzxStore(path, mode="w") as store:
             _create(store)
             with pytest.raises(NgioValueError, match="already open for writing"):
-                open_ome_zarr_container(path, mode="r+")
+                # the archive is opened lazily, on first IO
+                open_ome_zarr_container(OzxStore(path, mode="r+"))
+            # By path, generic code joins the session instead of failing.
+            joined = open_ome_zarr_container(path, mode="r+")
+            joined.set_channel_labels(["a", "b"])
+            assert open_ome_zarr_container(store).get_image().channel_labels == [
+                "a",
+                "b",
+            ]
+        with pytest.raises(NgioValueError, match="closed"):
+            joined.get_image().get_array()
+
+    def test_reopen_by_path_shares_the_writer(self, tmp_path: Path) -> None:
+        path = tmp_path / "img.ozx"
+        created = _create(path)  # holds the writable store
+        edited = open_ome_zarr_container(path)  # default mode r+
+        edited.set_channel_labels(["x", "y"])
+        assert created.get_image().channel_labels == ["x", "y"]
+        assert open_ome_zarr_container(path, mode="r").get_image().channel_labels == [
+            "x",
+            "y",
+        ]
+        # mode="w" empties the live archive in place rather than opening a 2nd handle
+        fresh = _create(path, overwrite=True)
+        assert fresh.list_labels() == []
+        _assert_conforming(path)
 
     def test_remote_path_is_read_only(self) -> None:
         with pytest.raises(NgioValueError, match="read-only"):

@@ -188,6 +188,7 @@ nav:
     - "HCS plates": getting_started/5_hcs.md
     - "Iterators": getting_started/6_iterators.md
     - "Configuration": getting_started/7_configuration.md
+    - "OME-Zarr zip files": getting_started/8_ome_zarr_zip.md
 
   - Tutorials:
     - "Create an OME-Zarr image": tutorials/create_ome_zarr.md
