@@ -13,6 +13,7 @@ from pathlib import Path
 
 from zarr.storage import MemoryStore
 
+from ngio.utils._errors import NgioValueError
 from ngio.utils._ozx import OZX_SUFFIX, OzxStore
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
@@ -28,6 +29,12 @@ def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) ->
     # a store object stays the caller's to close.
     owned: OzxStore | None = None
     if isinstance(dst, str | Path) and os.fspath(dst).endswith(OZX_SUFFIX):
+        if "://" in os.fspath(dst):
+            # zipfile needs a seekable local file; a remote archive would have to
+            # be packed locally and uploaded, which is not offered yet.
+            raise NgioValueError(
+                f"An OME-Zarr zip file can only be written to a local path ({dst})."
+            )
         owned = OzxStore(dst, mode=mode)
     try:
         src_group = open_group_wrapper(src, mode="r")
@@ -84,9 +91,8 @@ def to_ozx(src: StoreOrGroup, path: Path | str, *, overwrite: bool = False) -> P
     Returns:
         The path of the archive.
     """
-    path = Path(path)
     _copy_hierarchy(src, path, overwrite=overwrite)
-    return path
+    return Path(path)
 
 
 def from_ozx(path: Path | str, dst: StoreOrGroup, *, overwrite: bool = False) -> None:

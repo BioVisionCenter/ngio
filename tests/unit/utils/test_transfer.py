@@ -91,6 +91,13 @@ def test_v2_source_cannot_be_packed(tmp_path: Path) -> None:
     assert not (tmp_path / "v04.ozx").exists()
 
 
+def test_remote_ozx_target_is_refused(tmp_path: Path) -> None:
+    _image(tmp_path / "v05.zarr", version="0.5")
+    with pytest.raises(NgioValueError, match="local path"):
+        to_ozx(tmp_path / "v05.zarr", "s3://bucket/image.ozx")
+    assert not list(tmp_path.glob("s3:*"))
+
+
 def test_to_memory_from_live_store(tmp_path: Path) -> None:
     from ngio import OzxStore
 
