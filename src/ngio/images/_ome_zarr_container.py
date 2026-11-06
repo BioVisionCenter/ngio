@@ -1316,10 +1316,10 @@ def create_ome_zarr_from_array(
     # `cache=True`. The caller still gets an uncached container.
     # Through the store zarr already holds rather than the `store` argument:
     # a path would open a second store on the same location, which a
-    # single-file store (`.ozx`) cannot serve. The store, not the group: a
+    # single-file store (`.ozx`) cannot serve. The bare store where possible: a
     # group argument costs the new handler a stale-attributes reopen.
     working = open_ome_zarr_container(
-        store=ome_zarr._group_handler.held_store, mode="r+", cache=True
+        store=ome_zarr._group_handler.reopen_source, mode="r+", cache=True
     )
     image = working.get_image()
     image.set_array(array)

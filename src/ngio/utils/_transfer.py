@@ -9,12 +9,15 @@ writes, where editing the archive in place is the wrong tool.
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
+from typing import cast
 
+import fsspec
 from zarr.storage import MemoryStore
 
-from ngio.utils._errors import NgioValueError
-from ngio.utils._ozx import OZX_SUFFIX, OzxStore
+from ngio.utils._errors import NgioFileExistsError
+from ngio.utils._ozx import OZX_SUFFIX, OzxStore, is_remote, open_ozx
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     StoreOrGroup,
@@ -23,19 +26,31 @@ from ngio.utils._zarr_utils import (
 )
 
 
+def _is_ozx_location(dst: object) -> bool:
+    return isinstance(dst, str | Path) and os.fspath(dst).endswith(OZX_SUFFIX)
+
+
+def _upload_ozx(src: StoreOrGroup, url: str, *, overwrite: bool) -> None:
+    """Pack into a local temporary file, then upload: zip needs a seekable file."""
+    fs, remote_path = fsspec.core.url_to_fs(url)
+    if not overwrite and fs.exists(remote_path):
+        raise NgioFileExistsError(f"{url} already exists; pass overwrite=True.")
+    with tempfile.TemporaryDirectory() as tmp:
+        local = Path(tmp) / Path(remote_path).name
+        _copy_hierarchy(src, local, overwrite=True)
+        fs.put_file(os.fspath(local), remote_path)
+
+
 def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) -> None:
     mode: AccessModeLiteral = "w" if overwrite else "w-"
     # A `.ozx` path becomes a store this function opens and therefore closes;
     # a store object stays the caller's to close.
     owned: OzxStore | None = None
-    if isinstance(dst, str | Path) and os.fspath(dst).endswith(OZX_SUFFIX):
-        if "://" in os.fspath(dst):
-            # zipfile needs a seekable local file; a remote archive would have to
-            # be packed locally and uploaded, which is not offered yet.
-            raise NgioValueError(
-                f"An OME-Zarr zip file can only be written to a local path ({dst})."
-            )
-        owned = OzxStore(dst, mode=mode)
+    if _is_ozx_location(dst):
+        if is_remote(cast("str | Path", dst)):
+            _upload_ozx(src, os.fspath(cast("str | Path", dst)), overwrite=overwrite)
+            return
+        owned = OzxStore(cast("str | Path", dst), mode=mode)
     try:
         src_group = open_group_wrapper(src, mode="r")
         dst_group = open_group_wrapper(
@@ -76,31 +91,34 @@ def from_memory(
     _copy_hierarchy(src, dst, overwrite=overwrite)
 
 
-def to_ozx(src: StoreOrGroup, path: Path | str, *, overwrite: bool = False) -> Path:
+def to_ozx(
+    src: StoreOrGroup, path: Path | str, *, overwrite: bool = False
+) -> Path | str:
     """Pack an OME-Zarr hierarchy into an OME-Zarr zip file (RFC-9).
 
     The archive is written once, closed and conformant on return: no dead
     space, `zarr.json` records first, archive comment set. The source must be
-    OME-Zarr 0.5 (Zarr v3); RFC-9 has no Zarr v2 form.
+    OME-Zarr 0.5 (Zarr v3); RFC-9 has no Zarr v2 form. A URL target is packed
+    into a local temporary file and uploaded.
 
     Args:
         src: The hierarchy to pack (path, store or group).
-        path: The `.ozx` file to create.
+        path: The `.ozx` file to create, a local path or a URL.
         overwrite: Replace an existing file.
 
     Returns:
-        The path of the archive.
+        The archive location: a `Path` for a local file, the URL otherwise.
     """
     _copy_hierarchy(src, path, overwrite=overwrite)
-    return Path(path)
+    return path if is_remote(path) else Path(path)
 
 
 def from_ozx(path: Path | str, dst: StoreOrGroup, *, overwrite: bool = False) -> None:
     """Unpack an OME-Zarr zip file into `dst` (a path, store or group).
 
     Args:
-        path: The `.ozx` file to read.
+        path: The `.ozx` file to read, a local path or a URL.
         dst: Where to write the hierarchy.
         overwrite: Replace an existing hierarchy at `dst`.
     """
-    _copy_hierarchy(OzxStore(path, mode="r"), dst, overwrite=overwrite)
+    _copy_hierarchy(open_ozx(path, mode="r"), dst, overwrite=overwrite)

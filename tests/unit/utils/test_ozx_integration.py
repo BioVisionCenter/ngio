@@ -175,9 +175,17 @@ class TestPathRouting:
             with pytest.raises(NgioValueError, match="already open for writing"):
                 open_ome_zarr_container(path, mode="r+")
 
-    def test_remote_path_refused_for_now(self) -> None:
-        with pytest.raises(NgioValueError, match="Remote OME-Zarr zip"):
-            open_ome_zarr_container("https://example.org/x.ozx", mode="r")
+    def test_remote_path_is_read_only(self) -> None:
+        with pytest.raises(NgioValueError, match="read-only"):
+            open_ome_zarr_container("https://example.org/x.ozx")  # default r+
+
+
+@pytest.mark.network
+def test_public_remote_ozx() -> None:
+    url = "https://static.webknossos.org/misc/6001240.ozx"
+    assert check_ozx(url).must == []
+    img = open_ome_zarr_container(url, mode="r").get_image()
+    assert img.get_array(x=slice(0, 4), y=slice(0, 4)).size > 0
 
     def test_pickle_read_only_container_store(self, tmp_path: Path) -> None:
         path = tmp_path / "img.ozx"

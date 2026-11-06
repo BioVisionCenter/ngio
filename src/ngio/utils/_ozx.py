@@ -45,6 +45,7 @@ if TYPE_CHECKING:
 
     from zarr.abc.store import ByteRequest
     from zarr.core.buffer import BufferPrototype
+    from zarr.storage import FsspecStore
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -596,6 +597,54 @@ class OzxStore(ZipStore):
             if child not in seen:
                 seen.add(child)
                 yield child
+
+
+# ----------------------------------------------------------------------
+# Opening by location
+# ----------------------------------------------------------------------
+
+
+def is_remote(location: str | Path) -> bool:
+    """Whether `location` is a URL rather than a local path."""
+    return "://" in os.fspath(location)
+
+
+def remote_ozx_store(url: str) -> FsspecStore:
+    """Open a remote `.ozx` read-only through fsspec's zip filesystem.
+
+    Only the central directory and the entries actually read are fetched
+    (range requests). fsspec's zip filesystem raises `KeyError` for a missing
+    entry, which zarr must see as "absent" for format detection to work.
+    """
+    from zarr.storage import FsspecStore
+
+    return FsspecStore.from_url(
+        f"zip::{url}",
+        read_only=True,
+        allowed_exceptions=(
+            FileNotFoundError,
+            IsADirectoryError,
+            NotADirectoryError,
+            KeyError,
+        ),
+    )
+
+
+def open_ozx(location: str | Path, mode: OzxAccessMode = "r") -> OzxStore | FsspecStore:
+    """Open an OME-Zarr zip file at a local path or URL.
+
+    A URL is read-only: Python's `zipfile` needs a seekable local file, and an
+    object store has no in-place writes. Use `to_ozx` to produce a remote
+    archive (packed locally, then uploaded).
+    """
+    if not is_remote(location):
+        return OzxStore(location, mode=mode)
+    if mode != "r":
+        raise NgioValueError(
+            f"A remote OME-Zarr zip file is read-only; open {location} with "
+            "mode='r' (to write one, pack locally and upload with `to_ozx`)."
+        )
+    return remote_ozx_store(os.fspath(location))
 
 
 # ----------------------------------------------------------------------

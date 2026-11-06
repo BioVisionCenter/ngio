@@ -228,14 +228,18 @@ class ZarrGroupHandler:
         return self._store_facade
 
     @property
-    def held_store(self) -> NgioSupportedStore:
-        """Return the store object zarr holds for this group.
+    def reopen_source(self) -> StoreOrGroup:
+        """Return what to hand `open_group_wrapper` to open this group again.
 
-        Unlike `store`, not a facade: a plain local store comes back bare, as
-        `open_group_wrapper` handed it to zarr. Use it to open a second handler
-        on the same location without re-normalizing a path, which a
-        single-file store cannot serve twice and which would cost a reopen.
+        Not a facade and not a path: re-normalizing a path would open a second
+        store on the same location, which a single-file store cannot serve.
+        A root group comes back as the bare store zarr holds, which a new
+        handler reads fresh. A nested group has no store-only spelling (the
+        store carries no path), so it comes back as the group itself, which
+        the new handler treats as possibly stale.
         """
+        if self._group.path:
+            return self._group
         return cast("NgioSupportedStore", self._group.store)
 
     @property

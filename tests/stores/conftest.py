@@ -1,4 +1,6 @@
 # conftest.py
+import io
+import os
 import socket
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -12,6 +14,30 @@ class _NoListingHTTPHandler(SimpleHTTPRequestHandler):
     def list_directory(self, path):
         self.send_error(403, "Directory listing not allowed")
         return None
+
+    def send_head(self):
+        """Serve `Range: bytes=a-b` requests (206) so a zip can be read in place."""
+        rng = self.headers.get("Range")
+        path = self.translate_path(self.path)
+        if rng is None or not rng.startswith("bytes=") or not os.path.isfile(path):
+            return super().send_head()
+        size = os.path.getsize(path)
+        first, _, last = rng.removeprefix("bytes=").partition("-")
+        start = int(first) if first else max(size - int(last), 0)
+        end = min(int(last), size - 1) if last and first else size - 1
+        if start > end or start >= size:
+            self.send_error(416, "Requested range not satisfiable")
+            return None
+        with open(path, "rb") as f:
+            f.seek(start)
+            chunk = f.read(end - start + 1)
+        self.send_response(206)
+        self.send_header("Content-Type", self.guess_type(path))
+        self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        self.send_header("Content-Length", str(len(chunk)))
+        self.send_header("Accept-Ranges", "bytes")
+        self.end_headers()
+        return io.BytesIO(chunk)
 
     def log_message(self, format, *args):
         pass

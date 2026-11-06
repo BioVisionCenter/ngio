@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import uuid
 from typing import TYPE_CHECKING
 
+import fsspec
 import numpy as np
 import pytest
 from zarr.storage import MemoryStore
@@ -20,6 +22,7 @@ from ngio import (
 from ngio.utils import NgioFileExistsError, NgioValueError
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 SHAPE = (2, 4, 16, 16)
@@ -91,11 +94,32 @@ def test_v2_source_cannot_be_packed(tmp_path: Path) -> None:
     assert not (tmp_path / "v04.ozx").exists()
 
 
-def test_remote_ozx_target_is_refused(tmp_path: Path) -> None:
-    _image(tmp_path / "v05.zarr", version="0.5")
-    with pytest.raises(NgioValueError, match="local path"):
-        to_ozx(tmp_path / "v05.zarr", "s3://bucket/image.ozx")
-    assert not list(tmp_path.glob("s3:*"))
+@pytest.fixture
+def memory_url() -> Iterator[str]:
+    """A URL on fsspec's in-process `memory://` filesystem; removed afterwards."""
+    fs = fsspec.filesystem("memory")
+    name = f"remote-{uuid.uuid4().hex}"
+    yield f"memory://{name}/image.ozx"
+    fs.rm(f"/{name}", recursive=True)
+
+
+def test_remote_ozx_round_trip(tmp_path: Path, memory_url: str) -> None:
+    src = _image(tmp_path / "src.zarr")
+    assert to_ozx(tmp_path / "src.zarr", memory_url) == memory_url
+    assert check_ozx(memory_url).must == []
+
+    # read-only in place, over the (memory) filesystem
+    _same(src, open_ome_zarr_container(memory_url, mode="r"))
+    with pytest.raises(NgioValueError, match="read-only"):
+        open_ome_zarr_container(memory_url, mode="r+")
+
+    from_ozx(memory_url, tmp_path / "back.zarr")
+    _same(src, open_ome_zarr_container(tmp_path / "back.zarr", mode="r"))
+
+    with pytest.raises(NgioFileExistsError):
+        to_ozx(tmp_path / "src.zarr", memory_url)
+    from_memory(to_memory(tmp_path / "src.zarr"), memory_url, overwrite=True)
+    _same(src, open_ome_zarr_container(memory_url, mode="r"))
 
 
 def test_to_memory_from_live_store(tmp_path: Path) -> None:

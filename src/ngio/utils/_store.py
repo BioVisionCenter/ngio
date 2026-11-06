@@ -27,7 +27,7 @@ from zarr.storage._common import make_store
 from ngio.config import RetryConfig, get_config
 from ngio.utils import _retry
 from ngio.utils._errors import NgioValueError
-from ngio.utils._ozx import OZX_SUFFIX, OzxStore
+from ngio.utils._ozx import OZX_SUFFIX, OzxStore, open_ozx
 from ngio.utils._retry import (
     aretry_call,
     aretry_sharing_violation,
@@ -94,22 +94,19 @@ def _bypass_is_safe(store: Store) -> bool:
 
 def _as_ozx(
     store: object, mode: Literal["r", "r+", "w", "w-", "a"] | None
-) -> OzxStore | None:
-    """Route a `.ozx` path to an `OzxStore`, before zarr's `make_store`.
+) -> OzxStore | FsspecStore | None:
+    """Route a `.ozx` location to its store, before zarr's `make_store`.
 
-    zarr's `make_store` never yields a `ZipStore`: a `.ozx` path would become
-    a `LocalStore` and a directory of that name would be created.
+    zarr's `make_store` never yields a `ZipStore`: a local `.ozx` path would
+    become a `LocalStore` and a directory of that name would be created. A
+    URL opens read-only over range requests.
     """
     if not isinstance(store, str | Path):
         return None
     location = os.fspath(store)
     if not location.endswith(OZX_SUFFIX):
         return None
-    if "://" in location:
-        raise NgioValueError(
-            f"Remote OME-Zarr zip files are not supported yet ({location})."
-        )
-    return OzxStore(Path(location), mode=mode if mode is not None else "a")
+    return open_ozx(location, mode=mode if mode is not None else "a")
 
 
 def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:

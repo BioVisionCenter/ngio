@@ -1233,7 +1233,7 @@ def create_empty_plate(
     # single-file store (`.ozx`) cannot serve. The store, not the group: a
     # group argument costs the new handler a stale-attributes reopen.
     return open_ome_zarr_plate(
-        store=group_handler.held_store,
+        store=group_handler.reopen_source,
         cache=cache,
         mode="r+",
     )
@@ -1280,7 +1280,7 @@ def derive_ome_zarr_plate(
     # single-file store (`.ozx`) cannot serve. The store, not the group: a
     # group argument costs the new handler a stale-attributes reopen.
     return open_ome_zarr_plate(
-        store=group_handler.held_store,
+        store=group_handler.reopen_source,
         cache=cache,
         mode="r+",
     )
