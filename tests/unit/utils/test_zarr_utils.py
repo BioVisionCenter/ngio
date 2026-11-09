@@ -521,6 +521,25 @@ def test_copy_group_refuses_overlapping_groups_of_one_store(tmp_path: Path):
     np.testing.assert_array_equal(copied, [1, 1])
 
 
+def test_copy_keys_clear_removes_what_the_source_lacks(tmp_path: Path):
+    from zarr.storage import MemoryStore
+
+    from ngio.utils._zarr_utils import copy_keys
+
+    src = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    src.attrs.put({"from": "src"})
+    src.create_array("keep", shape=(2,), chunks=(2,), dtype="u1")[:] = 1
+    dest = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    dest.create_array("stale", shape=(2,), chunks=(2,), dtype="u1")[:] = 7
+    dest.create_group("obs").create_array("u", shape=(1,), chunks=(1,), dtype="u1")
+
+    copy_keys(src, dest)  # default: an overlay
+    assert sorted(dest.keys()) == ["keep", "obs", "stale"]
+    copy_keys(src, dest, clear=True)
+    assert sorted(dest.keys()) == ["keep"]
+    assert dest.attrs.asdict() == {"from": "src"}  # the root document survives
+
+
 def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     """The store-level copy fallback keeps sharded data byte-exact.
 

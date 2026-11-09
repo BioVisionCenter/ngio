@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import warnings
-from collections.abc import Awaitable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
@@ -29,7 +29,7 @@ from ngio.utils._errors import (
     NgioFileNotFoundError,
     NgioValueError,
 )
-from ngio.utils._ozx import OzxStore
+from ngio.utils._ozx import OzxStore, _record_sort_key
 from ngio.utils._store import NgioStore
 from ngio.utils._warnings import NgioUserWarning
 
@@ -771,7 +771,31 @@ def _refuse_overlapping_copy(src_group: zarr.Group, dest_group: zarr.Group) -> N
         )
 
 
-def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
+def _prefix_of(group: zarr.Group) -> str:
+    return f"{group.path}/" if group.path else ""
+
+
+def clear_keys(group: zarr.Group) -> None:
+    """Delete every key under `group` except its own metadata document."""
+    store, prefix = group.store, _prefix_of(group)
+
+    async def run() -> None:
+        keys = [
+            key
+            async for key in store.list_prefix(prefix)
+            if key[len(prefix) :] not in _ROOT_METADATA
+        ]
+        for k in range(0, len(keys), _COPY_BATCH):
+            await asyncio.gather(
+                *(store.delete(key) for key in keys[k : k + _COPY_BATCH])
+            )
+
+    sync(run())
+
+
+def copy_keys(
+    src_group: zarr.Group, dest_group: zarr.Group, *, clear: bool = False
+) -> None:
     """Copy every key under `src_group` into `dest_group`, byte for byte.
 
     Key level rather than node level: a zarr walk misses the files that table
@@ -779,17 +803,24 @@ def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
     chunks and shards exactly as written. The root metadata document is not
     copied: the destination keeps its own and takes the source's attributes
     through zarr, so consolidated metadata, which ngio neither writes nor
-    trusts, never travels.
+    trusts, never travels. Keys already in the destination and absent from
+    the source stay unless `clear` is set.
+
+    Into a zip archive the keys are written in RFC-9 order (root `zarr.json`,
+    the other `zarr.json` records breadth-first, then the rest), so the
+    physical layout matches the central directory `to_ozx` promises.
     """
     _refuse_overlapping_copy(src_group, dest_group)
     src_attrs = src_group.attrs.asdict()
     if dest_group.attrs.asdict() != src_attrs:
         dest_group.attrs.put(src_attrs)
+    if clear:
+        clear_keys(dest_group)
 
     src_store, dest_store = src_group.store, dest_group.store
-    src_prefix = f"{src_group.path}/" if src_group.path else ""
-    dest_prefix = f"{dest_group.path}/" if dest_group.path else ""
+    src_prefix, dest_prefix = _prefix_of(src_group), _prefix_of(dest_group)
     prototype = default_buffer_prototype()
+    ordered = NgioStore.ensure(dest_store).store_type == "zip"
 
     async def copy_one(key: str) -> None:
         rel = key[len(src_prefix) :]
@@ -799,30 +830,53 @@ def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
         if value is not None:
             await dest_store.set(dest_prefix + rel, value)
 
-    async def run() -> None:
+    async def run_batched(keys: AsyncIterator[str]) -> None:
         pending: list[Awaitable[None]] = []
-        async for key in src_store.list_prefix(src_prefix):
+        async for key in keys:
             pending.append(copy_one(key))
             if len(pending) >= _COPY_BATCH:
                 await asyncio.gather(*pending)
                 pending = []
         await asyncio.gather(*pending)
 
-    sync(run())
+    async def run_ordered() -> None:
+        keys = sorted(
+            [key async for key in src_store.list_prefix(src_prefix)],
+            key=lambda key: _record_sort_key(key[len(src_prefix) :]),
+        )
+        # `zarr.json` records one at a time: a batch lands in arbitrary order.
+        n_json = sum(
+            1 for key in keys if _record_sort_key(key[len(src_prefix) :])[0] == 0
+        )
+        for key in keys[:n_json]:
+            await copy_one(key)
+
+        async def rest() -> AsyncIterator[str]:
+            for key in keys[n_json:]:
+                yield key
+
+        await run_batched(rest())
+
+    sync(run_ordered() if ordered else run_batched(src_store.list_prefix(src_prefix)))
     # The copy ends on chunk writes, which a single-file store publishes only
     # when its directory is written.
     NgioStore.ensure(dest_store).flush()
 
 
 def copy_group(
-    src_group: zarr.Group, dest_group: zarr.Group, suppress_warnings: bool = False
+    src_group: zarr.Group,
+    dest_group: zarr.Group,
+    suppress_warnings: bool = False,
+    *,
+    clear: bool = False,
 ):
     """Copy a group and everything under it into `dest_group`.
 
     Through fsspec mappers when both sides are filesystems, otherwise key by
     key through the stores (`copy_keys`); both carry non-zarr files such as
-    parquet and csv tables. `suppress_warnings` is kept for callers; the copy
-    no longer warns.
+    parquet and csv tables. Keys already in the destination and absent from
+    the source stay unless `clear` is set. `suppress_warnings` is kept for
+    callers; the copy no longer warns.
     """
     if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
         raise NgioValueError(
@@ -840,9 +894,11 @@ def copy_group(
     dest_store = NgioStore.ensure(dest_group.store)
     fs_types = ("local", "fsspec")
     if src_store.store_type in fs_types and dest_store.store_type in fs_types:
+        if clear:
+            clear_keys(dest_group)
         _fsspec_copy(src_store, src_group.path, dest_store, dest_group.path)
         return
-    copy_keys(src_group, dest_group)
+    copy_keys(src_group, dest_group, clear=clear)
 
 
 def refresh_s3fs_config(config: NgioConfig) -> None:

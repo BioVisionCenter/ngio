@@ -107,7 +107,9 @@ class AnnDataBackend(AbstractTableBackend):
         scratch_store = MemoryStore()
         self._write_zarr(table, scratch_store)
         anndata_group = zarr.open_group(scratch_store, mode="r")
-        copy_group(anndata_group, self._group_handler._group)
+        # `clear`: anndata's own write is `mode="w"`, so a dropped column must
+        # not survive here either (in a zip it would be a live record forever).
+        copy_group(anndata_group, self._group_handler._group, clear=True)
 
     def _cleanup_after_write(self) -> None:
         """Clean up any temporary data after writing."""

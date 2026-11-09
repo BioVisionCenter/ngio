@@ -86,6 +86,25 @@ def test_overwrite_flag(tmp_path: Path) -> None:
     from_ozx(tmp_path / "p.ozx", tmp_path / "out.zarr", overwrite=True)
 
 
+def test_to_ozx_physical_order_is_breadth_first(tmp_path: Path) -> None:
+    import zipfile
+
+    from ngio.utils._ozx import _record_sort_key
+
+    _image(tmp_path / "src.zarr")
+    ozx = to_ozx(tmp_path / "src.zarr", tmp_path / "ordered.ozx")
+    with zipfile.ZipFile(ozx) as zf:
+        physical = [
+            i.filename for i in sorted(zf.infolist(), key=lambda i: i.header_offset)
+        ]
+        directory = zf.namelist()
+    n_json = sum(1 for n in physical if n.endswith("zarr.json"))
+    assert physical[:n_json] == directory[:n_json]
+    assert physical[:n_json] == sorted(physical[:n_json], key=_record_sort_key)
+    assert physical[0] == "zarr.json" and n_json > 3
+    assert not any(n.endswith("zarr.json") for n in physical[n_json:])
+
+
 def test_to_ozx_always_writes_an_archive(tmp_path: Path) -> None:
     import zipfile
 
