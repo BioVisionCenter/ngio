@@ -57,11 +57,6 @@ DEFAULT_OME_VERSION = "0.5"
 
 _ZIP_MODES: dict[str, str] = {"r": "r", "r+": "a", "a": "a", "w": "w", "w-": "x"}
 _META_NAME = "zarr.json"
-_ALLOWED_EXTRA_IDS = {
-    0x0001: "ZIP64",
-    0x5455: "extended timestamp",
-    0x7875: "Info-ZIP New Unix",
-}
 
 
 def _is_zarr_json(name: str) -> bool:
@@ -215,34 +210,17 @@ def _close_abandoned(zf: _OzxZipFile, path: Path) -> None:
 
 
 def _check_archive(zf: zipfile.ZipFile) -> None:
-    """Refuse an existing archive that violates an RFC-9 MUST we rely on."""
-    infos = zf.filelist
-    if not infos:
-        return
-    problems = []
-    compressed = [i.filename for i in infos if i.compress_type != zipfile.ZIP_STORED]
-    if compressed:
-        problems.append(
-            f"{len(compressed)} entries are compressed (e.g. {compressed[0]!r}); "
-            "all entries must use the STORE method"
-        )
-    encrypted = [i.filename for i in infos if i.flag_bits & 0x1]
+    """Refuse an existing archive `zipfile` cannot read.
+
+    Everything the RFC merely recommends against (compression, no ZIP64,
+    extra fields, prepended data) reads fine and is left to `check_ozx` to
+    report; ngio writes STORE entries into such an archive regardless.
+    """
+    encrypted = [i.filename for i in zf.filelist if i.flag_bits & 0x1]
     if encrypted:
-        problems.append(f"{len(encrypted)} entries are encrypted")
-    # The RFC bans data before the first local file header (prepended stubs).
-    # An obsolete header at offset 0 still satisfies that: the RFC allows
-    # headers the central directory no longer references, and rewriting the
-    # root `zarr.json` leaves exactly such a header behind.
-    fp = zf.fp
-    assert fp is not None
-    fp.seek(0)
-    if fp.read(4) != b"PK\x03\x04":
-        problems.append("no local file header at offset 0")
-    if problems:
         raise NgioValueError(
-            f"{zf.filename} is not an OME-Zarr zip file (RFC-9): "
-            + "; ".join(problems)
-            + ". Use `zarr.storage.ZipStore` directly for arbitrary zip archives."
+            f"{zf.filename} has {len(encrypted)} encrypted entries "
+            f"(e.g. {encrypted[0]!r}); ngio cannot read them."
         )
 
 
@@ -264,8 +242,7 @@ class OzxStore(ZipStore):
     Raises:
         NgioValueError: On a second writable store for the same archive in
             this process, on pickling a writable store, on IO after `close`,
-            and when an existing archive breaks an RFC-9 MUST (compression,
-            encryption, data before the first entry).
+            and on an existing archive with encrypted entries.
     """
 
     supports_deletes: bool = True
@@ -740,11 +717,16 @@ def check_ozx(path: str | Path) -> OzxReport:
     """Check an OME-Zarr zip file against the RFC-9 MUST and SHOULD rules.
 
     Reads only the end of the file and the central directory, so a URL costs
-    a few range requests, never the entries themselves. Mirrors the reference
-    checker shipped with the RFC.
+    a few range requests, never the entries themselves. `must` holds the RFC's
+    conditions (a root-level `zarr.json`, a single-part archive) and whatever
+    makes the file not a zip at all; `should` holds the RFC's RECOMMENDED list
+    plus observations about dead space and duplicate records.
 
     Args:
         path: A local path or a URL (`https://`, `s3://`, ...).
+
+    Returns:
+        An `OzxReport`; `conforming` is `True` when `must` is empty.
     """
     location = os.fspath(path)
     report = OzxReport(path=location)
@@ -761,23 +743,26 @@ def check_ozx(path: str | Path) -> OzxReport:
             tail[i : i + 22]
         )
         raw_comment = tail[i + 22 : i + 22 + comment_len]
+        end_pos = size - tail_len + i  # where the end record actually sits
         j = tail.rfind(b"PK\x06\x07", 0, i)
         report.zip64 = j >= 0
         if n_total == 0xFFFF or cd_size == 0xFFFFFFFF or cd_off == 0xFFFFFFFF:
-            _, _, rec_off, _ = _EOCD64_LOC.unpack(tail[j : j + 20])
-            f.seek(rec_off)
-            rec = f.read(56)
+            # Like `zipfile`, take the zip64 end record to sit right before
+            # its locator rather than trusting the locator's absolute offset.
+            end_pos = size - tail_len + j - 56
             (_, _, _, _, disk, cd_disk, _, n_total, cd_size, cd_off) = _EOCD64.unpack(
-                rec
+                tail[j - 56 : j]
             )
-        f.seek(cd_off)
+        # Offsets are relative to the archive start; data prepended to the
+        # file (a stub, a self-extractor) shifts everything by `concat`.
+        concat = end_pos - cd_size - cd_off
+        f.seek(cd_off + concat)
         cd = f.read(cd_size)
         f.seek(0)
         head = f.read(4)
 
     names: list[str] = []
     methods: set[int] = set()
-    extras: dict[int, str] = {}
     encrypted = multi_disk = False
     lowest = None
     pos = 0
@@ -804,8 +789,6 @@ def check_ozx(path: str | Path) -> OzxReport:
                 p = k + 4 + (8 if usize == 0xFFFFFFFF else 0)
                 p += 8 if csize == 0xFFFFFFFF else 0
                 off = struct.unpack_from("<Q", ex, p)[0]
-            if hid not in _ALLOWED_EXTRA_IDS:
-                extras.setdefault(hid, name)
             k += 4 + hsz
         names.append(name)
         methods.add(method)
@@ -817,23 +800,23 @@ def check_ozx(path: str | Path) -> OzxReport:
 
     if _META_NAME not in names:
         report.must.append("root-level zarr.json is missing")
-    if methods - {0}:
-        report.must.append(f"entries are not STORE (methods {sorted(methods - {0})})")
-    if encrypted:
-        report.must.append("encrypted entries")
-    for hid, name in extras.items():
-        report.must.append(f"disallowed extra field 0x{hid:04x} (first seen on {name})")
     if disk or cd_disk or multi_disk:
-        report.must.append("multi-volume archive")
+        report.must.append("archive is split into multiple parts")
+    if methods - {0}:
+        report.should.append(
+            f"entries are compressed (methods {sorted(methods - {0})}); the RFC "
+            "recommends STORE and Zarr-level codecs"
+        )
+    if encrypted:
+        report.should.append("encrypted entries (not readable by ngio)")
     if head != b"PK\x03\x04":
-        report.must.append("no local file header at offset 0")
+        report.should.append("data before the first local file header")
     elif lowest:
-        # Obsolete headers may stay behind after in-place modification; the
-        # RFC's reference checker reports this as a MUST violation because it
-        # only sees the central directory. `repack` removes them.
+        # Obsolete headers stay behind after in-place modification; the RFC
+        # allows them and `repack` removes them.
         report.should.append(
             f"{lowest} bytes of obsolete entries before the first live record "
-            "(the RFC reference checker flags this; repack() reclaims it)"
+            "(repack() reclaims it)"
         )
 
     if not report.zip64:

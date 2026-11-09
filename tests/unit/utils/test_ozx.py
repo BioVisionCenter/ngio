@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import pickle
+import struct
 import subprocess
 import sys
 import zipfile
@@ -190,15 +191,58 @@ class TestGuards:
         copy = pickle.loads(pickle.dumps(OzxStore(path, mode="r")))
         assert sync(copy.exists("zarr.json"))
 
-    def test_refuses_non_conformant_archive(self, tmp_path: Path) -> None:
-        path = tmp_path / "bad.ozx"
+    def test_reads_what_the_rfc_only_recommends_against(self, tmp_path: Path) -> None:
+        # Deflate entries, a foreign extra field (macOS `ditto` style) and
+        # bytes before the first local header are all SHOULD-level at most.
+        path = tmp_path / "odd.ozx"
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            zf.writestr("zarr.json", "{}")
-        with pytest.raises(NgioValueError, match="compressed"):
-            zarr.open_group(OzxStore(path, mode="r"), mode="r")
+            info = zipfile.ZipInfo("zarr.json")
+            info.extra = struct.pack("<HH", 0x5855, 4) + b"\0\0\0\0"
+            zf.writestr(info, b'{"attributes":{"ome":{"version":"0.5"}}}')
+            zf.writestr("0/c/0", b"x" * 64)
+        path.write_bytes(b"#!/bin/sh\n" + path.read_bytes())
+
+        report = check_ozx(path)
+        assert report.conforming, report
+        assert any("compressed" in s for s in report.should)
+        assert any("before the first local file header" in s for s in report.should)
+        assert not any("extra" in s for s in report.should)
+
+        with OzxStore(path, mode="r+") as store:  # reads, and appends STORE entries
+            root = zarr.open_group(store, mode="r+")
+            assert root.attrs["ome"] == {"version": "0.5"}
+            root.attrs["touched"] = True
+        with zipfile.ZipFile(path) as zf:
+            assert zf.testzip() is None
+            assert zf.getinfo("zarr.json").compress_type == zipfile.ZIP_STORED
+            assert zf.getinfo("0/c/0").compress_type == zipfile.ZIP_DEFLATED
+
+    def test_refuses_encrypted_entries(self, tmp_path: Path) -> None:
+        path = tmp_path / "enc.ozx"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
+            zf.writestr("zarr.json", b"{}")
+        # zipfile resets flag bits on write: flip the encryption bit in the
+        # central directory record by hand.
+        data = bytearray(path.read_bytes())
+        cd = data.rfind(b"PK\x01\x02")
+        data[cd + 8] |= 0x1
+        path.write_bytes(data)
+        with pytest.raises(NgioValueError, match="encrypted"):
+            OzxStore(path, mode="r")._sync_open()
+        report = check_ozx(path)
+        assert report.conforming and any("encrypted" in s for s in report.should)
+
+    def test_split_archive_is_a_must_violation(self, tmp_path: Path) -> None:
+        path = tmp_path / "split.ozx"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
+            zf.writestr("zarr.json", b"{}")
+        data = bytearray(path.read_bytes())
+        eocd = data.rfind(b"PK\x05\x06")
+        data[eocd + 4 : eocd + 6] = (1).to_bytes(2, "little")  # "this disk" = 1
+        path.write_bytes(data)
         report = check_ozx(path)
         assert not report.conforming
-        assert any("STORE" in m for m in report.must)
+        assert report.must == ["archive is split into multiple parts"]
 
     def test_gc_finalizes_unclosed_store(self, tmp_path: Path) -> None:
         path = tmp_path / "img.ozx"
