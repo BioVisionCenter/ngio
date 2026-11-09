@@ -506,6 +506,21 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
     assert "sub_array1" in dest_group["group1"]
 
 
+def test_copy_group_refuses_overlapping_groups_of_one_store(tmp_path: Path):
+    from ngio.utils._zarr_utils import copy_keys
+
+    root = zarr.open_group(LocalStore(tmp_path / "s.zarr"), mode="w", zarr_format=3)
+    a = root.create_group("labels/a")
+    a.create_array("0", shape=(2,), chunks=(2,), dtype="u1")[:] = 1
+    b = root.create_group("labels/b")
+    for src, dest in ((root, root), (root, a), (a, root), (a, a)):
+        with pytest.raises(NgioValueError, match="overlap"):
+            copy_keys(src, dest)
+    copy_keys(a, b)  # disjoint siblings are fine
+    copied = np.asarray(zarr.open_array(b.store, path="labels/b/0")[:])
+    np.testing.assert_array_equal(copied, [1, 1])
+
+
 def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     """The store-level copy fallback keeps sharded data byte-exact.
 

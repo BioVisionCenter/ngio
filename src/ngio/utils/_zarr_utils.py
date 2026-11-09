@@ -752,6 +752,21 @@ _ROOT_METADATA = frozenset({"zarr.json", ".zgroup", ".zattrs", ".zmetadata"})
 _COPY_BATCH = 32
 
 
+def _refuse_overlapping_copy(src_group: zarr.Group, dest_group: zarr.Group) -> None:
+    """Same store, one prefix inside the other: the copy would eat its source."""
+    src_key = NgioStore.ensure(src_group.store).location_key
+    dest_key = NgioStore.ensure(dest_group.store).location_key
+    if src_key is None or src_key != dest_key:
+        return
+    src_prefix = f"{src_group.path}/" if src_group.path else ""
+    dest_prefix = f"{dest_group.path}/" if dest_group.path else ""
+    if src_prefix.startswith(dest_prefix) or dest_prefix.startswith(src_prefix):
+        raise NgioValueError(
+            f"Cannot copy {src_group.path or '/'!r} into {dest_group.path or '/'!r} "
+            "of the same store: the groups overlap."
+        )
+
+
 def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
     """Copy every key under `src_group` into `dest_group`, byte for byte.
 
@@ -762,6 +777,7 @@ def copy_keys(src_group: zarr.Group, dest_group: zarr.Group) -> None:
     through zarr, so consolidated metadata, which ngio neither writes nor
     trusts, never travels.
     """
+    _refuse_overlapping_copy(src_group, dest_group)
     src_attrs = src_group.attrs.asdict()
     if dest_group.attrs.asdict() != src_attrs:
         dest_group.attrs.put(src_attrs)
@@ -815,6 +831,7 @@ def copy_group(
 
     if dest_group.read_only:
         raise NgioValueError("Destination group is read only, cannot copy.")
+    _refuse_overlapping_copy(src_group, dest_group)
     src_store = NgioStore.ensure(src_group.store)
     dest_store = NgioStore.ensure(dest_group.store)
     fs_types = ("local", "fsspec")

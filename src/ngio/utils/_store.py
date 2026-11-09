@@ -277,6 +277,26 @@ class NgioStore(WrapperStore[Store]):
             f"The store is not in-memory (store_type={self.store_type})."
         )
 
+    @property
+    def location_key(self) -> str | None:
+        """A key that is equal for two stores backed by the same data.
+
+        Store objects are not comparable by identity: zarr's read-only open
+        hands back a copy (`with_read_only`), and ngio wraps and unwraps.
+        Local and zip stores key on the resolved path, fsspec stores on the
+        full URL, memory stores on the identity of the backing dict. `None`
+        when the store cannot be placed.
+        """
+        store = self._store
+        if isinstance(store, LocalStore | ZipStore):
+            root = store.root if isinstance(store, LocalStore) else store.path
+            return os.fspath(Path(root).resolve())
+        if isinstance(store, FsspecStore):
+            return store.fs.unstrip_protocol(store.path).rstrip("/")
+        if isinstance(store, MemoryStore):
+            return f"memory:{id(store._store_dict)}"
+        return None
+
     def full_url(self, path: str = "") -> str | None:
         """Return the full URL/path of `path` inside the store.
 

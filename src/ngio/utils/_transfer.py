@@ -14,10 +14,13 @@ from pathlib import Path
 from typing import cast
 
 import fsspec
+import zarr
+from zarr.abc.store import Store
 from zarr.storage import MemoryStore
 
-from ngio.utils._errors import NgioFileExistsError
+from ngio.utils._errors import NgioFileExistsError, NgioValueError
 from ngio.utils._ozx import OZX_SUFFIX, OzxStore, is_remote, live_writer, open_ozx
+from ngio.utils._store import NgioStore
 from ngio.utils._zarr_utils import (
     AccessModeLiteral,
     StoreOrGroup,
@@ -41,8 +44,36 @@ def _upload_ozx(src: StoreOrGroup, url: str, *, overwrite: bool) -> None:
         fs.put_file(os.fspath(local), remote_path)
 
 
+def _location_key(target: object) -> str | None:
+    """`NgioStore.location_key` for a store, a group or a path/URL argument."""
+    if isinstance(target, zarr.Group):
+        target = target.store
+    if isinstance(target, str | Path):
+        if is_remote(target):
+            return os.fspath(target).rstrip("/")
+        return os.fspath(Path(target).resolve())
+    if isinstance(target, NgioStore | Store):
+        return NgioStore.ensure(target).location_key
+    return None
+
+
+def _refuse_same_location(src_group: zarr.Group, dst: StoreOrGroup) -> None:
+    """Opening the destination with `mode="w"` clears it: never the source."""
+    src_key, dst_key = _location_key(src_group), _location_key(dst)
+    if src_key is not None and src_key == dst_key:
+        raise NgioValueError(
+            "The source and the destination of the copy are the same location "
+            f"({dst_key}); copying would clear the source first. Copy into a "
+            "new file, or `OzxStore.repack()` to reclaim dead space in an archive."
+        )
+
+
 def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) -> None:
     mode: AccessModeLiteral = "w" if overwrite else "w-"
+    # Open the source before anything touches the destination: `mode="w"`
+    # clears it, and a `.ozx` destination truncates the file as it opens.
+    src_group = open_group_wrapper(src, mode="r")
+    _refuse_same_location(src_group, dst)
     # A `.ozx` path becomes a store this function opens and therefore closes;
     # a store object, or the live writer of an archive already open in this
     # process, stays the caller's to close.
@@ -57,7 +88,6 @@ def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) ->
         else:
             dst = open_ozx(location, mode=mode)
     try:
-        src_group = open_group_wrapper(src, mode="r")
         dst_group = open_group_wrapper(
             owned if owned is not None else dst,
             mode=mode,

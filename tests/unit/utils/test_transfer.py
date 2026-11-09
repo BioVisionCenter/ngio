@@ -173,6 +173,44 @@ def test_repack_into_an_archive_held_open_by_path(tmp_path: Path) -> None:
     assert check_ozx(tmp_path / "held.ozx").must == []
 
 
+def test_copy_onto_itself_is_refused_before_anything_is_cleared(
+    tmp_path: Path,
+) -> None:
+    import gc
+
+    path = tmp_path / "self.ozx"
+    held = _image(path)  # live writer in this process
+    expected = held.get_image().get_array()
+    with pytest.raises(NgioValueError, match="same location"):
+        to_ozx(path, path, overwrite=True)
+    with pytest.raises(NgioValueError, match="same location"):
+        to_ozx(held.get_image().zarr_array.store, path, overwrite=True)
+    assert held.list_labels() == ["seg"]  # the caller's container still works
+    np.testing.assert_array_equal(held.get_image().get_array(), expected)
+    del held
+    gc.collect()
+
+    # No live writer: a second handle would truncate the file as it opens.
+    with pytest.raises(NgioValueError, match="same location"):
+        to_ozx(path, path, overwrite=True)
+    with pytest.raises(NgioValueError, match="same location"):
+        to_ozx(str(path), tmp_path / "x" / ".." / "self.ozx", overwrite=True)
+    assert check_ozx(path).must == []
+    np.testing.assert_array_equal(
+        open_ome_zarr_container(path, mode="r").get_image().get_array(), expected
+    )
+
+    # Directories and memory stores: same guard.
+    img_dir = _image(tmp_path / "d.zarr")
+    with pytest.raises(NgioValueError, match="same location"):
+        to_ozx(tmp_path / "d.zarr", tmp_path / "d.zarr", overwrite=True)
+    assert img_dir.list_labels() == ["seg"]
+    mem = to_memory(path)
+    with pytest.raises(NgioValueError, match="same location"):
+        from_memory(mem, mem, overwrite=True)
+    _same(open_ome_zarr_container(mem), open_ome_zarr_container(path, mode="r"))
+
+
 def test_to_memory_from_live_store(tmp_path: Path) -> None:
     from ngio import OzxStore
 
