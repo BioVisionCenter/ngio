@@ -447,6 +447,24 @@ class TestStore:
                     assert zf.read(f"0/c/{tid}/{k}") == bytes([tid, k])
         _assert_conforming(path)
 
+    def test_relative_path_survives_chdir(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from ngio.utils._ozx import live_writer
+
+        monkeypatch.chdir(tmp_path)
+        store = OzxStore("rel.ozx", mode="w")
+        root = zarr.open_group(store, mode="w", zarr_format=3)
+        root.attrs["ome"] = {"version": "0.5"}
+        assert live_writer(tmp_path / "rel.ozx") is store
+        elsewhere = tmp_path / "elsewhere"
+        elsewhere.mkdir()
+        monkeypatch.chdir(elsewhere)
+        store.close()
+        assert live_writer(tmp_path / "rel.ozx") is None
+        with OzxStore(tmp_path / "rel.ozx", mode="w") as again:  # slot released
+            zarr.open_group(again, mode="w", zarr_format=3)
+
     def test_dedupes_archive_from_stock_zipstore(self, tmp_path: Path) -> None:
         path = tmp_path / "legacy.ozx"
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:

@@ -182,7 +182,7 @@ def _registry_key(path: Path) -> str:
 
 
 def _register_writable(store: OzxStore) -> None:
-    key = _registry_key(store.path)
+    key = store._registry_key
     with _registry_lock:
         other = _open_writable.get(key)
         if other is not None and other is not store:
@@ -197,7 +197,7 @@ def _register_writable(store: OzxStore) -> None:
 
 
 def _unregister_writable(store: OzxStore) -> None:
-    key = _registry_key(store.path)
+    key = store._registry_key
     with _registry_lock:
         if _open_writable.get(key) is store:
             del _open_writable[key]
@@ -292,6 +292,7 @@ class OzxStore(ZipStore):
     _closed: bool
     _view_of: OzxStore | None
     _finalizer: weakref.finalize | None
+    _registry_key: str
 
     def __init__(self, path: Path | str, *, mode: OzxAccessMode = "r") -> None:
         if mode not in _ZIP_MODES:
@@ -317,6 +318,9 @@ class OzxStore(ZipStore):
         self._closed = False
         self._view_of = None
         self._finalizer = None
+        # Resolved once: a relative path plus `os.chdir` between open and
+        # close must still register and unregister the same archive.
+        self._registry_key = _registry_key(path)
 
     # ------------------------------------------------------------------
     # Lifecycle
