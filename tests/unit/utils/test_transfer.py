@@ -87,6 +87,36 @@ def test_overwrite_flag(tmp_path: Path) -> None:
     from_ozx(tmp_path / "p.ozx", tmp_path / "out.zarr", overwrite=True)
 
 
+def test_to_ozx_always_writes_an_archive(tmp_path: Path) -> None:
+    import zipfile
+
+    from ngio import OzxStore
+    from ngio.utils import NgioUserWarning
+
+    src = _image(tmp_path / "src.zarr")
+    for name in ("out.zip", "out_noext"):
+        with pytest.warns(NgioUserWarning, match="should end with '.ozx'"):
+            out = to_ozx(tmp_path / "src.zarr", tmp_path / name)
+        assert (tmp_path / name).is_file() and zipfile.is_zipfile(out)
+        report = check_ozx(out)
+        assert report.conforming
+        assert any("does not end with .ozx" in s for s in report.should)
+        # Path routing goes by suffix, so such a file is opened via the store.
+        with OzxStore(out, mode="r") as store:
+            _same(src, open_ome_zarr_container(store, mode="r"))
+
+
+def test_from_ozx_on_a_directory_is_refused(tmp_path: Path) -> None:
+    _image(tmp_path / "src.zarr")
+    with pytest.raises(NgioValueError, match="is a directory"):
+        from_ozx(tmp_path / "src.zarr", tmp_path / "out.zarr")
+    assert not (tmp_path / "out.zarr").exists()
+    from ngio import OzxStore
+
+    with pytest.raises(NgioValueError, match="is a directory"):
+        OzxStore(tmp_path / "src.zarr", mode="r")._sync_open()
+
+
 def test_v2_source_cannot_be_packed(tmp_path: Path) -> None:
     _image(tmp_path / "v04.zarr", version="0.4")
     with pytest.raises(NgioValueError, match="Zarr v2"):

@@ -40,7 +40,7 @@ def _upload_ozx(src: StoreOrGroup, url: str, *, overwrite: bool) -> None:
         raise NgioFileExistsError(f"{url} already exists; pass overwrite=True.")
     with tempfile.TemporaryDirectory() as tmp:
         local = Path(tmp) / Path(remote_path).name
-        _copy_hierarchy(src, local, overwrite=True)
+        _copy_hierarchy(src, local, overwrite=True, archive=True)
         fs.put_file(os.fspath(local), remote_path)
 
 
@@ -68,8 +68,26 @@ def _refuse_same_location(src_group: zarr.Group, dst: StoreOrGroup) -> None:
         )
 
 
-def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) -> None:
+def _copy_hierarchy(
+    src: StoreOrGroup,
+    dst: StoreOrGroup,
+    *,
+    overwrite: bool,
+    archive: bool | None = None,
+) -> None:
+    """Copy `src` into `dst`; `archive` forces (or forbids) a zip destination.
+
+    `None` decides by the `.ozx` suffix, which is how a path argument is routed
+    everywhere else in ngio. `to_ozx` passes `True`: its destination is an
+    archive whatever the name, so a `.zip` target never becomes a directory.
+    """
     mode: AccessModeLiteral = "w" if overwrite else "w-"
+    if archive is None:
+        archive = _is_ozx_location(dst)
+    elif archive and not isinstance(dst, str | Path):
+        raise NgioValueError(
+            f"An OME-Zarr zip file is written to a path or URL, got {type(dst)}."
+        )
     # Open the source before anything touches the destination: `mode="w"`
     # clears it, and a `.ozx` destination truncates the file as it opens.
     src_group = open_group_wrapper(src, mode="r")
@@ -78,7 +96,7 @@ def _copy_hierarchy(src: StoreOrGroup, dst: StoreOrGroup, *, overwrite: bool) ->
     # a store object, or the live writer of an archive already open in this
     # process, stays the caller's to close.
     owned: OzxStore | None = None
-    if _is_ozx_location(dst):
+    if archive:
         location = cast("str | Path", dst)
         if is_remote(location):
             _upload_ozx(src, os.fspath(location), overwrite=overwrite)
@@ -132,7 +150,9 @@ def to_ozx(
     The archive is written once, closed and conformant on return: no dead
     space, `zarr.json` records first, archive comment set. The source must be
     OME-Zarr 0.5 (Zarr v3); RFC-9 has no Zarr v2 form. A URL target is packed
-    into a local temporary file and uploaded.
+    into a local temporary file and uploaded. The file is an archive whatever
+    its name; a name not ending in `.ozx` warns, as the RFC recommends the
+    suffix.
 
     Args:
         src: The hierarchy to pack (path, store or group).
@@ -142,7 +162,7 @@ def to_ozx(
     Returns:
         The archive location: a `Path` for a local file, the URL otherwise.
     """
-    _copy_hierarchy(src, path, overwrite=overwrite)
+    _copy_hierarchy(src, path, overwrite=overwrite, archive=True)
     return path if is_remote(path) else Path(path)
 
 

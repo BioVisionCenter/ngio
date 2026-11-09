@@ -220,6 +220,11 @@ def _check_path(path: Path, mode: OzxAccessMode) -> None:
     directory) and fail on a missing parent directory for every writing mode
     (a `LocalStore` creates parents).
     """
+    if path.is_dir():
+        raise NgioValueError(
+            f"{path} is a directory, not an OME-Zarr zip file; pass it as a "
+            "plain store path instead."
+        )
     if mode in ("r", "r+") and not path.exists():
         raise NgioFileNotFoundError(
             f"No OME-Zarr zip file at {path}; open with mode='a' or 'w' to create one."
