@@ -12,6 +12,7 @@ from ngio.config._config import (
     S3FSConfig,
     ZarrConfig,
     get_config,
+    set_config,
 )
 
 __all__ = [
@@ -26,4 +27,5 @@ __all__ = [
     "S3FSConfig",
     "ZarrConfig",
     "get_config",
+    "set_config",
 ]

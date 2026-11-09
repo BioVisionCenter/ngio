@@ -969,10 +969,11 @@ def apply_zarr_config(config: NgioConfig) -> None:
 
     This runs at import of `ngio.utils._zarr_utils` because
     `threading.max_workers` is snapshotted by zarr into a process-global
-    executor at the first zarr operation — import time is the only moment
-    ngio can guarantee is early enough. `async.concurrency` is read by zarr
-    on every call, so re-applying after mutating `get_config().zarr` also
-    works for that field (as does `zarr.config.set` directly).
+    executor at the first zarr operation — import time, or a `set_config`
+    call made before that, is the only moment early enough.
+    `async.concurrency` is read by zarr on every call, so re-applying after
+    mutating `get_config().zarr` also works for that field (as does
+    `zarr.config.set` directly).
     """
     values: dict[str, int] = {}
     if config.zarr.async_concurrency is not None:

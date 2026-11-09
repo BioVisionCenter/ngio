@@ -272,3 +272,116 @@ def test_zarr_config_from_json(monkeypatch, tmp_path):
     config = NgioConfig.model_validate(_load_config_data())
     assert config.zarr.async_concurrency == 64
     assert config.zarr.threading_max_workers is None
+
+
+@pytest.fixture
+def restore_config():
+    """Put back the config object that was installed, and zarr's runtime config.
+
+    `set_config(saved)` also re-applies the s3fs handler and the zarr section,
+    so nothing is reloaded from disk and the developer's own config file never
+    leaks into later tests.
+    """
+    import zarr
+
+    from ngio.config import set_config
+
+    saved_config = get_config()
+    saved_zarr = {"async.concurrency": zarr.config.get("async.concurrency")}
+    yield
+    zarr.config.set(saved_zarr)
+    set_config(saved_config)
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_replaces_the_singleton():
+    from ngio.config import set_config
+
+    config = NgioConfig(io_retry=RetryConfig(max_retries=4))
+    set_config(config)
+    assert get_config() is config
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_rejects_non_config():
+    from ngio.config import set_config
+
+    before = get_config()
+    with pytest.raises(NgioValidationError, match="expects an NgioConfig"):
+        set_config({"io_retry": {"max_retries": 3}})
+    with pytest.raises(NgioValidationError, match="expects an NgioConfig"):
+        set_config(RetryConfig(max_retries=3))
+    # The bad argument never became the singleton.
+    assert get_config() is before
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_discards_the_config_file(monkeypatch, tmp_path):
+    import zarr
+
+    from ngio.config import set_config
+    from ngio.config._config import _reset_config
+    from ngio.utils._zarr_utils import apply_zarr_config
+
+    path = tmp_path / "cfg.json"
+    path.write_text(
+        '{"io_retry": {"max_retries": 7}, "dask": {"write_block_max_bytes": 1}, '
+        '"zarr": {"async_concurrency": 64}}'
+    )
+    monkeypatch.setenv(_ENV_VAR, str(path))
+    _reset_config()
+    assert get_config().io_retry.max_retries == 7
+    apply_zarr_config(get_config())  # what `import ngio` does with the file
+
+    set_config(NgioConfig())
+    assert get_config().io_retry.max_retries == 0
+    assert get_config().dask == DaskConfig()
+    # Documented limit: a `None` zarr field leaves zarr as found, so the value
+    # the file forwarded earlier survives the replacement.
+    assert get_config().zarr.async_concurrency is None
+    assert zarr.config.get("async.concurrency") == 64
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_applies_s3fs_retry_markers():
+    s3fs = pytest.importorskip("s3fs")
+    if not hasattr(s3fs, "set_custom_error_handler"):
+        pytest.skip("s3fs predates set_custom_error_handler")
+    from ngio.config import set_config
+
+    original = s3fs.core.CUSTOM_ERROR_HANDLER
+    try:
+        set_config(NgioConfig(s3fs=S3FSConfig(custom_retry_markers=["Skewed"])))
+
+        handler = s3fs.core.CUSTOM_ERROR_HANDLER
+        assert handler is not original
+        assert handler(RuntimeError("RequestTimeTooSkewed")) is True
+        assert handler(RuntimeError("NoSuchKey")) is False
+    finally:
+        s3fs.set_custom_error_handler(original)
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_applies_zarr_config():
+    import zarr
+
+    from ngio.config import ZarrConfig, set_config
+
+    set_config(NgioConfig(zarr=ZarrConfig(async_concurrency=42)))
+    assert zarr.config.get("async.concurrency") == 42
+
+
+@pytest.mark.usefixtures("restore_config")
+def test_set_config_warns_on_retry_all_errors():
+    from ngio.config import set_config
+
+    with pytest.warns(NgioUserWarning, match="retry_all_errors"):
+        set_config(NgioConfig(io_retry=RetryConfig(retry_all_errors=True)))
+
+
+def test_set_config_exported_at_top_level():
+    import ngio
+    from ngio.config import set_config
+
+    assert ngio.set_config is set_config
+    assert "set_config" in ngio.__all__
