@@ -56,8 +56,9 @@ joins the live session (read-only if you asked for `mode="r"`), and `overwrite=T
 empties it in place. Create, then reopen by path, keeps working as it does for a
 directory.
 
-Overwritten entries leave their old bytes behind. `check_ozx` reports the state of an
-archive against the RFC:
+Overwritten entries leave their old bytes behind: that is the "obsolete entries" notice
+in the report below, and `repack` (further down) is the remedy. `check_ozx` reports the
+state of an archive against the RFC:
 
 ```python exec="true" source="material-block" session="ozx"
 --8<-- "docs/snippets/getting_started/ome_zarr_zip.py:check"
@@ -75,15 +76,24 @@ still hold, so open it first or on a file of its own.
 --8<-- "docs/snippets/getting_started/ome_zarr_zip.py:session"
 ```
 
-After the block, every container opened inside it is closed with the store. A second
-explicit writer on the same archive raises, and so does pickling a writable store, so
-an `.ozx` cannot be the target of a dask cluster. For parallel writes work on a
-directory or in memory and pack at the end (below).
+After the block, every container opened inside it is closed with the store. Inside it,
+`store.flush()` publishes what has been written so far to readers with their own
+handle; ngio calls it at the end of every write verb, so you only need it around raw
+zarr writes. A second explicit writer on the same archive raises, and so does pickling a
+writable store, so an `.ozx` cannot be the target of a dask cluster. For parallel writes
+work on a directory or in memory and pack at the end (below).
+
+!!! tip "Shard when the archive is the destination"
+    The RFC recommends the sharding codec for zip files: with one entry per chunk a
+    large image means a central directory of tens of thousands of records, which every
+    reader parses before the first byte of data. Pass `shards=` to the creation
+    functions when an `.ozx` is the target.
 
 ### Reclaim dead space
 
-Rewriting an entry appends the new version and abandons the old bytes. `repack` rewrites
-the archive with only its live entries:
+Rewriting an entry appends the new version and abandons the old bytes, so editing the
+pixels of an existing level grows the file by the rewritten size until the next
+`repack`, which rewrites the archive with only its live entries:
 
 ```python exec="true" source="material-block" session="ozx"
 --8<-- "docs/snippets/getting_started/ome_zarr_zip.py:repack"
@@ -94,7 +104,11 @@ the archive with only its live entries:
 `to_memory`, `from_memory`, `to_ozx` and `from_ozx` copy a whole hierarchy between
 stores, tables included. This is the explicit extract, modify, repack workflow the RFC
 recommends for workloads that are a poor fit for in-place editing: load the archive into
-RAM, work on it with any store-agnostic code, and write it back in one pass.
+RAM, work on it with any store-agnostic code, and write it back in one pass. `to_memory`
+holds every level and every table in RAM, and for a URL it downloads the whole archive
+first. A derive followed by a full pyramid build is cheaper on a directory or in memory
+than in place, since every rewritten level stays in the file until `repack`; build it
+there and `to_ozx` at the end.
 
 ```python exec="true" source="material-block" session="ozx"
 --8<-- "docs/snippets/getting_started/ome_zarr_zip.py:transfer"

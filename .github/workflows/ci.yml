@@ -131,7 +131,7 @@ jobs:
         # alongside the floors. That excludes 21 of 441 test functions, all of
         # them exercising s3fs/aiomoto rather than a declared runtime floor.
         run: |
-          pytest tests/unit -n 4 --durations=10 \
+          pytest tests/unit -n 4 --durations=10 -m "not network" \
             --ignore=tests/unit/utils/test_s3fs_config.py
 
   setup:
@@ -194,7 +194,7 @@ jobs:
             ${{ runner.os }}-data-
 
       - name: 🧪 Run Tests
-        run: pixi run -e ${{ matrix.environment }} pytest -n 4 --durations=10 ${{ matrix.platform == 'ubuntu-latest' && matrix.environment == 'test11' && '--cov=ngio --cov-report=xml' || '' }}
+        run: pixi run -e ${{ matrix.environment }} pytest -n 4 --durations=10 -m "not network" ${{ matrix.platform == 'ubuntu-latest' && matrix.environment == 'test11' && '--cov=ngio --cov-report=xml' || '' }}
 
       # If something goes wrong with scheduled tests, open an issue in the repo
       - name: 📝 Report Failures

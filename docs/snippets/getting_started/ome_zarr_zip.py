@@ -59,6 +59,8 @@ with OzxStore(session_path, mode="w") as store:
         store, array, pixelsize=0.325, axes_names="czyx", ngff_version="0.5"
     )
     ome_zarr.derive_label("cells").set_array(np.zeros(array.shape[1:], "uint8"))
+    # Editing pixels appends the new chunks; the first version is dead space now.
+    ome_zarr.get_image().set_array(array // 2)
     print(store)
 # --8<-- [end:session]
 

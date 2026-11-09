@@ -265,8 +265,9 @@ class NgioStore(WrapperStore[Store]):
     def memory_dict(self) -> MutableMapping[str, Any]:
         """Return the backing dict of an in-memory store.
 
-        The table backends stash non-Buffer values (e.g. raw pyarrow tables)
-        in this mapping, hence the `Any` value type.
+        Every ngio write stores zarr `Buffer`s; the mapping is typed `Any`
+        because a caller-supplied dict (`open_ome_zarr_container({})`) may
+        hold anything.
 
         Raises:
             NgioValueError: If the store is not in-memory.

@@ -112,14 +112,14 @@ def open_group_wrapper(
     per metadata read remotely.
 
     Args:
-        store (StoreOrGroup): The store or group to open.
-        mode (AccessModeLiteral): The mode to open the group in.
-        zarr_format (int): The Zarr format version to use.
-        attributes (dict | None): Attributes for a group created by this call,
-            written together with the group so its document is written once.
+        store: The store or group to open.
+        mode: The mode to open the group in.
+        zarr_format: The Zarr format version to use.
+        attributes: Attributes for a group created by this call, written
+            together with the group so its document is written once.
 
     Returns:
-        zarr.Group: The opened Zarr group.
+        The opened Zarr group.
     """
     if isinstance(store, zarr.Group):
         return _check_group(store, mode)
