@@ -387,6 +387,66 @@ class TestStore:
             assert rd.read("1/c/0") == b"y"
         assert check_ozx(path).conforming
 
+    def test_zip64_archive_is_read_edited_and_kept_zip64(self, tmp_path: Path) -> None:
+        # More than 65535 entries forces the zip64 end records (~1 s to write).
+        path = tmp_path / "big.ozx"
+        meta = b'{"attributes":{"ome":{"version":"0.5"}}}'
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
+            zf.writestr("zarr.json", meta)
+            for k in range(65_540):
+                zf.writestr(f"0/c/{k}", b"x")
+        report = check_ozx(path)
+        assert report.zip64 and report.conforming and report.entries == 65_541
+
+        proto = default_buffer_prototype()
+        with OzxStore(path, mode="r+") as store:
+            buf = sync(store.get("0/c/65539", proto))
+            assert buf is not None and buf.to_bytes() == b"x"
+            sync(store.set("0/c/new", proto.buffer.from_bytes(b"y")))
+            sync(store.delete("0/c/0"))
+        report = check_ozx(path)
+        assert report.zip64 and report.conforming and report.json_first
+        assert report.entries == 65_541  # one added, one removed
+        with zipfile.ZipFile(path) as zf:
+            assert zf.testzip() is None
+            assert zf.read("0/c/new") == b"y"
+            assert "0/c/0" not in zf.NameToInfo
+
+    def test_threaded_writers_share_one_store(self, tmp_path: Path) -> None:
+        import threading
+
+        path = tmp_path / "threads.ozx"
+        proto = default_buffer_prototype()
+        n_threads, n_keys = 8, 40
+
+        def work(tid: int) -> None:
+            for k in range(n_keys):
+                sync(
+                    store.set(
+                        f"0/c/{tid}/{k}", proto.buffer.from_bytes(bytes([tid, k]))
+                    )
+                )
+                if k % 10 == 0:
+                    store.flush()
+
+        with OzxStore(path, mode="w") as store:
+            root = zarr.open_group(store, mode="w", zarr_format=3)
+            root.attrs["ome"] = {"version": "0.5"}
+            threads = [
+                threading.Thread(target=work, args=(t,)) for t in range(n_threads)
+            ]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        names = _names(path)
+        assert len(names) == n_threads * n_keys + 1
+        with zipfile.ZipFile(path) as zf:
+            for tid in range(n_threads):
+                for k in range(n_keys):
+                    assert zf.read(f"0/c/{tid}/{k}") == bytes([tid, k])
+        _assert_conforming(path)
+
     def test_dedupes_archive_from_stock_zipstore(self, tmp_path: Path) -> None:
         path = tmp_path / "legacy.ozx"
         with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:

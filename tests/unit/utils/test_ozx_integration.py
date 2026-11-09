@@ -246,6 +246,23 @@ class TestPathRouting:
         assert fresh.list_labels() == []
         _assert_conforming(path)
 
+    def test_read_only_view_refuses_writes(self, tmp_path: Path) -> None:
+        path = tmp_path / "img.ozx"
+        writer = _create(path)
+        writer.get_image().set_array(np.ones(SHAPE, dtype=np.uint8))
+        view = open_ome_zarr_container(path, mode="r")  # joins the live session
+        with pytest.raises(ValueError, match="read-only"):
+            view.get_image().set_array(np.zeros(SHAPE, dtype=np.uint8))
+        with pytest.raises(NgioValueError, match="read only"):
+            view.set_channel_labels(["x", "y"])
+        # Nothing reached the archive; the writer is unaffected.
+        assert int(view.get_image().get_array().min()) == 1
+        writer.set_channel_labels(["a", "b"])
+        assert view.get_image().channel_labels == ["a", "b"]
+        del writer, view
+        gc.collect()
+        _assert_conforming(path)
+
     def test_missing_file_semantics_follow_zarr_paths(self, tmp_path: Path) -> None:
         from ngio.utils import NgioFileExistsError, NgioFileNotFoundError
 

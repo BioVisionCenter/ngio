@@ -10,7 +10,7 @@ import fsspec
 import pytest
 from utils import check_ome_zarr, create_sample_ome_zarr, derive_image
 
-from ngio import check_ozx, open_ome_zarr_container
+from ngio import check_ozx, open_ome_zarr_container, to_ozx
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -68,3 +68,19 @@ def test_remote_ozx_tables(tmp_path: Path, memory_url: str) -> None:
     fsspec.filesystem("memory").put_file(str(path), memory_url.removeprefix("memory:/"))
     remote = open_ome_zarr_container(memory_url, mode="r")
     check_ome_zarr(remote, supported_backends=ALL_BACKENDS)
+
+
+def test_to_ozx_uploads_to_s3(tmp_path: Path, moto_s3_server: dict) -> None:
+    """`to_ozx(src, "s3://...")` packs locally and uploads; the URL reads back."""
+    src = tmp_path / "sample.zarr"
+    create_sample_ome_zarr(
+        store=src, supported_backends=ALL_BACKENDS, ngff_version="0.5"
+    )
+    url = f"s3://{moto_s3_server['bucket_name']}/packed-{uuid.uuid4().hex}.ozx"
+    assert to_ozx(src, url) == url
+    assert check_ozx(url).must == []
+    remote = open_ome_zarr_container(url, mode="r")
+    check_ome_zarr(remote, supported_backends=ALL_BACKENDS)
+    with pytest.raises(Exception, match="already exists"):
+        to_ozx(src, url)
+    to_ozx(src, url, overwrite=True)
