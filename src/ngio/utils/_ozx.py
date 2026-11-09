@@ -37,7 +37,11 @@ from zarr.core.buffer import Buffer
 from zarr.core.sync import sync
 from zarr.storage import ZipStore
 
-from ngio.utils._errors import NgioValueError
+from ngio.utils._errors import (
+    NgioFileExistsError,
+    NgioFileNotFoundError,
+    NgioValueError,
+)
 from ngio.utils._warnings import NgioUserWarning
 
 if TYPE_CHECKING:
@@ -209,6 +213,25 @@ def _close_abandoned(zf: _OzxZipFile, path: Path) -> None:
     logger.debug(f"Finalized the OME-Zarr zip file {path} on garbage collection.")
 
 
+def _check_path(path: Path, mode: OzxAccessMode) -> None:
+    """Apply ngio's mode semantics to the file before `zipfile` touches it.
+
+    `zipfile` would create a file for `r+` (ngio: must exist, like a `.zarr`
+    directory) and fail on a missing parent directory for every writing mode
+    (a `LocalStore` creates parents).
+    """
+    if mode in ("r", "r+") and not path.exists():
+        raise NgioFileNotFoundError(
+            f"No OME-Zarr zip file at {path}; open with mode='a' or 'w' to create one."
+        )
+    if mode == "w-" and path.exists():
+        raise NgioFileExistsError(
+            f"{path} already exists, consider setting overwrite=True."
+        )
+    if mode != "r":
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+
 def _check_archive(zf: zipfile.ZipFile) -> None:
     """Refuse an existing archive `zipfile` cannot read.
 
@@ -216,6 +239,13 @@ def _check_archive(zf: zipfile.ZipFile) -> None:
     extra fields, prepended data) reads fine and is left to `check_ozx` to
     report; ngio writes STORE entries into such an archive regardless.
     """
+    if not zf.filelist and zf.start_dir != 0:
+        # Append mode on a file that is not a zip: `zipfile` would write an
+        # archive after the existing content, and only `start_dir` tells.
+        raise NgioValueError(
+            f"{zf.filename} is not a zip file ({zf.start_dir} bytes of other "
+            "content); refusing to append an archive to it."
+        )
     encrypted = [i.filename for i in zf.filelist if i.flag_bits & 0x1]
     if encrypted:
         raise NgioValueError(
@@ -227,8 +257,9 @@ def _check_archive(zf: zipfile.ZipFile) -> None:
 class OzxStore(ZipStore):
     """A zarr store for an OME-Zarr zip file (`.ozx`, RFC-9).
 
-    Modes follow ngio's: `"r"` read-only, `"r+"`/`"a"` append to an existing
-    archive (created if missing), `"w"` truncate, `"w-"` create or fail.
+    Modes follow ngio's: `"r"` read-only, `"r+"` append to an existing
+    archive, `"a"` append or create, `"w"` truncate, `"w-"` create or fail.
+    Writing modes create missing parent directories, as a `.zarr` path does.
 
     The archive on disk is a complete, readable OME-Zarr zip file after every
     `flush` and after `close`. ngio flushes at the end of every call that
@@ -301,38 +332,47 @@ class OzxStore(ZipStore):
                 f"The store for {self.path} is closed. Open the archive again "
                 "instead of reusing a closed store."
             )
+        _check_path(self.path, self._ngio_mode)
         if not self.read_only:
             _register_writable(self)
         self._lock = threading.RLock()
+        zf: _OzxZipFile | None = None
         try:
-            self._zf = _OzxZipFile(
+            zf = _OzxZipFile(
                 self.path,
                 mode=cast("Any", self._zmode),
                 compression=self.compression,
                 allowZip64=self.allowZip64,
             )
-        except zipfile.BadZipFile as e:
+            _check_archive(zf)
+            if not self.read_only:
+                # An archive written by a stock `ZipStore` may carry duplicate
+                # records; readers resolve the last one, keep exactly that.
+                zf.drop_duplicates()
+        except BaseException as e:
+            if zf is not None:
+                # Refused after opening: nothing was written, so close the
+                # handle without an end record (append mode marks itself
+                # modified on a non-zip file).
+                zf._didModify = False
+                zf.close()
             if not self.read_only:
                 _unregister_writable(self)
-            raise NgioValueError(
-                f"{self.path} is not a readable zip archive ({e}). An OME-Zarr "
-                "zip file is edited in place: a process that dies while ngio is "
-                "writing to it leaves the archive without its central directory, "
-                "and ngio cannot recover it. Keep a copy, or write heavy jobs to "
-                "a directory or memory store and pack them with `to_ozx`."
-            ) from e
-        except BaseException:
-            if not self.read_only:
-                _unregister_writable(self)
+            if isinstance(e, zipfile.BadZipFile):
+                raise NgioValueError(
+                    f"{self.path} is not a readable zip archive ({e}). An "
+                    "OME-Zarr zip file is edited in place: a process that dies "
+                    "while ngio is writing to it leaves the archive without its "
+                    "central directory, and ngio cannot recover it. Keep a copy, "
+                    "or write heavy jobs to a directory or memory store and pack "
+                    "them with `to_ozx`."
+                ) from e
             raise
+        self._zf = zf
         if self._zmode == "x":
             # Exclusive creation happened; everything from here on is an append.
             self._zmode = "a"
-        _check_archive(self._zf)
         if not self.read_only:
-            # An archive written by a stock `ZipStore` may carry duplicate
-            # records; readers resolve the last one, keep exactly that.
-            self._zf.drop_duplicates()
             self._finalizer = weakref.finalize(
                 self, _close_abandoned, self._zf, self.path
             )

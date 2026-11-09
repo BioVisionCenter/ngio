@@ -24,6 +24,7 @@ from ngio.utils import _retry
 from ngio.utils._cache import NgioCache
 from ngio.utils._codec_pipeline import warn_on_codec_pipeline_fallback
 from ngio.utils._errors import (
+    NgioError,
     NgioFileExistsError,
     NgioFileNotFoundError,
     NgioValueError,
@@ -143,6 +144,9 @@ def open_group_wrapper(
                 f"The archive at {store} holds a Zarr v2 hierarchy; OME-Zarr "
                 "zip files (RFC-9) require OME-Zarr 0.5 (Zarr v3)."
             )
+
+    except NgioError:
+        raise  # a store already said precisely what is wrong
 
     except FileExistsError as e:
         raise NgioFileExistsError(

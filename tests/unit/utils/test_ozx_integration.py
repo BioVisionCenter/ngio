@@ -246,6 +246,40 @@ class TestPathRouting:
         assert fresh.list_labels() == []
         _assert_conforming(path)
 
+    def test_missing_file_semantics_follow_zarr_paths(self, tmp_path: Path) -> None:
+        from ngio.utils import NgioFileExistsError, NgioFileNotFoundError
+
+        missing = tmp_path / "nope.ozx"
+        with pytest.raises(NgioFileNotFoundError, match="No OME-Zarr zip file"):
+            open_ome_zarr_container(missing)  # default r+: must exist
+        with pytest.raises(NgioFileNotFoundError, match="No OME-Zarr zip file"):
+            open_ome_zarr_container(missing, mode="r")
+        assert not missing.exists()  # no stub left behind
+
+        nested = tmp_path / "no" / "such" / "dir" / "img.ozx"
+        img = _create(nested)  # writing modes create parents
+        assert nested.exists()
+        del img
+        gc.collect()
+        with pytest.raises(NgioFileExistsError, match="already exists"):
+            _create(nested)
+        _assert_conforming(nested)
+
+    def test_non_zip_file_named_ozx_is_left_alone(self, tmp_path: Path) -> None:
+        path = tmp_path / "user_file.ozx"
+        path.write_text("these are not the bytes you are looking for\n" * 12)
+        before = path.read_bytes()
+        for mode in ("r+", "a"):
+            with pytest.raises(NgioValueError, match="not a zip file"):
+                open_ome_zarr_container(path, mode=mode)
+            assert path.read_bytes() == before
+        with pytest.raises(NgioValueError, match="not a readable zip archive"):
+            open_ome_zarr_container(path, mode="r")
+        # The refusal released the one-writer slot and the file handle.
+        with OzxStore(path, mode="w") as store:
+            _create(store)
+        _assert_conforming(path)
+
     def test_remote_path_is_read_only(self) -> None:
         with pytest.raises(NgioValueError, match="read-only"):
             open_ome_zarr_container("https://example.org/x.ozx")  # default r+
