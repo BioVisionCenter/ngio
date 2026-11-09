@@ -1,21 +1,21 @@
 """Common utilities for working with Zarr groups in consistent ways."""
 
+import asyncio
 import logging
 import warnings
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Awaitable, Iterator
 from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
-from typing import Literal, TypeAlias
+from typing import Literal, TypeAlias, cast
 from urllib.parse import quote
 
-import dask.array as da
 import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
-from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
-from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
+from zarr.core.buffer import default_buffer_prototype
+from zarr.core.sync import sync
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
 
@@ -24,12 +24,14 @@ from ngio.utils import _retry
 from ngio.utils._cache import NgioCache
 from ngio.utils._codec_pipeline import warn_on_codec_pipeline_fallback
 from ngio.utils._errors import (
+    NgioError,
     NgioFileExistsError,
     NgioFileNotFoundError,
     NgioValueError,
 )
+from ngio.utils._ozx import OzxStore, _record_sort_key
 from ngio.utils._store import NgioStore
-from ngio.utils._warnings import NgioUserWarning
+from ngio.utils._warnings import NgioDeprecationWarning, NgioUserWarning
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -46,6 +48,7 @@ NgioSupportedStore: TypeAlias = (
     | dict
     | LocalStore
     | ZipStore
+    | OzxStore
     | NgioStore
 )
 GenericStore: TypeAlias = NgioSupportedStore | Store
@@ -76,10 +79,17 @@ def _check_group(
     return group
 
 
+def _is_ozx(store: Store) -> bool:
+    if isinstance(store, NgioStore):
+        return store.is_ozx
+    return isinstance(store, OzxStore)
+
+
 def open_group_wrapper(
     store: StoreOrGroup,
     mode: AccessModeLiteral | None = None,
     zarr_format: Literal[2, 3] | None = None,
+    attributes: dict | None = None,
 ) -> zarr.Group:
     """Wrapper around zarr.open_group with some additional checks.
 
@@ -102,12 +112,14 @@ def open_group_wrapper(
     per metadata read remotely.
 
     Args:
-        store (StoreOrGroup): The store or group to open.
-        mode (AccessModeLiteral): The mode to open the group in.
-        zarr_format (int): The Zarr format version to use.
+        store: The store or group to open.
+        mode: The mode to open the group in.
+        zarr_format: The Zarr format version to use.
+        attributes: Attributes for a group created by this call, written
+            together with the group so its document is written once.
 
     Returns:
-        zarr.Group: The opened Zarr group.
+        The opened Zarr group.
     """
     if isinstance(store, zarr.Group):
         return _check_group(store, mode)
@@ -115,12 +127,29 @@ def open_group_wrapper(
     try:
         mode = mode if mode is not None else "a"
         ngio_store = NgioStore.normalize(store, mode=mode)
+        if zarr_format == 2 and _is_ozx(ngio_store):
+            raise NgioValueError(
+                f"Cannot create a Zarr v2 (OME-Zarr 0.4) hierarchy in {store}: an "
+                "OME-Zarr zip file (RFC-9) must hold its root `zarr.json` at the "
+                "archive root, which only Zarr v3 (OME-Zarr 0.5 and later) has. "
+                "Pass ngff_version='0.5'."
+            )
         group = zarr.open_group(
             store=ngio_store,
             mode=mode,
             zarr_format=zarr_format,
+            attributes=attributes,
             use_consolidated=False,
         )
+        if group.metadata.zarr_format == 2 and _is_ozx(ngio_store):
+            raise NgioValueError(
+                f"The archive at {store} holds a Zarr v2 hierarchy, which has no "
+                "root `zarr.json`; an OME-Zarr zip file (RFC-9) requires one "
+                "(Zarr v3, OME-Zarr 0.5 and later)."
+            )
+
+    except NgioError:
+        raise  # a store already said precisely what is wrong
 
     except FileExistsError as e:
         raise NgioFileExistsError(
@@ -204,6 +233,21 @@ class ZarrGroupHandler:
         if self._store_facade is None:
             self._store_facade = NgioStore.ensure(self._group.store)
         return self._store_facade
+
+    @property
+    def reopen_source(self) -> StoreOrGroup:
+        """Return what to hand `open_group_wrapper` to open this group again.
+
+        Not a facade and not a path: re-normalizing a path would open a second
+        store on the same location, which a single-file store cannot serve.
+        A root group comes back as the bare store zarr holds, which a new
+        handler reads fresh. A nested group has no store-only spelling (the
+        store carries no path), so it comes back as the group itself, which
+        the new handler treats as possibly stale.
+        """
+        if self._group.path:
+            return self._group
+        return cast("NgioSupportedStore", self._group.store)
 
     @property
     def path(self) -> str:
@@ -429,12 +473,18 @@ class ZarrGroupHandler:
         if self.read_only:
             raise NgioValueError("The group is read only. Cannot write metadata.")
         group = self.reopen_group()
+        # One metadata document write either way. zarr's `Attributes` only
+        # implements `__setitem__`/`__delitem__`, so `clear()` + `update()`
+        # would rewrite the document once per existing key and once per new
+        # key: a round-trip each remotely, a dead copy each in a zip archive.
         if overwrite:
-            group.attrs.clear()
-        group.attrs.update(attrs)
+            group.attrs.put(attrs)
+        else:
+            group.update_attributes(attrs)
         # The write went through a freshly opened group, so `_group` and the
         # attrs cache both describe the state from before it.
         self.invalidate_meta()
+        self.store.flush()
 
     def _evict_subtree(self, path: str) -> None:
         """Drop `path` and everything below it from all three caches.
@@ -468,6 +518,7 @@ class ZarrGroupHandler:
         if overwrite:
             self._evict_subtree(path)
         self._group_cache.set(path, group)
+        self.store.flush()
         return group
 
     def get_group(
@@ -594,12 +645,14 @@ class ZarrGroupHandler:
             raise NgioValueError("Cannot delete a group in read only mode.")
         self.group.__delitem__(path)
         self._evict_subtree(path)
+        self.store.flush()
 
     def delete_self(self) -> None:
         """Delete the current group."""
         if self.group.read_only:
             raise NgioValueError("Cannot delete a group in read only mode.")
         self.group.__delitem__("/")
+        self.store.flush()
 
     def copy_group(self, dest_group: zarr.Group):
         """Copy the group to a new store."""
@@ -701,44 +754,140 @@ def _fsspec_copy(
         dest_mapper[key] = src_mapper[key]
 
 
-def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
-    # Deferred: `ngio.common` imports `ngio.utils`.
-    from ngio.common._dask_io import store_dask
+# Root metadata documents: synced through zarr's attributes API, never copied.
+_ROOT_METADATA = frozenset({"zarr.json", ".zgroup", ".zattrs", ".zmetadata"})
+_COPY_BATCH = 32
 
-    # Copy attributes
-    dest_group.attrs.put(src_group.attrs.asdict())
-    # Copy arrays
-    for name, array in src_group.arrays():
-        if array.metadata.zarr_format == 2:
-            spec = AnyArraySpecV2.from_zarr(array)
-        else:
-            spec = AnyArraySpecV3.from_zarr(array)
-        dst = spec.to_zarr(
-            store=dest_group.store,
-            path=f"{dest_group.path}/{name}",
-            overwrite=True,
+
+def _refuse_overlapping_copy(src_group: zarr.Group, dest_group: zarr.Group) -> None:
+    """Same store, one prefix inside the other: the copy would eat its source."""
+    src_key = NgioStore.ensure(src_group.store).location_key
+    dest_key = NgioStore.ensure(dest_group.store).location_key
+    if src_key is None or src_key != dest_key:
+        return
+    src_prefix = f"{src_group.path}/" if src_group.path else ""
+    dest_prefix = f"{dest_group.path}/" if dest_group.path else ""
+    if src_prefix.startswith(dest_prefix) or dest_prefix.startswith(src_prefix):
+        raise NgioValueError(
+            f"Cannot copy {src_group.path or '/'!r} into {dest_group.path or '/'!r} "
+            "of the same store: the groups overlap."
         )
-        if array.ndim > 0:
-            if array.dtype.hasobject or array.dtype.kind in ("U", "S"):
-                # dask >=2025.11 refuses auto-chunking for object/string dtypes
-                # (NotImplementedError in dask.array.core.auto_chunks). These
-                # arrays come from table backends and are small; copy directly.
-                dst[:] = array[:]
-            else:
-                dask_array = da.from_zarr(array)
-                # Aligned to the destination's write unit: a raw `da.to_zarr`
-                # under a sub-unit block budget gives one shard several racing
-                # read-modify-writers and silently loses updates.
-                store_dask(dask_array, dst)
-    # Copy subgroups
-    for name, subgroup in src_group.groups():
-        dest_subgroup = dest_group.create_group(name, overwrite=True)
-        _zarr_python_copy(subgroup, dest_subgroup)
+
+
+def _prefix_of(group: zarr.Group) -> str:
+    return f"{group.path}/" if group.path else ""
+
+
+def clear_keys(group: zarr.Group) -> None:
+    """Delete every key under `group` except its own metadata document."""
+    store, prefix = group.store, _prefix_of(group)
+
+    async def run() -> None:
+        keys = [
+            key
+            async for key in store.list_prefix(prefix)
+            if key[len(prefix) :] not in _ROOT_METADATA
+        ]
+        for k in range(0, len(keys), _COPY_BATCH):
+            await asyncio.gather(
+                *(store.delete(key) for key in keys[k : k + _COPY_BATCH])
+            )
+
+    sync(run())
+
+
+def copy_keys(
+    src_group: zarr.Group, dest_group: zarr.Group, *, clear: bool = False
+) -> None:
+    """Copy every key under `src_group` into `dest_group`, byte for byte.
+
+    Key level rather than node level: a zarr walk misses the files that table
+    backends keep beside the zarr nodes (parquet, csv), and a byte copy keeps
+    chunks and shards exactly as written. The root metadata document is not
+    copied: the destination keeps its own and takes the source's attributes
+    through zarr, so consolidated metadata, which ngio neither writes nor
+    trusts, never travels. Keys already in the destination and absent from
+    the source stay unless `clear` is set.
+
+    Into a zip archive the keys are written in RFC-9 order (root `zarr.json`,
+    the other `zarr.json` records breadth-first, then the rest), so the
+    physical layout matches the central directory `to_ozx` promises.
+    """
+    _refuse_overlapping_copy(src_group, dest_group)
+    src_attrs = src_group.attrs.asdict()
+    if dest_group.attrs.asdict() != src_attrs:
+        dest_group.attrs.put(src_attrs)
+    if clear:
+        clear_keys(dest_group)
+
+    src_store, dest_store = src_group.store, dest_group.store
+    src_prefix, dest_prefix = _prefix_of(src_group), _prefix_of(dest_group)
+    prototype = default_buffer_prototype()
+    ordered = NgioStore.ensure(dest_store).store_type == "zip"
+
+    async def copy_one(key: str) -> None:
+        rel = key[len(src_prefix) :]
+        if rel in _ROOT_METADATA:
+            return
+        value = await src_store.get(key, prototype=prototype)
+        if value is not None:
+            await dest_store.set(dest_prefix + rel, value)
+
+    async def run_batched(keys: AsyncIterator[str]) -> None:
+        pending: list[Awaitable[None]] = []
+        async for key in keys:
+            pending.append(copy_one(key))
+            if len(pending) >= _COPY_BATCH:
+                await asyncio.gather(*pending)
+                pending = []
+        await asyncio.gather(*pending)
+
+    async def run_ordered() -> None:
+        keys = sorted(
+            [key async for key in src_store.list_prefix(src_prefix)],
+            key=lambda key: _record_sort_key(key[len(src_prefix) :]),
+        )
+        # `zarr.json` records one at a time: a batch lands in arbitrary order.
+        n_json = sum(
+            1 for key in keys if _record_sort_key(key[len(src_prefix) :])[0] == 0
+        )
+        for key in keys[:n_json]:
+            await copy_one(key)
+
+        async def rest() -> AsyncIterator[str]:
+            for key in keys[n_json:]:
+                yield key
+
+        await run_batched(rest())
+
+    sync(run_ordered() if ordered else run_batched(src_store.list_prefix(src_prefix)))
+    # The copy ends on chunk writes, which a single-file store publishes only
+    # when its directory is written.
+    NgioStore.ensure(dest_store).flush()
 
 
 def copy_group(
-    src_group: zarr.Group, dest_group: zarr.Group, suppress_warnings: bool = False
+    src_group: zarr.Group,
+    dest_group: zarr.Group,
+    suppress_warnings: bool | None = None,
+    *,
+    clear: bool = False,
 ):
+    """Copy a group and everything under it into `dest_group`.
+
+    Through fsspec mappers when both sides are filesystems, otherwise key by
+    key through the stores (`copy_keys`); both carry non-zarr files such as
+    parquet and csv tables. Keys already in the destination and absent from
+    the source stay unless `clear` is set. `suppress_warnings` is deprecated:
+    the copy no longer warns, so there is nothing to suppress.
+    """
+    if suppress_warnings is not None:
+        warnings.warn(
+            "copy_group(suppress_warnings=) is deprecated and will be removed in "
+            "ngio=1.3: the copy no longer warns, drop the argument.",
+            NgioDeprecationWarning,
+            stacklevel=2,
+        )
     if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
         raise NgioValueError(
             "Different Zarr format versions between source and destination, "
@@ -750,21 +899,16 @@ def copy_group(
 
     if dest_group.read_only:
         raise NgioValueError("Destination group is read only, cannot copy.")
+    _refuse_overlapping_copy(src_group, dest_group)
     src_store = NgioStore.ensure(src_group.store)
     dest_store = NgioStore.ensure(dest_group.store)
     fs_types = ("local", "fsspec")
     if src_store.store_type in fs_types and dest_store.store_type in fs_types:
+        if clear:
+            clear_keys(dest_group)
         _fsspec_copy(src_store, src_group.path, dest_store, dest_group.path)
         return
-    if not suppress_warnings:
-        warnings.warn(
-            "Fsspec copy not possible, falling back to Zarr Python API for the copy. "
-            "This will preserve some tabular data non-zarr native (parquet, and csv), "
-            "and it will be slower for large datasets.",
-            NgioUserWarning,
-            stacklevel=2,
-        )
-    _zarr_python_copy(src_group, dest_group)
+    copy_keys(src_group, dest_group, clear=clear)
 
 
 def refresh_s3fs_config(config: NgioConfig) -> None:

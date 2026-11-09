@@ -16,8 +16,10 @@ from ngio.utils._errors import (
     NgioValueError,
 )
 from ngio.utils._fractal_fsspec_store import fractal_fsspec_store
+from ngio.utils._ozx import OzxReport, OzxStore, check_ozx
 from ngio.utils._retry import retry_io
 from ngio.utils._store import NgioStore
+from ngio.utils._transfer import from_memory, from_ozx, to_memory, to_ozx
 
 # `stacklevel_of_first_caller` (ngio.utils._warnings) and `apply_zarr_config`
 # (ngio.utils._zarr_utils) are internal helpers; ngio's own modules import
@@ -53,16 +55,23 @@ __all__ = [
     "NgioUserWarning",
     "NgioValidationError",
     "NgioValueError",
+    "OzxReport",
+    "OzxStore",
     "StoreOrGroup",
     "ZarrGroupHandler",
+    "check_ozx",
     "copy_group",
     "deprecated",
     "deprecated_alias",
     "download_ome_zarr_dataset",
     "fractal_fsspec_store",
+    "from_memory",
+    "from_ozx",
     "list_ome_zarr_datasets",
     "open_group_wrapper",
     "print_datasets_infos",
     "refresh_s3fs_config",
     "retry_io",
+    "to_memory",
+    "to_ozx",
 ]

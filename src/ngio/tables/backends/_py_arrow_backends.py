@@ -72,22 +72,19 @@ class PyArrowBackend(AbstractTableBackend):
         dataset = pa_ds.dataset(table_path, format=self.table_format, filesystem=fs)
         return dataset
 
-    def _load_from_in_memory_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
-        """Load the table from an in-memory store."""
-        table_path = f"{path}/{self.table_name}"
-        table = store.memory_dict.get(table_path, None)
-        if table is None:
-            raise NgioValueError(
-                f"Table {self.table_name} not found in the in-memory store at "
-                f"path {path}."
-            )
-        assert isinstance(table, pa.Table)
-        dataset = pa_ds.dataset(table)
-        return dataset
+    def _load_through_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
+        """Load the table as one key read in full through the store.
 
-    def _load_from_zip_store(self, store: NgioStore, path: str) -> pa_ds.Dataset:
-        """Load the table from a zip store."""
-        raise NotImplementedError("Zip store loading is not implemented yet.")
+        For stores pyarrow cannot scan itself (in-memory, single-file zip).
+        """
+        table_path = f"{path}/{self.table_name}"
+        data = store.read_bytes(table_path)
+        if data is None:
+            raise NgioValueError(f"Table {self.table_name} not found at {table_path}.")
+        reader = pa.BufferReader(data)
+        if self.table_format == "parquet":
+            return pa_ds.dataset(pa_parquet.read_table(reader))
+        return pa_ds.dataset(pa_csv.read_csv(reader))
 
     @retry_io
     def _load_pyarrow_dataset(self) -> pa_ds.Dataset:
@@ -103,10 +100,8 @@ class PyArrowBackend(AbstractTableBackend):
             return self._load_from_local_store(store, path)
         elif store.store_type == "fsspec":
             return self._load_from_fsspec_store(store, path)
-        elif store.store_type == "memory":
-            return self._load_from_in_memory_store(store, path)
-        elif store.store_type == "zip":
-            return self._load_from_zip_store(store, path)
+        elif store.store_type in ("memory", "zip"):
+            return self._load_through_store(store, path)
         self._raise_store_type_not_supported()
 
     def load_as_pandas_df(self) -> DataFrame:
@@ -170,16 +165,13 @@ class PyArrowBackend(AbstractTableBackend):
         with fs.open_output_stream(table_path) as out_stream:
             self._write_to_stream(out_stream, table)
 
-    def _write_to_in_memory_store(
+    def _write_through_store(
         self, store: NgioStore, path: str, table: pa.Table
     ) -> None:
-        """Write the table to an in-memory store."""
-        table_path = f"{path}/{self.table_name}"
-        store.memory_dict[table_path] = table
-
-    def _write_to_zip_store(self, store: NgioStore, path: str, table: pa.Table) -> None:
-        """Write the table to a zip store."""
-        raise NotImplementedError("Writing to zip store is not implemented yet.")
+        """Write the table as one key through the store (see `_load_through_store`)."""
+        stream = pa.BufferOutputStream()
+        self._write_to_stream(stream, table)
+        store.write_bytes(f"{path}/{self.table_name}", stream.getvalue().to_pybytes())
 
     @retry_io
     def _write_pyarrow_dataset(self, dataset: pa.Table) -> None:
@@ -194,10 +186,8 @@ class PyArrowBackend(AbstractTableBackend):
             return self._write_to_local_store(store=store, path=path, table=dataset)
         elif store.store_type == "fsspec":
             return self._write_to_fsspec_store(store=store, path=path, table=dataset)
-        elif store.store_type == "memory":
-            return self._write_to_in_memory_store(store=store, path=path, table=dataset)
-        elif store.store_type == "zip":
-            return self._write_to_zip_store(store=store, path=path, table=dataset)
+        elif store.store_type in ("memory", "zip"):
+            return self._write_through_store(store=store, path=path, table=dataset)
         self._raise_store_type_not_supported()
 
     def write_from_pandas(self, table: DataFrame) -> None:

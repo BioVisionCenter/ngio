@@ -106,7 +106,7 @@ def derive_image(
 
 
 def create_sample_ome_zarr(
-    store, supported_backends: list[str] | None = None
+    store, supported_backends: list[str] | None = None, ngff_version: str = "0.4"
 ) -> OmeZarrContainer:
     """Create a sample OME-Zarr structure in the given store for testing."""
     ome_zarr = create_empty_ome_zarr(
@@ -116,6 +116,7 @@ def create_sample_ome_zarr(
         channels_meta=["Channel 1", "Channel 2", "Channel 3"],
         levels=2,
         axes_names=["c", "z", "y", "x"],
+        ngff_version=ngff_version,
     )
     ome_zarr = set_to_image(ome_zarr)
     check_image_data(ome_zarr)

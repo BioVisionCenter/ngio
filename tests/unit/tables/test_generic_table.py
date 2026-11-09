@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 from anndata import AnnData
+from zarr.storage import MemoryStore
 
 from ngio.tables._tables_container import open_table, write_table
 from ngio.tables.backends import CsvTableBackend
@@ -148,3 +149,28 @@ def test_generic_anndata_table(tmp_path: Path, backend: str):
     assert set(loaded_df.columns) == {"a", "b", "c"}
 
     np.testing.assert_allclose(loaded_ad.obsm["test"], test_obsm)  # type: ignore
+
+
+@pytest.mark.parametrize("make_store", [lambda d: MemoryStore(), lambda d: d / "t.ozx"])
+def test_anndata_consolidate_drops_removed_columns_from_the_store(tmp_path, make_store):
+    """A column dropped before `consolidate()` leaves no key behind.
+
+    anndata itself writes with `mode="w"`; the scratch-store copy used for
+    memory and zip stores has to clear the destination to match.
+    """
+    import zarr
+
+    from ngio.utils._zarr_utils import open_group_wrapper
+
+    store = make_store(tmp_path)
+    df = pd.DataFrame({"a": [1, 2], "u": ["x", "y"]})
+    write_table(store=store, table=GenericTable(table_data=df), backend="anndata")
+    table = open_table(store=store)
+    table.set_table_data(table.dataframe.drop(columns="u"))
+    table.consolidate()
+
+    obs = open_group_wrapper(store, mode="r")["obs"]
+    assert isinstance(obs, zarr.Group)
+    obs_keys = set(obs.keys())
+    assert "a" in obs_keys and "u" not in obs_keys
+    assert list(open_table(store=store).dataframe.columns) == ["a"]

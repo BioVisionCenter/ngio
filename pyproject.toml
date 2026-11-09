@@ -214,10 +214,12 @@ markers = [
 # https://coverage.readthedocs.io/
 [tool.coverage.run]
 source = ["ngio"]
-# The concurrency tests run their workers in real subprocesses, so without this
-# every line they exercise — the file lock, `atomic_add_image` — would read as
-# uncovered. pytest-cov combines the per-process data files.
-concurrency = ["multiprocessing"]
+# The concurrency tests run their workers in real subprocesses, so without
+# "multiprocessing" every line they exercise — the file lock, `atomic_add_image` —
+# would read as uncovered; pytest-cov combines the per-process data files. All
+# store IO runs on zarr's sync-loop thread, so without "thread" every store
+# module reads as half covered (`_ozx.py` 49% reported vs 88% true).
+concurrency = ["thread", "multiprocessing"]
 parallel = true
 
 [tool.coverage.report]
@@ -298,12 +300,13 @@ build_docs = "zensical build --clean --strict"
 # `data/tmp` is the shared staging dir `download_ome_zarr_dataset` extracts through; an
 # interrupted build can leave a half-extracted dataset there, and every later build then
 # fails with "Expected one directory to be extracted, got 2". Clearing it is the fix.
-clean_docs_data = "rm -rf ./data/tmp ./data/*.zarr"
+clean_docs_data = "rm -rf ./data/tmp ./data/*.zarr ./data/*.ozx"
 snip_quickstart = "python docs/snippets/getting_started/quickstart.py > /dev/null"
 snip_get_started = "python docs/snippets/getting_started/get_started.py > /dev/null"
 snip_masked_images = "python docs/snippets/getting_started/masked_images.py > /dev/null"
 snip_iterators = "python docs/snippets/getting_started/iterators.py > /dev/null"
 snip_hcs = "python docs/snippets/getting_started/hcs.py > /dev/null"
+snip_ome_zarr_zip = "python docs/snippets/getting_started/ome_zarr_zip.py > /dev/null"
 snip_create_ome_zarr = "python docs/snippets/tutorials/create_ome_zarr.py > /dev/null"
 snip_image_processing = "python docs/snippets/tutorials/image_processing.py > /dev/null"
 snip_image_segmentation = "python docs/snippets/tutorials/image_segmentation.py > /dev/null"
@@ -321,6 +324,7 @@ python docs/snippets/getting_started/get_started.py > /dev/null &&
 python docs/snippets/getting_started/masked_images.py > /dev/null &&
 python docs/snippets/getting_started/iterators.py > /dev/null &&
 python docs/snippets/getting_started/hcs.py > /dev/null &&
+python docs/snippets/getting_started/ome_zarr_zip.py > /dev/null &&
 python docs/snippets/tutorials/create_ome_zarr.py > /dev/null &&
 python docs/snippets/tutorials/image_processing.py > /dev/null &&
 python docs/snippets/tutorials/image_segmentation.py > /dev/null &&

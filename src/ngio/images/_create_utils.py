@@ -123,6 +123,8 @@ def _create_image_like_group(
     group_handler = group_handler.reopen_handler()
     # Write the pyramid
     pyramid_builder.to_zarr(group=group_handler.group)
+    # The arrays went through zarr directly; publish them (single-file stores).
+    group_handler.store.flush()
     return group_handler
 
 

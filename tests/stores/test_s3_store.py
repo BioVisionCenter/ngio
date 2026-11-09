@@ -14,10 +14,9 @@ from utils import (
 # previously broken with the moto subprocess).
 S3_STORE_SUPPORTED_BACKENDS = ["anndata", "json", "csv", "parquet"]
 
-# Deriving to an in-memory (dict) store falls back to the Zarr-Python copy, which does
-# not carry over the non-zarr-native tabular files (csv/parquet). Restrict those
-# backends when the destination is a memory store.
-MEMORY_STORE_SUPPORTED_BACKENDS = ["anndata", "json"]
+# Deriving to an in-memory (dict) store copies key by key (`copy_keys`), so the
+# non-zarr-native tabular files (csv/parquet) travel along too.
+MEMORY_STORE_SUPPORTED_BACKENDS = ["anndata", "json", "csv", "parquet"]
 
 
 def test_s3_store(moto_s3_server: dict) -> None:

@@ -98,16 +98,18 @@ class AnnDataBackend(AbstractTableBackend):
         """
         self._write_zarr(table, store.get_mapper(path))
 
-    def _write_to_memory_store(self, table: AnnData) -> None:
-        """Write the AnnData table to a MemoryStore."""
+    def _write_through_scratch_store(self, table: AnnData) -> None:
+        """Write into a scratch `MemoryStore`, then copy group by group.
+
+        For stores anndata cannot write into directly: in-memory, and a
+        single-file zip, which cannot be opened a second time.
+        """
         scratch_store = MemoryStore()
         self._write_zarr(table, scratch_store)
         anndata_group = zarr.open_group(scratch_store, mode="r")
-        copy_group(
-            anndata_group,
-            self._group_handler._group,
-            suppress_warnings=True,
-        )
+        # `clear`: anndata's own write is `mode="w"`, so a dropped column must
+        # not survive here either (in a zip it would be a live record forever).
+        copy_group(anndata_group, self._group_handler._group, clear=True)
 
     def _cleanup_after_write(self) -> None:
         """Clean up any temporary data after writing."""
@@ -138,14 +140,14 @@ class AnnDataBackend(AbstractTableBackend):
                 path,
                 table,
             )
-        elif store.store_type == "memory":
-            self._write_to_memory_store(table)
+        elif store.store_type in ("memory", "zip"):
+            self._write_through_scratch_store(table)
         else:
             raise NgioValueError(
                 f"Ngio does not support writing an AnnData table to a "
                 f"store of type {type(store)}. "
                 "Please make sure to use a compatible "
-                "store like a LocalStore, or FsspecStore."
+                "store like a LocalStore, FsspecStore, MemoryStore or ZipStore."
             )
         self._cleanup_after_write()
 

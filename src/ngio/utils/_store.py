@@ -12,6 +12,7 @@ import asyncio
 import functools
 import json
 import logging
+import os
 import warnings
 from itertools import starmap
 from pathlib import Path
@@ -19,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar
 
 import fsspec
 from zarr.abc.store import ByteRequest, Store
+from zarr.core.buffer import default_buffer_prototype
 from zarr.core.sync import sync
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, WrapperStore, ZipStore
 from zarr.storage._common import make_store
@@ -26,6 +28,7 @@ from zarr.storage._common import make_store
 from ngio.config import RetryConfig, get_config
 from ngio.utils import _retry
 from ngio.utils._errors import NgioValueError
+from ngio.utils._ozx import OZX_SUFFIX, OzxStore, open_ozx
 from ngio.utils._retry import (
     aretry_call,
     aretry_sharing_violation,
@@ -90,6 +93,23 @@ def _bypass_is_safe(store: Store) -> bool:
     return type(store) is LocalStore
 
 
+def _as_ozx(
+    store: object, mode: Literal["r", "r+", "w", "w-", "a"] | None
+) -> OzxStore | FsspecStore | None:
+    """Route a `.ozx` location to its store, before zarr's `make_store`.
+
+    zarr's `make_store` never yields a `ZipStore`: a local `.ozx` path would
+    become a `LocalStore` and a directory of that name would be created. A
+    URL opens read-only over range requests.
+    """
+    if not isinstance(store, str | Path):
+        return None
+    location = os.fspath(store)
+    if not location.endswith(OZX_SUFFIX):
+        return None
+    return open_ozx(location, mode=mode if mode is not None else "a")
+
+
 def _make_sync_fs(fs: fsspec.AbstractFileSystem) -> fsspec.AbstractFileSystem:
     fs_dict = json.loads(fs.to_json())
     fs_dict["asynchronous"] = False
@@ -143,7 +163,7 @@ class NgioStore(WrapperStore[Store]):
         if isinstance(store, NgioStore):
             return store
         if not isinstance(store, Store):
-            store = sync(make_store(store, mode=mode))
+            store = _as_ozx(store, mode) or sync(make_store(store, mode=mode))
         _warn_if_unknown_store(store)
         return cls(store, retry=retry)
 
@@ -178,7 +198,7 @@ class NgioStore(WrapperStore[Store]):
         if isinstance(store, NgioStore):
             return store
         if not isinstance(store, Store):
-            store = sync(make_store(store, mode=mode))
+            store = _as_ozx(store, mode) or sync(make_store(store, mode=mode))
         _warn_if_unknown_store(store)
         if _bypass_is_safe(store) and not _wrapper_changes_behaviour(retry):
             return store
@@ -245,8 +265,9 @@ class NgioStore(WrapperStore[Store]):
     def memory_dict(self) -> MutableMapping[str, Any]:
         """Return the backing dict of an in-memory store.
 
-        The table backends stash non-Buffer values (e.g. raw pyarrow tables)
-        in this mapping, hence the `Any` value type.
+        Every ngio write stores zarr `Buffer`s; the mapping is typed `Any`
+        because a caller-supplied dict (`open_ome_zarr_container({})`) may
+        hold anything.
 
         Raises:
             NgioValueError: If the store is not in-memory.
@@ -256,6 +277,26 @@ class NgioStore(WrapperStore[Store]):
         raise NgioValueError(
             f"The store is not in-memory (store_type={self.store_type})."
         )
+
+    @property
+    def location_key(self) -> str | None:
+        """A key that is equal for two stores backed by the same data.
+
+        Store objects are not comparable by identity: zarr's read-only open
+        hands back a copy (`with_read_only`), and ngio wraps and unwraps.
+        Local and zip stores key on the resolved path, fsspec stores on the
+        full URL, memory stores on the identity of the backing dict. `None`
+        when the store cannot be placed.
+        """
+        store = self._store
+        if isinstance(store, LocalStore | ZipStore):
+            root = store.root if isinstance(store, LocalStore) else store.path
+            return os.fspath(Path(root).resolve())
+        if isinstance(store, FsspecStore):
+            return store.fs.unstrip_protocol(store.path).rstrip("/")
+        if isinstance(store, MemoryStore):
+            return f"memory:{id(store._store_dict)}"
+        return None
 
     def full_url(self, path: str = "") -> str | None:
         """Return the full URL/path of `path` inside the store.
@@ -304,6 +345,32 @@ class NgioStore(WrapperStore[Store]):
             return [key async for key in self.list_dir(prefix)]
 
         return sync(_collect())
+
+    def read_bytes(self, key: str) -> bytes | None:
+        """Return the whole value at `key`, or `None` if absent, synchronously."""
+        buffer = sync(self.get(key, prototype=default_buffer_prototype()))
+        return None if buffer is None else buffer.to_bytes()
+
+    def write_bytes(self, key: str, data: bytes) -> None:
+        """Store `data` at `key`, synchronously."""
+        sync(self.set(key, default_buffer_prototype().buffer.from_bytes(data)))
+
+    @property
+    def is_ozx(self) -> bool:
+        """Whether the wrapped store is an OME-Zarr zip file (`OzxStore`)."""
+        return isinstance(self._store, OzxStore)
+
+    def flush(self) -> None:
+        """Publish the hierarchy written so far to readers with their own handle.
+
+        A single-file store (`.ozx`) keeps its directory in memory during a
+        writing session; this writes it. Every other store is consistent after
+        each write, so this is a no-op for them. Called by the group handler
+        whenever the hierarchy changes and by the image write verbs
+        (`set_array`, `set_roi`, `consolidate`) when they return.
+        """
+        if isinstance(self._store, OzxStore):
+            self._store.flush()
 
     # ------------------------------------------------------------------
     # Retried IO

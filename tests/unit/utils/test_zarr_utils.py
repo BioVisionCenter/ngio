@@ -506,12 +506,64 @@ def test_copy_group(tmp_path: Path, src_store, dest_store):
     assert "sub_array1" in dest_group["group1"]
 
 
+def test_copy_group_refuses_overlapping_groups_of_one_store(tmp_path: Path):
+    from ngio.utils._zarr_utils import copy_keys
+
+    root = zarr.open_group(LocalStore(tmp_path / "s.zarr"), mode="w", zarr_format=3)
+    a = root.create_group("labels/a")
+    a.create_array("0", shape=(2,), chunks=(2,), dtype="u1")[:] = 1
+    b = root.create_group("labels/b")
+    for src, dest in ((root, root), (root, a), (a, root), (a, a)):
+        with pytest.raises(NgioValueError, match="overlap"):
+            copy_keys(src, dest)
+    copy_keys(a, b)  # disjoint siblings are fine
+    copied = np.asarray(zarr.open_array(b.store, path="labels/b/0")[:])
+    np.testing.assert_array_equal(copied, [1, 1])
+
+
+def test_copy_group_suppress_warnings_is_deprecated(tmp_path: Path):
+    from zarr.storage import MemoryStore
+
+    from ngio.utils import NgioDeprecationWarning
+    from ngio.utils._zarr_utils import copy_group
+
+    src = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    src.attrs.put({"a": 1})
+    dest = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    with pytest.warns(NgioDeprecationWarning, match="suppress_warnings"):
+        copy_group(src, dest, suppress_warnings=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        copy_group(src, dest)  # the default is silent
+    assert dest.attrs.asdict() == {"a": 1}
+
+
+def test_copy_keys_clear_removes_what_the_source_lacks(tmp_path: Path):
+    from zarr.storage import MemoryStore
+
+    from ngio.utils._zarr_utils import copy_keys
+
+    src = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    src.attrs.put({"from": "src"})
+    src.create_array("keep", shape=(2,), chunks=(2,), dtype="u1")[:] = 1
+    dest = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    dest.create_array("stale", shape=(2,), chunks=(2,), dtype="u1")[:] = 7
+    dest.create_group("obs").create_array("u", shape=(1,), chunks=(1,), dtype="u1")
+
+    copy_keys(src, dest)  # default: an overlay
+    assert sorted(dest.keys()) == ["keep", "obs", "stale"]
+    copy_keys(src, dest, clear=True)
+    assert sorted(dest.keys()) == ["keep"]
+    assert dest.attrs.asdict() == {"from": "src"}  # the root document survives
+
+
 def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
-    """The zarr-python copy fallback writes whole write units, byte-exact.
+    """The store-level copy fallback keeps sharded data byte-exact.
 
     A raw dask write under a block budget smaller than the destination's
     shard gave one shard several racing read-modify-writers and silently lost
-    most of the data (~75% of pixels in the review's repro).
+    most of the data (~75% of pixels in the review's repro). The copy now moves
+    keys, so no write unit is ever rebuilt.
     """
     import dask
 
@@ -524,7 +576,7 @@ def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     labels[...] = data
     handler = ZarrGroupHandler(store=src_group, cache=False, mode="r")
 
-    # A MemoryStore destination forces the `_zarr_python_copy` fallback; the
+    # A MemoryStore destination forces the key-copy fallback; the
     # tiny global budget is what a shard bigger than dask's default hits.
     dest_group = zarr.group(store={}, overwrite=True)
     with dask.config.set({"array.chunk-size": "64 KiB"}):
