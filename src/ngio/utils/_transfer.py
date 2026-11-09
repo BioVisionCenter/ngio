@@ -149,7 +149,8 @@ def to_ozx(
 
     The archive is written once, closed and conformant on return: no dead
     space, `zarr.json` records first, archive comment set. The source must be
-    OME-Zarr 0.5 (Zarr v3); RFC-9 has no Zarr v2 form. A URL target is packed
+    Zarr v3 (OME-Zarr 0.5 and later): the RFC requires the root `zarr.json` at
+    the archive root, which Zarr v2 does not have. A URL target is packed
     into a local temporary file and uploaded. The file is an archive whatever
     its name; a name not ending in `.ozx` warns, as the RFC recommends the
     suffix.

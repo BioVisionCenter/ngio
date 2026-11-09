@@ -209,7 +209,7 @@ class TestPathRouting:
         assert open_ome_zarr_container(path).list_labels() == []
 
     def test_zarr_v2_refused(self, tmp_path: Path) -> None:
-        with pytest.raises(NgioValueError, match="Zarr v2"):
+        with pytest.raises(NgioValueError, match=r"Zarr v2.*ngff_version='0.5'"):
             create_empty_ome_zarr(
                 tmp_path / "img.ozx", shape=SHAPE, pixelsize=0.5, ngff_version="0.4"
             )

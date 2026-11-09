@@ -521,6 +521,23 @@ def test_copy_group_refuses_overlapping_groups_of_one_store(tmp_path: Path):
     np.testing.assert_array_equal(copied, [1, 1])
 
 
+def test_copy_group_suppress_warnings_is_deprecated(tmp_path: Path):
+    from zarr.storage import MemoryStore
+
+    from ngio.utils import NgioDeprecationWarning
+    from ngio.utils._zarr_utils import copy_group
+
+    src = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    src.attrs.put({"a": 1})
+    dest = zarr.open_group(MemoryStore(), mode="w", zarr_format=3)
+    with pytest.warns(NgioDeprecationWarning, match="suppress_warnings"):
+        copy_group(src, dest, suppress_warnings=True)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        copy_group(src, dest)  # the default is silent
+    assert dest.attrs.asdict() == {"a": 1}
+
+
 def test_copy_keys_clear_removes_what_the_source_lacks(tmp_path: Path):
     from zarr.storage import MemoryStore
 

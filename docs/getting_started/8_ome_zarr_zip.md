@@ -18,8 +18,9 @@ ngio works on `.ozx` files natively: anywhere a path is accepted, a path ending 
 `.ozx` opens the archive. Nothing else in a script has to know it is a zip.
 
 !!! note "OME-Zarr 0.5 only"
-    RFC-9 is defined for OME-Zarr 0.5 and later (Zarr v3). Creating a 0.4 image inside
-    an `.ozx` raises, so pass `ngff_version="0.5"` to the creation functions.
+    RFC-9 requires the root `zarr.json` at the archive root, which only Zarr v3
+    (OME-Zarr 0.5 and later) has. Creating a 0.4 image inside an `.ozx` raises, so pass
+    `ngff_version="0.5"` to the creation functions.
 
 ## Create and edit in place
 

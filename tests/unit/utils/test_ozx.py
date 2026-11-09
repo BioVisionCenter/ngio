@@ -184,7 +184,7 @@ class TestGuards:
             _write_hierarchy(store)
             with pytest.raises(NgioValueError, match="cannot be pickled"):
                 pickle.dumps(store)
-            with pytest.raises(NgioValueError, match="cannot be pickled"):
+            with pytest.raises(NgioValueError, match=r"read-only view .* cannot"):
                 pickle.dumps(store.with_read_only(True))
         copy = pickle.loads(pickle.dumps(OzxStore(path, mode="r")))
         assert sync(copy.exists("zarr.json"))

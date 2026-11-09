@@ -187,9 +187,11 @@ def _register_writable(store: OzxStore) -> None:
         other = _open_writable.get(key)
         if other is not None and other is not store:
             raise NgioValueError(
-                f"{store.path} is already open for writing in this process. "
-                "An OME-Zarr zip file has one writer: close() the other store "
-                "(or the container holding it) first."
+                f"{store.path} is already open for writing in this process. An "
+                "OME-Zarr zip file has one writer per process: close the "
+                "`OzxStore` that holds it (`store.close()`, or the end of its "
+                "`with` block), or drop every container opened on that path and "
+                "let it be garbage collected, then open it again."
             )
         _open_writable[key] = store
 
@@ -523,7 +525,14 @@ class OzxStore(ZipStore):
     # ------------------------------------------------------------------
 
     def __getstate__(self) -> dict[str, Any]:
-        if not self.read_only or self._view_of is not None:
+        if self._view_of is not None:
+            raise NgioValueError(
+                f"A read-only view of a live writing session ({self.path}) cannot "
+                "be pickled: the copy would read the stale directory on disk, not "
+                "the session. Close the writer first, or copy the hierarchy with "
+                "`to_memory` and pickle that."
+            )
+        if not self.read_only:
             raise NgioValueError(
                 f"A writable OzxStore ({self.path}) cannot be pickled: every "
                 "unpickled copy would open its own writing session on the archive "

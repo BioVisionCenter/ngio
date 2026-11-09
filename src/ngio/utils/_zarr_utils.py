@@ -31,7 +31,7 @@ from ngio.utils._errors import (
 )
 from ngio.utils._ozx import OzxStore, _record_sort_key
 from ngio.utils._store import NgioStore
-from ngio.utils._warnings import NgioUserWarning
+from ngio.utils._warnings import NgioDeprecationWarning, NgioUserWarning
 
 logger = logging.getLogger(f"ngio:{__name__}")
 
@@ -129,8 +129,10 @@ def open_group_wrapper(
         ngio_store = NgioStore.normalize(store, mode=mode)
         if zarr_format == 2 and _is_ozx(ngio_store):
             raise NgioValueError(
-                "OME-Zarr zip files (RFC-9) hold OME-Zarr 0.5 or later, which "
-                "is Zarr v3; cannot write Zarr v2 (OME-Zarr 0.4) into one."
+                f"Cannot create a Zarr v2 (OME-Zarr 0.4) hierarchy in {store}: an "
+                "OME-Zarr zip file (RFC-9) must hold its root `zarr.json` at the "
+                "archive root, which only Zarr v3 (OME-Zarr 0.5 and later) has. "
+                "Pass ngff_version='0.5'."
             )
         group = zarr.open_group(
             store=ngio_store,
@@ -141,8 +143,9 @@ def open_group_wrapper(
         )
         if group.metadata.zarr_format == 2 and _is_ozx(ngio_store):
             raise NgioValueError(
-                f"The archive at {store} holds a Zarr v2 hierarchy; OME-Zarr "
-                "zip files (RFC-9) require OME-Zarr 0.5 (Zarr v3)."
+                f"The archive at {store} holds a Zarr v2 hierarchy, which has no "
+                "root `zarr.json`; an OME-Zarr zip file (RFC-9) requires one "
+                "(Zarr v3, OME-Zarr 0.5 and later)."
             )
 
     except NgioError:
@@ -866,7 +869,7 @@ def copy_keys(
 def copy_group(
     src_group: zarr.Group,
     dest_group: zarr.Group,
-    suppress_warnings: bool = False,
+    suppress_warnings: bool | None = None,
     *,
     clear: bool = False,
 ):
@@ -875,9 +878,16 @@ def copy_group(
     Through fsspec mappers when both sides are filesystems, otherwise key by
     key through the stores (`copy_keys`); both carry non-zarr files such as
     parquet and csv tables. Keys already in the destination and absent from
-    the source stay unless `clear` is set. `suppress_warnings` is kept for
-    callers; the copy no longer warns.
+    the source stay unless `clear` is set. `suppress_warnings` is deprecated:
+    the copy no longer warns, so there is nothing to suppress.
     """
+    if suppress_warnings is not None:
+        warnings.warn(
+            "copy_group(suppress_warnings=) is deprecated and will be removed in "
+            "ngio=1.3: the copy no longer warns, drop the argument.",
+            NgioDeprecationWarning,
+            stacklevel=2,
+        )
     if src_group.metadata.zarr_format != dest_group.metadata.zarr_format:
         raise NgioValueError(
             "Different Zarr format versions between source and destination, "
