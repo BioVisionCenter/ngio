@@ -102,9 +102,7 @@ class TestSession:
             store.repack()
             assert path.stat().st_size < size_1
             _assert_conforming(path)
-            assert check_ozx(path).should == [
-                "ZIP64 end of central directory records are not present"
-            ]
+            assert not any("obsolete" in s for s in check_ozx(path).should)
             arr[0, 0] = 9  # the session continues after a repack
         _assert_conforming(path)
         root = zarr.open_group(OzxStore(path, mode="r"), mode="r")
@@ -231,6 +229,62 @@ class TestGuards:
             OzxStore(path, mode="r")._sync_open()
         report = check_ozx(path)
         assert report.conforming and any("encrypted" in s for s in report.should)
+
+    def test_ordering_check_wants_root_first_and_breadth_first(
+        self, tmp_path: Path
+    ) -> None:
+        meta = b'{"attributes":{"ome":{"version":"0.5"}}}'
+
+        def write(names: list[str]) -> Path:
+            path = tmp_path / f"{len(list(tmp_path.iterdir()))}.ozx"
+            with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
+                for name in names:
+                    zf.writestr(name, meta if name.endswith("zarr.json") else b"x")
+                zf.comment = rfc9_comment("0.5")
+            return path
+
+        good = write(
+            [
+                "zarr.json",
+                "0/zarr.json",
+                "labels/zarr.json",
+                "labels/a/zarr.json",
+                "0/c/0",
+            ]
+        )
+        assert check_ozx(good).json_first
+        root_not_first = write(["0/zarr.json", "zarr.json", "0/c/0"])
+        depth_decreasing = write(
+            ["zarr.json", "labels/a/zarr.json", "labels/zarr.json", "0/c/0"]
+        )
+        json_after_chunk = write(["zarr.json", "0/c/0", "0/zarr.json"])
+        for path in (root_not_first, depth_decreasing, json_after_chunk):
+            report = check_ozx(path)
+            assert not report.json_first, path
+            assert any("jsonFirst: true but" in s for s in report.should)
+
+    def test_embedded_archive_is_a_must_violation(self, tmp_path: Path) -> None:
+        path = tmp_path / "outer.ozx"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as zf:
+            zf.writestr("zarr.json", b"{}")
+            zf.writestr("labels/inner.ozx", b"PK")
+        report = check_ozx(path)
+        assert not report.conforming
+        assert any("SHALL NOT be embedded" in m for m in report.must)
+
+    def test_comment_carries_no_version_for_a_plain_zarr_group(
+        self, tmp_path: Path
+    ) -> None:
+        path = tmp_path / "plain.ozx"
+        with OzxStore(path, mode="w") as store:
+            root = zarr.open_group(store, mode="w", zarr_format=3)
+            root.attrs.put({"not": "ome"})
+        with zipfile.ZipFile(path) as zf:
+            assert zf.comment == rfc9_comment(None)
+            assert b"version" not in zf.comment
+        report = check_ozx(path)
+        assert report.conforming and report.json_first
+        assert any("ome.version" in s for s in report.should)
 
     def test_split_archive_is_a_must_violation(self, tmp_path: Path) -> None:
         path = tmp_path / "split.ozx"

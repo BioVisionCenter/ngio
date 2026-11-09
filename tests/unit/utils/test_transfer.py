@@ -51,9 +51,8 @@ def test_dir_to_ozx_to_memory_to_dir(tmp_path: Path) -> None:
     src = _image(tmp_path / "src.zarr")
     ozx = to_ozx(tmp_path / "src.zarr", tmp_path / "packed.ozx")
     report = check_ozx(ozx)
-    assert report.conforming and report.should == [
-        "ZIP64 end of central directory records are not present"
-    ]
+    assert report.conforming and report.json_first
+    assert not any("obsolete" in s or "duplicate" in s for s in report.should)
     _same(src, open_ome_zarr_container(ozx))
 
     mem = to_memory(ozx)

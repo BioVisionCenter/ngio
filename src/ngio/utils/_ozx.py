@@ -57,7 +57,6 @@ logger = logging.getLogger(f"ngio:{__name__}")
 OzxAccessMode = Literal["r", "r+", "w", "w-", "a"]
 
 OZX_SUFFIX = ".ozx"
-DEFAULT_OME_VERSION = "0.5"
 
 _ZIP_MODES: dict[str, str] = {"r": "r", "r+": "a", "a": "a", "w": "w", "w-": "x"}
 _META_NAME = "zarr.json"
@@ -72,15 +71,17 @@ def _record_sort_key(name: str) -> tuple[int, int, str]:
     return (0 if _is_zarr_json(name) else 1, name.count("/"), name)
 
 
-def rfc9_comment(version: str = DEFAULT_OME_VERSION) -> bytes:
-    """Return the RFC-9 archive comment for a `zarr.json`-first central directory."""
-    doc = {
-        "ome": {
-            "version": version,
-            "zipFile": {"centralDirectory": {"jsonFirst": True}},
-        }
-    }
-    return json.dumps(doc, separators=(",", ":")).encode("utf-8")
+def rfc9_comment(version: str | None) -> bytes:
+    """Return the RFC-9 archive comment for a `zarr.json`-first central directory.
+
+    `version` is the OME-Zarr version of the hierarchy; `None` (a plain zarr
+    group, no `ome` attributes) leaves it out rather than asserting one.
+    """
+    ome: dict[str, Any] = {}
+    if version is not None:
+        ome["version"] = version
+    ome["zipFile"] = {"centralDirectory": {"jsonFirst": True}}
+    return json.dumps({"ome": ome}, separators=(",", ":")).encode("utf-8")
 
 
 class _OzxZipFile(zipfile.ZipFile):
@@ -91,15 +92,16 @@ class _OzxZipFile(zipfile.ZipFile):
     `__del__`) is still conformant.
     """
 
-    def ome_version(self) -> str:
+    def ome_version(self) -> str | None:
+        """The OME-Zarr version in the root `zarr.json`, `None` when it has none."""
         info = self.NameToInfo.get(_META_NAME)
         if info is None:
-            return DEFAULT_OME_VERSION
+            return None
         try:
             with self.open(info) as f:
                 version = json.loads(f.read())["attributes"]["ome"]["version"]
         except (KeyError, TypeError, ValueError, zipfile.BadZipFile):
-            return DEFAULT_OME_VERSION
+            return None
         return str(version)
 
     def tombstone(self, name: str) -> bool:
@@ -847,6 +849,12 @@ def check_ozx(path: str | Path) -> OzxReport:
         report.must.append("root-level zarr.json is missing")
     if disk or cd_disk or multi_disk:
         report.must.append("archive is split into multiple parts")
+    nested = [n for n in names if n.lower().endswith((".zip", OZX_SUFFIX))]
+    if nested:
+        report.must.append(
+            f"{len(nested)} entries look like archives (e.g. {nested[0]!r}); an "
+            "OME-Zarr zip file SHALL NOT be embedded in a parent hierarchy"
+        )
     if methods - {0}:
         report.should.append(
             f"entries are compressed (methods {sorted(methods - {0})}); the RFC "
@@ -865,7 +873,11 @@ def check_ozx(path: str | Path) -> OzxReport:
         )
 
     if not report.zip64:
-        report.should.append("ZIP64 end of central directory records are not present")
+        report.should.append(
+            "no ZIP64 end of central directory records (the RFC recommends them "
+            "irrespective of size; Python's zipfile writes them only when the "
+            "archive needs them, and readers do not depend on them)"
+        )
     seen: set[str] = set()
     dups: set[str] = set()
     for n in names:
@@ -876,8 +888,19 @@ def check_ozx(path: str | Path) -> OzxReport:
             f"{len(dups)} duplicate names in the central directory "
             f"(e.g. {report.duplicates[0]!r})"
         )
-    is_json = [_is_zarr_json(n) for n in names if not n.endswith("/")]
-    ordered = all(is_json[k] >= is_json[k + 1] for k in range(len(is_json) - 1))
+    # The RECOMMENDED order: root `zarr.json` first, the other `zarr.json`
+    # records next in breadth-first (non-decreasing depth) order, then the rest.
+    records = [n for n in names if not n.endswith("/")]
+    n_json = next(
+        (k for k, n in enumerate(records) if not _is_zarr_json(n)), len(records)
+    )
+    json_prefix = records[:n_json]
+    depths = [n.count("/") for n in json_prefix]
+    ordered = (
+        not any(_is_zarr_json(n) for n in records[n_json:])
+        and (not records or records[0] == _META_NAME)
+        and all(depths[k] <= depths[k + 1] for k in range(len(depths) - 1))
+    )
     report.json_first = ordered
 
     comment_ok = False
