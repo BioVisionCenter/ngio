@@ -40,11 +40,14 @@ deleted tables and `overwrite=True` all work in place:
 
 A ZIP archive is a sequence of entries followed by a central directory that lists them.
 ngio appends new entries and, when an entry is rewritten, drops the old record from the
-directory so no duplicate names remain. The directory itself is rewritten whenever the
-hierarchy changes (a group created or deleted, metadata written), so after each of those
-the file on disk is a complete, readable archive. Chunks written after the last such
-change are published when the store is closed or released, which the path-based API
-does for you when the container is garbage collected or the interpreter exits.
+directory so no duplicate names remain. The directory itself is rewritten at the end of
+every call that writes (metadata, a group created or deleted, `set_array`, `set_roi`,
+`consolidate`, a table), so whenever your code is between ngio calls the file on disk is
+a complete, readable archive, in this process and in any other. The one window where it
+is not is the write itself: appending to a zip overwrites the directory, so a process
+that dies in the middle of a `set_array` leaves an archive without one, and ngio cannot
+recover it. Keep a copy of anything precious, and for heavy or parallel writes work on a
+directory or in memory and pack the result with `to_ozx`.
 
 An archive has one writer per process. Opening a path that another container in the
 same process already holds for writing does not open the file again: the new container

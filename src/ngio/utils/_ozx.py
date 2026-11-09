@@ -135,6 +135,8 @@ class _OzxZipFile(zipfile.ZipFile):
         Mirrors what `close` does: seek to the end of the last entry, write
         the directory and the end records, truncate. Later writes overwrite
         the directory again, exactly as the first append of a session does.
+        No `fsync`: readers with their own handle see the page cache, and a
+        process death keeps it; only `close` syncs to the device.
         """
         if self.mode not in ("w", "x", "a"):
             return
@@ -153,11 +155,14 @@ class _OzxZipFile(zipfile.ZipFile):
             # record behind the live one, and readers scan for it from the end.
             fp.truncate()
             fp.flush()
-            os.fsync(fp.fileno())
+            # Nothing to write until the next modification.
+            self._didModify = False
 
     def close(self) -> None:
-        if self.fp is not None and self.mode in ("w", "x", "a") and self._didModify:
-            self._prepare_directory()
+        fp = self.fp
+        if fp is not None and self.mode in ("w", "x", "a"):
+            self.flush()
+            os.fsync(fp.fileno())
         super().close()
 
 
@@ -248,10 +253,13 @@ class OzxStore(ZipStore):
     archive (created if missing), `"w"` truncate, `"w-"` create or fail.
 
     The archive on disk is a complete, readable OME-Zarr zip file after every
-    `flush` and after `close`. ngio flushes whenever the hierarchy changes
-    (metadata written, groups created or deleted); array chunks written since
-    the last flush become visible at the next flush or at `close`. Dead space
-    left by overwrites and deletes is only reclaimed by `repack`.
+    `flush` and after `close`. ngio flushes at the end of every call that
+    writes (metadata, groups, `set_array`, `set_roi`, `consolidate`, tables),
+    so between calls the file is always readable; chunks written through a raw
+    zarr array become visible at the next flush or at `close`. While a write
+    is in flight the file has no central directory: a process that dies there
+    leaves an archive ngio cannot recover. Dead space left by overwrites and
+    deletes is only reclaimed by `repack`.
 
     Raises:
         NgioValueError: On a second writable store for the same archive in
@@ -326,6 +334,16 @@ class OzxStore(ZipStore):
                 compression=self.compression,
                 allowZip64=self.allowZip64,
             )
+        except zipfile.BadZipFile as e:
+            if not self.read_only:
+                _unregister_writable(self)
+            raise NgioValueError(
+                f"{self.path} is not a readable zip archive ({e}). An OME-Zarr "
+                "zip file is edited in place: a process that dies while ngio is "
+                "writing to it leaves the archive without its central directory, "
+                "and ngio cannot recover it. Keep a copy, or write heavy jobs to "
+                "a directory or memory store and pack them with `to_ozx`."
+            ) from e
         except BaseException:
             if not self.read_only:
                 _unregister_writable(self)

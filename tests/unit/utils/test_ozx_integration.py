@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import gc
 import pickle
+import subprocess
+import sys
 import zipfile
 from typing import TYPE_CHECKING
 
@@ -152,6 +154,50 @@ class TestPathRouting:
         del img
         gc.collect()
         assert open_ome_zarr_container(path).list_labels() == ["seg"]
+
+    def test_chunk_writes_publish_before_release(self, tmp_path: Path) -> None:
+        # Random bytes: compressible data hides a missing directory behind
+        # the write buffer. Everything stays referenced throughout.
+        path = tmp_path / "img.ozx"
+        rng = np.random.default_rng(0)
+        data = rng.integers(0, 255, size=SHAPE, dtype=np.uint8)
+        oz = _create(path, overwrite=True)
+        img = oz.get_image()
+        img.set_array(data)
+        _assert_conforming(path)
+        other = open_ome_zarr_container(path, mode="r").get_image()
+        np.testing.assert_array_equal(other.get_array(), data)
+
+        patch = rng.integers(0, 255, size=(2, 4, 8, 8), dtype=np.uint8)
+        img.set_roi(img.roi(), patch, x=slice(0, 8), y=slice(0, 8))
+        _assert_conforming(path)
+        img.consolidate()
+        _assert_conforming(path)
+        with zipfile.ZipFile(path) as zf:
+            assert any(name.startswith("1/c/") for name in zf.namelist())
+
+    def test_chunk_writes_survive_os_exit(self, tmp_path: Path) -> None:
+        # `os._exit` skips finalizers and garbage collection: what is on
+        # disk when `set_array` returns is all a crashed process leaves.
+        path = tmp_path / "img.ozx"
+        script = (
+            "import os\nimport numpy as np\n"
+            "from ngio import create_empty_ome_zarr\n"
+            f"oz = create_empty_ome_zarr({str(path)!r}, shape={SHAPE!r}, "
+            f"pixelsize=0.5, chunks={CHUNKS!r}, ngff_version='0.5')\n"
+            "rng = np.random.default_rng(0)\n"
+            f"oz.get_image().set_array(rng.integers(0, 255, size={SHAPE!r}, "
+            "dtype=np.uint8))\n"
+            "os._exit(0)\n"
+        )
+        proc = subprocess.run(
+            [sys.executable, "-c", script], capture_output=True, text=True
+        )
+        assert proc.returncode == 0, proc.stderr
+        _assert_conforming(path)
+        expected = np.random.default_rng(0).integers(0, 255, size=SHAPE, dtype=np.uint8)
+        img = open_ome_zarr_container(path, mode="r").get_image()
+        np.testing.assert_array_equal(img.get_array(), expected)
 
     def test_mode_w_truncates(self, tmp_path: Path) -> None:
         path = tmp_path / "img.ozx"

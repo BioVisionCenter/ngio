@@ -345,7 +345,8 @@ class NgioStore(WrapperStore[Store]):
         A single-file store (`.ozx`) keeps its directory in memory during a
         writing session; this writes it. Every other store is consistent after
         each write, so this is a no-op for them. Called by the group handler
-        whenever the hierarchy changes.
+        whenever the hierarchy changes and by the image write verbs
+        (`set_array`, `set_roi`, `consolidate`) when they return.
         """
         if isinstance(self._store, OzxStore):
             self._store.flush()

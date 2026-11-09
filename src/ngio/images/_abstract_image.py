@@ -592,6 +592,7 @@ class AbstractImage(ABC):
             )
             numpy_setter(patch)
             self._record_write(numpy_setter)
+            self._group_handler.store.flush()
 
         elif isinstance(patch, da.Array):
             dask_setter = DaskSetter(
@@ -604,6 +605,7 @@ class AbstractImage(ABC):
             )
             dask_setter(patch)
             self._record_write(dask_setter)
+            self._group_handler.store.flush()
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -647,6 +649,7 @@ class AbstractImage(ABC):
             )
             roi_numpy_setter(patch)
             self._record_write(roi_numpy_setter)
+            self._group_handler.store.flush()
 
         elif isinstance(patch, da.Array):
             roi_dask_setter = DaskSetter(
@@ -660,6 +663,7 @@ class AbstractImage(ABC):
             )
             roi_dask_setter(patch)
             self._record_write(roi_dask_setter)
+            self._group_handler.store.flush()
         else:
             raise TypeError(
                 f"Unsupported patch type: {type(patch)}. "
@@ -847,6 +851,7 @@ def consolidate_image(
             None if regions is None else _resolve_consolidation_regions(image, regions)
         ),
     )
+    image._group_handler.store.flush()
 
 
 def _shapes_from_ref_image(

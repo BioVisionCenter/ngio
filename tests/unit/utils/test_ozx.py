@@ -228,6 +228,23 @@ class TestGuards:
         assert proc.returncode == 0, proc.stderr
         _assert_conforming(path)
 
+    def test_corrupt_archive_raises_ngio_error(self, tmp_path: Path) -> None:
+        garbage = tmp_path / "garbage.ozx"
+        garbage.write_bytes(b"not a zip at all" * 10)
+        with pytest.raises(NgioValueError, match="not a readable zip archive"):
+            OzxStore(garbage, mode="r")._sync_open()
+
+        # What a process death mid-write leaves behind: entries, no directory.
+        truncated = tmp_path / "truncated.ozx"
+        with OzxStore(truncated, mode="w") as store:
+            _write_hierarchy(store)
+        with zipfile.ZipFile(truncated) as zf:
+            start_dir = zf.start_dir
+        with truncated.open("r+b") as fp:
+            fp.truncate(start_dir + 7)
+        with pytest.raises(NgioValueError, match="cannot recover"):
+            OzxStore(truncated, mode="r")._sync_open()
+
 
 class TestStore:
     def test_read_only_view_shares_live_session(self, tmp_path: Path) -> None:
@@ -257,6 +274,7 @@ class TestStore:
             zf.writestr("zarr.json", meta)
             zf.flush()
             assert _names(path) == ["zarr.json", "0/c/0"]
+            assert not zf._didModify  # a second flush has nothing to write
             zf.tombstone(
                 "0/c/0"
             )  # the directory shrinks: no stale end record may remain
