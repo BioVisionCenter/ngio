@@ -187,7 +187,10 @@ image.set_array(data)
 ```
 
 It accepts a numpy array or a dask array, and takes the same slicing and `axes_order`
-arguments as the getters, so you can write back exactly the region you read. Writes
+arguments as the getters, so you can write back exactly the region you read. In an
+`axes_order`, a canonical axis (`t`, `c`, `z`, `y`, `x`) that the image does not have
+is a singleton dimension, so one `"czyx"` works on 2D and 3D data; any other name
+that is not on disk raises. Writes
 can also *combine* with what is on disk instead of replacing it — see
 [Merging instead of overwriting](#merging-instead-of-overwriting) and
 [Keeping label ids unique across regions](#keeping-label-ids-unique-across-regions)

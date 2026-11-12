@@ -6,6 +6,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict
 
 from ngio.common._dimensions import Dimensions
+from ngio.ome_zarr_meta.ngio_specs import canonical_axes_order
 from ngio.utils import NgioValueError
 
 ##############################################################
@@ -243,16 +244,17 @@ def set_as_sequence_axes_ops(
 
 def _check_output_axes(axes: Sequence[str]) -> None:
     """Check that the input axes are valid."""
-    unique_names = set(axes)
-    if len(unique_names) != len(axes):
-        raise NgioValueError(
-            "Duplicate axis names found. Please provide unique names for each axis."
-        )
     for name in axes:
         if not isinstance(name, str):
             raise NgioValueError(
                 f"Invalid axis name '{name}'. Axis names must be strings."
             )
+    duplicates = sorted({name for name in axes if axes.count(name) > 1})
+    if duplicates:
+        raise NgioValueError(
+            f"Duplicate axis names {duplicates} in axes_order={list(axes)}. "
+            "Please provide unique names for each axis."
+        )
 
 
 def _build_squeeze_tuple(
@@ -332,15 +334,32 @@ def _normalize_axes_order(
     """Convert axes order to the on-disk axes names.
 
     In this way there is not unambiguity in the axes order.
+
+    An axis that is not on disk is kept as a virtual (singleton) axis only if
+    it is a canonical axis, by its canonical name or the name the `AxesSetup`
+    maps to it. Any other name is an error rather than a phantom dimension.
     """
+    axes_handler = dimensions.axes_handler
     new_axes_order = []
     for axis_name in axes_order:
-        axis = dimensions.axes_handler.get_axis(axis_name)
-        if axis is None:
-            new_axes_order.append(axis_name)
-        else:
+        axis = axes_handler.get_axis(axis_name)
+        if axis is not None:
             new_axes_order.append(axis.name)
+            continue
+        canonical = axes_handler.get_canonical_name(axis_name) or axis_name
+        if canonical not in canonical_axes_order():
+            raise NgioValueError(
+                f"axes_order={list(axes_order)} contains '{axis_name}', which is "
+                f"neither an axis of this image {list(axes_handler.axes_names)} "
+                f"nor a canonical axis {list(canonical_axes_order())}."
+            )
+        new_axes_order.append(canonical)
     return tuple(new_axes_order)
+
+
+def validate_axes_order(dimensions: Dimensions, axes_order: Sequence[str]) -> None:
+    """Fail now, not at the first read, if `axes_order` cannot be honoured."""
+    _check_output_axes(_normalize_axes_order(dimensions, axes_order))
 
 
 def build_axes_ops(

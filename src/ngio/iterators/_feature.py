@@ -18,6 +18,7 @@ from ngio.io_pipes import (
     NumpyGetter,
     TransformProtocol,
 )
+from ngio.io_pipes._ops_axes import validate_axes_order
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol
 from ngio.iterators._partials import (
@@ -328,6 +329,8 @@ class FeatureExtractorIterator(
         )
         self._channel_selection = channel_selection
         self._axes_order = axes_order
+        if axes_order is not None:
+            validate_axes_order(input_image.dimensions, axes_order)
         self._input_transforms = input_transforms
         self._label_transforms = label_transforms
 
