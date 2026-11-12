@@ -23,6 +23,7 @@ from ngio.io_pipes._io_pipe_ops import IoPipeContext, setup_io_pipe
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._mask_transform import BaseMaskMerge, BaseMaskTransform
 from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
+from ngio.io_pipes._ops_axes import validate_axes_order
 from ngio.io_pipes._ops_slices_utils import check_if_regions_overlap
 from ngio.iterators._abstract_iterator import OverlapPolicy, WritingIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol, WriteOrder, validate_write_order
@@ -140,6 +141,8 @@ class SegmentationIterator(WritingIteratorBuilder[np.ndarray, da.Array, None]):
         )
         self._channel_selection = channel_selection
         self._axes_order = axes_order
+        if axes_order is not None:
+            validate_axes_order(input_image.dimensions, axes_order)
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 
@@ -607,6 +610,8 @@ class MaskedSegmentationIterator(SegmentationIterator):
         )
         self._channel_selection = channel_selection
         self._axes_order = axes_order
+        if axes_order is not None:
+            validate_axes_order(input_image.dimensions, axes_order)
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 

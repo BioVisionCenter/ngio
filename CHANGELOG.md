@@ -6,6 +6,8 @@
 
 - Add `set_config()` (exported from `ngio` and `ngio.config`) to replace the global `NgioConfig` from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the `s3fs` retry markers and the `zarr` section, so libraries can configure ngio without setting `NGIO_CONFIG_PATH` before `import ngio`.
 
+- `axes_order` only virtualises canonical axes. A canonical axis (`t`, `c`, `z`, `y`, `x`) missing on disk still comes back as a singleton, by its canonical name or the name the `AxesSetup` maps to it, so one `"czyx"` keeps working on 2D and 3D data. Any other name that is not an axis of the image raises `NgioValueError` naming it, the full order, the image axes and the canonical set; it used to become a phantom dimension (`axes_order="czyq"` returned a 4D array with `x` dropped and a size-1 axis appended). The iterators run the check in the constructor instead of at the first read, and the duplicate-axis error names the repeated axis ([#277](https://github.com/BioVisionCenter/ngio/issues/277)).
+
 ### Tests
 
 - The suite passes under pandas 3.1. The stores test helper no longer calls `set_index(inplace=True)` (deprecated, PDEP-8), and anndata's read of the deprecated `future.infer_string` option is ignored by message in `filterwarnings` until an anndata release carries the upstream fix ([scverse/anndata#2672](https://github.com/scverse/anndata/issues/2672)). The weekly pip CI was red on both jobs ([#266](https://github.com/BioVisionCenter/ngio/issues/266), [#267](https://github.com/BioVisionCenter/ngio/issues/267)).

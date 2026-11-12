@@ -33,6 +33,7 @@ from ngio.images._image import (
     add_channel_selection_to_slicing_dict,
 )
 from ngio.io_pipes import DaskGetter, DataGetter, NumpyGetter, TransformProtocol
+from ngio.io_pipes._ops_axes import validate_axes_order
 from ngio.iterators._abstract_iterator import AbstractIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol
 from ngio.iterators._partials import (
@@ -418,6 +419,8 @@ class ObjectDetectionIterator(
         )
         self._channel_selection = channel_selection
         self._axes_order = axes_order
+        if axes_order is not None:
+            validate_axes_order(input_image.dimensions, axes_order)
         self._input_transforms = input_transforms
 
     def _get_init_kwargs(self) -> dict:
