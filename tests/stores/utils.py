@@ -23,8 +23,7 @@ TEST_TABLE = pd.DataFrame(
         "area": [150, 200, 250],
         "mean_intensity": [120.5, 130.0, 140.5],
     }
-)
-TEST_TABLE.set_index("label", inplace=True)
+).set_index("label")
 
 
 def set_to_image(ome_zarr: OmeZarrContainer) -> OmeZarrContainer:
