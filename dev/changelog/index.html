@@ -2048,6 +2048,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -2449,7 +2460,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
+  <a href="#tests_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Tests
@@ -2644,7 +2655,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests_1" class="md-nav__link">
+  <a href="#tests_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Tests
@@ -3485,6 +3496,17 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      <span class="md-typeset">
+        Tests
+      </span>
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3886,7 +3908,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests" class="md-nav__link">
+  <a href="#tests_1" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Tests
@@ -4081,7 +4103,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#tests_1" class="md-nav__link">
+  <a href="#tests_2" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
         Tests
@@ -4832,6 +4854,10 @@
 <ul>
 <li>Add <code>set_config()</code> (exported from <code>ngio</code> and <code>ngio.config</code>) to replace the global <code>NgioConfig</code> from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the <code>s3fs</code> retry markers and the <code>zarr</code> section, so libraries can configure ngio without setting <code>NGIO_CONFIG_PATH</code> before <code>import ngio</code>.</li>
 </ul>
+<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<ul>
+<li>The suite passes under pandas 3.1. The stores test helper no longer calls <code>set_index(inplace=True)</code> (deprecated, PDEP-8), and anndata's read of the deprecated <code>future.infer_string</code> option is ignored by message in <code>filterwarnings</code> until an anndata release carries the upstream fix (<a href="https://github.com/scverse/anndata/issues/2672">scverse/anndata#2672</a>). The weekly pip CI was red on both jobs (<a href="https://github.com/BioVisionCenter/ngio/issues/266">#266</a>, <a href="https://github.com/BioVisionCenter/ngio/issues/267">#267</a>).</li>
+</ul>
 <h2 id="v113">[v1.1.3]<a class="headerlink" href="#v113" title="Permanent link">&para;</a></h2>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
@@ -5161,7 +5187,7 @@
 <li>Add a global <code>NgioConfig</code> / <code>get_config()</code> configuration system, loaded from <code>~/.ngio_config.json</code> by default or a path set via the <code>NGIO_CONFIG_PATH</code> env var (<code>.json</code> file). Both are exported from the top-level <code>ngio</code> package.</li>
 <li>Add configurable s3fs retry handling: <code>NgioConfig.s3fs.custom_retry_markers</code> lists error substrings that trigger a retry via a custom <code>s3fs.set_custom_error_handler</code>, applied through the new <code>ngio.utils.refresh_s3fs_config()</code>. The motivating use case is AWS clock-skew errors, but any error substring can be configured.</li>
 </ul>
-<h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
+<h3 id="tests_1">Tests<a class="headerlink" href="#tests_1" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Migrate the S3 store test harness from a <code>moto[server]</code> subprocess to <a href="https://github.com/owenlamont/aiomoto"><code>aiomoto</code></a> in server mode (<code>aiomoto[pandas]</code> in the <code>test</code> extra). This also fixes a CI import crash on Python 3.13/3.14: <code>aiomoto</code> caps <code>aiobotocore</code>/<code>moto</code> and floors <code>s3fs</code>, so the universal (multi-platform) solve no longer backtracks <code>s3fs</code> to the ancient <code>0.4.2</code> (which lacks <code>set_custom_error_handler</code> and crashed <code>import ngio</code> at module load). CSV and Parquet table backends now round-trip on the S3 store under the mock.</li>
 </ul>
@@ -5213,7 +5239,7 @@
 <ul>
 <li>Change tolerance when converting Roi to pixel coordinates to avoid machine precision dependent rounding issues.</li>
 </ul>
-<h3 id="tests_1">Tests<a class="headerlink" href="#tests_1" title="Permanent link">&para;</a></h3>
+<h3 id="tests_2">Tests<a class="headerlink" href="#tests_2" title="Permanent link">&para;</a></h3>
 <ul>
 <li>Improve testing for ZoomTransform.</li>
 <li>Remove broad warnings filter for all tests.</li>
