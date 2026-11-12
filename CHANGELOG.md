@@ -6,6 +6,10 @@
 
 - Add `set_config()` (exported from `ngio` and `ngio.config`) to replace the global `NgioConfig` from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the `s3fs` retry markers and the `zarr` section, so libraries can configure ngio without setting `NGIO_CONFIG_PATH` before `import ngio`.
 
+### Fixes
+
+- `derive_label` and `add_table` on a container opened with `mode="r"` that has no `labels`/`tables` group yet raise `NgioValueError("The group is read only. Cannot derive a label.")` (or `... add a table.`) instead of `NgioValidationError("No labels found in the image.")`: the missing group could not be created, and the error said it did not exist. Same for `OmeZarrPlate.add_table`. Reading on such a container (`list_labels`, `labels_container`) still reports "No labels found" ([#279](https://github.com/BioVisionCenter/ngio/issues/279)).
+
 ### Tests
 
 - The suite passes under pandas 3.1. The stores test helper no longer calls `set_index(inplace=True)` (deprecated, PDEP-8), and anndata's read of the deprecated `future.infer_string` option is ignored by message in `filterwarnings` until an anndata release carries the upstream fix ([scverse/anndata#2672](https://github.com/scverse/anndata/issues/2672)). The weekly pip CI was red on both jobs ([#266](https://github.com/BioVisionCenter/ngio/issues/266), [#267](https://github.com/BioVisionCenter/ngio/issues/267)).

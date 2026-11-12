@@ -154,6 +154,8 @@ def test_tables_container_missing_on_readonly_plate(tmp_path: Path):
     assert plate.list_tables() == []
     with pytest.raises(NgioValidationError, match="No tables found"):
         _ = plate.tables_container
+    with pytest.raises(NgioValueError, match="read only"):
+        plate.add_table("t", RoiTable(rois=[]))
 
 
 def test_typed_table_getters(tmp_path: Path):

@@ -202,5 +202,11 @@ def test_labels_missing_on_read_only_container(tmp_path: Path):
 
     # a read-only container without a labels group degrades gracefully
     assert container.list_labels() == []
-    with pytest.raises(NgioValidationError):
+    with pytest.raises(NgioValidationError, match="No labels found"):
         _ = container.labels_container
+
+    # a write names the real problem: the group cannot be created (#279)
+    with pytest.raises(NgioValueError, match="read only"):
+        container.derive_label("x")
+    with pytest.raises(NgioValueError, match="read only"):
+        container.add_table("t", RoiTable(rois=[]))
