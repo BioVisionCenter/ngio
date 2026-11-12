@@ -178,6 +178,11 @@ class OmeZarrContainer:
         self._tables_container = None
         self._tables_absent = False
 
+    def _require_writable(self, action: str) -> None:
+        """Raise before a write that needs a group this container cannot create."""
+        if self._group_handler.read_only:
+            raise NgioValueError(f"The group is read only. Cannot {action}.")
+
     @property
     def images_container(self) -> ImagesContainer:
         """Return the images container.
@@ -820,6 +825,7 @@ class OmeZarrContainer:
 
         If `backend` is `None` (default), the table's own backend is preserved.
         """
+        self._require_writable("add a table")
         self.tables_container.add(
             name=name, table=table, backend=backend, overwrite=overwrite
         )
@@ -992,6 +998,7 @@ class OmeZarrContainer:
             Label: The new derived label.
 
         """
+        self._require_writable("derive a label")
         if ref_image is None:
             ref_image = self.get_image()
         return self.labels_container.derive(

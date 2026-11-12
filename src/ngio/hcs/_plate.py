@@ -1002,6 +1002,8 @@ class OmeZarrPlate:
 
         If `backend` is `None` (default), the table's own backend is preserved.
         """
+        if self._group_handler.read_only:
+            raise NgioValueError("The group is read only. Cannot add a table.")
         self.tables_container.add(
             name=name, table=table, backend=backend, overwrite=overwrite
         )
