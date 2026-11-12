@@ -4852,7 +4852,12 @@
 <h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
 <h3 id="features">Features<a class="headerlink" href="#features" title="Permanent link">&para;</a></h3>
 <ul>
-<li>Add <code>set_config()</code> (exported from <code>ngio</code> and <code>ngio.config</code>) to replace the global <code>NgioConfig</code> from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the <code>s3fs</code> retry markers and the <code>zarr</code> section, so libraries can configure ngio without setting <code>NGIO_CONFIG_PATH</code> before <code>import ngio</code>.</li>
+<li>
+<p>Add <code>set_config()</code> (exported from <code>ngio</code> and <code>ngio.config</code>) to replace the global <code>NgioConfig</code> from code at any time. It replaces the previous configuration (a zarr setting forwarded earlier stays unless the new config sets it) and immediately applies the <code>s3fs</code> retry markers and the <code>zarr</code> section, so libraries can configure ngio without setting <code>NGIO_CONFIG_PATH</code> before <code>import ngio</code>.</p>
+</li>
+<li>
+<p><code>axes_order</code> only virtualises canonical axes. A canonical axis (<code>t</code>, <code>c</code>, <code>z</code>, <code>y</code>, <code>x</code>) missing on disk still comes back as a singleton, by its canonical name or the name the <code>AxesSetup</code> maps to it, so one <code>"czyx"</code> keeps working on 2D and 3D data. Any other name that is not an axis of the image raises <code>NgioValueError</code> naming it, the full order, the image axes and the canonical set; it used to become a phantom dimension (<code>axes_order="czyq"</code> returned a 4D array with <code>x</code> dropped and a size-1 axis appended). The iterators run the check in the constructor instead of at the first read, and the duplicate-axis error names the repeated axis (<a href="https://github.com/BioVisionCenter/ngio/issues/277">#277</a>).</p>
+</li>
 </ul>
 <h3 id="tests">Tests<a class="headerlink" href="#tests" title="Permanent link">&para;</a></h3>
 <ul>

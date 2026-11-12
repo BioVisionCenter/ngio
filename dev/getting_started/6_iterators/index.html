@@ -2726,7 +2726,8 @@ ImageProcessingIterator(rois=1)
 </div>
 <p>The constructors share a small vocabulary of keyword arguments:
 <code>channel_selection</code> restricts the input reads to given channels, <code>axes_order</code>
-fixes the axes order of the patches the function sees (<code>"yx"</code> above),
+fixes the axes order of the patches the function sees (<code>"yx"</code> above; a canonical
+axis the image lacks is a singleton, any other unknown name raises at construction),
 <code>input_transforms</code>/<code>output_transforms</code> apply
 <a href="../../api/ngio/transforms/">transforms</a> around the function, and the writing
 iterators take <code>consolidation_mode</code> (how the output pyramid is rebuilt at the
