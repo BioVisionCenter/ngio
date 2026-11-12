@@ -283,9 +283,9 @@ def test_get_and_squeeze(tmp_path: Path):
     assert image.get_array(channel_selection=(0,), axes_order=None).shape == (1, 20, 30)
     assert image.get_array(channel_selection=0, axes_order=None).shape == (20, 30)
 
-    # Reordering axes and adding a virtual axis
+    # Reordering axes and adding a virtual (canonical, not on disk) axis
     assert image.get_array(
-        channel_selection=0, axes_order=["c", "x", "y", "virtual"]
+        channel_selection=0, axes_order=["c", "x", "y", "z"]
     ).shape == (
         1,
         30,

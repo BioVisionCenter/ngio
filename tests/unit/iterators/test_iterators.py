@@ -5,7 +5,11 @@ import numpy as np
 import pytest
 from zarr.storage import MemoryStore
 
-from ngio import create_ome_zarr_from_array, open_ome_zarr_container
+from ngio import (
+    create_empty_ome_zarr,
+    create_ome_zarr_from_array,
+    open_ome_zarr_container,
+)
 from ngio.iterators import (
     FeatureExtractorIterator,
     ImageProcessingIterator,
@@ -356,3 +360,24 @@ def test_incomplete_get_init_kwargs_is_refused():
     )
     with pytest.raises(NgioValueError, match="favourite"):
         iterator.by_yx()
+
+
+def test_iterator_rejects_unknown_axes_order_at_construction():
+    # a typo in `axes_order` fails in the constructor, not at the first read (#277)
+    ome_zarr = create_empty_ome_zarr(
+        MemoryStore(),
+        shape=(2, 8, 8),
+        axes_names=("c", "y", "x"),
+        pixelsize=0.5,
+        levels=2,
+    )
+    image = ome_zarr.get_image()
+    t_image = ome_zarr.derive_image(store=MemoryStore()).get_image()
+    label = ome_zarr.derive_label("label")
+
+    with pytest.raises(NgioValueError, match="'typo'"):
+        ImageProcessingIterator(image, t_image, axes_order=["c", "x", "y", "typo"])
+    with pytest.raises(NgioValueError, match="'q'"):
+        SegmentationIterator(image, label, channel_selection=0, axes_order="yxq")
+    # a canonical axis missing on disk stays a virtual axis
+    ImageProcessingIterator(image, t_image, axes_order="czyx")

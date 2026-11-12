@@ -197,7 +197,8 @@ iterator covers the whole image as a single region:
 
 The constructors share a small vocabulary of keyword arguments:
 `channel_selection` restricts the input reads to given channels, `axes_order`
-fixes the axes order of the patches the function sees (`"yx"` above),
+fixes the axes order of the patches the function sees (`"yx"` above; a canonical
+axis the image lacks is a singleton, any other unknown name raises at construction),
 `input_transforms`/`output_transforms` apply
 [transforms](../api/ngio/transforms.md) around the function, and the writing
 iterators take `consolidation_mode` (how the output pyramid is rebuilt at the

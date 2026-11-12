@@ -20,6 +20,7 @@ from ngio.io_pipes import (
 )
 from ngio.io_pipes._io_pipes_types import DataGetterProtocol, DataSetterProtocol
 from ngio.io_pipes._merge_policy import MergeInput, resolve_merge
+from ngio.io_pipes._ops_axes import validate_axes_order
 from ngio.iterators._abstract_iterator import OverlapPolicy, WritingIteratorBuilder
 from ngio.iterators._mappers import MapperProtocol, WriteOrder, validate_write_order
 
@@ -85,6 +86,8 @@ class ImageProcessingIterator(WritingIteratorBuilder[np.ndarray, da.Array, None]
         self._channel_selection = channel_selection
         self._output_channel_selection = output_channel_selection
         self._axes_order = axes_order
+        if axes_order is not None:
+            validate_axes_order(input_image.dimensions, axes_order)
         self._input_transforms = input_transforms
         self._output_transforms = output_transforms
 

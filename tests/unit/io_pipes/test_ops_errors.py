@@ -5,6 +5,7 @@ from zarr.storage import MemoryStore
 from ngio import Roi, create_empty_ome_zarr
 from ngio.common import Dimensions
 from ngio.io_pipes._match_shape import numpy_match_shape
+from ngio.io_pipes._ops_axes import build_axes_ops, validate_axes_order
 from ngio.io_pipes._ops_slices import build_slicing_ops
 from ngio.io_pipes._zoom_transform import BaseZoomTransform
 from ngio.ome_zarr_meta import AxesHandler, Dataset
@@ -266,3 +267,56 @@ def test_negative_value_in_slicing_sequence_raises_ngio_error():
             dimensions=dims,
             slicing_dict={"y": [-1, 0]},
         )
+
+
+##############################################################
+# _ops_axes.py: which names may be virtual axes (#277)
+##############################################################
+
+
+def test_axes_order_canonical_axis_missing_on_disk_is_virtual():
+    dims = _make_dims(["c", "y", "x"], (2, 8, 8))
+    ops = build_axes_ops(
+        dimensions=dims, input_axes=("c", "y", "x"), axes_order=["c", "z", "y", "x"]
+    )
+    assert ops.output_axes == ("c", "z", "y", "x")
+    assert ops.expand_op == (1,)
+
+
+def test_axes_order_unknown_name_raises():
+    dims = _make_dims(["c", "y", "x"], (2, 8, 8))
+    with pytest.raises(NgioValueError, match="'typo'") as exc:
+        build_axes_ops(
+            dimensions=dims,
+            input_axes=("c", "y", "x"),
+            axes_order=["c", "x", "y", "typo"],
+        )
+    # the message echoes the order, the image axes and the canonical set
+    assert "['c', 'x', 'y', 'typo']" in str(exc.value)
+    assert "['c', 'y', 'x']" in str(exc.value)
+    assert "['t', 'c', 'z', 'y', 'x']" in str(exc.value)
+
+
+def test_axes_order_setup_alias_for_missing_canonical_axis_is_virtual():
+    # the setup maps "channel" to "c"; the image has no channel axis, so
+    # asking for "channel" is a virtual "c" axis, not an unknown name
+    dims = _make_dims(["y", "x"], (8, 8), axes_setup=AxesSetup(c="channel"))
+    ops = build_axes_ops(
+        dimensions=dims, input_axes=("y", "x"), axes_order=["channel", "y", "x"]
+    )
+    assert ops.output_axes == ("c", "y", "x")
+
+
+def test_axes_order_duplicate_names_are_named():
+    dims = _make_dims(["c", "y", "x"], (2, 8, 8))
+    with pytest.raises(NgioValueError, match=r"Duplicate axis names \['y'\]"):
+        build_axes_ops(
+            dimensions=dims, input_axes=("c", "y", "x"), axes_order=["c", "y", "y"]
+        )
+
+
+def test_validate_axes_order_accepts_string_orders():
+    dims = _make_dims(["c", "y", "x"], (2, 8, 8))
+    validate_axes_order(dims, "zyx")
+    with pytest.raises(NgioValueError, match="'q'"):
+        validate_axes_order(dims, "czyq")

@@ -9,6 +9,7 @@
 ### Fixes
 
 - `derive_label` and `add_table` on a container opened with `mode="r"` that has no `labels`/`tables` group yet raise `NgioValueError("The group is read only. Cannot derive a label.")` (or `... add a table.`) instead of `NgioValidationError("No labels found in the image.")`: the missing group could not be created, and the error said it did not exist. Same for `OmeZarrPlate.add_table`. Reading on such a container (`list_labels`, `labels_container`) still reports "No labels found" ([#279](https://github.com/BioVisionCenter/ngio/issues/279)).
+- `axes_order` only virtualises canonical axes. A canonical axis (`t`, `c`, `z`, `y`, `x`) missing on disk still comes back as a singleton, by its canonical name or the name the `AxesSetup` maps to it, so one `"czyx"` keeps working on 2D and 3D data. Any other name that is not an axis of the image raises `NgioValueError` naming it, the full order, the image axes and the canonical set; it used to become a phantom dimension (`axes_order="czyq"` returned a 4D array with `x` dropped and a size-1 axis appended). The iterators run the check in the constructor instead of at the first read, and the duplicate-axis error names the repeated axis ([#277](https://github.com/BioVisionCenter/ngio/issues/277)).
 
 ### Tests
 
