@@ -2026,15 +2026,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#unreleased" class="md-nav__link">
+  <a href="#v115" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        [Unreleased]
+        [v1.1.5]
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+    <nav class="md-nav" aria-label="[v1.1.5]">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3513,15 +3513,15 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#unreleased" class="md-nav__link">
+  <a href="#v115" class="md-nav__link">
     <span class="md-ellipsis">
       <span class="md-typeset">
-        [Unreleased]
+        [v1.1.5]
       </span>
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[Unreleased]">
+    <nav class="md-nav" aria-label="[v1.1.5]">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4927,7 +4927,7 @@
 
 
 <h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
-<h2 id="unreleased">[Unreleased]<a class="headerlink" href="#unreleased" title="Permanent link">&para;</a></h2>
+<h2 id="v115">[v1.1.5]<a class="headerlink" href="#v115" title="Permanent link">&para;</a></h2>
 <h3 id="fixes">Fixes<a class="headerlink" href="#fixes" title="Permanent link">&para;</a></h3>
 <ul>
 <li><code>fractal_fsspec_store</code> accepts <abbr title="Cloud-optimised file format for bioimaging data, built on Zarr and the OME-NGFF specification">OME-Zarr</abbr> 0.5 (zarr v3) stores. Its reachability probe only fetched the zarr v2 keys <code>.zgroup</code> and <code>.zarray</code>, so any v3 store, which has a <code>zarr.json</code> instead, raised <code>NgioValueError("Store ... can not be read")</code> even though the data was reachable. The probe now tries <code>zarr.json</code> first; the missing/invalid <code>fractal_token</code> errors apply to v3 stores too (<a href="https://github.com/BioVisionCenter/ngio/issues/289">#289</a>).</li>
