@@ -20,6 +20,7 @@ from ngio.utils import (
     NgioValueError,
     ZarrGroupHandler,
     _retry,
+    copy_group,
     open_group_wrapper,
 )
 
@@ -533,6 +534,47 @@ def test_copy_group_sharded_data_survives_a_small_block_budget(tmp_path: Path):
     copied = dest_group["labels"]
     assert isinstance(copied, zarr.Array)
     np.testing.assert_array_equal(copied[...], data)
+
+
+@pytest.mark.parametrize("zarr_format", [2, 3])
+def test_copy_group_fallback_keeps_array_metadata(tmp_path: Path, zarr_format):
+    """The zarr-python copy fallback reproduces each array's metadata and data."""
+    src_group = zarr.create_group(
+        store=tmp_path / "src.zarr", zarr_format=zarr_format, overwrite=True
+    )
+    plain = src_group.create_array(
+        "plain",
+        shape=(8, 8),
+        chunks=(4, 4),
+        dtype="uint16",
+        fill_value=7,
+        attributes={"a": 1},
+        chunk_key_encoding={"name": "v2", "separator": "."},
+    )
+    plain[:4] = 3
+    src_group.create_array("uncompressed", shape=(4,), dtype="f4", compressors=None)
+    src_group.create_array("scalar", shape=(), dtype="int64")
+    strings = src_group.create_array("strings", shape=(3,), dtype=str)
+    strings[:] = np.array(["a", "bb", "ccc"])
+    if zarr_format == 3:
+        src_group.create_array(
+            "sharded",
+            shape=(16, 16),
+            chunks=(4, 4),
+            shards=(8, 8),
+            dtype="uint8",
+            dimension_names=("y", "x"),
+        )
+
+    # A MemoryStore destination forces the `_zarr_python_copy` fallback.
+    dest_group = zarr.group(store={}, zarr_format=zarr_format, overwrite=True)
+    copy_group(src_group, dest_group, suppress_warnings=True)
+
+    for name, src_array in src_group.arrays():
+        copied = dest_group[name]
+        assert isinstance(copied, zarr.Array)
+        assert copied.metadata.to_dict() == src_array.metadata.to_dict(), name
+        np.testing.assert_array_equal(copied[...], src_array[...])
 
 
 def test_writes_are_visible_through_a_stale_consolidated_metadata(tmp_path: Path):
