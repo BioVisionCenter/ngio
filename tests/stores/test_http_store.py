@@ -10,8 +10,8 @@ from utils import (
     random_zarr_path,
 )
 
-from ngio import open_ome_zarr_container
-from ngio.utils import NgioValueError
+from ngio import create_empty_ome_zarr, open_ome_zarr_container
+from ngio.utils import NgioValueError, fractal_fsspec_store
 
 HTTP_STORE_SUPPORTED_BACKENDS = ["anndata", "json", "csv", "parquet"]
 
@@ -80,3 +80,25 @@ def test_http_store_derive_to_memory_store(http_static_server: dict) -> None:
     other_store = {}
     with pytest.raises(NgioValueError, match="not listable"):
         derive_image(ome_zarr, other_store=other_store)
+
+
+@pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
+def test_fractal_fsspec_store(http_static_server: dict, ngff_version: str) -> None:
+    # 0.5 is zarr v3: the store has a `zarr.json` and no `.zgroup` (#289).
+    url, root = http_static_server["url"], http_static_server["root"]
+    zarr_path = random_zarr_path()
+    create_empty_ome_zarr(
+        root / zarr_path,
+        shape=(8, 8),
+        pixelsize=0.5,
+        levels=1,
+        ngff_version=ngff_version,
+    )
+    store = fractal_fsspec_store(f"{url}/{zarr_path}")
+    assert open_ome_zarr_container(store).get_image().shape == (8, 8)
+
+
+def test_fractal_fsspec_store_not_a_zarr(http_static_server: dict) -> None:
+    url = http_static_server["url"]
+    with pytest.raises(NgioValueError, match="can not be read"):
+        fractal_fsspec_store(f"{url}/{random_zarr_path()}")

@@ -45,7 +45,8 @@ def fractal_fsspec_store(
 
     store = fs.get_mapper(url)
 
-    possible_keys = [".zgroup", ".zarray"]
+    # zarr v3 (`zarr.json`) first, then the zarr v2 keys.
+    possible_keys = ["zarr.json", ".zgroup", ".zarray"]
     for key in possible_keys:
         value = _probe_key(store, url, key, fractal_token)
         if value is not None:

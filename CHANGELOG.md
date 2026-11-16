@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixes
+
+- `fractal_fsspec_store` accepts OME-Zarr 0.5 (zarr v3) stores. Its reachability probe only fetched the zarr v2 keys `.zgroup` and `.zarray`, so any v3 store, which has a `zarr.json` instead, raised `NgioValueError("Store ... can not be read")` even though the data was reachable. The probe now tries `zarr.json` first; the missing/invalid `fractal_token` errors apply to v3 stores too ([#289](https://github.com/BioVisionCenter/ngio/issues/289)).
+
 ## [v1.1.4]
 
 ### Features
