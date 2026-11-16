@@ -13,8 +13,6 @@ import dask.array as da
 import fsspec
 import zarr
 from filelock import BaseFileLock, FileLock
-from pydantic_zarr.v2 import ArraySpec as AnyArraySpecV2
-from pydantic_zarr.v3 import ArraySpec as AnyArraySpecV3
 from zarr.abc.store import Store
 from zarr.errors import ContainsGroupError
 from zarr.storage import FsspecStore, LocalStore, MemoryStore, ZipStore
@@ -709,13 +707,15 @@ def _zarr_python_copy(src_group: zarr.Group, dest_group: zarr.Group):
     dest_group.attrs.put(src_group.attrs.asdict())
     # Copy arrays
     for name, array in src_group.arrays():
-        if array.metadata.zarr_format == 2:
-            spec = AnyArraySpecV2.from_zarr(array)
-        else:
-            spec = AnyArraySpecV3.from_zarr(array)
-        dst = spec.to_zarr(
-            store=dest_group.store,
-            path=f"{dest_group.path}/{name}",
+        # Metadata only. `from_array` keeps the chunk layout and codecs of
+        # `array` but not its fill value or attributes.
+        dst = zarr.from_array(
+            dest_group.store,
+            data=array,
+            write_data=False,
+            name=f"{dest_group.path}/{name}",
+            fill_value=array.fill_value,
+            attributes=array.attrs.asdict(),
             overwrite=True,
         )
         if array.ndim > 0:

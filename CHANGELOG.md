@@ -5,6 +5,7 @@
 ### Fixes
 
 - `fractal_fsspec_store` accepts OME-Zarr 0.5 (zarr v3) stores. Its reachability probe only fetched the zarr v2 keys `.zgroup` and `.zarray`, so any v3 store, which has a `zarr.json` instead, raised `NgioValueError("Store ... can not be read")` even though the data was reachable. The probe now tries `zarr.json` first; the missing/invalid `fractal_token` errors apply to v3 stores too ([#289](https://github.com/BioVisionCenter/ngio/issues/289)).
+- The zarr-python fallback of `copy_group` (used when source or destination is not a local/fsspec store, e.g. deriving into a memory store) no longer goes through pydantic-zarr. pydantic-zarr 0.11.0 deprecated `ArraySpec.from_zarr`/`to_zarr` for removal in 0.12, so every such copy emitted a `DeprecationWarning` and would have broken on 0.12. Each array is now created with `zarr.from_array`; the copied metadata is unchanged. The weekly pip CI was red on both jobs ([#287](https://github.com/BioVisionCenter/ngio/issues/287), [#288](https://github.com/BioVisionCenter/ngio/issues/288)).
 
 ## [v1.1.4]
 
