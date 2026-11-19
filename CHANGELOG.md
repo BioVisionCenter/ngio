@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- Expose `ngio.common.pixel_to_world` and `ngio.common.world_to_pixel` for scalar coordinate conversions with the same near-grid snapping as ROI conversion ([#238](https://github.com/BioVisionCenter/ngio/issues/238)).
+
 ## [v1.1.5]
 
 ### Fixes

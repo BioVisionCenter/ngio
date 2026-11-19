@@ -2,10 +2,49 @@ import pytest
 from pydantic import ValidationError
 
 from ngio import PixelSize
-from ngio.common import Roi, RoiSlice
+from ngio.common import Roi, RoiSlice, pixel_to_world, world_to_pixel
 from ngio.tables import RoiTable
 from ngio.tables._tables_container import open_table, write_table
 from ngio.utils import NgioValueError
+
+
+@pytest.mark.parametrize(
+    ("world", "pixel_size", "eps", "expected"),
+    [
+        (2.0, 0.5, 1e-2, 4),
+        (2.003, 0.5, 1e-2, 4),
+        (-2.003, 0.5, 1e-2, -4),
+        (2.01, 0.5, 1e-2, 4.02),
+        (2.125, 0.5, 0.25, 4.25),
+        (2.0625, 0.5, 0.25, 4),
+        (2.003, 0.5, 0.0, 4.006),
+        (2.25, 0.5, 0.6, 4),
+        (-2.75, 0.5, 0.6, -6),
+    ],
+)
+def test_world_to_pixel_snapping(world, pixel_size, eps, expected):
+    assert world_to_pixel(world, pixel_size, eps=eps) == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("pixel", [0, 4, -4, 1.25, -1.25])
+def test_pixel_world_round_trip(pixel):
+    pixel_size = 0.3
+    world = pixel_to_world(pixel, pixel_size)
+    assert world == pytest.approx(pixel * pixel_size)
+    assert world_to_pixel(world, pixel_size) == pytest.approx(pixel)
+
+
+def test_scalar_conversions_match_roi_slice():
+    roi_slice = RoiSlice(axis_name="x", start=-2.003, length=1.125)
+    pixel_size = 0.5
+
+    pixel_slice = roi_slice.to_pixel(pixel_size)
+    assert pixel_slice.start == world_to_pixel(-2.003, pixel_size) == -4
+    assert pixel_slice.length == world_to_pixel(1.125, pixel_size) == 2.25
+
+    world_slice = pixel_slice.to_world(pixel_size)
+    assert world_slice.start == pixel_to_world(-4, pixel_size) == -2.0
+    assert world_slice.length == pixel_to_world(2.25, pixel_size) == 1.125
 
 
 def test_basic_rois_ops():

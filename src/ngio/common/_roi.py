@@ -17,20 +17,44 @@ SliceValueType: TypeAlias = float | tuple[float | None, float | None] | slice
 
 
 def world_to_pixel(value: float, pixel_size: float, eps: float = 1e-2) -> float:
-    raster_value = value / pixel_size
+    """Convert a position or length from physical units to pixel units.
 
-    # Round to nearest integer if within eps, this allows to keep pixel-aligned ROIs
-    # when machine precision issues would otherwise make them slightly off.
-    # Since errors in precision are both on the value and the pixel size,
-    # the tolerance must be large enough to accommodate compounded errors,
-    # we default to 1e-2 which allows for ~1% error.
-    _rounded = round(raster_value)
-    if abs(_rounded - raster_value) < eps:
-        return _rounded
+    Divide by the pixel size, then snap to the nearest integer when the
+    distance is strictly less than `eps` pixels. The nearest integer uses
+    Python's `round`, which rounds ties to even. Values at or beyond the
+    tolerance retain their fractional part. Positions are relative to the
+    axis origin.
+
+    Snapping applies to each input independently. Image slicing applies its
+    floor for the start and its ceiling for the exclusive stop separately.
+
+    Args:
+        value: Position or length in the same physical units as `pixel_size`.
+        pixel_size: Physical size of one pixel along the axis.
+        eps: Absolute snapping tolerance in pixel units. Zero disables snapping.
+
+    Returns:
+        The converted value in pixel units.
+    """
+    raster_value = value / pixel_size
+    nearest = round(raster_value)
+    if abs(nearest - raster_value) < eps:
+        return nearest
     return raster_value
 
 
 def pixel_to_world(value: float, pixel_size: float) -> float:
+    """Convert a position or length from pixel units to physical units.
+
+    Multiply by the pixel size. Positions are relative to the axis origin.
+
+    Args:
+        value: Position or length in pixel units, including fractional pixels.
+        pixel_size: Physical size of one pixel along the axis.
+
+    Returns:
+        The converted value in the units of `pixel_size`.
+    """
     return value * pixel_size
 
 

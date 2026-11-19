@@ -11,7 +11,7 @@ from ngio.common._pyramid import (
     consolidate_pyramid,
     on_disk_zoom,
 )
-from ngio.common._roi import Roi, RoiSlice
+from ngio.common._roi import Roi, RoiSlice, pixel_to_world, world_to_pixel
 from ngio.common._zoom import InterpolationOrder, dask_zoom, numpy_zoom
 
 __all__ = [
@@ -29,4 +29,6 @@ __all__ = [
     "dask_zoom",
     "numpy_zoom",
     "on_disk_zoom",
+    "pixel_to_world",
+    "world_to_pixel",
 ]
