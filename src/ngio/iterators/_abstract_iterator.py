@@ -295,6 +295,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
         stride_z: int | None = None,
         stride_t: int | None = None,
         tail: TailPolicy = "clip",
+        anchor: Literal["image", "roi"] = "image",
         base_name: str = "",
     ) -> Self:
         """Tile the current ROIs with a regular grid.
@@ -318,6 +319,11 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
                 neighbour, so a writing iterator needs a merge or serial
                 execution; `"drop"` discards the tail and leaves that border
                 uncovered.
+            anchor: `"image"` (default) builds one grid over the reference image
+                and intersects it with the ROIs. `"roi"` starts a grid at each
+                ROI's pixel origin and applies `tail` to its extent. Open
+                bounds use the corresponding image bounds. With `tail="shift"`,
+                the last tile in each ROI can overlap more than the stride implies.
             base_name: Prefix for the generated tile names.
 
         Returns:
@@ -335,6 +341,7 @@ class AbstractIteratorBuilder(ABC, Generic[NumpyPipeType, DaskPipeType, Finalize
             stride_z=stride_z,
             stride_t=stride_t,
             tail=tail,
+            anchor=anchor,
             base_name=base_name,
         )
         return self._new_from_rois(rois)

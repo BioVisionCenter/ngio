@@ -88,13 +88,13 @@ def _masked_setup(store, *, touching=False, levels=1):
     return ome_zarr, mask
 
 
-def _stitched_masked_iterator(ome_zarr, *, stitch=True, halo=6):
+def _stitched_masked_iterator(ome_zarr, *, stitch=True, halo=6, anchor="image"):
     iterator = MaskedSegmentationIterator(
         ome_zarr.get_masked_image(masking_label_name="organoids"),
         ome_zarr.get_label("nuclei"),
         axes_order="yx",
         consolidation_mode="dask",
-    ).by_grid(size_y=32, size_x=32)
+    ).by_grid(size_y=32, size_x=32, anchor=anchor)
     if stitch:
         iterator = iterator.with_stitch(None if stitch is True else stitch)
     if halo:
@@ -145,10 +145,13 @@ def test_masked_stitch_never_merges_across_masks():
     assert left != right, "objects of different masks were merged"
 
 
-def test_masked_garbage_extension_does_not_bridge_masks():
+@pytest.mark.parametrize("anchor", ["image", "roi"])
+def test_masked_garbage_extension_does_not_bridge_masks(anchor):
     """A func that labels the fill region must not union across masks."""
     ome_zarr, mask = _masked_setup(MemoryStore(), touching=True)
-    _stitched_masked_iterator(ome_zarr).map(_label_everything)
+    iterator = _stitched_masked_iterator(ome_zarr, anchor=anchor)
+    assert {roi.label for roi in iterator.rois} == {1, 2}
+    iterator.map(_label_everything)
 
     written = ome_zarr.get_label("nuclei").get_as_numpy()
     # One merged id per organoid, and the masks keep their pixels apart.

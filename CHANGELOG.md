@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- `by_grid(..., anchor="roi")` tiles each region from its own pixel origin and applies the tail policy at that region's bounds ([#246](https://github.com/BioVisionCenter/ngio/issues/246)).
+
 ## [v1.1.5]
 
 ### Fixes

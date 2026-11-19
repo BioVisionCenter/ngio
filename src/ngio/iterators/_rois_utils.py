@@ -1,9 +1,10 @@
 import itertools
 import math
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Literal
 
 from ngio.common import Roi
+from ngio.common._roi import _join_roi_names
 from ngio.images._abstract_image import AbstractImage
 from ngio.utils import NgioValueError
 
@@ -183,27 +184,50 @@ def _axis_partition(axis_name: str, dim: int, num: int) -> list[tuple[int, int]]
     return list(zip(starts, lengths, strict=True))
 
 
-def _intervals_to_rois(
-    rois: list[Roi],
+def _grid_tiles(
     ref_image: AbstractImage,
     intervals: dict[str, list[tuple[int, int]]],
     base_name: str,
-) -> list[Roi]:
-    """Cross the per-axis intervals into named tiles, intersected with `rois`."""
-    new_rois = []
+) -> Iterator[Roi]:
+    """Cross the per-axis pixel intervals into named world-space tiles."""
     for combo in itertools.product(*(intervals[axis] for axis in _GRID_AXES)):
-        starts = {
-            axis: start for axis, (start, _) in zip(_GRID_AXES, combo, strict=True)
-        }
-        tile_name = "_".join(f"{axis}{starts[axis]}" for axis in _GRID_AXES)
+        slices = dict(zip(_GRID_AXES, combo, strict=True))
+        tile_name = "_".join(f"{axis}{start}" for axis, (start, _) in slices.items())
         name = f"{base_name}_{tile_name}" if base_name else tile_name
-        roi = Roi.from_values(
-            name=name,
-            slices=dict(zip(_GRID_AXES, combo, strict=True)),
-            space="pixel",
+        yield Roi.from_values(name=name, slices=slices, space="pixel").to_world(
+            pixel_size=ref_image.pixel_size
         )
-        new_rois.append(roi.to_world(pixel_size=ref_image.pixel_size))
-    return rois_product(rois, new_rois)
+
+
+def _grid_intervals(
+    ref_image: AbstractImage,
+    sizes: Mapping[str, int | None],
+    strides: Mapping[str, int | None],
+    tail: TailPolicy,
+    roi_px: Roi | None = None,
+) -> dict[str, list[tuple[int, int]]]:
+    """Tile each axis within the image or the ROI's readable pixel bounds."""
+    intervals = {}
+    for axis in _GRID_AXES:
+        dim = ref_image.dimensions.get(axis, default=1)
+        start, stop = 0, dim
+        if roi_px is not None and (bounds := roi_px.get(axis)) is not None:
+            # Use the same floor/ceil and clipping as array slicing.
+            if bounds.start is not None:
+                start = max(0, min(math.floor(bounds.start), dim))
+            if bounds.end is not None:
+                stop = max(0, min(math.ceil(bounds.end), dim))
+
+        extent = stop - start
+        size = sizes[axis]
+        if size is None:
+            size = extent
+        stride = strides[axis]
+        if stride is None:
+            stride = size
+        axis_tiles = _axis_intervals(axis, extent, size, stride, tail)
+        intervals[axis] = [(start + offset, length) for offset, length in axis_tiles]
+    return intervals
 
 
 def by_grid(
@@ -219,6 +243,7 @@ def by_grid(
     stride_z: int | None = None,
     stride_t: int | None = None,
     tail: TailPolicy = "clip",
+    anchor: Literal["image", "roi"] = "image",
     base_name: str = "",
 ) -> list[Roi]:
     """Tile the ROIs with a regular grid of tiles.
@@ -227,23 +252,33 @@ def by_grid(
     strides default to the sizes (adjacent, non-overlapping tiles); a stride
     smaller than the size produces overlapping tiles. `tail` decides what
     happens where the grid does not divide the axis — see `_axis_intervals`.
-    The grid is intersected with the existing ROIs, so tiling composes with
-    `product` and ROI tables.
+    Anchor the grid to the image and intersect it with the existing ROIs, or
+    anchor to each ROI and apply the tail policy at its own bounds.
     """
     sizes = {"t": size_t, "z": size_z, "y": size_y, "x": size_x}
     strides = {"t": stride_t, "z": stride_z, "y": stride_y, "x": stride_x}
 
-    intervals: dict[str, list[tuple[int, int]]] = {}
-    for axis in _GRID_AXES:
-        dim = ref_image.dimensions.get(axis, default=1)
-        size = sizes[axis]
-        if size is None:
-            size = dim
-        stride = strides[axis]
-        if stride is None:
-            stride = size
-        intervals[axis] = _axis_intervals(axis, dim, size, stride, tail)
-    return _intervals_to_rois(rois, ref_image, intervals, base_name)
+    if anchor == "image":
+        intervals = _grid_intervals(ref_image, sizes, strides, tail)
+        return rois_product(rois, list(_grid_tiles(ref_image, intervals, base_name)))
+    if anchor != "roi":
+        raise NgioValueError(f"Grid anchor must be 'image' or 'roi', got {anchor!r}.")
+
+    names: set[str | None] = set()
+    tiles = []
+    for roi_index, roi in enumerate(rois, start=1):
+        roi_px = roi.to_pixel(pixel_size=ref_image.pixel_size)
+        intervals = _grid_intervals(ref_image, sizes, strides, tail, roi_px)
+        parent_slices = {s.axis_name: s for s in roi.slices}
+        for tile in _grid_tiles(ref_image, intervals, base_name):
+            name = _join_roi_names(roi.name, tile.name)
+            while name in names:
+                # Unnamed or identically named overlapping ROIs can share a tile origin.
+                name = f"{name}:roi{roi_index}"
+            names.add(name)
+            slices = parent_slices | {s.axis_name: s for s in tile.slices}
+            tiles.append(roi._updated(name=name, slices=tuple(slices.values())))
+    return tiles
 
 
 def by_blocks(
@@ -269,7 +304,7 @@ def by_blocks(
         )
         for axis in _GRID_AXES
     }
-    return _intervals_to_rois(rois, ref_image, intervals, base_name)
+    return rois_product(rois, list(_grid_tiles(ref_image, intervals, base_name)))
 
 
 def by_yx(rois: list[Roi], ref_image: AbstractImage) -> list[Roi]:
@@ -316,9 +351,8 @@ def by_storage_units(
     in `ref_image`'s space. An axis present on `ref_image` but absent on
     `grid_image` is left un-tiled (one tile spans it) — coarser, never unsafe.
 
-    The tail policy is pinned to `"clip"`: shifting or balancing tiles would
-    misalign them from the storage grid and defeat the point of storage
-    tiling.
+    The tail policy and anchor are pinned to `"clip"` and `"image"` to
+    keep the tiles aligned to the storage grid.
     """
     if grid_image is None:
         chunk_size = ref_image.chunks
@@ -351,4 +385,5 @@ def by_storage_units(
         stride_z=stride_z,
         stride_t=stride_t,
         tail="clip",
+        anchor="image",
     )

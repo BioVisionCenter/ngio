@@ -237,6 +237,26 @@ shape otherwise, inspectable as `image.write_granularity` — which makes parall
 writes collision-free by construction, so a parallel `map` runs as a single
 fully-parallel wave.
 
+Use `anchor="roi"` to start a fresh grid in each field of view, well, or other
+region. With the default `anchor="image"`, the grid starts at the image origin
+and gets clipped to each region.
+
+```python
+tiles = (
+    SegmentationIterator(image, label)
+    .product(fov_table)
+    .by_grid(
+        size_y=100, size_x=100, stride_y=90, stride_x=90,
+        anchor="roi", tail="shift",
+    )
+    .with_stitch()
+)
+```
+
+Here `shift` keeps tiles full-size in each field of view that can fit one. The
+last tile on each axis may overlap its neighbour by more than the usual 10
+pixels. An open ROI bound uses the corresponding image bound.
+
 <!-- Figure 10 — what happens to the leftover -->
 <div class="ngio-diagram">
 <svg viewBox="0 0 640 260" style="display:block;width:100%;height:auto" role="img" aria-labelledby="f10t f10d">
