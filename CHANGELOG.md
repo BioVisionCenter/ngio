@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Features
+
+- `Image.write_grid(roi)` exposes the Dask writer's chunk- or shard-aligned block sizes in array order for an ROI or the full image ([#278](https://github.com/BioVisionCenter/ngio/issues/278)).
+
 ## [v1.1.5]
 
 ### Fixes

@@ -10,6 +10,7 @@ import zarr.storage
 from dask.array.core import _get_zarr_write_chunks
 from dask.utils import parse_bytes
 
+from ngio import Roi, create_empty_ome_zarr
 from ngio.common._dask_io import (
     _normalize_region,
     block_budget,
@@ -239,6 +240,75 @@ def test_the_cap_bounds_the_block(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 # block and grid
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("shards", "expected_grid"),
+    [
+        (None, ((1,), (1, 4, 4, 2), (3, 4, 4, 4, 2))),
+        ((1, 8, 8), ((1,), (5, 6), (3, 8, 6))),
+    ],
+    ids=["chunked", "sharded"],
+)
+def test_image_write_grid_matches_the_roi_writer(monkeypatch, shards, expected_grid):
+    """A world-space ROI uses the writer's rounded, clipped on-disk bounds."""
+    image = create_empty_ome_zarr(
+        zarr.storage.MemoryStore(),
+        shape=(3, 15, 22),
+        pixelsize=0.5,
+        axes_names=("c", "y", "x"),
+        levels=1,
+        chunks=(1, 4, 4),
+        shards=shards,
+        ngff_version="0.5",
+    ).get_image()
+    roi = Roi.from_values(
+        name=None,
+        slices={"x": (2.6, 10.0), "y": (1.6, 5.2), "c": (1, 1)},
+    )
+    data = np.arange(1, 188, dtype=image.dtype).reshape(1, 11, 17)
+    stored = []
+    original_store = da.store
+
+    def record_store(sources, *args, **kwargs):
+        stored.append((sources, kwargs["regions"], kwargs["lock"]))
+        return original_store(sources, *args, **kwargs)
+
+    monkeypatch.setattr(da, "store", record_store)
+    with dask.config.set({"array.chunk-size": "1 B"}):
+        grid = image.write_grid(roi)
+        assert grid == expected_grid
+        patch = da.from_array(data, chunks=grid)
+        image.set_roi(roi, patch, axes_order=image.axes)
+
+    assert len(stored) == 1
+    written, regions, lock = stored[0]
+    selection = (slice(1, 2), slice(3, 14), slice(5, 22))
+    assert regions == [selection]
+    assert not lock
+    assert written.chunks == grid
+    assert written.name == patch.name
+    expected = np.zeros(image.shape, dtype=image.dtype)
+    expected[selection] = data
+    np.testing.assert_array_equal(image.get_as_numpy(axes_order=image.axes), expected)
+
+
+def test_image_write_grid_for_full_image_uses_the_block_budget(monkeypatch):
+    image = create_empty_ome_zarr(
+        zarr.storage.MemoryStore(),
+        shape=(2, 9, 21),
+        pixelsize=1.0,
+        axes_names=("c", "y", "x"),
+        levels=1,
+        chunks=(1, 4, 4),
+    ).get_image()
+
+    with dask.config.set({"array.chunk-size": "1 MiB"}):
+        _with_cap(monkeypatch, None)
+        assert image.write_grid() == ((2,), (9,), (21,))
+        _with_cap(monkeypatch, 1)
+        assert image.write_grid() == ((1, 1), (4, 4, 1), (4, 4, 4, 4, 4, 1))
+        assert image.write_grid(image.roi()) == image.write_grid()
 
 
 def test_small_units_are_glued_into_one_block():

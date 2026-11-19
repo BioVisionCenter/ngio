@@ -18,7 +18,8 @@ from ngio.common import (
     Roi,
     consolidate_pyramid,
 )
-from ngio.common._dask_io import RegionType
+from ngio.common._dask_io import RegionType, _normalize_region
+from ngio.common._dask_io import write_grid as dask_write_grid
 from ngio.common._pyramid import (
     ChunksLike,
     ConsolidationMode,
@@ -232,6 +233,35 @@ class AbstractImage(ABC):
         of whole shard objects), otherwise the chunk shape.
         """
         return self.zarr_array.shards or self.zarr_array.chunks
+
+    def write_grid(self, roi: Roi | None = None) -> tuple[tuple[int, ...], ...]:
+        """Return the Dask block sizes for writing a region of this image.
+
+        Interior block edges fall on chunk or shard boundaries in Zarr array
+        coordinates. Each block is written by one Dask task. A block at the
+        edge of the region may cover part of a write unit.
+
+        The grid uses the writer's current Dask block-size settings. Use these
+        sizes to build a lazy patch in `image.axes` order and write it with the
+        same ROI and settings to avoid rechunking.
+
+        Args:
+            roi: The region to write, resolved at this image's pixel size.
+                `None` selects the full image.
+
+        Returns:
+            The block lengths along each on-disk axis, in array order.
+        """
+        region = None
+        if roi is not None:
+            setter = DaskSetter(
+                zarr_array=self.zarr_array,
+                dimensions=self.dimensions,
+                roi=roi,
+            )
+            region = setter.slicing_ops.normalized_slicing_tuple
+        slices = _normalize_region(region, self.shape)
+        return dask_write_grid(self.zarr_array, slices)
 
     @property
     def is_3d(self) -> bool:

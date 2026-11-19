@@ -234,6 +234,24 @@ that came back:
 
 Axis keywords compose with a roi as a hierarchy: `get_roi(roi, z=2)` reads the roi's x/y extent at one absolute z plane. An explicit keyword on an axis the roi already pins replaces the roi-derived selection — coordinates are absolute array indices, not relative to the roi — and drops the pipe's `roi`, so anything needing the region as a `Roi` (a mask transform, world anchoring) refuses rather than misplacing pixels.
 
+### Planning Dask writes
+
+`image.write_grid(roi)` returns the block lengths the writer uses for a region,
+in `image.axes` order. Interior block edges fall on chunk or shard boundaries in
+the Zarr array, and each block is written by one Dask task. Call
+`image.write_grid()` for the full image.
+
+If a sliceable source matches the ROI's shape and axis order, use the grid as its
+Dask chunks. The writer can use those blocks directly when the block-size
+settings and the ROI match.
+
+```python
+import dask.array as da
+
+patch = da.from_array(source, chunks=image.write_grid(roi))
+image.set_roi(roi, patch, axes_order=image.axes)
+```
+
 ## Labels
 
 A label is a segmentation mask that identifies objects in the image. In ngio a [`Label`][ngio.Label]
