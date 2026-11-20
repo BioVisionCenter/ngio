@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changes
+
+- Preserve pyramid-level coordinate transformations when updating OME-Zarr 0.4 and 0.5 images and labels. Dataset scales, translations, and `pixel_size` now reflect the dataset-level metadata. The pyramid transforms are available on `meta.coordinate_transformations` and apply afterward ([#281](https://github.com/BioVisionCenter/ngio/issues/281)).
+
 ## [v1.1.5]
 
 ### Fixes

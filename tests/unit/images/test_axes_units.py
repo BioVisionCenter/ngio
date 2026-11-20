@@ -1,8 +1,9 @@
 """The units API: split setters, the deprecated batch form, and issue #231/#232."""
 
 import pytest
+import zarr
 
-from ngio import create_empty_ome_zarr
+from ngio import create_empty_ome_zarr, open_ome_zarr_container
 from ngio.utils import NgioDeprecationWarning
 
 
@@ -73,3 +74,53 @@ def test_label_source_survives_metadata_updates(ngff_version):
     label.set_space_unit("micrometer")
     after = label._meta_handler.get_meta().image_label
     assert after == before
+
+
+@pytest.mark.parametrize("ngff_version", ["0.4", "0.5"])
+@pytest.mark.parametrize("is_label", [False, True], ids=["image", "label"])
+def test_metadata_updates_preserve_multiscale_transforms(ngff_version, is_label):
+    store = zarr.storage.MemoryStore()
+    container = create_empty_ome_zarr(
+        store=store,
+        shape=(2, 16, 24),
+        axes_names=["c", "y", "x"],
+        pixelsize=(0.5, 1.0),
+        levels=2,
+        ngff_version=ngff_version,
+    )
+    if is_label:
+        container.derive_label("seg")
+    group_path = "labels/seg" if is_label else None
+    group = zarr.open_group(store=store, path=group_path, mode="r+")
+    attrs = dict(group.attrs)
+    metadata = attrs if ngff_version == "0.4" else attrs["ome"]
+    multiscale = metadata["multiscales"][0]
+    leading_axes = len(multiscale["axes"]) - 2
+    pyramid_transforms = [
+        {"type": "scale", "scale": [1.0] * leading_axes + [2.0, 3.0]},
+        {"type": "translation", "translation": [0.0] * leading_axes + [10.0, 20.0]},
+    ]
+    multiscale["coordinateTransformations"] = pyramid_transforms
+    local_translation = [0.0] * leading_axes + [4.0, -3.0]
+    for dataset in multiscale["datasets"]:
+        dataset["coordinateTransformations"].append(
+            {"type": "translation", "translation": local_translation}
+        )
+    group.attrs.update(attrs)
+
+    container = open_ome_zarr_container(store, mode="r+")
+    image = container.get_label("seg") if is_label else container.get_image()
+    for decoded, raw in zip(image.meta.datasets, multiscale["datasets"], strict=True):
+        assert decoded.scale == tuple(raw["coordinateTransformations"][0]["scale"])
+        assert decoded.translation == tuple(local_translation)
+
+    if not is_label:
+        container.set_channel_labels(["first", "second"])
+    image.set_space_unit("nanometer")
+
+    attrs = dict(zarr.open_group(store=store, path=group_path, mode="r").attrs)
+    metadata = attrs if ngff_version == "0.4" else attrs["ome"]
+    written = metadata["multiscales"][0]
+    assert written["coordinateTransformations"] == pyramid_transforms
+    assert written["datasets"] == multiscale["datasets"]
+    assert all(axis["unit"] == "nanometer" for axis in written["axes"][-2:])

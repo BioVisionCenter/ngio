@@ -134,9 +134,13 @@ def test_image_global_coordinate_transformations():
     ngio_image = v05_to_ngio_image_meta(
         _image_attrs(multiscales=[multiscale]), axes_setup=AxesSetup()
     )
-    # the multiscale-level scale multiplies every dataset scale
-    assert ngio_image.datasets[0].scale == (2.0, 2.0)
-    assert ngio_image.datasets[1].scale == (4.0, 4.0)
+    assert ngio_image.datasets[0].scale == (1.0, 1.0)
+    assert ngio_image.datasets[1].scale == (2.0, 2.0)
+    transforms = ngio_image.coordinate_transformations
+    assert transforms is not None
+    assert [transform.model_dump() for transform in transforms] == multiscale[
+        "coordinateTransformations"
+    ]
 
 
 def _label_attrs() -> dict:
