@@ -37,6 +37,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ChannelVisualisation,
     Dataset,
     ImageLabelSource,
+    NgioImageLabelMeta,
     NgioImageMeta,
     NgioLabelMeta,
     NgioLabelsGroupMeta,
@@ -97,9 +98,10 @@ def _v04_omero_to_channels(v04_omero: OmeroV04 | None) -> ChannelsMeta | None:
 
 def _compute_scale_translation(
     v04_transforms: ValidTransformV04,
-    scale: list[float],
-    translation: list[float],
+    ndim: int,
 ) -> tuple[list[float], list[float]]:
+    scale = [1.0] * ndim
+    translation = [0.0] * ndim
     for v04_transform in v04_transforms:
         if isinstance(v04_transform, VectorScaleV04):
             scale = [t1 * t2 for t1, t2 in zip(scale, v04_transform.scale, strict=True)]
@@ -123,14 +125,6 @@ def _v04_to_ngio_datasets(
     """Convert a v04 multiscale to a list of ngio datasets."""
     datasets = []
 
-    global_scale = [1.0] * len(v04_multiscale.axes)
-    global_translation = [0.0] * len(v04_multiscale.axes)
-
-    if v04_multiscale.coordinateTransformations is not None:
-        global_scale, global_translation = _compute_scale_translation(
-            v04_multiscale.coordinateTransformations, global_scale, global_translation
-        )
-
     # Prepare axes handler
     axes = []
     for v04_axis in v04_multiscale.axes:
@@ -153,7 +147,7 @@ def _v04_to_ngio_datasets(
 
     for v04_dataset in v04_multiscale.datasets:
         _scale, _translation = _compute_scale_translation(
-            v04_dataset.coordinateTransformations, global_scale, global_translation
+            v04_dataset.coordinateTransformations, len(v04_multiscale.axes)
         )
         datasets.append(
             Dataset(
@@ -187,15 +181,15 @@ def v04_to_ngio_image_meta(
             "Multiple multiscales in a single image are not supported in ngio."
         )
 
-    v04_muliscale = v04_image.multiscales[0]
+    v04_multiscale = v04_image.multiscales[0]
 
     channels_meta = _v04_omero_to_channels(v04_image.omero)
     datasets = _v04_to_ngio_datasets(
-        v04_muliscale,
+        v04_multiscale,
         axes_setup=axes_setup,
     )
 
-    name = v04_muliscale.name
+    name = v04_multiscale.name
     if name is not None and not isinstance(name, str):
         name = str(name)
     return NgioImageMeta(
@@ -203,6 +197,7 @@ def v04_to_ngio_image_meta(
         name=name,
         datasets=datasets,
         channels=channels_meta,
+        coordinate_transformations=v04_multiscale.coordinateTransformations,
     )
 
 
@@ -227,9 +222,9 @@ def v04_to_ngio_label_meta(
             "Multiple multiscales in a single image are not supported in ngio."
         )
 
-    v04_muliscale = v04_label.multiscales[0]
+    v04_multiscale = v04_label.multiscales[0]
     datasets = _v04_to_ngio_datasets(
-        v04_muliscale,
+        v04_multiscale,
         axes_setup=axes_setup,
     )
 
@@ -246,7 +241,7 @@ def v04_to_ngio_label_meta(
             version="0.4",
             source={"image": image_label_source},
         )
-    name = v04_muliscale.name
+    name = v04_multiscale.name
     if name is not None and not isinstance(name, str):
         name = str(name)
 
@@ -255,20 +250,13 @@ def v04_to_ngio_label_meta(
         name=name,
         datasets=datasets,
         image_label=image_label_source,
+        coordinate_transformations=v04_multiscale.coordinateTransformations,
     )
 
 
-def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> MultiscaleV04:
-    """Convert a ngio multiscale to a v04 multiscale.
-
-    Args:
-        name (str | None): The name of the multiscale.
-        datasets (list[Dataset]): The ngio datasets.
-
-    Returns:
-        MultiscaleV04: The v04 multiscale.
-    """
-    ax_mapper = datasets[0].axes_handler
+def _ngio_to_v04_multiscale(metadata: NgioImageLabelMeta) -> MultiscaleV04:
+    """Convert a ngio multiscale to a v04 multiscale."""
+    ax_mapper = metadata.axes_handler
     v04_axes = []
     for axis in ax_mapper.axes:
         v04_axes.append(
@@ -280,7 +268,7 @@ def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
         )
 
     v04_datasets = []
-    for dataset in datasets:
+    for dataset in metadata.datasets:
         transform = [VectorScaleV04(type="scale", scale=list(dataset._scale))]
         if any(abs(t) > 1e-9 for t in dataset._translation):
             transform = (
@@ -296,7 +284,11 @@ def _ngio_to_v04_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
             DatasetV04(path=dataset.path, coordinateTransformations=transform)
         )
     return MultiscaleV04(
-        axes=v04_axes, datasets=tuple(v04_datasets), version="0.4", name=name
+        axes=v04_axes,
+        datasets=tuple(v04_datasets),
+        version="0.4",
+        name=metadata.name,
+        coordinateTransformations=metadata.coordinate_transformations,
     )
 
 
@@ -341,9 +333,7 @@ def ngio_to_v04_image_meta(metadata: NgioImageMeta) -> dict:
     Returns:
         dict: The v04 image metadata.
     """
-    v04_muliscale = _ngio_to_v04_multiscale(
-        name=metadata.name, datasets=metadata.datasets
-    )
+    v04_muliscale = _ngio_to_v04_multiscale(metadata)
     v04_omero = _ngio_to_v04_omero(metadata._channels_meta)
 
     v04_image = ImageAttrsV04(multiscales=[v04_muliscale], omero=v04_omero)
@@ -359,9 +349,7 @@ def ngio_to_v04_label_meta(metadata: NgioLabelMeta) -> dict:
     Returns:
         dict: The v04 image metadata.
     """
-    v04_muliscale = _ngio_to_v04_multiscale(
-        name=metadata.name, datasets=metadata.datasets
-    )
+    v04_muliscale = _ngio_to_v04_multiscale(metadata)
     labels_meta = {
         "multiscales": [v04_muliscale],
         "image-label": metadata.image_label.model_dump(),

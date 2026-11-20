@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from typing import Any, Literal, TypeVar
 
 import numpy as np
+from ome_zarr_models.common.coordinate_transformations import ValidTransform
 from pydantic import BaseModel
 
 from ngio.ome_zarr_meta.ngio_specs._axes import (
@@ -53,7 +54,12 @@ class AbstractNgioImageMeta:
     """Base class for ImageMeta and LabelMeta."""
 
     def __init__(
-        self, version: NgffVersions, name: str | None, datasets: list[Dataset]
+        self,
+        version: NgffVersions,
+        name: str | None,
+        datasets: list[Dataset],
+        *,
+        coordinate_transformations: ValidTransform | None = None,
     ) -> None:
         """Initialize the ImageMeta object."""
         self._version = version
@@ -64,6 +70,12 @@ class AbstractNgioImageMeta:
 
         self._datasets = datasets
         self._axes_handler = datasets[0].axes_handler
+        self._coordinate_transformations = coordinate_transformations
+
+    @property
+    def coordinate_transformations(self) -> ValidTransform | None:
+        """Transforms applied to the image pyramid after each dataset's transforms."""
+        return self._coordinate_transformations
 
     def __repr__(self):
         class_name = type(self).__name__
@@ -111,6 +123,7 @@ class AbstractNgioImageMeta:
             version=self.version,
             name=name,
             datasets=datasets,
+            coordinate_transformations=self.coordinate_transformations,
         )
 
     def to_units(
@@ -385,9 +398,16 @@ class NgioLabelMeta(AbstractNgioImageMeta):
         name: str | None,
         datasets: list[Dataset],
         image_label: ImageLabelSource | None = None,
+        *,
+        coordinate_transformations: ValidTransform | None = None,
     ) -> None:
         """Initialize the ImageMeta object."""
-        super().__init__(version, name, datasets)
+        super().__init__(
+            version,
+            name,
+            datasets,
+            coordinate_transformations=coordinate_transformations,
+        )
         image_label = (
             ImageLabelSource.default_init(self.version)
             if image_label is None
@@ -421,6 +441,7 @@ class NgioLabelMeta(AbstractNgioImageMeta):
             name=name,
             datasets=datasets,
             image_label=self._image_label,
+            coordinate_transformations=self.coordinate_transformations,
         )
 
 
@@ -433,9 +454,16 @@ class NgioImageMeta(AbstractNgioImageMeta):
         name: str | None,
         datasets: list[Dataset],
         channels: ChannelsMeta | None = None,
+        *,
+        coordinate_transformations: ValidTransform | None = None,
     ) -> None:
         """Initialize the ImageMeta object."""
-        super().__init__(version=version, name=name, datasets=datasets)
+        super().__init__(
+            version=version,
+            name=name,
+            datasets=datasets,
+            coordinate_transformations=coordinate_transformations,
+        )
         self._channels_meta = channels
 
     @property
@@ -458,6 +486,7 @@ class NgioImageMeta(AbstractNgioImageMeta):
             name=name,
             datasets=datasets,
             channels=self._channels_meta,
+            coordinate_transformations=self.coordinate_transformations,
         )
 
     def init_channels(

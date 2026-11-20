@@ -38,6 +38,7 @@ from ngio.ome_zarr_meta.ngio_specs import (
     ChannelVisualisation,
     Dataset,
     ImageLabelSource,
+    NgioImageLabelMeta,
     NgioImageMeta,
     NgioLabelMeta,
     NgioLabelsGroupMeta,
@@ -110,9 +111,10 @@ def _v05_omero_to_channels(v05_omero: OmeroV05 | None) -> ChannelsMeta | None:
 
 def _compute_scale_translation(
     v05_transforms: ValidTransformV05,
-    scale: list[float],
-    translation: list[float],
+    ndim: int,
 ) -> tuple[list[float], list[float]]:
+    scale = [1.0] * ndim
+    translation = [0.0] * ndim
     for v05_transform in v05_transforms:
         if isinstance(v05_transform, VectorScaleV05):
             scale = [t1 * t2 for t1, t2 in zip(scale, v05_transform.scale, strict=True)]
@@ -136,14 +138,6 @@ def _v05_to_ngio_datasets(
     """Convert a v05 multiscale to a list of ngio datasets."""
     datasets = []
 
-    global_scale = [1.0] * len(v05_multiscale.axes)
-    global_translation = [0.0] * len(v05_multiscale.axes)
-
-    if v05_multiscale.coordinateTransformations is not None:
-        global_scale, global_translation = _compute_scale_translation(
-            v05_multiscale.coordinateTransformations, global_scale, global_translation
-        )
-
     # Prepare axes handler
     axes = []
     for v05_axis in v05_multiscale.axes:
@@ -166,7 +160,7 @@ def _v05_to_ngio_datasets(
 
     for v05_dataset in v05_multiscale.datasets:
         _scale, _translation = _compute_scale_translation(
-            v05_dataset.coordinateTransformations, global_scale, global_translation
+            v05_dataset.coordinateTransformations, len(v05_multiscale.axes)
         )
         datasets.append(
             Dataset(
@@ -216,6 +210,7 @@ def v05_to_ngio_image_meta(
         name=name,
         datasets=datasets,
         channels=channels_meta,
+        coordinate_transformations=v05_multiscale.coordinateTransformations,
     )
 
 
@@ -273,20 +268,13 @@ def v05_to_ngio_label_meta(
         name=name,
         datasets=datasets,
         image_label=image_label_source,
+        coordinate_transformations=v05_multiscale.coordinateTransformations,
     )
 
 
-def _ngio_to_v05_multiscale(name: str | None, datasets: list[Dataset]) -> MultiscaleV05:
-    """Convert a ngio multiscale to a v05 multiscale.
-
-    Args:
-        name (str | None): The name of the multiscale.
-        datasets (list[Dataset]): The ngio datasets.
-
-    Returns:
-        MultiscaleV05: The v05 multiscale.
-    """
-    ax_mapper = datasets[0].axes_handler
+def _ngio_to_v05_multiscale(metadata: NgioImageLabelMeta) -> MultiscaleV05:
+    """Convert a ngio multiscale to a v05 multiscale."""
+    ax_mapper = metadata.axes_handler
     v05_axes = []
     for axis in ax_mapper.axes:
         v05_axes.append(
@@ -298,7 +286,7 @@ def _ngio_to_v05_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
         )
 
     v05_datasets = []
-    for dataset in datasets:
+    for dataset in metadata.datasets:
         transform = [VectorScaleV05(type="scale", scale=list(dataset._scale))]
         if any(abs(t) > 1e-9 for t in dataset._translation):
             transform = (
@@ -313,7 +301,12 @@ def _ngio_to_v05_multiscale(name: str | None, datasets: list[Dataset]) -> Multis
         v05_datasets.append(
             DatasetV05(path=dataset.path, coordinateTransformations=transform)
         )
-    return MultiscaleV05(axes=v05_axes, datasets=tuple(v05_datasets), name=name)
+    return MultiscaleV05(
+        axes=v05_axes,
+        datasets=tuple(v05_datasets),
+        name=metadata.name,
+        coordinateTransformations=metadata.coordinate_transformations,
+    )
 
 
 def _ngio_to_v05_omero(channels: ChannelsMeta | None) -> OmeroV05 | None:
@@ -357,9 +350,7 @@ def ngio_to_v05_image_meta(metadata: NgioImageMeta) -> dict:
     Returns:
         dict: The v05 image metadata.
     """
-    v05_muliscale = _ngio_to_v05_multiscale(
-        name=metadata.name, datasets=metadata.datasets
-    )
+    v05_muliscale = _ngio_to_v05_multiscale(metadata)
     v05_omero = _ngio_to_v05_omero(metadata._channels_meta)
 
     v05_image_attrs = ImageV05AttrsWithOmero(
@@ -380,9 +371,7 @@ def ngio_to_v05_label_meta(metadata: NgioLabelMeta) -> dict:
     Returns:
         dict: The v05 image metadata.
     """
-    v05_muliscale = _ngio_to_v05_multiscale(
-        name=metadata.name, datasets=metadata.datasets
-    )
+    v05_muliscale = _ngio_to_v05_multiscale(metadata)
     labels_meta = {
         "multiscales": [v05_muliscale],
         "image-label": metadata.image_label.model_dump(),
